@@ -53185,21 +53185,72 @@ const rr = (a, b) => a + (b - a) * rnd();
 const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(6.2832 * rnd());
 const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, ...o });
 
-// labels: name, real size, size here
-const LABELS = [];
-function label(lines, pos, scale = 1) {
+// signs: every caption is a physical object in the world. Three kinds:
+//   plaque  -- on a stand beside its exhibit, set at the edge of the nearest path and
+//              facing it (placed once everything is built); fades in as you approach
+//   banner  -- a board fixed where it is told, facing back down the avenue (+z)
+//   floor   -- painted flat on the slide, reading as you walk forward (-z)
+const PLAQUES = [];
+function label(lines, pos, scale = 1, kind = "plaque") {
   const c = document.createElement("canvas"), g = c.getContext("2d"), px = 44;
   g.font = `600 ${px}px -apple-system, Helvetica, sans-serif`;
   const w = Math.max(...lines.map((l, i) => { g.font = `${i ? 400 : 600} ${i ? px * 0.72 : px}px -apple-system, Helvetica, sans-serif`;
-    return g.measureText(l).width; })) + 30;
-  c.width = w; c.height = px * 1.25 + (lines.length - 1) * px * 0.95 + 16;
-  g.fillStyle = "rgba(10,30,45,.72)"; g.fillRect(0, 0, c.width, c.height);
+    return g.measureText(l).width; })) + 40;
+  c.width = w; c.height = px * 1.3 + (lines.length - 1) * px * 0.95 + 22;
+  if (kind === "floor") { g.clearRect(0, 0, c.width, c.height); }
+  else { g.fillStyle = kind === "banner" ? "#1b3a4b" : "#20313b"; g.fillRect(0, 0, c.width, c.height);
+    g.strokeStyle = "#c9a227"; g.lineWidth = 6; g.strokeRect(3, 3, c.width - 6, c.height - 6); }
   lines.forEach((l, i) => { g.font = `${i ? 400 : 600} ${i ? px * 0.72 : px}px -apple-system, Helvetica, sans-serif`;
-    g.fillStyle = i ? "#cfe6f2" : "#ffffff"; g.fillText(l, 15, px * 1.05 + i * px * 0.95); });
-  const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, depthWrite: false }));
-  s.scale.set(c.width / 600 * scale, c.height / 600 * scale, 1); s.position.copy(pos);
-  scene.add(s); LABELS.push(s); return s;
+    g.fillStyle = kind === "floor" ? "#1b2631" : i ? "#d5e6ee" : "#ffffff"; g.fillText(l, 20, px * 1.1 + i * px * 0.95 + 4); });
+  const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 8;
+  const W = THREE.MathUtils.clamp(c.width / 600 * scale, kind === "floor" ? 0.05 : 0.45, 12), Hh = W * c.height / c.width;
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(W, Hh), new THREE.MeshBasicMaterial({ map: tx, transparent: true, toneMapped: false,
+    depthWrite: kind !== "floor" }));
+  const g3 = new THREE.Group(); scene.add(g3);
+  const rec = { g: g3, face, W, H: Hh, kind, anchor: new THREE.Vector3(pos.x, 0, pos.z), y: pos.y, mats: [face.material] };
+  if (kind === "floor") { face.rotation.x = -Math.PI / 2; face.position.y = 0.012; g3.add(face); g3.position.set(pos.x, 0, pos.z); }
+  else if (kind === "banner") { face.position.y = pos.y; g3.add(face);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(W * 1.02, Hh * 1.04, Math.max(0.02, W * 0.01)), M(0x2c3e50)); back.position.set(0, pos.y, -Math.max(0.011, W * 0.0051)); g3.add(back);
+    g3.position.set(pos.x, 0, pos.z); }
+  else {                                                     // a plaque: a lectern for small signs, a two-post board for big ones
+    const stand = M(0x34495e), backMat = M(0x2c3e50, { transparent: true });
+    const back = new THREE.Mesh(new THREE.BoxGeometry(W * 1.03, Hh * 1.05, Math.max(0.02, W * 0.012)), backMat);
+    rec.mats.push(backMat);
+    const holder = new THREE.Group(); holder.add(back, face); face.position.z = Math.max(0.011, W * 0.0061);
+    if (W < 1.6) { const tilt = 0.5, top = 0.95;               // lectern, tilted back toward the reader
+      holder.rotation.x = -tilt; holder.position.set(0, top + Math.sin(tilt) * 0 + Hh / 2 * Math.cos(tilt), -Hh / 2 * Math.sin(tilt));
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, top, 8), stand); post.position.y = top / 2; g3.add(post);
+      rec.mats.push(post.material = stand.clone()); post.material.transparent = true; }
+    else { const bottom = Math.min(1.2, 0.4 + W * 0.08); holder.position.y = bottom + Hh / 2;
+      for (const sx of [-0.42, 0.42]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(W * 0.012, W * 0.012, bottom + Hh, 8), stand.clone());
+        post.material.transparent = true; post.position.set(sx * W, (bottom + Hh) / 2, -W * 0.01); g3.add(post); rec.mats.push(post.material); } }
+    g3.add(holder); g3.position.copy(rec.anchor);
+  }
+  PLAQUES.push(rec); return g3;
+}
+// once every path exists: stand each plaque at the edge of the nearest path, facing it
+function placePlaques() {
+  const plaza = new THREE.Vector2(AVX, 1), placed = [];
+  for (const r of PLAQUES) {
+    if (r.kind !== "plaque") continue;
+    const a = new THREE.Vector2(r.anchor.x, r.anchor.z);
+    let best = null, bd = Infinity, bw = 0;
+    for (const [P, w] of PATHS) for (let i = 0; i < P.length - 1; i++) {
+      const A = P[i], B = P[i + 1], AB = B.clone().sub(A), t = THREE.MathUtils.clamp(a.clone().sub(A).dot(AB) / AB.lengthSq(), 0, 1);
+      const q = A.clone().addScaledVector(AB, t), d = q.distanceTo(a); if (d < bd) { bd = d; best = q; bw = w; } }
+    let pos, facing;
+    if (a.distanceTo(plaza) < 12.5 || !best || bd < 0.5) {     // on paving already: just in front of the exhibit, facing the start
+      pos = a.clone().add(new THREE.Vector2(0, 0.75)); facing = new THREE.Vector2(0, 1); }
+    else { const n = a.clone().sub(best).normalize();           // from the path toward the exhibit
+      let off = bw / 2 + 0.3; if (bd - off < 0.45) off = Math.max(0, bd - 0.45);
+      pos = best.clone().addScaledVector(n, off); facing = n.clone().negate(); }
+    // don't stand two plaques in the same spot: slide sideways along the path
+    const side = new THREE.Vector2(-facing.y, facing.x);
+    for (let k = 0; k < 12 && placed.some(o => o.p.distanceTo(pos) < (o.W + r.W) / 2 + 0.15); k++) pos.addScaledVector(side, (r.W + 0.2) * 0.6);
+    placed.push({ p: pos.clone(), W: r.W });
+    r.g.position.set(pos.x, 0, pos.y); r.g.rotation.y = Math.atan2(facing.x, facing.y);
+    r.reach = Math.max(7, r.W * 7);                             // how near you must be to read it
+  }
 }
 const fmt = m => m >= 1 ? `${+m.toPrecision(3)} m` : m >= 0.01 ? `${+(m * 100).toPrecision(3)} cm` : `${+(m * 1000).toPrecision(3)} mm`;
 const fmtReal = m => m >= 1e3 ? `${(+(m / 1e3).toPrecision(3)).toLocaleString()} km` : m >= 1 ? `${+m.toPrecision(3)} m` :
@@ -53499,7 +53550,7 @@ label(sizeLines("animal cell", REAL.cell).concat(["nucleus " + fmt(sz(REAL.nucle
     o.position.set(RX - 0.25 + l / 2, 0.006, z0 - d); o.scale.set(l, 1, w); o.updateMatrix(); im.setMatrixAt(i, o.matrix); });
   scene.add(im);
   const marks = [0.1, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 300, 400, 500, 600, 700];
-  for (const d of marks) label([fmtReal(d / S)], new THREE.Vector3(RX - 0.55, 0.12 + d * 0.004, z0 - d), 0.16 + d * 0.012);
+  for (const d of marks) label([fmtReal(d / S)], new THREE.Vector3(RX - 0.75 - d * 0.008, 0, z0 - d), 0.22 + d * 0.012, "floor");
   label(["ruler: real distance", "1 cm here = 1 nm  ·  1 m = 100 nm  ·  100 m = 10 µm"], new THREE.Vector3(RX, 0.45, z0 - 0.4), 0.28);
 }
 
@@ -53870,7 +53921,7 @@ for (const h of HALLS) {
   const big = Math.min(6, Math.max(1.2, h.w / 14));
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04 * big, 0.05 * big, 2.6 * big, 8), M(0x34495e));
   const px = h.side === 0 ? -3 : h.side * 2.6; pole.position.set(px, 1.3 * big, h.z0); scene.add(pole);
-  label([h.name.toUpperCase(), h.line], new THREE.Vector3(px, 2.9 * big, h.z0), 1.1 * big);
+  label([h.name.toUpperCase(), h.line], new THREE.Vector3(px, 2.6 * big, h.z0 + 0.06 * big), 1.1 * big, "banner");
 }
 const plinth = (x, z, top = 0.9, w = 0.5) => { const p = new THREE.Mesh(new THREE.BoxGeometry(w, top, w), M(0xe5ecef, { roughness: 0.8 }));
   p.position.set(x, top / 2, z); scene.add(p); return top; };
@@ -54234,7 +54285,7 @@ label(["a concession stand: 3 m here", "really 300 nm -- the size of a large vir
 function signpost(x, z, entries) {
   const g = new THREE.Group(); g.position.set(x, 0, z); scene.add(g);
   const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 3.2, 8), M(0x5d4037)); post.position.y = 1.6; g.add(post);
-  label(entries.map(([n, dz]) => `${n}  ${fmt(Math.abs(dz))} (${fmtReal(Math.abs(dz) / S)})`), new THREE.Vector3(x, 3.4, z), 0.55);
+  label(entries.map(([n, dz]) => `${n}  ${fmt(Math.abs(dz))} (${fmtReal(Math.abs(dz) / S)})`), new THREE.Vector3(x, 2.9, z + 0.08), 0.55, "banner");
 }
 for (const h of HALLS) if (h.id !== "entrance") {
   const z = h.z0 + 1, side = h.side === 0 ? 1 : h.side;
@@ -54618,6 +54669,8 @@ function readout(v) {
     ${dWater > 0.05 ? "— too fast to follow, shown frozen" : ""}</span>`;
 }
 
+placePlaques();
+const camW = new THREE.Vector3();
 // ---------- the loop -----------------------------------------------------------------
 const clock = new THREE.Clock(), fwd = new THREE.Vector3(), side = new THREE.Vector3(), upV = new THREE.Vector3(0, 1, 0);
 let hudT = 0;
@@ -54676,6 +54729,10 @@ renderer.setAnimationLoop(() => {
   if (ECOLI.position.distanceTo(EHOME) > 18) es.dir.copy(EHOME).sub(ECOLI.position).normalize();
   ECOLI.quaternion.slerp(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), es.dir), Math.min(1, T * dt * 20));
 
+  camera.getWorldPosition(camW);
+  for (const r of PLAQUES) if (r.kind === "plaque") {          // plaques come into view as you walk up to them
+    const d = Math.hypot(camW.x - r.g.position.x, camW.z - r.g.position.z), o = THREE.MathUtils.clamp((r.reach - d) / (r.reach * 0.35), 0, 1);
+    r.g.visible = o > 0.01; if (r.g.visible) for (const m of r.mats) m.opacity = o; }
   hudT -= dt; if (hudT <= 0) { readout(moved > 0 ? moved : speed); hudT = 0.2; }
   renderer.render(scene, camera);
 });
