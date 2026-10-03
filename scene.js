@@ -283,7 +283,7 @@ label([`${NW.toLocaleString()} water molecules`, "all of them behind the helix, 
        "they jostle by diffusion: watch at 1 picosecond per second"], new THREE.Vector3(0.62, DY + 0.07, 2.95), 0.26);
 
 // ---------- E. coli: a 2 µm bacterium becomes a 20 m truck ------------------------
-const EHOME = new THREE.Vector3(30, 8, -150);
+const EHOME = new THREE.Vector3(30, 4.6, -150);       // resting on the slide
 const ECOLI = new THREE.Group(); ECOLI.position.copy(EHOME); scene.add(ECOLI);
 const eL = sz(REAL.ecoliLen), eR = sz(REAL.ecoliDiam) / 2;
 {
@@ -349,13 +349,14 @@ function rbc() {                           // biconcave disc: 7.8 µm across, 2.
   for (let i = 40; i >= 0; i--) pts.push(new THREE.Vector2(pts[i].x, -pts[i].y));
   return new THREE.Mesh(new THREE.LatheGeometry(pts, 64), M(0xb3312a, { roughness: 0.45 }));
 }
-for (const [x, y, z, rx] of [[55, 14, -300, 1.35], [92, 26, -318, 1.1], [70, 12, -350, 1.45]]) {
-  const r = rbc(); r.position.set(x, y, z); r.rotation.set(rx, 0.4, 0.3); scene.add(r);
+for (const [x, y, z, rx] of [[55, 11, -300, 0], [100, 11, -318, 0.08], [70, 30, -352, 1.3]]) {   // two lying flat, one on edge
+  const r = rbc(); r.position.set(x, y, z); r.rotation.set(rx, 0.4, 0); scene.add(r);
 }
 label(sizeLines("red blood cell", REAL.rbcDiam), new THREE.Vector3(72, 62, -318), 12);
-const CELL = new THREE.Group(); CELL.position.set(160, sz(REAL.cell) / 2 + 2, -470); scene.add(CELL);
+const CELL = new THREE.Group(); CELL.position.set(160, sz(REAL.cell) / 2 * 0.82, -470);   // settled, a little flattened scene.add(CELL);
 {
   const R = sz(REAL.cell) / 2;
+  CELL.scale.set(1.08, 0.82, 1.08);
   CELL.add(new THREE.Mesh(new THREE.IcosahedronGeometry(R, 5), new THREE.MeshStandardMaterial({
     color: 0xe8c9a0, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false })));
   const nuc = new THREE.Mesh(new THREE.IcosahedronGeometry(sz(REAL.nucleus) / 2, 4), M(0x6a4c93, { roughness: 0.7 }));
@@ -618,7 +619,7 @@ SAR.rotation.y = Math.PI / 2;                       // lie along the walk (z)
 
 // ---------- a muscle fibre with a nerve ending ----------------------------------------
 const FIB = new THREE.Group(); const FR = sz(REAL.fiber) / 2, FLEN = 160;
-FIB.position.set(-120, FR + 1, -350); scene.add(FIB);
+FIB.position.set(-120, FR - 2, -350); scene.add(FIB);
 const fibreSkin = new THREE.Mesh(new THREE.CylinderGeometry(FR, FR, FLEN, 64, 1, true), new THREE.MeshStandardMaterial({
   color: 0xd98880, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false, emissive: 0x000000 }));
 fibreSkin.rotation.x = Math.PI / 2; FIB.add(fibreSkin);
@@ -658,7 +659,7 @@ label(sizeLines("a muscle fibre (one cell)", REAL.fiber).concat([
   "inside: myofibrils 1.5 µm → 15 m, striped by their sarcomeres"]), new THREE.Vector3(-120, 2 * FR + 22, -280), 16);
 ladder.push({ name: "muscle fibre", real: REAL.fiber, x: -120, z: -350 });
 // the neuromuscular junction: nerve terminal branches lying on top of the fibre
-const NMJ = new THREE.Group(); NMJ.position.set(-120, 2 * FR + 1, -350); scene.add(NMJ);
+const NMJ = new THREE.Group(); NMJ.position.set(-120, 2 * FR - 2, -350); scene.add(NMJ);
 const termR = sz(REAL.terminal) / 2, cleft = sz(REAL.cleft);
 const termMat = new THREE.MeshStandardMaterial({ color: 0xf7dc6f, transparent: true, opacity: 0.38, depthWrite: false,
   emissive: 0x000000, side: THREE.DoubleSide });
@@ -746,11 +747,11 @@ function updateMuscle(Treal) {
 const HALLS = [   // name, side (-1 left, +1 right), z from, z to, x extent, colour, one-line description
   { id: "entrance",  name: "Entrance",          side: 0,  z0: 7,    z1: -5,   w: 14,  col: 0xffffff, line: "the size ladder and DNA in water" },
   { id: "molecules", name: "Molecules",         side: 1,  z0: -6,   z1: -16,  w: 12,  col: 0x5dade2, line: "the small molecules life is built from" },
-  { id: "proteins",  name: "Proteins",          side: -1, z0: -6,   z1: -72,  w: 28,  col: 0xaf7ac5, line: "the machines: carriers, motors, makers" },
-  { id: "nonliving", name: "Non-living things", side: 1,  z0: -18,  z1: -112, w: 104, col: 0x95a5a6, line: "materials, light, a chip and a CD" },
-  { id: "viruses",   name: "Viruses",           side: -1, z0: -78,  z1: -114, w: 36,  col: 0xe74c3c, line: "packages of genes that need a cell" },
-  { id: "bacteria",  name: "Bacteria",          side: 1,  z0: -122, z1: -190, w: 70,  col: 0x52be80, line: "cells without a nucleus" },
-  { id: "archaea",   name: "Archaea",           side: -1, z0: -122, z1: -205, w: 70,  col: 0xf5b041, line: "the other cells without a nucleus" },
+  { id: "proteins",  name: "Proteins",          side: -1, z0: -6,   z1: -74,  w: 32,  col: 0xaf7ac5, line: "the machines: carriers, motors, makers" },
+  { id: "nonliving", name: "Non-living things", side: 1,  z0: -18,  z1: -114, w: 104, col: 0x95a5a6, line: "materials, light, a chip and a CD" },
+  { id: "viruses",   name: "Viruses",           side: -1, z0: -78,  z1: -120, w: 46,  col: 0xe74c3c, line: "packages of genes that need a cell" },
+  { id: "bacteria",  name: "Bacteria",          side: 1,  z0: -124, z1: -215, w: 160,  col: 0x52be80, line: "cells without a nucleus" },
+  { id: "archaea",   name: "Archaea",           side: -1, z0: -124, z1: -215, w: 120,  col: 0xf5b041, line: "the other cells without a nucleus" },
   { id: "eukaryotes",name: "Eukaryotes",        side: 0,  z0: -230, z1: -580, w: 380, col: 0xec7063, line: "cells with a nucleus: yeast to muscle" },
 ];
 for (const h of HALLS) {
@@ -921,12 +922,12 @@ function cytoplasm(g, n, within, col = 0x9b59b6, r = sz(REAL.ribosome) / 2) {   
     for (const [x, y, z] of [[0, 0, 0], [9.6, 0.5, 2], [4.5, 1, 8.4], [-5, 0.3, 7.5], [4, 8.6, 3], [-4, 8, -2], [8, 7, -5]]) {
       const c = new THREE.Mesh(new THREE.SphereGeometry(R, 32, 24), cellMat(0xf4d03f, 0.55)); c.position.set(x, y, z); g.add(c);
       cytoplasm(g, 400, () => { const v = new THREE.Vector3(gauss(), gauss(), gauss()).multiplyScalar(R * 0.4); return v.length() < R * 0.9 ? v.add(c.position) : null; }, 0xb7950b); }
-    g.position.y = R + 0.2; exhibit(g, 40, -132, "Staphylococcus aureus", 1 * um, ["round cells that cluster like grapes · a common skin bacterium"], 22, 3); }
+    g.position.y = R - 0.3; exhibit(g, 40, -132, "Staphylococcus aureus", 1 * um, ["round cells that cluster like grapes · a common skin bacterium"], 22, 3); }
   // Mycoplasma: among the smallest cells known, ~0.3 µm, no cell wall
   { const g = new THREE.Group(), R = sz(0.15 * um);
     const c = new THREE.Mesh(new THREE.SphereGeometry(R, 24, 18), cellMat(0xa9dfbf, 0.5)); c.scale.set(1.25, 1, 1); g.add(c);
     cytoplasm(g, 120, () => { const v = new THREE.Vector3(gauss(), gauss(), gauss()).multiplyScalar(R * 0.35); return v.length() < R * 0.85 ? v : null; });
-    g.position.y = R + 0.3; exhibit(g, 12, -130, "Mycoplasma", 0.3 * um, ["one of the smallest cells: ~500 genes, no wall · a virus-scale cell"], 4.6, 0.8); }
+    g.position.y = R * 0.9; exhibit(g, 12, -130, "Mycoplasma", 0.3 * um, ["one of the smallest cells: ~500 genes, no wall · a virus-scale cell"], 4.6, 0.8); }
   // Vibrio cholerae: a curved rod with one polar flagellum
   { const g = new THREE.Group(), L = sz(2 * um), r = sz(0.25 * um), pts = [];
     for (let i = 0; i <= 20; i++) { const u = i / 20 - 0.5; pts.push(new THREE.Vector3(u * L, -Math.cos(u * 2.2) * 4 + 4, 0)); }
@@ -934,7 +935,7 @@ function cytoplasm(g, n, within, col = 0x9b59b6, r = sz(REAL.ribosome) / 2) {   
     const fl = []; for (let i = 0; i <= 120; i++) { const u = i / 120; fl.push(new THREE.Vector3(L / 2 + u * 50, pts.at(-1).y + Math.sin(u * 30) * 1.5 * Math.min(1, u * 5), Math.cos(u * 30) * 1.5 * Math.min(1, u * 5))); }
     const flag = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(fl), 300, sz(REAL.flagellumD) / 2, 5), M(0xd8e8c8)); g.add(flag);
     animate.push(Treal => { flag.rotation.x += Treal * 1000 * 6.283; });     // its sodium-driven motor turns up to ~1,700 Hz
-    g.position.y = 8; exhibit(g, 22, -170, "Vibrio cholerae", 2 * um, ["comma-shaped · one whip-like flagellum, one of the fastest swimmers"], 18, 3); }
+    g.position.y = 2.2; exhibit(g, 22, -170, "Vibrio cholerae", 2 * um, ["comma-shaped · one whip-like flagellum, one of the fastest swimmers"], 18, 3); }
   // Caulobacter crescentus: a crescent on a thin stalk with a sticky holdfast
   { const g = new THREE.Group(), L = sz(1.8 * um), r = sz(0.3 * um), pts = [];
     for (let i = 0; i <= 20; i++) { const u = i / 20 - 0.5; pts.push(new THREE.Vector3(u * L, Math.cos(u * 2.6) * -3, 0)); }
@@ -953,7 +954,7 @@ function cytoplasm(g, n, within, col = 0x9b59b6, r = sz(REAL.ribosome) / 2) {   
       const gv = new THREE.InstancedMesh(new THREE.CapsuleGeometry(sz(0.06 * um), sz(0.25 * um), 4, 8), M(0xfdfefe, { emissive: 0x333333 }), 90), o = new THREE.Object3D();
       for (let i = 0; i < 90; i++) { o.position.set(x + rr(-s2 / 2.4, s2 / 2.4), 0, z + rr(-s2 / 2.4, s2 / 2.4)); o.rotation.set(0, rnd() * 6, Math.PI / 2); o.updateMatrix(); gv.setMatrixAt(i, o.matrix); }
       g.add(gv); }
-    g.position.y = 6; g.rotation.z = 0.15;
+    g.position.y = 0.7; g.rotation.z = 0;      // lying flat on the glass
     exhibit(g, -45, -140, "Haloquadratum walsbyi", 2.5 * um, ["square, flat archaea from salt brines -- 25 m across, 1.5 m thin here",
       "the white grains are gas vesicles that float them to the light"], 16, 3); }
   // Methanocaldococcus jannaschii: a deep-sea vent coccus with tufts of archaella
@@ -965,20 +966,20 @@ function cytoplasm(g, n, within, col = 0x9b59b6, r = sz(REAL.ribosome) / 2) {   
       for (let j = 0; j <= 40; j++) { const u = j / 40; pts.push(d.clone().multiplyScalar(R + u * 35).add(new THREE.Vector3(0, Math.sin(u * 14 + i) * 1.2, Math.cos(u * 14 + i) * 1.2))); }
       arch.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 80, sz(6 * nm), 4), M(0xf0b27a))); }
     animate.push(Treal => { arch.rotation.x += Treal * 30 * 6.283; });          // archaella rotate like flagella
-    g.position.y = R + 4; exhibit(g, -30, -175, "Methanocaldococcus jannaschii", 1.5 * um, ["lives at 85 °C in deep-sea vents, makes methane",
+    g.position.y = R - 0.4; exhibit(g, -30, -175, "Methanocaldococcus jannaschii", 1.5 * um, ["lives at 85 °C in deep-sea vents, makes methane",
       "its tuft of archaella spins like a propeller (different machinery from bacteria)"], 2 * R + 10, 3); }
   // Sulfolobus: a lobed, irregular coccus from hot acid springs
   { const R = sz(0.5 * um), geo = new THREE.IcosahedronGeometry(R, 4), p = geo.attributes.position;
     for (let i = 0; i < p.count; i++) { const v = new THREE.Vector3().fromBufferAttribute(p, i), k = 1 + 0.18 * Math.sin(v.x * 0.6) * Math.cos(v.y * 0.5) + 0.12 * Math.sin(v.z * 0.8);
       v.multiplyScalar(k); p.setXYZ(i, v.x, v.y, v.z); }
-    geo.computeVertexNormals(); const c = new THREE.Mesh(geo, cellMat(0xdc7633, 0.55)); c.position.y = R + 2;
+    geo.computeVertexNormals(); const c = new THREE.Mesh(geo, cellMat(0xdc7633, 0.55)); c.position.y = R * 0.92;
     exhibit(c, -55, -195, "Sulfolobus", 1 * um, ["thrives in hot acid springs (80 °C, pH 2)"], 2 * R + 6, 2.5); }
   // Ignicoccus hospitalis carrying Nanoarchaeum equitans, one of the smallest cells
   { const g = new THREE.Group(), R = sz(1 * um);
     g.add(new THREE.Mesh(new THREE.SphereGeometry(R, 32, 24), cellMat(0xf8c471, 0.4)));
     for (let i = 0; i < 5; i++) { const d = new THREE.Vector3(gauss(), Math.abs(gauss()), gauss()).normalize(), n = new THREE.Mesh(new THREE.SphereGeometry(sz(0.2 * um), 20, 14), cellMat(0xca6f1e, 0.8));
       n.position.copy(d).multiplyScalar(R + sz(0.18 * um)); g.add(n); }
-    g.position.y = R + 1; exhibit(g, -15, -150, "Ignicoccus with Nanoarchaeum", 2 * um, ["the little cells are Nanoarchaeum equitans, 0.4 µm → 4 m:",
+    g.position.y = R - 0.5; exhibit(g, -15, -150, "Ignicoccus with Nanoarchaeum", 2 * um, ["the little cells are Nanoarchaeum equitans, 0.4 µm → 4 m:",
       "too small to live alone, it rides on its host"], 2 * R + 8, 3); }
 }
 
@@ -991,7 +992,7 @@ const chlamyFlagella = [];
     const bud = new THREE.Mesh(new THREE.SphereGeometry(R * 0.5, 32, 24), cellMat(0xf9e79f, 0.35)); bud.position.set(R * 1.45, R * 0.15, 0); g.add(bud);
     const nuc = new THREE.Mesh(new THREE.SphereGeometry(R * 0.32, 24, 16), M(0x6a4c93)); nuc.position.set(-R * 0.25, R * 0.15, 0); g.add(nuc);
     const vac = new THREE.Mesh(new THREE.SphereGeometry(R * 0.4, 24, 16), cellMat(0x85c1e9, 0.5)); vac.position.set(R * 0.3, -R * 0.2, R * 0.2); g.add(vac);
-    g.position.y = R + 2; exhibit(g, -50, -255, "baker's yeast", 5 * um, ["a single-celled fungus, budding off a daughter · nucleus purple, vacuole blue"], 2 * R + 14, 5); }
+    g.position.y = R * 0.95; exhibit(g, -50, -255, "baker's yeast", 5 * um, ["a single-celled fungus, budding off a daughter · nucleus purple, vacuole blue"], 2 * R + 14, 5); }
   // Chlamydomonas: a 10 µm green alga that swims with two flagella
   { const g = new THREE.Group(), R = sz(5 * um);
     const c = new THREE.Mesh(new THREE.SphereGeometry(R, 48, 32), cellMat(0xa9dfbf, 0.3)); c.scale.set(0.85, 1, 0.85); g.add(c);
@@ -1004,7 +1005,7 @@ const chlamyFlagella = [];
       chlamyFlagella.push({ f, sd }); }
     animate.push(Treal => { chlamyT += Treal; const ph = chlamyT * 50 * 6.283;            // breaststroke at ~50 Hz
       for (const { f, sd } of chlamyFlagella) f.rotation.z = sd * (-0.9 + 0.9 * Math.sin(ph)); });
-    g.position.y = R + 4; exhibit(g, 40, -240, "Chlamydomonas (green alga)", 10 * um, ["swims by breaststroke with two flagella, ~50 beats a second",
+    g.position.y = R * 0.95; exhibit(g, 40, -240, "Chlamydomonas (green alga)", 10 * um, ["swims by breaststroke with two flagella, ~50 beats a second",
       "red eyespot steers it toward light · green chloroplast"], 2 * R + 80, 9); }
 }
 let chlamyT = 0;
@@ -1154,6 +1155,287 @@ for (const h of HALLS) if (h.id !== "entrance") {
     leg.position.set(-6 + Math.cos(0.6) * sx, 1.35, 6.5 - Math.sin(0.6) * sx); scene.add(leg); }
 }
 
+// ==========================================================================================
+//  MORE EXHIBITS: filling the halls. Sizes from structures in the Protein Data Bank, virus
+//  measurements from cryo-electron microscopy, and atomic radii from Bondi (1964).
+// ==========================================================================================
+const lumpy = (rNm, col, k = 0.18, detail = 3) => {           // a globular protein: a bumpy ball of the right size
+  const geo = new THREE.IcosahedronGeometry(sz(rNm * nm), detail), p = geo.attributes.position;
+  const ph = rnd() * 9;
+  for (let i = 0; i < p.count; i++) { const v = new THREE.Vector3().fromBufferAttribute(p, i), u = v.clone().normalize();
+    v.multiplyScalar(1 + k * Math.sin(u.x * 5 + ph) * Math.cos(u.y * 4 + ph) * Math.sin(u.z * 6)); p.setXYZ(i, v.x, v.y, v.z); }
+  geo.computeVertexNormals(); return new THREE.Mesh(geo, M(col, { flatShading: true })); };
+const onPlinth = (obj, x, z, name, realM, extra, top = 1.0, w = 0.5) => {
+  plinth(x, z, top, w); obj.position.y += top; return exhibit(obj, x, z, name, realM, extra, top + 0.55 + Math.max(0.1, sz(realM) * 0.9), 0.4); };
+
+// ---------- proteins: two more rows and the long ones ------------------------------------
+{
+  const row1 = -31, row2 = -39, xs = i => -12.5 - i * 2.1;
+  const P = [];
+  P.push(["myoglobin", 4.5, ["holds oxygen in muscle: one haem, one iron"], () => { const g = new THREE.Group(); const b = lumpy(2.2, 0xcb4335); b.position.y = sz(2.4 * nm); g.add(b); return g; }]);
+  P.push(["lysozyme", 4.0, ["in tears and egg white: cuts bacterial walls"], () => { const g = new THREE.Group(); const b = lumpy(2.0, 0xf1948a); b.scale.set(1.3, 1, 1); b.position.y = sz(2 * nm); g.add(b); return g; }]);
+  P.push(["insulin (hexamer)", 5.0, ["stored as six insulins around two zinc ions"], () => { const g = new THREE.Group();
+    for (let i = 0; i < 6; i++) { const b = lumpy(1.1, 0x5dade2, 0.12, 2), a = i / 6 * 6.283; b.position.set(Math.cos(a) * sz(1.4 * nm), sz(2.5 * nm), Math.sin(a) * sz(1.4 * nm)); g.add(b); }
+    for (const y of [-1, 1]) { const zn = new THREE.Mesh(new THREE.SphereGeometry(sz(0.14 * nm), 10, 8), M(0x95a5a6, { metalness: 0.8 })); zn.position.y = sz(2.5 * nm) + y * sz(0.5 * nm); g.add(zn); } return g; }]);
+  P.push(["ferritin", 12, ["a hollow shell of 24 proteins storing up to 4,500 iron atoms"], () => { const g = new THREE.Group();
+    const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(sz(6 * nm), 2), new THREE.MeshStandardMaterial({ color: 0xa04000, transparent: true, opacity: 0.45, flatShading: true }));
+    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(sz(3.8 * nm), 2), M(0x6e2c00)); shell.position.y = core.position.y = sz(6 * nm); g.add(shell, core); return g; }]);
+  P.push(["nucleosome", 11, ["DNA wound 1.65 times round 8 histones: how 2 m of DNA fits in a nucleus"], () => { const g = new THREE.Group(), y0 = sz(5.5 * nm);
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(sz(3.5 * nm), sz(3.5 * nm), sz(5.5 * nm), 24), M(0x5b2c6f)); core.rotation.x = Math.PI / 2; core.position.y = y0; g.add(core);
+    const pts = []; for (let i = 0; i <= 120; i++) { const u = i / 120, a = u * 1.65 * 6.283; pts.push(new THREE.Vector3(Math.cos(a) * sz(4.6 * nm), y0 + Math.sin(a) * sz(4.6 * nm), (u - 0.5) * sz(5 * nm))); }
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 160, sz(1 * nm), 8), M(0xf0a030))); return g; }]);
+  P.push(["GroEL chaperonin", 14, ["a folding chamber: two rings of 7, a protein refolds inside"], () => { const g = new THREE.Group();
+    for (const [y, c] of [[sz(3.5 * nm), 0x1f618d], [sz(10.5 * nm), 0x2e86c1]]) for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283, b = lumpy(2.0, c, 0.1, 2);
+      b.scale.set(1, 1.7, 1); b.position.set(Math.cos(a) * sz(5 * nm), y, Math.sin(a) * sz(5 * nm)); g.add(b); } return g; }]);
+  P.push(["proteasome", 15, ["the shredder: a barrel of 28 subunits that chops up old proteins"], () => { const g = new THREE.Group();
+    for (let r = 0; r < 4; r++) for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283 + r * 0.2, b = lumpy(1.3, r % 3 ? 0xd4ac0d : 0x7d6608, 0.1, 2);
+      b.position.set(Math.cos(a) * sz(4.5 * nm), sz((1.6 + r * 3.2) * nm), Math.sin(a) * sz(4.5 * nm)); g.add(b); } return g; }]);
+  P.push(["RNA polymerase", 15, ["copies DNA into RNA, ~40 letters a second"], () => { const g = new THREE.Group();
+    const a = lumpy(6, 0x16a085), b = lumpy(5, 0x48c9b0); a.position.set(-sz(2 * nm), sz(6 * nm), 0); b.position.set(sz(3 * nm), sz(6 * nm), 0); g.add(a, b);
+    const dna_ = new THREE.Mesh(new THREE.CylinderGeometry(sz(1 * nm), sz(1 * nm), sz(30 * nm), 10), M(0xf0a030)); dna_.rotation.z = Math.PI / 2; dna_.position.y = sz(6 * nm); g.add(dna_); return g; }]);
+  P.push(["clathrin triskelion", 48, ["three legs; many of them lock into cages (see the cage nearby)"], () => { const g = new THREE.Group();
+    for (let i = 0; i < 3; i++) { const a = i / 3 * 6.283, pts = [new THREE.Vector3(0, sz(4 * nm), 0), new THREE.Vector3(Math.cos(a) * sz(12 * nm), sz(2 * nm), Math.sin(a) * sz(12 * nm)),
+      new THREE.Vector3(Math.cos(a + 0.5) * sz(24 * nm), sz(0.8 * nm), Math.sin(a + 0.5) * sz(24 * nm))];
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 30, sz(1.2 * nm), 6), M(0xe59866))); } return g; }]);
+  P.forEach(([name, size, extra, make], i) => onPlinth(make(), xs(i), row1, name, size * nm, extra, 1.0, 0.55));
+  // row two: membrane machines, standing in patches of membrane
+  const memPatch = (w = 0.3) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, sz(5 * nm), w), new THREE.MeshStandardMaterial({ color: 0xf5e6a8, transparent: true, opacity: 0.55 }));
+    m.position.y = sz(2.5 * nm); return m; };
+  { const g = new THREE.Group(); g.add(memPatch());                                   // aquaporin: four channels, water in single file
+    for (let i = 0; i < 4; i++) { const a = i / 4 * 6.283 + 0.785, b = lumpy(1.6, 0x3498db, 0.12, 2); b.scale.set(1, 2, 1);
+      b.position.set(Math.cos(a) * sz(1.8 * nm), sz(2.5 * nm), Math.sin(a) * sz(1.8 * nm)); g.add(b);
+      for (let k = 0; k < 6; k++) { const w = water(); w.position.set(Math.cos(a) * sz(1.8 * nm) * 0.55, sz((0.2 + k * 0.85) * nm), Math.sin(a) * sz(1.8 * nm) * 0.55); g.add(w); } }
+    onPlinth(g, xs(0), row2, "aquaporin", 6.5 * nm, ["water channels: ~3 billion molecules a second pass in single file"], 1.0, 0.55); }
+  { const g = new THREE.Group(); g.add(memPatch());                                   // potassium channel with K+ ions in its filter
+    for (let i = 0; i < 4; i++) { const a = i / 4 * 6.283, b = lumpy(1.5, 0x8e44ad, 0.1, 2); b.scale.set(1, 2.2, 1); b.position.set(Math.cos(a) * sz(1.6 * nm), sz(2.6 * nm), Math.sin(a) * sz(1.6 * nm)); g.add(b); }
+    for (let k = 0; k < 3; k++) { const ion = new THREE.Mesh(new THREE.SphereGeometry(sz(0.138 * nm), 10, 8), M(0xd35400, { emissive: 0x401000 })); ion.position.y = sz((2.2 + k * 0.7) * nm); g.add(ion); }
+    onPlinth(g, xs(1), row2, "potassium channel", 6 * nm, ["lets K⁺ through but not the smaller Na⁺ -- the basis of every nerve impulse"], 1.0, 0.55); }
+  { const g = new THREE.Group();                                                     // clathrin cage: a soccer-ball lattice
+    const cage = new THREE.Mesh(new THREE.IcosahedronGeometry(sz(37 * nm), 1), M(0xe59866, { wireframe: true }));
+    cage.position.y = sz(37 * nm) + 0.02; g.add(cage);
+    const ves = new THREE.Mesh(new THREE.SphereGeometry(sz(22 * nm), 24, 18), new THREE.MeshStandardMaterial({ color: 0xf5e6a8, transparent: true, opacity: 0.5 })); ves.position.y = cage.position.y; g.add(ves);
+    onPlinth(g, xs(2), row2, "clathrin-coated vesicle", 75 * nm, ["triskelions locked into a cage around a bubble of membrane"], 0.5, 1.0); }
+  { const g = new THREE.Group();                                                     // fibrinogen: the clotting rod, 45 nm, three globules
+    for (const [x, r] of [[-22.5, 3.5], [0, 2.6], [22.5, 3.5]]) { const b = lumpy(r, 0xc0392b, 0.1, 2); b.position.set(sz(x * nm), sz(4 * nm), 0); g.add(b); }
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(sz(0.8 * nm), sz(0.8 * nm), sz(45 * nm), 6), M(0xe74c3c)); rod.rotation.z = Math.PI / 2; rod.position.y = sz(4 * nm); g.add(rod);
+    onPlinth(g, xs(3) - 0.4, row2, "fibrinogen", 45 * nm, ["in blood plasma: knits into fibrin to make a clot"], 1.0, 0.6); }
+  // the long ones: collagen and titin, laid out at their full length
+  { const g = new THREE.Group(), L = sz(300 * nm);                                    // collagen: three chains wound round each other
+    for (let k = 0; k < 3; k++) { const pts = []; for (let i = 0; i <= 600; i++) { const u = i / 600, a = u * L / sz(8.6 * nm) * 6.283 + k * 2.094;
+      pts.push(new THREE.Vector3(u * L - L / 2, 1.0 + Math.cos(a) * sz(0.45 * nm), Math.sin(a) * sz(0.45 * nm))); }
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 1800, sz(0.32 * nm), 5), M([0xfdebd0, 0xf8c471, 0xf5b041][k]))); }
+    for (const x of [-1.3, 0, 1.3]) plinth(-22 + x, -48, 0.95, 0.3);
+    exhibit(g, -22, -48, "collagen", 300 * nm, ["the most abundant protein in you: three chains, 1.5 nm thick, 300 nm long",
+      "bundled by the thousand into tendons and skin"], 1.6, 0.5); }
+  { const g = new THREE.Group(), n = 120;                                              // titin: a chain of ~300 domains; 1 µm long in full
+    for (let i = 0; i < n; i++) { const b = lumpy(2.2, i % 9 ? 0x76448a : 0xd2b4de, 0.08, 1); b.scale.set(1.6, 1, 1); b.position.set(i * sz(4.4 * nm) - n * sz(4.4 * nm) / 2, 1.0, Math.sin(i * 0.3) * 0.04); g.add(b); }
+    for (const x of [-2.5, 0, 2.5]) plinth(-22 + x, -58, 0.95, 0.3);
+    exhibit(g, -22, -58, "titin (a stretch of it)", 1 * um, ["the largest protein: a 1 µm spring in muscle, ~34,000 amino acids",
+      `${n} of its ~300 domains shown (${fmt(n * sz(4.4 * nm))} of its 10 m)`], 1.6, 0.5); }
+}
+
+// ---------- viruses: a second row and two giants -----------------------------------------
+{
+  const zr = -115.5, xs = i => -4.5 - i * 2.6;
+  const capsid = (dNm, col, bumps = 60) => { const g = new THREE.Group(), R = sz(dNm / 2 * nm);
+    g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(R, 1), M(col, { flatShading: true })));
+    const im = new THREE.InstancedMesh(new THREE.SphereGeometry(R * 0.13, 6, 5), M(col), bumps), o = new THREE.Object3D();
+    for (let i = 0; i < bumps; i++) { const y = 1 - 2 * (i + 0.5) / bumps, rad = Math.sqrt(1 - y * y), a = i * 2.39996;
+      o.position.set(Math.cos(a) * rad * R, y * R, Math.sin(a) * rad * R); o.updateMatrix(); im.setMatrixAt(i, o.matrix); }
+    g.add(im); return g; };
+  const enveloped = (dNm, col, spikes, spikeNm, spikeCol) => { const g = new THREE.Group(), R = sz(dNm / 2 * nm);
+    g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(R, 3), M(col, { roughness: 0.8 })));
+    const L = sz(spikeNm * nm), im = new THREE.InstancedMesh(new THREE.CylinderGeometry(L * 0.12, L * 0.18, L, 5), M(spikeCol), spikes), o = new THREE.Object3D();
+    for (let i = 0; i < spikes; i++) { const y = 1 - 2 * (i + 0.5) / spikes, rad = Math.sqrt(1 - y * y), a = i * 2.39996, d = new THREE.Vector3(Math.cos(a) * rad, y, Math.sin(a) * rad);
+      o.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d); o.position.copy(d).multiplyScalar(R + L / 2); o.updateMatrix(); im.setMatrixAt(i, o.matrix); }
+    g.add(im); return g; };
+  const lift = (g, dNm) => { g.position.y = sz(dNm / 2 * nm) + 0.02; return g; };
+  const V = [
+    ["MS2 phage", 27, ["infects E. coli; one of the simplest viruses: 4 genes"], () => lift(capsid(27, 0x85c1e9, 40), 27)],
+    ["rhinovirus (common cold)", 30, ["over 100 kinds; why colds keep coming back"], () => lift(capsid(30, 0x76d7c4, 60), 30)],
+    ["norovirus", 38, ["stomach bug: as few as 20 particles can infect"], () => lift(capsid(38, 0xf7dc6f, 90), 38)],
+    ["hepatitis B virus", 42, ["a small DNA virus wrapped in an envelope"], () => lift(enveloped(42, 0xd7bde2, 60, 4, 0x7d3c98), 42)],
+    ["Zika virus", 50, ["a smooth, tiled envelope of 180 proteins"], () => lift(capsid(50, 0xaed6f1, 180), 50)],
+    ["human papillomavirus", 55, ["72 star-shaped capsomers; a vaccine now prevents most cervical cancer"], () => lift(capsid(55, 0xf5cba7, 72), 55)],
+    ["rotavirus", 75, ["three shells, like a wheel (rota): spokes inside"], () => { const g = lift(capsid(75, 0xf0b27a, 132), 75);
+      const inner = new THREE.Mesh(new THREE.IcosahedronGeometry(sz(30 * nm), 1), M(0xdc7633, { flatShading: true })); g.add(inner); return g; }],
+    ["herpes simplex virus", 180, ["an icosahedral capsid inside a tegument, inside a spiky envelope"], () => { const g = new THREE.Group(), R = sz(90 * nm);
+      g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(R, 3), new THREE.MeshStandardMaterial({ color: 0xa3e4d7, transparent: true, opacity: 0.35, depthWrite: false })));
+      g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(sz(62 * nm), 1), M(0x117864, { flatShading: true })));
+      const sp = enveloped(180, 0xa3e4d7, 60, 12, 0x0e6655); sp.children[0].visible = false; g.add(sp); return lift(g, 180); }],
+    ["rabies virus", 180, ["bullet-shaped: 75 nm wide, 180 nm long"], () => { const g = new THREE.Group(), r = sz(37 * nm), L = sz(140 * nm);
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(r, r, L, 24), M(0xd98880)); body.rotation.z = Math.PI / 2; g.add(body);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2), M(0xd98880)); tip.rotation.z = -Math.PI / 2; tip.position.x = L / 2; g.add(tip);
+      g.position.y = r + 0.02; return g; }],
+    ["lambda phage", 210, ["infects E. coli; its flexible 150 nm tail hides its DNA"], () => { const g = new THREE.Group(), r = sz(30 * nm);
+      const head_ = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), M(0x95a5a6, { flatShading: true })); head_.position.y = sz(150 * nm) + r; g.add(head_);
+      const pts = []; for (let i = 0; i <= 20; i++) { const u = i / 20; pts.push(new THREE.Vector3(Math.sin(u * 2) * 0.12, sz(150 * nm) * (1 - u), 0)); }
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 30, sz(4.5 * nm), 6), M(0x7f8c8d))); return g; }],
+  ];
+  V.forEach(([name, d, extra, make], i) => onPlinth(make(), xs(i), zr, name, d * nm, extra, 0.8, 0.8));
+  // Ebola: a filament ~80 nm wide and ~1 µm long, often curled like a shepherd's crook
+  { const g = new THREE.Group(), pts = [];
+    for (let i = 0; i <= 60; i++) { const u = i / 60, L = sz(970 * nm); const x = u * L * 0.75, hook = u > 0.75 ? (u - 0.75) / 0.25 : 0;
+      pts.push(new THREE.Vector3(x - (hook ? Math.sin(hook * Math.PI) * 1.5 : 0), sz(40 * nm) + Math.sin(hook * Math.PI) * 2.2, 0)); }
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 160, sz(40 * nm), 16), M(0xec7063, { roughness: 0.6 })));
+    exhibit(g, -36, -84, "Ebola virus", 970 * nm, ["a filament 80 nm wide and about 1 µm long, often curled like a crook"], 3.6, 1.0); }
+  // Pandoravirus: an amphora-shaped giant ~1 µm long, with a pore at one end
+  { const pts = []; for (let i = 0; i <= 30; i++) { const u = i / 30; pts.push(new THREE.Vector2(sz(250 * nm) * Math.sin(Math.PI * Math.pow(u, 0.8)) + 0.05, u * sz(1000 * nm))); }
+    const amph = new THREE.Mesh(new THREE.LatheGeometry(pts, 40), M(0x873600, { roughness: 0.7 })); amph.rotation.z = Math.PI / 2;
+    const g = new THREE.Group(); g.add(amph); amph.position.set(sz(500 * nm), sz(250 * nm), 0);
+    exhibit(g, -44, -108, "Pandoravirus (giant virus)", 1 * um, ["bigger than many bacteria; ~2,500 genes, most unlike anything known"], 6.5, 1.4); }
+}
+
+// ---------- non-living: a periodic table of atoms, crystals, nanomaterials ----------------
+{
+  // atoms at their van der Waals radii (Bondi 1964), in their places in the periodic table
+  const A = [["H", 1, 1, 120], ["He", 1, 18, 140], ["Li", 2, 1, 182], ["C", 2, 14, 170], ["N", 2, 15, 155], ["O", 2, 16, 152], ["F", 2, 17, 147], ["Ne", 2, 18, 154],
+    ["Na", 3, 1, 227], ["Mg", 3, 2, 173], ["Si", 3, 14, 210], ["P", 3, 15, 180], ["S", 3, 16, 180], ["Cl", 3, 17, 175], ["Ar", 3, 18, 188],
+    ["K", 4, 1, 275], ["Ni", 4, 10, 163], ["Cu", 4, 11, 140], ["Zn", 4, 12, 139], ["Ga", 4, 13, 187], ["As", 4, 15, 185], ["Se", 4, 16, 190], ["Br", 4, 17, 185], ["Kr", 4, 18, 202],
+    ["Pd", 5, 10, 163], ["Ag", 5, 11, 172], ["Cd", 5, 12, 158], ["In", 5, 13, 193], ["Sn", 5, 14, 217], ["Te", 5, 16, 206], ["I", 5, 17, 198], ["Xe", 5, 18, 216],
+    ["Pt", 6, 10, 175], ["Au", 6, 11, 166], ["Hg", 6, 12, 155], ["Tl", 6, 13, 196], ["Pb", 6, 14, 202], ["U", 7, 3, 186]];
+  const board = new THREE.Group(); board.position.set(26, 0, -21); board.rotation.y = -Math.PI / 2; scene.add(board);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.0, 0.03), M(0x1b2631)); back.position.set(0, 1.4, -0.02); board.add(back);
+  for (const sx of [-0.9, 0.9]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.9, 0.04), M(0x34495e)); leg.position.set(sx, 0.45, 0); board.add(leg); }
+  const cell = 0.1;
+  for (const [sym, per, grp, pm] of A) {
+    const x = -0.9 + (grp - 0.5) * cell, y = 1.85 - (per - 0.5) * cell * 1.15;
+    const tile = new THREE.Mesh(new THREE.BoxGeometry(cell * 0.92, cell * 1.05, 0.006), M(0x2e4053)); tile.position.set(x, y, 0); board.add(tile);
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(sz(pm * 1e-12), 16, 12), M(sym === "Au" ? 0xd4ac0d : sym === "Cu" ? 0xb87333 : sym === "O" ? 0xd84a3a : sym === "C" ? 0x555555 : sym === "H" ? 0xffffff : 0xaeb6bf, { metalness: ["Au", "Cu", "Ag", "Pt", "Ni", "Pd", "Zn", "Cd", "Hg", "Sn", "Pb", "Tl", "In", "Ga", "U"].includes(sym) ? 0.7 : 0 }));
+    ball.position.set(x, y + 0.012, 0.01); board.add(ball);
+    const c = document.createElement("canvas"); c.width = 64; c.height = 32; const cg = c.getContext("2d"); cg.fillStyle = "#e8eef3"; cg.font = "700 22px -apple-system, Helvetica"; cg.fillText(sym, 4, 24);
+    const t = new THREE.CanvasTexture(c); const lab = new THREE.Mesh(new THREE.PlaneGeometry(cell * 0.5, cell * 0.25), new THREE.MeshBasicMaterial({ map: t, transparent: true }));
+    lab.position.set(x - cell * 0.18, y - cell * 0.33, 0.005); board.add(lab);
+  }
+  label(["a periodic table of real atoms", "each ball is its atom at ×10⁷: hydrogen 2.4 mm, xenon 4.3 mm across",
+         "atoms barely grow down the table: uranium (92 protons) is about the size of chlorine"], new THREE.Vector3(26, 2.35, -21), 0.6);
+  ladder.push({ name: "atoms (periodic table)", real: 0.3 * nm, x: 26, z: -21 });
+}
+{
+  const zr = -42.5, xs = i => 18.5 + i * 2.2;
+  const lattice = (a, basis, n, rNm, col, cut) => { const pts = [];
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) for (let k = 0; k < n; k++) for (const b of basis) {
+      const v = new THREE.Vector3(i + b[0], j + b[1], k + b[2]).multiplyScalar(sz(a)); if (!cut || cut(v)) pts.push(v); }
+    const g = new THREE.Group(); const at = atoms(pts, sz(rNm * nm), M(col)); at.position.set(-n * sz(a) / 2, 0.005, -n * sz(a) / 2); g.add(at); return [g, pts.length]; };
+  const fccDiamond = [[0, 0, 0], [0.5, 0.5, 0], [0.5, 0, 0.5], [0, 0.5, 0.5], [0.25, 0.25, 0.25], [0.75, 0.75, 0.25], [0.75, 0.25, 0.75], [0.25, 0.75, 0.75]];
+  const items = [];
+  { const [g, n] = lattice(0.357 * nm, fccDiamond, 5, 0.07, 0xd6eaf8); items.push([g, "diamond", 1.8 * nm, [`${n} carbon atoms, each bonded to four`]]); }
+  { const [g, n] = lattice(0.543 * nm, fccDiamond, 4, 0.11, 0x7f8c8d); items.push([g, "silicon crystal", 2.2 * nm, [`${n} atoms: the crystal every chip is cut from`]]); }
+  { const pts = [], a = 0.452 * nm, c = 0.736 * nm;                                  // ice Ih: oxygens on a hexagonal lattice
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) for (let k = 0; k < 3; k++) for (const [bx, by, bz] of [[0, 0, 0.0625], [2 / 3, 1 / 3, 0.4375], [0, 0, 0.9375 - 0.5], [2 / 3, 1 / 3, 0.5625 + 0.375]]) {
+      pts.push(new THREE.Vector3(sz((i + j / 2 + bx) * a), sz((k + bz) * c), sz((j + by) * a * 0.866))); }
+    const g = new THREE.Group(); const at = atoms(pts, sz(0.15 * nm), M(0xaed6f1)); at.position.set(-sz(2 * a), 0.005, -sz(1.7 * a)); g.add(at);
+    items.push([g, "ice", 2 * nm, ["water molecules locked in hexagons -- why snowflakes have six sides"]]); }
+  { const g = new THREE.Group(); const p = new THREE.Mesh(new THREE.DodecahedronGeometry(sz(10 * nm), 0), M(0xd5d8dc, { metalness: 0.95, roughness: 0.15 })); p.position.y = sz(10 * nm); g.add(p);
+    items.push([g, "silver nanoparticle", 20 * nm, ["kills microbes: used in wound dressings"]]); }
+  { const g = new THREE.Group(); const r = new THREE.Mesh(new THREE.CapsuleGeometry(sz(7.5 * nm), sz(35 * nm), 8, 16), M(0xd4ac0d, { metalness: 0.9, roughness: 0.2 }));
+    r.rotation.z = Math.PI / 2; r.position.y = sz(7.5 * nm); g.add(r); items.push([g, "gold nanorod", 50 * nm, ["its length tunes which colour of light it absorbs"]]); }
+  { const g = new THREE.Group(); const p = lumpy(10, 0xfdfefe, 0.25, 1); p.position.y = sz(10 * nm); g.add(p);
+    items.push([g, "titanium dioxide particle", 20 * nm, ["the white in paint and mineral sunscreen"]]); }
+  { const g = new THREE.Group(); const p = new THREE.Mesh(new THREE.OctahedronGeometry(sz(2.5 * nm), 0), M(0xeaf2f8, { metalness: 0.2, roughness: 0.05 })); p.position.y = sz(2.5 * nm); g.add(p);
+    items.push([g, "nanodiamond", 5 * nm, ["made in detonations; found in meteorites"]]); }
+  { const g = new THREE.Group(); for (let i = 0; i < 60; i++) { const y = 1 - 2 * (i + 0.5) / 60, rad = Math.sqrt(1 - y * y), a = i * 2.39996, d = new THREE.Vector3(Math.cos(a) * rad, y, Math.sin(a) * rad);
+      const h = new THREE.Mesh(new THREE.SphereGeometry(sz(0.35 * nm), 8, 6), M(0xf0a030)); h.position.copy(d).multiplyScalar(sz(2.3 * nm)).add(new THREE.Vector3(0, sz(2.5 * nm), 0)); g.add(h); }
+    const core = new THREE.Mesh(new THREE.SphereGeometry(sz(1.9 * nm), 16, 12), M(0xf9e79f, { transparent: true, opacity: 0.6 })); core.position.y = sz(2.5 * nm); g.add(core);
+    items.push([g, "soap micelle", 5 * nm, ["oily tails hide inside, heads face the water: how soap lifts grease"]]); }
+  items.forEach(([g, name, real, extra], i) => onPlinth(g, xs(i), zr, name, real, extra, 1.0, 0.55));
+  // bigger nanomaterials, standing on the slide
+  { const s2 = new THREE.Mesh(new THREE.SphereGeometry(sz(50 * nm), 32, 24), M(0xf2f3f4, { roughness: 0.2 })); s2.position.y = sz(50 * nm);
+    exhibit(s2, 22, -27, "silica nanosphere", 100 * nm, ["glass beads: these stacked in order make opal's colours"], 1.8, 0.6); }
+  { const g = new THREE.Group(), R = sz(50 * nm);
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(R, 40, 30, 0, Math.PI * 1.5), new THREE.MeshStandardMaterial({ color: 0xf5e6a8, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })));
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(R - sz(5 * nm), 40, 30, 0, Math.PI * 1.5), new THREE.MeshStandardMaterial({ color: 0xf0a030, side: THREE.DoubleSide })));
+    g.position.y = R; exhibit(g, 27, -27, "liposome", 100 * nm, ["a hollow bubble of membrane, cut open · mRNA vaccines ride in these"], 1.9, 0.6); }
+  { const g = new THREE.Group(); let p = new THREE.Vector3(0, sz(15 * nm), 0);       // soot: 30 nm carbon spheres stuck in a chain
+    for (let i = 0; i < 14; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(sz(15 * nm), 16, 12), M(0x1c1c1c, { roughness: 0.95 })); b.position.copy(p); g.add(b);
+      p.add(new THREE.Vector3(gauss(), Math.abs(gauss()) * 0.5, gauss()).normalize().multiplyScalar(sz(26 * nm))); }
+    exhibit(g, 33, -27, "a soot particle", 300 * nm, ["30 nm spheres of carbon stuck together: what's in smoke"], 2.6, 0.6); }
+  { const shape = new THREE.Shape(); for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283; shape[i ? "lineTo" : "moveTo"](Math.cos(a) * 5, Math.sin(a) * 5); }
+    const plate = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: sz(50 * nm), bevelEnabled: false }), M(0xe8daef, { roughness: 0.6 }));
+    plate.rotation.x = -Math.PI / 2; exhibit(plate, 45, -30, "a clay platelet (kaolinite)", 1 * um, ["a hexagonal mineral flake, 1 µm wide, 50 nm thick"], 3, 1.2); }
+}
+
+// ---------- more bacteria (on the ground) -------------------------------------------------
+{
+  // Streptococcus: 1 µm cocci in a chain
+  { const g = new THREE.Group(), R = sz(0.5 * um);
+    for (let i = 0; i < 8; i++) { const c = new THREE.Mesh(new THREE.SphereGeometry(R, 24, 18), cellMat(0xa9cce3, 0.55)); c.position.set(i * R * 1.85, R - 0.3, Math.sin(i * 0.7) * 3); g.add(c); }
+    exhibit(g, 66, -133, "Streptococcus", 1 * um, ["round cells that divide in one direction, so they form chains · strep throat"], 14, 3); }
+  // Bacillus subtilis forming a spore inside
+  { const g = new THREE.Group(), L = sz(3 * um), r = sz(0.4 * um);
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(r, L - 2 * r, 12, 24), cellMat(0xd7bde2, 0.4)); body.rotation.z = Math.PI / 2; body.position.y = r - 0.3; g.add(body);
+    const spore = new THREE.Mesh(new THREE.CapsuleGeometry(r * 0.6, r * 1.2, 8, 16), M(0x5b2c6f)); spore.rotation.z = Math.PI / 2; spore.position.set(L * 0.28, r - 0.3, 0); g.add(spore);
+    exhibit(g, 84, -150, "Bacillus subtilis", 3 * um, ["a rod in the soil · the dark core is a spore that can survive for centuries"], 12, 3); }
+  // Pelagibacter: tiny crescent, the most abundant cell in the oceans
+  { const pts = []; for (let i = 0; i <= 16; i++) { const u = i / 16 - 0.5; pts.push(new THREE.Vector3(u * sz(0.8 * um), Math.cos(u * 3) * -1.2, 0)); }
+    const c = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, sz(0.08 * um), 16, false), cellMat(0x48c9b0, 0.6)); c.position.y = sz(0.08 * um) + 1.1;
+    exhibit(c, 10, -158, "Pelagibacter ubique", 0.8 * um, ["perhaps the most numerous cell on Earth: ~10²⁸ in the oceans"], 4, 1); }
+  // Leptospira: a tightly coiled spiral 0.1 µm thick and ~8 µm long, lying across the ground
+  { const pts = [], L = sz(8 * um), R = sz(0.1 * um), turns = 40;
+    for (let i = 0; i <= 2000; i++) { const u = i / 2000, a = u * turns * 6.283; pts.push(new THREE.Vector3(u * L, R + 0.2 + Math.cos(a) * R * 0.9, Math.sin(a) * R * 0.9 + Math.sin(u * 3) * 4)); }
+    const sp = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 4000, sz(0.05 * um), 6), M(0x1abc9c));
+    exhibit(sp, 92, -200, "Leptospira", 8 * um, ["a spirochete: a corkscrew 0.1 µm thick that swims by spinning itself"], 6, 4);
+    ladder.at(-1).x = 92 + L / 2; }
+  // Anabaena: a chain of cyanobacterial cells, with a thick-walled heterocyst that fixes nitrogen
+  { const g = new THREE.Group(), R = sz(1.5 * um);
+    for (let i = 0; i < 9; i++) { const het = i === 5, c = new THREE.Mesh(new THREE.SphereGeometry(R * (het ? 1.1 : 1), 24, 18), cellMat(het ? 0xf9e79f : 0x239b56, het ? 0.6 : 0.5));
+      c.scale.set(1.05, 0.9, 0.9); c.position.set(i * R * 2.05, R * 0.88, 0); g.add(c); }
+    exhibit(g, 110, -175, "Anabaena (cyanobacteria)", 3 * um, ["photosynthesising cells in a chain; the yellow one fixes nitrogen from air",
+      "cyanobacteria put the oxygen into Earth's air"], 40, 6);
+    ladder.at(-1).x = 110 + 9 * R; }
+  // Streptomyces: branching filaments spreading over the ground -- where most antibiotics come from
+  { const g = new THREE.Group(), r = sz(0.4 * um);
+    const grow = (p, dir, len, depth) => { const pts = [p.clone()]; let q = p.clone(), d = dir.clone();
+      for (let i = 0; i < 12; i++) { d.applyAxisAngle(new THREE.Vector3(0, 1, 0), rr(-0.25, 0.25)); q = q.clone().addScaledVector(d, len / 12); q.y = r; pts.push(q); }
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, r, 10), cellMat(0xb9770e, 0.7)));
+      if (depth > 0) for (let k = 0; k < 2; k++) { const at = pts[3 + Math.floor(rnd() * 8)];
+        grow(at, d.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), (k ? 1 : -1) * rr(0.5, 1.1)), len * 0.6, depth - 1); } };
+    grow(new THREE.Vector3(0, r, 0), new THREE.Vector3(1, 0, 0.2).normalize(), 70, 3);
+    exhibit(g, 125, -140, "Streptomyces", 0.8 * um, ["branching soil bacteria, like a mould · the source of most antibiotics"], 8, 4); }
+}
+
+// ---------- more archaea (on the ground) ----------------------------------------------------
+{
+  // Halobacterium: purple-membrane rods from salt flats
+  { const L = sz(5 * um), r = sz(0.3 * um), c = new THREE.Mesh(new THREE.CapsuleGeometry(r, L - 2 * r, 12, 24), cellMat(0xa569bd, 0.55));
+    c.rotation.z = Math.PI / 2; c.position.y = r - 0.3; exhibit(c, -85, -132, "Halobacterium salinarum", 5 * um,
+      ["turns salt ponds pink-purple · its purple membrane harvests light"], 9, 4); }
+  // Methanosarcina: cells packed into irregular packets
+  { const g = new THREE.Group(), R = sz(0.9 * um);
+    for (const [x, y, z] of [[0, 0, 0], [16, 0, 3], [7, 0, 15], [9, 14, 6], [-6, 0, 12], [-3, 13, -2]]) {
+      const c = new THREE.Mesh(new THREE.IcosahedronGeometry(R, 2), cellMat(0xe59866, 0.55)); c.position.set(x, y + R - 0.5, z); g.add(c); }
+    exhibit(g, -95, -170, "Methanosarcina", 2 * um, ["packets of methane-makers -- in cows' stomachs, rice paddies, and swamps"], 36, 4); }
+  // Pyrococcus furiosus: "rushing fireball", with a tuft of archaella
+  { const g = new THREE.Group(), R = sz(1 * um);
+    const c = new THREE.Mesh(new THREE.IcosahedronGeometry(R, 3), cellMat(0xcb4335, 0.5)); c.position.y = R - 0.5; g.add(c);
+    const tuft = new THREE.Group(); tuft.position.y = R - 0.5; g.add(tuft);
+    for (let i = 0; i < 14; i++) { const d = new THREE.Vector3(-1, rr(-0.3, 0.3), rr(-0.3, 0.3)).normalize(), pts = [];
+      for (let j = 0; j <= 30; j++) { const u = j / 30; pts.push(d.clone().multiplyScalar(R + u * 30).add(new THREE.Vector3(0, Math.sin(u * 12 + i) * 1.5, Math.cos(u * 12 + i) * 1.5))); }
+      tuft.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 60, sz(6 * nm), 4), M(0xf1948a))); }
+    animate.push(Treal => { tuft.rotation.x += Treal * 30 * 6.283; });
+    exhibit(g, -14, -200, "Pyrococcus furiosus", 2 * um, ["'rushing fireball': grows best at 100 °C, boiling water"], 2 * R + 6, 3); }
+  // Nitrosopumilus: one of the smallest free-living cells, abundant in the oceans
+  { const L = sz(0.8 * um), r = sz(0.1 * um), c = new THREE.Mesh(new THREE.CapsuleGeometry(r, L - 2 * r, 8, 16), cellMat(0x52be80, 0.6));
+    c.rotation.z = Math.PI / 2; c.position.y = r; exhibit(c, -10, -132, "Nitrosopumilus maritimus", 0.8 * um, ["among the most numerous cells in the sea; turns ammonia into nitrite"], 3.2, 0.9); }
+  // Prometheoarchaeum: an Asgard archaeon with long branching arms -- a cousin of our ancestors
+  { const g = new THREE.Group(), R = sz(0.25 * um);
+    const c = new THREE.Mesh(new THREE.SphereGeometry(R, 24, 18), cellMat(0xf8c471, 0.6)); c.position.y = R - 0.2; g.add(c);
+    const arm = (p, d, len, depth) => { const pts = [p.clone()]; let q = p.clone();
+      for (let i = 0; i < 10; i++) { d = d.clone().add(new THREE.Vector3(gauss() * 0.2, gauss() * 0.05, gauss() * 0.2)).normalize(); q = q.clone().addScaledVector(d, len / 10); q.y = Math.max(0.3, q.y); pts.push(q); }
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 30, sz(0.04 * um), 6), cellMat(0xf5b041, 0.8)));
+      if (depth) arm(pts[6], d.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.8), len * 0.6, depth - 1); };
+    for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283; arm(new THREE.Vector3(Math.cos(a) * R, R, Math.sin(a) * R), new THREE.Vector3(Math.cos(a), 0.05, Math.sin(a)), rr(30, 60), 1); }
+    exhibit(g, -100, -205, "Prometheoarchaeum (Asgard archaea)", 0.5 * um, ["first grown in a lab in 2020: long arms, and genes once thought only eukaryotes had",
+      "our own cells may descend from a partnership between one of these and a bacterium"], 8, 4); }
+}
+// paths to the new exhibits
+path([[-5.4, -32.4], [-30, -32.4]], 1.8); path([[-5.4, -40.4], [-30, -40.4]], 1.8);
+path([[-5.4, -50], [-26, -50]], 1.6); path([[-5.4, -60], [-26, -60]], 1.6);
+path([[-1.3, -117.6], [-32, -117.6]], 2); path(curve([[-34, -100], [-40, -95], [-42, -86]]), 2); path([[-34, -103], [-46, -110]], 2);
+path([[3.7, -44], [38, -44]], 1.8); path([[3.7, -25.6], [50, -25.6]], 1.8); path([[24.4, -25.6], [24.4, -21]], 1.4);
+path(curve([[56, -156], [76, -138], [96, -150], [118, -170], [150, -178], [115, -196], [90, -204], [44, -177]]), 2.6);
+path(curve([[-62, -152], [-82, -138], [-100, -160], [-104, -196], [-80, -206], [-40, -205], [-14, -205], [-1.3, -196]]), 2.6);
+
 // ---------- the guide: jump to any hall ------------------------------------------------
 window.museum = { rig, HALLS };                 // handy from the browser console
 {
@@ -1283,10 +1565,10 @@ renderer.setAnimationLoop(() => {
   updateMotors(T * dt); updateMuscle(T * dt); for (const f of animate) f(T * dt);
   const es = ecoliState;
   if (es.tumble > 0) { es.tumble -= T * dt; if (es.tumble <= 0) {
-      es.dir.set(gauss(), gauss() * 0.3, gauss()).normalize(); es.run = -Math.log(rnd()) * 1.0; } }
+      es.dir.set(gauss(), 0, gauss()).normalize(); es.run = -Math.log(rnd()) * 1.0; } }   // it glides along the glass
   else { es.run -= T * dt; ECOLI.position.addScaledVector(es.dir, sz(REAL.swim) * T * dt);
     if (es.run <= 0) es.tumble = 0.1; }
-  ECOLI.position.y = Math.max(eR + 1, ECOLI.position.y);
+  ECOLI.position.y = eR - 0.4;
   if (ECOLI.position.distanceTo(EHOME) > 18) es.dir.copy(EHOME).sub(ECOLI.position).normalize();
   ECOLI.quaternion.slerp(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), es.dir), Math.min(1, T * dt * 20));
 
