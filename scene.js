@@ -42,6 +42,18 @@ const REAL = {
   fin: 6 * nm,  finH: 50 * nm,  finPitch: 30 * nm, gatePitch: 48 * nm, gateW: 16 * nm,  // "3 nm-class" chip
   cdPitW: 0.5 * um,  cdPitDepth: 125 * nm,  cdTrack: 1.6 * um,  cdPitMin: 0.83 * um,  cdPitMax: 3.05 * um,
   cloudDrop: 10 * um,  silt: 40 * um,
+  // motor proteins and muscle
+  actinSub: 5.5 * nm,  actinRise: 2.75 * nm,  actinTwist: -166.7,   // per subunit, degrees
+  thickD: 15 * nm,  thickLen: 1.6 * um,  bareZone: 0.16 * um,
+  crown: 14.3 * nm,  crownTwist: 40,  headLen: 19 * nm,  stroke: 10 * nm,
+  thinLen: 1.0 * um,  sarcRest: 2.4 * um,  sarcShort: 2.1 * um,  lattice: 42 * nm,
+  crossBridgeHz: 20,                            // myosin cycles per second while contracting
+  kinStep: 8 * nm,  kinHz: 100,  kinLen: 70 * nm,                     // kinesin-1
+  dynStep: 8 * nm,  dynHz: 60,  dynRing: 13 * nm,                      // cytoplasmic dynein
+  vesicle: 80 * nm,
+  fiber: 12 * um,  myofibril: 1.5 * um,
+  terminal: 2 * um,  synVesicle: 40 * nm,  cleft: 50 * nm,  quanta: 50,
+  twitchDelay: 3e-3,  twitchRise: 30e-3,  twitchFall: 80e-3,  impulseEvery: 0.25,
 };
 
 // ---------- renderer: depth from millimetres to kilometres -----------------------
@@ -271,7 +283,7 @@ label([`${NW.toLocaleString()} water molecules`, "all of them behind the helix, 
        "they jostle by diffusion: watch at 1 picosecond per second"], new THREE.Vector3(0.62, DY + 0.07, 2.95), 0.26);
 
 // ---------- E. coli: a 2 µm bacterium becomes a 20 m truck ------------------------
-const EHOME = new THREE.Vector3(-16, 7, -38);
+const EHOME = new THREE.Vector3(-30, 8, -28);
 const ECOLI = new THREE.Group(); ECOLI.position.copy(EHOME); scene.add(ECOLI);
 const eL = sz(REAL.ecoliLen), eR = sz(REAL.ecoliDiam) / 2;
 {
@@ -341,7 +353,7 @@ for (const [x, y, z, rx] of [[125, 14, -130, 1.35], [165, 26, -150, 1.1], [140, 
   const r = rbc(); r.position.set(x, y, z); r.rotation.set(rx, 0.4, 0.3); scene.add(r);
 }
 label(sizeLines("red blood cell", REAL.rbcDiam), new THREE.Vector3(140, 62, -150), 12);
-const CELL = new THREE.Group(); CELL.position.set(-115, sz(REAL.cell) / 2 + 2, -215); scene.add(CELL);
+const CELL = new THREE.Group(); CELL.position.set(-130, sz(REAL.cell) / 2 + 2, -330); scene.add(CELL);
 {
   const R = sz(REAL.cell) / 2;
   CELL.add(new THREE.Mesh(new THREE.IcosahedronGeometry(R, 5), new THREE.MeshStandardMaterial({
@@ -513,6 +525,221 @@ const atoms = (pos, r, mat) => {           // many identical atoms as one instan
   ladder.push({ name: "silt grain", real: REAL.silt, x: 160, z: -420 });
 }
 
+// ---------- motor proteins: kinesin and dynein on a microtubule ---------------------
+// the track: a microtubule along x, plus end at +x; kinesin walks to +, dynein to -
+const MT0 = 2, MT1 = 16, MTY = 1.55, MTZ = -31;
+{ const mt = microtubule(MT1 - MT0); mt.rotation.z = -Math.PI / 2; mt.position.set((MT0 + MT1) / 2, MTY, MTZ); scene.add(mt);
+  label(["kinesin and dynein: motors on a microtubule",
+         "kinesin (blue) steps 8 nm → 8 cm toward the + end, ~100 steps a second",
+         "dynein (red) steps toward the − end, sometimes backwards",
+         "watch at 10 ms per second (press 3)  ·  − end ◀  ▶ + end"], new THREE.Vector3((MT0 + MT1) / 2, 3.1, MTZ), 1.0); }
+function head(rx, ry, rz, mat) { return new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10).scale(rx, ry, rz), mat); }
+function vesicle(r, col) { return new THREE.Mesh(new THREE.SphereGeometry(r, 24, 18),
+  new THREE.MeshStandardMaterial({ color: col, transparent: true, opacity: 0.55, roughness: 0.3 })); }
+const R_MT = sz(REAL.mtOuter) / 2;
+const kinesin = (() => {
+  const g = new THREE.Group(), m = M(0x2e86de), L = sz(REAL.kinLen);
+  const hA = head(0.045, 0.03, 0.025, m), hB = head(0.045, 0.03, 0.025, m);
+  const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, L, 6), M(0x5dade2));
+  const cargo = vesicle(sz(REAL.vesicle) / 2, 0x9bd2f2); g.add(hA, hB, stalk, cargo); scene.add(g);
+  return { g, hA, hB, stalk, cargo, L, n: 0, t: 0 };
+})();
+const dynein = (() => {
+  const g = new THREE.Group(), m = M(0xc0392b), r = sz(REAL.dynRing) / 2;
+  const ring = () => { const t = new THREE.Mesh(new THREE.TorusGeometry(r, r * 0.45, 8, 12), m); return t; };
+  const hA = ring(), hB = ring();
+  const stalkA = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.15, 5), M(0xe6b0aa)), stalkB = stalkA.clone();
+  const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.55, 6), M(0xe57373));
+  const cargo = vesicle(sz(REAL.vesicle) * 0.6, 0xf5b7b1); g.add(hA, hB, stalkA, stalkB, tail, cargo); scene.add(g);
+  return { g, hA, hB, stalkA, stalkB, tail, cargo, n: 0, t: 0, back: false };
+})();
+function updateMotors(Treal) {
+  // kinesin: dwell, then the trailing head swings 16 nm past the leading one (hand over hand)
+  const k = kinesin; k.t += Treal * REAL.kinHz;
+  while (k.t >= 1) { k.t -= 1; k.n++; }
+  const step = sz(REAL.kinStep), span = MT1 - MT0 - 1.4, x0 = MT0 + 0.5 + ((k.n * step) % span);
+  const lead = x0 + step, f = THREE.MathUtils.smoothstep(k.t, 0.75, 1);   // most of each cycle is dwell
+  const trailX = x0 - step + 2 * step * f, arc = Math.sin(f * Math.PI) * 0.06;
+  const yTop = MTY + R_MT + 0.03;
+  const [front, back] = k.n % 2 ? [k.hA, k.hB] : [k.hB, k.hA];
+  front.position.set(lead, yTop, MTZ); back.position.set(trailX, yTop + arc, MTZ);
+  const mid = (lead + trailX) / 2;
+  k.stalk.position.set(mid, yTop + 0.04 + k.L / 2, MTZ);
+  k.cargo.position.set(mid - 0.05, yTop + 0.06 + k.L + sz(REAL.vesicle) / 2, MTZ);
+  // dynein: toward the minus end, the occasional step back, a floppier gait
+  const d = dynein; d.t += Treal * REAL.dynHz;
+  while (d.t >= 1) { d.t -= 1; d.back = rnd() < 0.12; d.n += d.back ? -1 : 1; }
+  const dx = MT1 - 0.6 - (((d.n * sz(REAL.dynStep)) % span) + span) % span;
+  const g2 = THREE.MathUtils.smoothstep(d.t, 0.7, 1), dir = d.back ? 1 : -1;
+  const yB = MTY - R_MT - 0.1;                    // walks on the underside
+  d.hA.position.set(dx, yB - 0.03, MTZ + 0.05); d.hB.position.set(dx - dir * sz(REAL.dynStep) * (1 - g2), yB - 0.03 - Math.sin(g2 * Math.PI) * 0.05, MTZ - 0.05);
+  for (const [h, st] of [[d.hA, d.stalkA], [d.hB, d.stalkB]]) { h.rotation.y = Math.PI / 2;
+    st.position.set(h.position.x, (h.position.y + MTY - R_MT) / 2, h.position.z); st.scale.y = Math.abs(h.position.y - (MTY - R_MT)) / 0.15; }
+  d.tail.position.set(dx, yB - 0.33, MTZ); d.cargo.position.set(dx, yB - 0.6 - sz(REAL.vesicle) * 0.6, MTZ);
+}
+
+// ---------- one sarcomere, at walking scale: actin, myosin, Z-discs ---------------
+// 7 thick (myosin) filaments in a hexagon, thin (actin) filaments at the trigonal
+// positions between them, anchored to Z-discs that move together as it contracts
+const SAR = new THREE.Group(); SAR.position.set(-8, 1.6, -56); SAR.rotation.y = 0; scene.add(SAR);
+const SL = sz(REAL.sarcRest), D = sz(REAL.lattice);
+const thickPos = [[0, 0], ...[0, 1, 2, 3, 4, 5].map(i => [Math.cos(i * Math.PI / 3) * D, Math.sin(i * Math.PI / 3) * D])];
+const thinPos = [];
+for (const [a, b] of thickPos) for (let i = 0; i < 6; i++) {   // trigonal sites: centre of each triangle
+  const x = a + Math.cos(i * Math.PI / 3 + Math.PI / 6) * D / Math.sqrt(3), y = b + Math.sin(i * Math.PI / 3 + Math.PI / 6) * D / Math.sqrt(3);
+  if (Math.hypot(x, y) < D * 1.2 && !thinPos.some(([u, v]) => Math.hypot(u - x, v - y) < 0.01)) thinPos.push([x, y]); }
+const thinSides = [-1, 1].map(side => {           // each half: thin filaments anchored to one Z-disc
+  const g = new THREE.Group(); SAR.add(g);
+  const nSub = Math.round(sz(REAL.thinLen) / sz(REAL.actinRise)), pts = [];
+  for (const [y, z] of thinPos) for (let i = 0; i < nSub; i++) {
+    const a = i * REAL.actinTwist * Math.PI / 180, r = sz(REAL.actinSub) * 0.45;
+    pts.push(new THREE.Vector3(-side * i * sz(REAL.actinRise), y + Math.cos(a) * r, z + Math.sin(a) * r)); }
+  g.add(atoms(pts, sz(REAL.actinSub) / 2, M(0xf5b041, { roughness: 0.5 })));
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(D * 1.6, D * 1.6, 0.08, 6), M(0x7f8c8d));
+  disc.rotation.z = Math.PI / 2; g.add(disc);
+  return g;
+});
+const thickL = sz(REAL.thickLen), crown = sz(REAL.crown), hl = sz(REAL.headLen);
+for (const [y, z] of thickPos) { const t = new THREE.Mesh(new THREE.CylinderGeometry(sz(REAL.thickD) / 2, sz(REAL.thickD) / 2, thickL, 8), M(0x8e44ad));
+  t.rotation.z = Math.PI / 2; t.position.set(0, y, z); SAR.add(t); }
+const heads = [];                                  // myosin heads: 3 per crown, crowns every 14.3 nm, twisting 40 degrees
+for (const [y, z] of thickPos) for (let x = sz(REAL.bareZone) / 2; x < thickL / 2; x += crown) for (const side of [-1, 1])
+  for (let k = 0; k < 3; k++) { const ang = (x / crown) * REAL.crownTwist * Math.PI / 180 + k * 2 * Math.PI / 3;
+    heads.push({ x: side * x, y, z, ang, side, ph: rnd() }); }
+const headMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6).scale(hl * 0.5, hl * 0.22, hl * 0.22), M(0xc39bd3), heads.length);
+SAR.add(headMesh);
+label(["one sarcomere: the unit of muscle contraction",
+       "myosin (purple) heads pull actin (orange) toward the middle; the Z-discs (grey) close in",
+       `2.4 µm → ${fmt(SL)} at rest, ~2.1 µm contracted · myosin stays ${fmt(thickL)} long`,
+       "it twitches each time the nerve fires · watch at 10 ms per second (press 3)"], new THREE.Vector3(-8, 3.4, -56), 1.0);
+ladder.push({ name: "sarcomere (actin & myosin)", real: REAL.sarcRest, x: -8, z: -56 });
+ladder.push({ name: "kinesin & dynein", real: REAL.kinLen, x: 9, z: MTZ });
+SAR.rotation.y = Math.PI / 2;                       // lie along the walk (z)
+
+// ---------- a muscle fibre with a nerve ending ----------------------------------------
+const FIB = new THREE.Group(); const FR = sz(REAL.fiber) / 2, FLEN = 160;
+FIB.position.set(-100, FR + 1, -110); scene.add(FIB);
+const fibreSkin = new THREE.Mesh(new THREE.CylinderGeometry(FR, FR, FLEN, 64, 1, true), new THREE.MeshStandardMaterial({
+  color: 0xd98880, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false, emissive: 0x000000 }));
+fibreSkin.rotation.x = Math.PI / 2; FIB.add(fibreSkin);
+// myofibrils striped by the real band widths; the pattern follows the sarcomere length
+const bandMat = new THREE.ShaderMaterial({
+  uniforms: { L: { value: SL }, A: { value: thickL }, T: { value: sz(REAL.thinLen) }, light: { value: new THREE.Vector3(0.4, 0.8, 0.3).normalize() } },
+  // the logdepthbuf chunks are required: this world uses a logarithmic depth buffer
+  vertexShader: `#include <common>
+    #include <logdepthbuf_pars_vertex>
+    varying float vz; varying vec3 vn; void main(){ vz = position.y; vn = normalize(normalMatrix * normal);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    #include <logdepthbuf_vertex>
+    }`,
+  fragmentShader: `#include <common>
+    #include <logdepthbuf_pars_fragment>
+    uniform float L, A, T; uniform vec3 light; varying float vz; varying vec3 vn;
+    void main(){
+      #include <logdepthbuf_fragment>
+      float u = mod(vz + L * 0.5, L) - L * 0.5;          // 0 at the sarcomere centre (M-line)
+      float a = abs(u), half_ = L * 0.5;
+      vec3 c = vec3(0.93, 0.72, 0.70);                              // I band: thin filaments only, light
+      if (a < A * 0.5) c = vec3(0.55, 0.16, 0.18);                  // A band: myosin, dark
+      if (a < max(half_ - T, 0.0)) c = vec3(0.75, 0.32, 0.32);      // H zone: myosin without actin overlap
+      if (a > half_ - 0.12) c = vec3(0.2, 0.1, 0.1);                // Z line
+      float sh = 0.45 + 0.55 * max(dot(normalize(vn), light), 0.0);
+      gl_FragColor = vec4(c * sh, 1.0); }` });
+{
+  const r = sz(REAL.myofibril) / 2, geo = new THREE.CylinderGeometry(r, r, FLEN - 1, 20);
+  for (let i = -8; i <= 8; i++) for (let j = -8; j <= 8; j++) {
+    const x = (i + (j % 2) * 0.5) * r * 2.15, y = j * r * 2.15 * 0.866;
+    if (Math.hypot(x, y) > FR - r - 1) continue;
+    const m = new THREE.Mesh(geo, bandMat); m.rotation.x = Math.PI / 2; m.position.set(x, y, 0); FIB.add(m);
+  }
+}
+label(sizeLines("a muscle fibre (one cell)", REAL.fiber).concat([
+  "a 160 m stretch of it -- the whole cell is centimetres long, kilometres here",
+  "inside: myofibrils 1.5 µm → 15 m, striped by their sarcomeres"]), new THREE.Vector3(-100, 2 * FR + 22, -40), 16);
+ladder.push({ name: "muscle fibre", real: REAL.fiber, x: -100, z: -110 });
+// the neuromuscular junction: nerve terminal branches lying on top of the fibre
+const NMJ = new THREE.Group(); NMJ.position.set(-100, 2 * FR + 1, -110); scene.add(NMJ);
+const termR = sz(REAL.terminal) / 2, cleft = sz(REAL.cleft);
+const termMat = new THREE.MeshStandardMaterial({ color: 0xf7dc6f, transparent: true, opacity: 0.38, depthWrite: false,
+  emissive: 0x000000, side: THREE.DoubleSide });
+const branches = [];
+{
+  const axonPts = [new THREE.Vector3(30, 260, 40), new THREE.Vector3(10, 120, 20), new THREE.Vector3(0, termR + cleft + 8, 0)];
+  const axon = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(axonPts), 60, termR * 1.2, 16), termMat);
+  NMJ.add(axon);
+  for (const ang of [0.3, 1.9, 3.4, 4.8]) {           // terminal branches pressed along the fibre surface
+    const pts = []; for (let i = 0; i <= 12; i++) { const u = i / 12, d = u * 28;
+      const x = Math.cos(ang) * d * 0.6, z = Math.sin(ang) * d;
+      const yOn = Math.sqrt(Math.max(0, (FR + termR + cleft) ** 2 - x * x)) - FR;    // follow the fibre's curve
+      pts.push(new THREE.Vector3(x, yOn + (1 - u) * 8, z)); }
+    const b = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, termR, 14), termMat); NMJ.add(b);
+    branches.push(pts);
+  }
+}
+// synaptic vesicles clustered against the membrane facing the fibre
+const synV = [];
+for (const pts of branches) for (let i = 0; i < 90; i++) {
+  const p = pts[2 + Math.floor(rnd() * 10)].clone().add(new THREE.Vector3(rr(-termR, termR) * 0.6, -termR * rr(0.35, 0.85), rr(-termR, termR) * 0.6));
+  synV.push({ home: p, p: p.clone(), fusing: -1 }); }
+const synMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(sz(REAL.synVesicle) / 2, 10, 8), M(0xf39c12, { emissive: 0x3a2000 }), synV.length);
+NMJ.add(synMesh);
+const achN = 6000, achPos = new Float32Array(achN * 3);
+const ach = new THREE.Points(new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(achPos, 3)),
+  new THREE.PointsMaterial({ color: 0x76ff7a, size: 0.12, transparent: true, opacity: 0, depthWrite: false }));
+NMJ.add(ach);
+label(["a nerve ending on the muscle (neuromuscular junction)",
+       `terminal ${fmtReal(REAL.terminal)} → ${fmt(sz(REAL.terminal))} thick · vesicles ${fmtReal(REAL.synVesicle)} → ${fmt(sz(REAL.synVesicle))}`,
+       `synaptic cleft ${fmtReal(REAL.cleft)} → ${fmt(cleft)} · ~${REAL.quanta} vesicles release acetylcholine per impulse`,
+       "press N to fire the nerve, or wait: it fires 4 times a second (real time)"],
+  new THREE.Vector3(-100, 2 * FR + 60, -110), 14);
+ladder.push({ name: "nerve ending", real: REAL.terminal, x: -100, z: -110 });
+
+// the twitch: contraction c(t) after an impulse, from its real time course
+let realT = 0, lastImpulse = -1;
+function twitch(t) { const u = t - lastImpulse - REAL.twitchDelay; if (lastImpulse < 0 || u < 0) return 0;
+  return u < REAL.twitchRise ? THREE.MathUtils.smoothstep(u, 0, REAL.twitchRise) : Math.exp(-(u - REAL.twitchRise) / (REAL.twitchFall / 2.5)); }
+function fire() { lastImpulse = realT;
+  const near = synV.filter(v => v.fusing < 0).sort(() => rnd() - 0.5).slice(0, REAL.quanta);
+  for (const v of near) v.fusing = realT;
+  const c = achPos;
+  for (let i = 0; i < achN; i++) { const pts = branches[i % branches.length], p = pts[2 + Math.floor(rnd() * 10)];
+    c.set([p.x + gauss() * 0.4, p.y - termR - cleft * 0.5, p.z + gauss() * 0.4], 3 * i); }
+  ach.geometry.attributes.position.needsUpdate = true;
+}
+addEventListener("keydown", e => { if (e.code === "KeyN") fire(); });
+const hdum = new THREE.Object3D();
+function updateMuscle(Treal) {
+  realT += Treal;
+  if (realT - lastImpulse > REAL.impulseEvery || lastImpulse < 0) fire();
+  const c = twitch(realT), L = SL - (SL - sz(REAL.sarcShort)) * c;
+  thinSides[0].position.x = -L / 2; thinSides[1].position.x = L / 2;       // Z-discs and their actin
+  bandMat.uniforms.L.value = L;
+  // myosin heads: while contracting they cycle -- attach, swing ~10 nm, detach, recock
+  const ex = c > 0.02, since = realT - lastImpulse;
+  heads.forEach((h, i) => {
+    const overlap = Math.abs(h.x) > L / 2 - sz(REAL.thinLen);                   // actin within reach
+    const cyc = (h.ph + realT * REAL.crossBridgeHz) % 1;
+    const swing = ex && overlap ? (cyc < 0.6 ? cyc / 0.6 : 1 - (cyc - 0.6) / 0.4) : 0;
+    const tilt = (0.95 - swing * 0.75) * h.side;                                   // lever angle to the filament
+    const r = sz(REAL.thickD) / 2 + hl * 0.45;
+    hdum.position.set(h.x + h.side * Math.cos(tilt) * 0, h.y + Math.cos(h.ang) * r, h.z + Math.sin(h.ang) * r);
+    hdum.rotation.set(h.ang, 0, Math.PI / 2 - tilt * 0.9); hdum.updateMatrix(); headMesh.setMatrixAt(i, hdum.matrix); });
+  headMesh.instanceMatrix.needsUpdate = true;
+  // nerve terminal: calcium glow, vesicles fuse, acetylcholine spreads, the fibre membrane fires
+  termMat.emissive.setRGB(0.5, 0.35, 0).multiplyScalar(Math.exp(-Math.max(0, since) / 0.002));
+  fibreSkin.material.emissive.setRGB(0.6, 0.2, 0.15).multiplyScalar(since > 0.0008 ? Math.exp(-(since - 0.0008) / 0.004) : 0);
+  synV.forEach((v, i) => { if (v.fusing >= 0) { const f = (realT - v.fusing) / 0.0006;
+      v.p.copy(v.home).add(new THREE.Vector3(0, -termR * 0.3 * Math.min(1, f), 0));
+      if (realT - v.fusing > REAL.impulseEvery * 0.9) { v.fusing = -1; v.p.copy(v.home); } }
+    hdum.position.copy(v.p); hdum.rotation.set(0, 0, 0);
+    hdum.scale.setScalar(v.fusing >= 0 && realT - v.fusing > 0.0006 ? 0.001 : 1); hdum.updateMatrix(); synMesh.setMatrixAt(i, hdum.matrix); });
+  hdum.scale.setScalar(1); synMesh.instanceMatrix.needsUpdate = true;
+  const achAge = since; ach.material.opacity = achAge < 0.004 ? 0.9 * Math.min(1, achAge / 0.0005) * (1 - achAge / 0.004) : 0;
+  if (ach.material.opacity > 0) { const sp = Math.sqrt(2 * 4e-10 * Treal) * S;    // ACh diffusion D ~ 4e-10 m^2/s
+    for (let i = 0; i < achN; i++) { achPos[3 * i] += gauss() * sp; achPos[3 * i + 2] += gauss() * sp; }
+    ach.geometry.attributes.position.needsUpdate = true; }
+}
+
 // ---------- time: real rates at a chosen time scale --------------------------------
 const TAUS = [1e-12, 1e-11, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1];
 const TAU_NAMES = ["1 picosecond", "10 ps", "100 ps", "1 nanosecond", "10 ns", "100 ns", "1 microsecond",
@@ -528,6 +755,9 @@ const keys = {};
 addEventListener("keydown", e => {
   keys[e.code] = true; start();
   if (e.code === "BracketRight") tauI = Math.min(TAUS.length - 1, tauI + 1);
+  if (e.code === "Digit1") tauI = 0;                 // 1 ps: water
+  if (e.code === "Digit2") tauI = TAUS.indexOf(1e-3); // 1 ms: bacteria, flagella
+  if (e.code === "Digit3") tauI = TAUS.indexOf(1e-2); // 10 ms: motors, muscle
   if (e.code === "BracketLeft") tauI = Math.max(0, tauI - 1);
   if (e.code === "KeyF") flying = !flying;
   if (e.code === "Equal") speed = Math.min(800, speed * 2);
@@ -569,7 +799,7 @@ function readout(v) {
   const n = near.reduce((a, b) => b.pos.distanceTo(rig.position) < a.pos.distanceTo(rig.position) ? b : a);
   const dWater = Math.sqrt(6 * REAL.dWater * tau()) * S;        // rms 3D step of a water molecule, per second here
   hud.innerHTML = `<b>×10,000,000</b> &nbsp;·&nbsp; you are 1.7 m here = <b>170 nm</b> real<br>
-    time: 1 second here = <b>${TAU_NAMES[tauI]}</b> real &nbsp;<span class="k">[ ]</span> to change<br>
+    time: 1 second here = <b>${TAU_NAMES[tauI]}</b> real &nbsp;<span class="k">[ ]</span> or <span class="k">1</span> water · <span class="k">2</span> bacteria · <span class="k">3</span> motors &amp; muscle<br>
     ${flying ? "jetpack" : "walking"} <span class="k">F</span> &nbsp;·&nbsp; speed ${fmt(v)}/s here = <b>${fmtReal(realSpeed)}/s</b> real
     <span class="k">− =</span> or scroll<br>
     height above the slide: ${fmt(Math.max(0, h))} = ${fmtReal(Math.max(0, h) / S)}<br>
@@ -626,6 +856,7 @@ renderer.setAnimationLoop(() => {
   }
   // flagella turn at 100 Hz real; the bacterium runs and tumbles
   for (const f of flagella) f.userData.spin.rotation.x += REAL.flagellumHz * 6.283 * T * dt;
+  updateMotors(T * dt); updateMuscle(T * dt);
   const es = ecoliState;
   if (es.tumble > 0) { es.tumble -= T * dt; if (es.tumble <= 0) {
       es.dir.set(gauss(), gauss() * 0.3, gauss()).normalize(); es.run = -Math.log(rnd()) * 1.0; } }

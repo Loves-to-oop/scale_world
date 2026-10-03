@@ -60,6 +60,8 @@ PAGE = """<!doctype html>
   <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp;·&nbsp; drag to look &nbsp;·&nbsp;
   <kbd>space</kbd> up, <kbd>C</kbd> down (jetpack) &nbsp;·&nbsp; <kbd>F</kbd> jetpack / walk &nbsp;·&nbsp;
   <kbd>−</kbd><kbd>=</kbd> or scroll: speed &nbsp;·&nbsp; <kbd>shift</kbd> faster</p>
+  <p>Time presets: <kbd>1</kbd> water (1 ps per second) &nbsp;·&nbsp; <kbd>2</kbd> bacteria (1 ms) &nbsp;·&nbsp;
+  <kbd>3</kbd> motor proteins and muscle (10 ms) &nbsp;·&nbsp; <kbd>N</kbd> fire the nerve</p>
   <p class="dim">One thing is impossible on purpose: visible light's wavelength (400–700 nm) would be
   4–7 m here, far larger than molecules, so you could not actually see them. It is drawn as if you could.</p>
   <p class="dim">click anywhere, or press any key, to begin</p>
