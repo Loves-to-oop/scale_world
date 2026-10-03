@@ -37,6 +37,11 @@ PAGE = """<!doctype html>
     padding:10px 14px;border-radius:10px;font-size:13.5px;line-height:1.55;max-width:560px}
   #hud .k{background:rgba(255,255,255,.15);border-radius:4px;padding:0 5px;font-size:12px}
   #hud .dim{color:#a9c6d4;font-size:12.5px}
+  #guide{position:fixed;right:14px;top:12px;z-index:2;background:rgba(10,30,45,.72);color:#e6f3f9;
+    padding:10px 12px;border-radius:10px;font-size:13px;display:flex;flex-direction:column;gap:4px;min-width:170px}
+  #guide button{all:unset;cursor:pointer;padding:3px 6px;border-radius:6px;display:flex;align-items:center;gap:8px}
+  #guide button:hover{background:rgba(255,255,255,.15)}
+  #guide i{width:10px;height:10px;border-radius:50%;display:inline-block}
   #vr{display:none;position:fixed;right:18px;bottom:18px;z-index:3;padding:12px 20px;
     font:600 15px -apple-system,sans-serif;border:0;border-radius:10px;background:#1d4e66;color:#fff;cursor:pointer}
 </style></head><body>
@@ -67,6 +72,7 @@ PAGE = """<!doctype html>
   <p class="dim">click anywhere, or press any key, to begin</p>
 </div></div>
 <div id="hud"></div>
+<div id="guide"></div>
 <button id="vr">Enter VR</button>
 <script type="module">
 __THREE__
