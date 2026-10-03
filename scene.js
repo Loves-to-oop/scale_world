@@ -32,7 +32,16 @@ const REAL = {
   rbcDiam:    7.8 * um,  rbcThick: 2.5 * um,
   cell:       20 * um,  nucleus: 6 * um,  mito: [0.5 * um, 1.5 * um],
   hair:       80 * um,
-  lightGreen: 530 * nm,
+  lightGreen: 530 * nm,  xray: 0.1 * nm,
+  // non-biological things at these scales
+  c60: 0.71 * nm,  c60Bond: 0.144 * nm,          // buckminsterfullerene, cage diameter
+  naCl: 0.282 * nm,                             // Na-Cl spacing in rock salt
+  graphene: 0.142 * nm,                         // C-C bond; lattice constant 0.246 nm
+  cnt: 1.36 * nm,                               // (10,10) carbon nanotube diameter
+  goldA: 0.408 * nm,  goldNP: 5 * nm,           // gold lattice constant; particle size
+  fin: 6 * nm,  finH: 50 * nm,  finPitch: 30 * nm, gatePitch: 48 * nm, gateW: 16 * nm,  // "3 nm-class" chip
+  cdPitW: 0.5 * um,  cdPitDepth: 125 * nm,  cdTrack: 1.6 * um,  cdPitMin: 0.83 * um,  cdPitMax: 3.05 * um,
+  cloudDrop: 10 * um,  silt: 40 * um,
 };
 
 // ---------- renderer: depth from millimetres to kilometres -----------------------
@@ -46,7 +55,7 @@ document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const WATERCOL = new THREE.Color(0x9cc4d8);        // everything here is under water
 scene.background = WATERCOL;
-scene.fog = new THREE.FogExp2(0x9cc4d8, 0.0011);
+scene.fog = new THREE.FogExp2(0x9cc4d8, 0.0009);
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.0005, 20000);
 const rig = new THREE.Group(); rig.add(camera); scene.add(rig);
 camera.position.y = 1.65;
@@ -262,7 +271,8 @@ label([`${NW.toLocaleString()} water molecules`, "all of them behind the helix, 
        "they jostle by diffusion: watch at 1 picosecond per second"], new THREE.Vector3(0.62, DY + 0.07, 2.95), 0.26);
 
 // ---------- E. coli: a 2 µm bacterium becomes a 20 m truck ------------------------
-const ECOLI = new THREE.Group(); ECOLI.position.set(-20, 9, -45); scene.add(ECOLI);
+const EHOME = new THREE.Vector3(-16, 7, -38);
+const ECOLI = new THREE.Group(); ECOLI.position.copy(EHOME); scene.add(ECOLI);
 const eL = sz(REAL.ecoliLen), eR = sz(REAL.ecoliDiam) / 2;
 {
   const env = new THREE.Mesh(new THREE.CapsuleGeometry(eR, eL - 2 * eR, 16, 40),
@@ -316,7 +326,7 @@ for (const [x, a] of [[-4, 1.2], [3, 2.6], [6, 0.3]]) {
 label(sizeLines("E. coli bacterium", REAL.ecoliLen).concat([
   `${REAL.ribosomesPerCell.toLocaleString()} ribosomes (purple)  ·  its DNA, stretched out: ${fmt(sz(REAL.chromosome * REAL.dnaRise))}`,
   `swims ${fmtReal(REAL.swim)} per second -- at 1 ms per second, ${fmt(sz(REAL.swim) * 1e-3)}/s here`]),
-  new THREE.Vector3(-20, 16.5, -45), 4);
+  new THREE.Vector3(-16, 14.5, -38), 4);
 
 // ---------- red blood cells and an animal cell -------------------------------------
 function rbc() {                           // biconcave disc: 7.8 µm across, 2.5 µm rim, ~1 µm centre
@@ -327,11 +337,11 @@ function rbc() {                           // biconcave disc: 7.8 µm across, 2.
   for (let i = 40; i >= 0; i--) pts.push(new THREE.Vector2(pts[i].x, -pts[i].y));
   return new THREE.Mesh(new THREE.LatheGeometry(pts, 64), M(0xb3312a, { roughness: 0.45 }));
 }
-for (const [x, y, z, rx] of [[170, 30, -120, 0.5], [230, 50, -60, 1.2], [200, 22, -200, 0.2]]) {
+for (const [x, y, z, rx] of [[125, 14, -130, 1.35], [165, 26, -150, 1.1], [140, 12, -185, 1.45]]) {
   const r = rbc(); r.position.set(x, y, z); r.rotation.set(rx, 0.4, 0.3); scene.add(r);
 }
-label(sizeLines("red blood cell", REAL.rbcDiam), new THREE.Vector3(170, 78, -120), 14);
-const CELL = new THREE.Group(); CELL.position.set(-120, sz(REAL.cell) / 2 + 2, -420); scene.add(CELL);
+label(sizeLines("red blood cell", REAL.rbcDiam), new THREE.Vector3(140, 62, -150), 12);
+const CELL = new THREE.Group(); CELL.position.set(-115, sz(REAL.cell) / 2 + 2, -215); scene.add(CELL);
 {
   const R = sz(REAL.cell) / 2;
   CELL.add(new THREE.Mesh(new THREE.IcosahedronGeometry(R, 5), new THREE.MeshStandardMaterial({
@@ -352,8 +362,155 @@ label(sizeLines("animal cell", REAL.cell).concat(["nucleus " + fmt(sz(REAL.nucle
 {
   const hair = new THREE.Mesh(new THREE.CylinderGeometry(sz(REAL.hair) / 2, sz(REAL.hair) / 2, 20000, 48),
     M(0x4a3020, { roughness: 0.85 }));
-  hair.rotation.set(0, 0.35, Math.PI / 2); hair.position.set(0, sz(REAL.hair) / 2, -1900); scene.add(hair);
-  label(sizeLines("a human hair", REAL.hair), new THREE.Vector3(0, sz(REAL.hair) + 90, -1700), 160);
+  hair.rotation.set(0, 0.35, Math.PI / 2); hair.position.set(0, sz(REAL.hair) / 2, -900); scene.add(hair);
+  label(sizeLines("a human hair", REAL.hair), new THREE.Vector3(0, sz(REAL.hair) + 90, -700), 160);
+}
+
+// ---------- the ruler: a scale bar on the slide, marked in real units ---------------
+// it runs from the start straight ahead (-z); 1 cm here = 1 nm real
+{
+  const RX = -2.2, z0 = 3.5, LEN = 460, dark = M(0x23404f);
+  const strip = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.004, LEN), M(0xf2ede0));
+  strip.position.set(RX, 0.002, z0 - LEN / 2); scene.add(strip);
+  const ticks = [];                      // [distance m, tick length m]
+  for (let d = 0; d <= 1.0001; d += 0.01) ticks.push([d, Math.round(d * 100) % 10 ? 0.06 : 0.14]);
+  for (let d = 1.1; d <= 10.0001; d += 0.1) ticks.push([d, Math.round(d * 10) % 10 ? 0.1 : 0.25]);
+  for (let d = 11; d <= 100.0001; d += 1) ticks.push([d, d % 10 ? 0.15 : 0.35]);
+  for (let d = 110; d <= LEN; d += 10) ticks.push([d, d % 50 ? 0.2 : 0.45]);
+  const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.006, 1), dark, ticks.length), o = new THREE.Object3D();
+  ticks.forEach(([d, l], i) => { const w = d <= 1 ? 0.003 : d <= 10 ? 0.012 : d <= 100 ? 0.05 : 0.2;
+    o.position.set(RX - 0.25 + l / 2, 0.006, z0 - d); o.scale.set(l, 1, w); o.updateMatrix(); im.setMatrixAt(i, o.matrix); });
+  scene.add(im);
+  const marks = [0.1, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 300, 400];
+  for (const d of marks) label([fmtReal(d / S)], new THREE.Vector3(RX - 0.55, 0.12 + d * 0.004, z0 - d), 0.16 + d * 0.012);
+  label(["ruler: real distance", "1 cm here = 1 nm  ·  1 m = 100 nm  ·  100 m = 10 µm"], new THREE.Vector3(RX, 0.45, z0 - 0.4), 0.28);
+}
+
+// ---------- the materials table: non-biological things, atom by atom -----------------
+const TZ = -7.5;                                // a second row, behind the size ladder
+const table = new THREE.Mesh(new THREE.BoxGeometry(9, 0.05, 0.9), M(0x8aa1ad));
+table.position.set(3.4, 1.0, TZ); scene.add(table);
+for (const x of [-0.9, 7.7]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.0, 0.8), M(0x6f8794));
+  leg.position.set(x, 0.5, TZ); scene.add(leg); }
+label(["the materials table", "non-living things, built atom by atom at ×10,000,000"], new THREE.Vector3(3.4, 2.3, TZ), 0.8);
+const onTable = (obj, x, name, real, extra = []) => { obj.position.x = x; obj.position.z = TZ; scene.add(obj);
+  label(sizeLines(name, real).concat(extra), new THREE.Vector3(x, 1.58, TZ), 0.42); ladder.push({ obj, name, real, x, z: TZ }); };
+const atoms = (pos, r, mat) => {           // many identical atoms as one instanced mesh
+  const im = new THREE.InstancedMesh(new THREE.SphereGeometry(r, 10, 8), mat, pos.length), o = new THREE.Object3D();
+  pos.forEach((p, i) => { o.position.copy(p); o.updateMatrix(); im.setMatrixAt(i, o.matrix); }); return im; };
+{ // C60: the 60 vertices of a truncated icosahedron, edge = one C-C bond
+  const phi = (1 + Math.sqrt(5)) / 2, base = [[0, 1, 3 * phi], [1, 2 + phi, 2 * phi], [phi, 2, 2 * phi + 1]], set = new Map();
+  for (const b of base) for (const sx of [1, -1]) for (const sy of [1, -1]) for (const sz_ of [1, -1]) {
+    const v = [b[0] * sx, b[1] * sy, b[2] * sz_];
+    for (const c of [[0, 1, 2], [1, 2, 0], [2, 0, 1]]) { const w = [v[c[0]], v[c[1]], v[c[2]]];
+      set.set(w.map(n => n.toFixed(4)).join(), w); } }
+  const k = sz(REAL.c60Bond) / 2, pts = [...set.values()].map(w => new THREE.Vector3(...w).multiplyScalar(k));
+  const g = new THREE.Group(); const ball = atoms(pts, sz(0.035 * nm), M(0x333333)); ball.position.y = 1.2; g.add(ball);
+  for (const a of pts) for (const b of pts) if (a !== b && a.distanceTo(b) < k * 2.1 && a.x < b.x + 1e-9) {
+    const m = a.clone().add(b).multiplyScalar(0.5), bond = new THREE.Mesh(new THREE.CylinderGeometry(sz(0.012 * nm), sz(0.012 * nm), a.distanceTo(b), 4), M(0x777777));
+    bond.position.copy(m).add(new THREE.Vector3(0, 1.2, 0)); bond.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize()); g.add(bond); }
+  g.add(stand(0.17).translateY(1.025)); onTable(g, -0.4, "buckyball (C₆₀)", REAL.c60, [`${pts.length} carbon atoms`]);
+}
+{ // rock salt: Na+ and Cl- alternating on a cubic lattice
+  const n = 8, a = sz(REAL.naCl), na = [], cl = [];
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) for (let k = 0; k < n; k++)
+    ((i + j + k) % 2 ? na : cl).push(new THREE.Vector3((i - n / 2) * a, j * a, (k - n / 2) * a));
+  const g = new THREE.Group(); g.add(atoms(na, sz(0.102 * nm), M(0x9b59b6)), atoms(cl, sz(0.181 * nm), M(0x2ecc71)));
+  g.position.y = 1.03; onTable(g, 0.6, "salt crystal (NaCl)", n * REAL.naCl, ["purple Na⁺, green Cl⁻, 0.282 nm apart"]);
+}
+{ // graphene: a hexagonal sheet of carbon, standing upright
+  const a = 0.246 * nm, W = 15 * nm, pts = [];
+  for (let i = -70; i < 70; i++) for (let j = -70; j < 70; j++) for (const [bx, by] of [[0, 0], [a / 2, a / (2 * Math.sqrt(3))]]) {
+    const x = i * a + j * a / 2 + bx, y = j * a * Math.sqrt(3) / 2 + by;
+    if (Math.abs(x) < W / 2 && y > 0 && y < W) pts.push(new THREE.Vector3(sz(x), sz(y), 0)); }
+  const g = new THREE.Group(); const sheet = atoms(pts, sz(0.04 * nm), M(0x2c3e50)); sheet.position.y = 1.03; g.add(sheet);
+  onTable(g, 1.8, "graphene sheet", W, [`${pts.length.toLocaleString()} carbon atoms, bonds ${fmt(sz(REAL.graphene))}`]);
+}
+{ // a (10,10) carbon nanotube: graphene rolled up along the armchair direction
+  const a = 0.246 * nm, C = a * Math.sqrt(3) * 10, L = 30 * nm, pts = [], rot = -Math.PI / 6;
+  for (let i = -260; i < 260; i++) for (let j = -260; j < 260; j++) for (const [bx, by] of [[0, 0], [a / 2, a / (2 * Math.sqrt(3))]]) {
+    const x0 = i * a + j * a / 2 + bx, y0 = j * a * Math.sqrt(3) / 2 + by;
+    const x = x0 * Math.cos(rot) - y0 * Math.sin(rot), y = x0 * Math.sin(rot) + y0 * Math.cos(rot);
+    if (x >= 0 && x < C - 1e-12 && y >= 0 && y < L) { const th = x / C * 2 * Math.PI, R = C / (2 * Math.PI);
+      pts.push(new THREE.Vector3(sz(y) - sz(L) / 2, sz(R * Math.cos(th)), sz(R * Math.sin(th)))); } }
+  const g = new THREE.Group(); const tube = atoms(pts, sz(0.04 * nm), M(0x34495e)); tube.position.y = 1.1; g.add(tube);
+  onTable(g, 3.0, "carbon nanotube", REAL.cnt, [`${pts.length.toLocaleString()} atoms, 30 nm of it`]);
+}
+{ // a 5 nm gold nanoparticle: face-centred cubic gold, cut to a truncated octahedron
+  const a = REAL.goldA, R = REAL.goldNP / 2, n = Math.ceil(R / a) + 1, pts = [];
+  for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) for (let k = -n; k <= n; k++)
+    for (const [bx, by, bz] of [[0, 0, 0], [0.5, 0.5, 0], [0.5, 0, 0.5], [0, 0.5, 0.5]]) {
+      const x = (i + bx) * a, y = (j + by) * a, z = (k + bz) * a;
+      if (Math.hypot(x, y, z) < R && Math.abs(x) + Math.abs(y) + Math.abs(z) < R * 1.45)
+        pts.push(new THREE.Vector3(sz(x), sz(y), sz(z))); }
+  const g = new THREE.Group(); const np = atoms(pts, sz(0.144 * nm), M(0xd4a62a, { metalness: 0.9, roughness: 0.25 }));
+  np.position.y = 1.03 + sz(R); g.add(np);
+  onTable(g, 4.4, "gold nanoparticle", REAL.goldNP, [`${pts.length.toLocaleString()} gold atoms`]);
+}
+{ // a quantum dot: a 5 nm semiconductor crystal whose colour is set by its size
+  const g = new THREE.Group(); const q = new THREE.Mesh(new THREE.IcosahedronGeometry(sz(2.5 * nm), 2),
+    M(0xff7a1a, { emissive: 0xff5a00, emissiveIntensity: 0.9, flatShading: true }));
+  q.position.y = 1.03 + sz(2.5 * nm); g.add(q);
+  onTable(g, 5.6, "quantum dot (CdSe)", 5 * nm, ["glows orange because it is 5 nm; smaller ones glow blue"]);
+}
+{ // X-ray and visible light wavelengths, drawn as waves across the path
+  const wave = (lambda, amp, x0, x1, y, z, col, r) => {
+    const pts = []; for (let x = x0; x <= x1; x += lambda / 24) pts.push(new THREE.Vector3(x, y + amp * Math.sin((x - x0) / lambda * 6.2832), z));
+    const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length * 2, r, 5),
+      M(col, { emissive: col, emissiveIntensity: 0.5 })); scene.add(m); };
+  const lam = sz(REAL.lightGreen); wave(lam, 0.9, -12, -12 + lam * 7, 3.2, -14, 0x2ecc40, 0.06);
+  label(["green light", `wavelength 530 nm → ${fmt(lam)}`, "light is far bigger than molecules: you could not really see them"],
+    new THREE.Vector3(-12 + lam * 3.5, 4.8, -14), 1.3);
+  wave(sz(REAL.xray), 0.0005, 6, 7, 1.4, -14, 0x8e44ad, 0.00015);
+  const xs = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.02, 0.02), M(0x4a5a6a)); xs.position.set(6.5, 1.3, -14); scene.add(xs);
+  label(["an X-ray", `wavelength 0.1 nm → ${fmt(sz(REAL.xray))}`, "(the purple thread: atom-sized, which is why X-rays reveal atoms)"],
+    new THREE.Vector3(6.5, 1.75, -14), 0.5);
+}
+{ // a modern chip: silicon fins with gates wrapped over them ("3 nm-class" process)
+  const C = new THREE.Group(); C.position.set(8, 0, -24); scene.add(C);
+  const W = 6, D = 3.2, base = 1.0;
+  const si = new THREE.Mesh(new THREE.BoxGeometry(W, base, D), M(0x5d6670, { roughness: 0.5 })); si.position.y = base / 2; C.add(si);
+  const nf = Math.floor(D / sz(REAL.finPitch));
+  for (let i = 0; i < nf; i++) { const f = new THREE.Mesh(new THREE.BoxGeometry(W, sz(REAL.finH), sz(REAL.fin)), M(0x7d8a96));
+    f.position.set(0, base + sz(REAL.finH) / 2, -D / 2 + (i + 0.5) * sz(REAL.finPitch)); C.add(f); }
+  const ng = Math.floor(W / sz(REAL.gatePitch));
+  for (let i = 0; i < ng; i++) { const g = new THREE.Mesh(new THREE.BoxGeometry(sz(REAL.gateW), sz(REAL.finH) + 0.25, D * 0.9), M(0xc9a227, { metalness: 0.7, roughness: 0.35 }));
+    g.position.set(-W / 2 + (i + 0.5) * sz(REAL.gatePitch), base + (sz(REAL.finH) + 0.25) / 2, 0); C.add(g); }
+  label(["a computer chip, up close", "silicon fins ~6 nm wide, 50 nm tall → 6 cm × 50 cm",
+         "gates (gold) every ~48 nm → 48 cm  ·  each fin-and-gate crossing is part of a transistor",
+         "a '3 nm' chip has no 3 nm feature: the name is marketing"], new THREE.Vector3(8, 3.0, -24), 1.6);
+  ladder.push({ name: "transistors (chip)", real: REAL.gatePitch, x: 8, z: -24 });
+}
+{ // the surface of a CD: pits along a spiral track, read by a laser
+  const P = new THREE.Group(); P.position.set(18, 0, -62); scene.add(P);
+  const W = 90, D = 52;
+  const disc = new THREE.Mesh(new THREE.BoxGeometry(W, 0.3, D), M(0xc8ccd2, { metalness: 0.8, roughness: 0.3 }));
+  disc.position.set(W / 2, 0.15, 0); P.add(disc);
+  const pitM = M(0x2a2e33, { metalness: 0.5, roughness: 0.5 }), track = sz(REAL.cdTrack), pw = sz(REAL.cdPitW);
+  for (let t = -D / 2 + track / 2; t < D / 2 - pw; t += track) {
+    let x = rr(0, 6); while (x < W - 2) { const L = rr(sz(REAL.cdPitMin), sz(REAL.cdPitMax));
+      if (x + L > W) break;
+      const pit = new THREE.Mesh(new THREE.BoxGeometry(L, 0.02, pw), pitM); pit.position.set(x + L / 2, 0.305, t); P.add(pit);
+      x += L + rr(sz(REAL.cdPitMin), sz(REAL.cdPitMax)); } }
+  label(["the surface of a CD", "pits 0.5 µm wide → 5 m, 0.8–3 µm long → 8–30 m, 125 nm deep → 1.25 m",
+         "tracks 1.6 µm apart → 16 m  ·  the dark lengths are the music's 1s and 0s"],
+    new THREE.Vector3(18 + W / 2, 9, -62), 6);
+  ladder.push({ name: "CD pits", real: REAL.cdPitW, x: 18 + W / 2, z: -62 });
+}
+{ // a cloud droplet hanging in the water above the slide, and a grain of silt
+  const drop = new THREE.Mesh(new THREE.SphereGeometry(sz(REAL.cloudDrop) / 2, 64, 48),
+    new THREE.MeshPhysicalMaterial({ color: 0xdff4ff, roughness: 0.05, transmission: 0.6, transparent: true, opacity: 0.55 }));
+  drop.position.set(95, 75, -175); scene.add(drop);
+  label(sizeLines("a cloud droplet", REAL.cloudDrop).concat(["(really it would float in air, not water)"]), new THREE.Vector3(95, 135, -175), 20);
+  ladder.push({ name: "cloud droplet", real: REAL.cloudDrop, x: 95, z: -175 });
+  const g = new THREE.IcosahedronGeometry(sz(REAL.silt) / 2, 2), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const v = new THREE.Vector3().fromBufferAttribute(p, i);
+    v.multiplyScalar(0.8 + 0.35 * Math.abs(Math.sin(v.x * 0.02) * Math.cos(v.y * 0.03 + v.z * 0.01))); p.setXYZ(i, v.x, v.y, v.z); }
+  g.computeVertexNormals();
+  const silt = new THREE.Mesh(g, M(0xd8cbb0, { flatShading: true, roughness: 0.4, transparent: true, opacity: 0.92 }));
+  silt.position.set(160, sz(REAL.silt) * 0.3, -420); scene.add(silt);
+  label(sizeLines("a grain of silt (quartz)", REAL.silt).concat(["finer than sand, coarser than clay"]), new THREE.Vector3(160, sz(REAL.silt) * 0.75, -420), 60);
+  ladder.push({ name: "silt grain", real: REAL.silt, x: 160, z: -420 });
 }
 
 // ---------- time: real rates at a chosen time scale --------------------------------
@@ -404,7 +561,7 @@ let snap = true;
 
 // ---------- the readout --------------------------------------------------------------
 const hud = document.getElementById("hud");
-const near = [...ladder.map(l => ({ name: l.name, real: l.real, pos: new THREE.Vector3(l.x, 1, -3) })),
+const near = [...ladder.map(l => ({ name: l.name, real: l.real, pos: new THREE.Vector3(l.x, 1, l.z ?? -3) })),
   { name: "E. coli", real: REAL.ecoliLen, pos: ECOLI.position }, { name: "animal cell", real: REAL.cell, pos: CELL.position },
   { name: "DNA helix", real: REAL.dnaWidth, pos: new THREE.Vector3(0, DY, 3) }];
 function readout(v) {
@@ -475,7 +632,7 @@ renderer.setAnimationLoop(() => {
   else { es.run -= T * dt; ECOLI.position.addScaledVector(es.dir, sz(REAL.swim) * T * dt);
     if (es.run <= 0) es.tumble = 0.1; }
   ECOLI.position.y = Math.max(eR + 1, ECOLI.position.y);
-  if (ECOLI.position.distanceTo(new THREE.Vector3(-20, 9, -45)) > 120) es.dir.set(-20, 9, -45).sub(ECOLI.position).normalize();
+  if (ECOLI.position.distanceTo(EHOME) > 18) es.dir.copy(EHOME).sub(ECOLI.position).normalize();
   ECOLI.quaternion.slerp(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), es.dir), Math.min(1, T * dt * 20));
 
   hudT -= dt; if (hudT <= 0) { readout(moved > 0 ? moved : speed); hudT = 0.2; }
