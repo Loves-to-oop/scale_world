@@ -411,24 +411,8 @@ for (const [x, y, z, rx] of [[55, 11, -300, 0], [100, 11, -318, 0.08], [70, 30, 
   const r = rbc(); r.position.set(x, y, z); r.rotation.set(rx, 0.4, 0); scene.add(r);
 }
 label(sizeLines("red blood cell", REAL.rbcDiam), new THREE.Vector3(72, 62, -318), 12);
-const CELL = new THREE.Group(); CELL.position.set(160, sz(REAL.cell) / 2 * 0.82, -470);   // settled, a little flattened scene.add(CELL);
-{
-  const R = sz(REAL.cell) / 2;
-  CELL.scale.set(1.08, 0.82, 1.08);
-  CELL.add(new THREE.Mesh(new THREE.IcosahedronGeometry(R, 5), new THREE.MeshStandardMaterial({
-    color: 0xe8c9a0, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false })));
-  const nuc = new THREE.Mesh(new THREE.IcosahedronGeometry(sz(REAL.nucleus) / 2, 4), M(0x6a4c93, { roughness: 0.7 }));
-  nuc.position.set(8, 6, 0); CELL.add(nuc);
-  const [mw, ml] = REAL.mito.map(sz);
-  const mitos = new THREE.InstancedMesh(new THREE.CapsuleGeometry(mw / 2, ml - mw, 6, 12), M(0xd35400), 320);
-  const d = new THREE.Object3D(); let k = 0;
-  while (k < 320) { const v = new THREE.Vector3(gauss(), gauss() * 0.8, gauss()).multiplyScalar(R * 0.4);
-    if (v.length() > R - 6 || v.distanceTo(nuc.position) < sz(REAL.nucleus) / 2 + 4) continue;
-    d.position.copy(v); d.rotation.set(rnd() * 6, rnd() * 6, rnd() * 6); d.updateMatrix(); mitos.setMatrixAt(k++, d.matrix); }
-  CELL.add(mitos);
-}
-label(sizeLines("animal cell", REAL.cell).concat(["nucleus " + fmt(sz(REAL.nucleus)) + "  ·  mitochondria " + fmt(sz(REAL.mito[1]))]),
-  CELL.position.clone().add(new THREE.Vector3(0, sz(REAL.cell) / 2 + 25, 0)), 40);
+// the animal cell is built as a walk-in cell further down (after the park paths exist)
+const CELL = new THREE.Group(); CELL.position.set(160, 20, -470); scene.add(CELL);
 // a human hair lying across the slide: 80 µm thick = an 800 m ridge
 {
   const hair = new THREE.Mesh(new THREE.CylinderGeometry(sz(REAL.hair) / 2, sz(REAL.hair) / 2, 20000, 48),
@@ -890,12 +874,13 @@ const HALLS = [   // name, side (-1 left, +1 right), z from, z to, x extent, col
   { id: "molecules", name: "Molecules",         side: 1,  z0: -6,   z1: -16,  w: 12,  col: 0x5dade2, line: "the small molecules life is built from" },
   { id: "proteins",  name: "Proteins",          side: -1, z0: -6,   z1: -74,  w: 32,  col: 0xaf7ac5, line: "the machines: carriers, motors, makers" },
   { id: "processes", name: "Life in action",    side: -1, z0: -62,  z1: -79,  w: 64,  col: 0x48c9b0, line: "proteins at work: vision, insulin, clotting, nerves" },
-  { id: "surfaces",  name: "Surfaces",          side: -1, z0: -1,   z1: -84,  w: 168, cx: -148, entryAt: [-62, 0, -42.5], col: 0xd4ac0d, line: "walk on glass, steel, paper, skin, a lotus leaf, a butterfly wing" },
-  { id: "nonliving", name: "Non-living things", side: 1,  z0: -18,  z1: -114, w: 104, col: 0x95a5a6, line: "materials, light, a chip and a CD" },
+  { id: "surfaces",  name: "Surfaces",          side: -1, z0: -1,   z1: -84,  w: 210, cx: -168, entryAt: [-62, 0, -42.5], col: 0xd4ac0d, line: "walk on glass, steel, paper, skin, a lotus leaf, a butterfly wing" },
+  { id: "nonliving", name: "Non-living things", side: 1,  z0: -18,  z1: -114, w: 162, col: 0x95a5a6, line: "materials, light, a chip and a CD" },
   { id: "viruses",   name: "Viruses",           side: -1, z0: -78,  z1: -120, w: 46,  col: 0xe74c3c, line: "packages of genes that need a cell" },
   { id: "bacteria",  name: "Bacteria",          side: 1,  z0: -124, z1: -215, w: 160,  col: 0x52be80, line: "cells without a nucleus" },
   { id: "archaea",   name: "Archaea",           side: -1, z0: -124, z1: -215, w: 120,  col: 0xf5b041, line: "the other cells without a nucleus" },
   { id: "eukaryotes",name: "Eukaryotes",        side: 0,  z0: -230, z1: -580, w: 380, col: 0xec7063, line: "cells with a nucleus: yeast to muscle" },
+  { id: "cell",      name: "Inside a cell",     side: 1,  z0: -464, z1: -476, w: 8,   cx: 56, entryAt: [50, 0, -470], col: 0xf5cba7, line: "walk into a human cell" },
 ];
 for (const h of HALLS) {
   const cx = h.cx ?? (h.side === 0 ? 0 : h.side * (2 + h.w / 2)), len = h.z0 - h.z1;
@@ -1202,7 +1187,7 @@ path(curve([[-1.3, -82], [-5.5, -86], [-9, -90], [-12.5, -94], [-16, -98], [-21,
 path(curve([[3.7, -128], [12, -133.5], [28, -138], [42, -142], [56, -156], [44, -177], [24, -179], [3.7, -174]]), 2.6);  // bacteria
 path(curve([[-1.3, -136], [-15, -158], [-36, -158], [-62, -152], [-66, -192], [-44, -190], [-28, -186], [-1.3, -184]]), 2.6); // archaea
 for (const pts of [[[-1.3, -258], [-33, -258]], [[3.7, -244], [22, -244]], [[3.7, -318], [44, -318]], [[-1.3, -352], [-58, -352]],
-                   [[3.7, -470], [56, -470]], [[3.7, -622], [96, -622]], [[-1.3, -642], [-150, -680]]]) path(pts, 3);   // the big ones
+                   [[3.7, -470], [64, -470]], [[3.7, -622], [96, -622]], [[-1.3, -642], [-150, -680]]]) path(pts, 3);   // the big ones
 
 // concession stands between the halls
 function kiosk(x, z, name, menu, col) {
@@ -1905,8 +1890,212 @@ tileLabel(C1, R1, ["window glass", "this tile is 3.6 µm of a windowpane: bumps 
   tileLabel(C4, R2, ["a blue Morpho butterfly's wing", "each wing scale is lined with ridges ~0.8 µm → 8 m apart; you're in a canyon between two",
     "every ridge is a 'Christmas tree' of thin layers spaced ~0.2 µm → 2 m",
     "the layers reflect blue light in step (interference): the blue is structure, not pigment"]); }
-path([[-5.4, -42.5], [-230, -42.5]], 2.4);
+path([[-5.4, -42.5], [-270, -42.5]], 2.4);
 ladder.push({ name: "Surfaces", real: 3.6 * um, x: -148, z: -42.5 });
+
+// ==========================================================================================
+//  MORE SURFACES: two from nature that work because of sub-micron structure
+// ==========================================================================================
+const C5 = -248;
+// gecko foot: the tips of its hairs split into ~200 nm spatulae (2 m paddles here) pressed on glass
+{ const N = 520, stalk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.06, 0.12, 1, 6), M(0x8d6e63), N),
+    pad = new THREE.InstancedMesh(new THREE.BoxGeometry(2, 0.1, 1.6), M(0xa1887f), N);
+  for (let i = 0; i < N; i++) { const x = rr(-17, 17), z = rr(-17, 17), Ln = rr(3, 6), lean = rr(-0.5, 0.5), dir = rr(0, 6.28);
+    const top = new THREE.Vector3(C5 + x + Math.cos(dir) * lean * 2, Ln + 0.15, R1 + z + Math.sin(dir) * lean * 2), base = new THREE.Vector3(C5 + x, 0.15, R1 + z);
+    O3.position.copy(top).add(base).multiplyScalar(0.5); O3.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), top.clone().sub(base).normalize());
+    O3.scale.set(1, top.distanceTo(base), 1); O3.updateMatrix(); stalk.setMatrixAt(i, O3.matrix);
+    O3.position.copy(base); O3.rotation.set(0, dir, 0); O3.scale.setScalar(1); O3.updateMatrix(); pad.setMatrixAt(i, O3.matrix); }
+  scene.add(stalk, pad);
+  // the spatulae hang down from the foot onto the glass: the "stalks" rise toward the foot above you
+  surfaceTile(C5, R1, { seg: 32, h: (x, z) => 0.05, mat: new THREE.MeshPhysicalMaterial({ color: 0xd6eef5, roughness: 0.05, clearcoat: 1 }) });
+  tileLabel(C5, R1, ["a gecko's foot on glass", "each toe hair splits into hundreds of spatulae: 200 nm → 2 m wide paddles, 10 nm → 10 cm thin",
+    "they press so close to the glass (about 0.3 nm → 3 mm) that van der Waals forces hold them",
+    "billions of them hold a gecko on a window, upside down, without any glue"]); }
+// moth eye: a hexagonal field of ~200 nm bumps that stops reflections
+{ const pitch = 2.2, hH = 2.2, hE = (x, z) => { const a = x / pitch, b = (z / pitch) / 0.866, j = Math.round(b), i = Math.round(a - (j % 2) * 0.5);
+      const cx = (i + (j % 2) * 0.5) * pitch, cz = j * pitch * 0.866, r = Math.hypot(x - cx, z - cz) / (pitch * 0.55);
+      return 0.1 + hH * Math.max(0, 1 - r * r); };
+  surfaceTile(C5, R2, { seg: 220, h: hE, color: 0x4a3b2f, mat: M(0x3e2f25, { roughness: 0.6 }) });
+  tileLabel(C5, R2, ["a moth's eye", "covered in bumps ~200 nm → 2 m tall and apart, smaller than a wavelength of light",
+    "light meets a gradual change instead of a sharp surface, so almost nothing reflects",
+    "so the moth's eye doesn't glint at predators; phone screens and camera lenses now copy it"]); }
+
+// ==========================================================================================
+//  NANOTECH AND EVERYDAY THINGS UNDER A MICRON (the Non-living hall's east end)
+// ==========================================================================================
+{
+  const NZ = -53;
+  path([[3.7, NZ], [162, NZ]], 2.2);
+  // phone camera pixels: 1 µm photosites, each under a colour filter and a micro-lens
+  { const g = new THREE.Group(); g.position.set(118, 0, NZ + 9); scene.add(g); const P = 10;
+    [[0xd62728, -1, -1], [0x2ca02c, 1, -1], [0x2ca02c, -1, 1], [0x1f77b4, 1, 1]].forEach(([c, sx, sz_]) => {
+      const base = new THREE.Mesh(new THREE.BoxGeometry(P - 0.3, 2.0, P - 0.3), M(0x2c3e50)); base.position.set(sx * P / 2, 1.0, sz_ * P / 2); g.add(base);
+      const filt = new THREE.Mesh(new THREE.BoxGeometry(P - 0.3, 0.8, P - 0.3), new THREE.MeshStandardMaterial({ color: c, transparent: true, opacity: 0.85 })); filt.position.set(sx * P / 2, 2.4, sz_ * P / 2); g.add(filt);
+      const lens = new THREE.Mesh(new THREE.SphereGeometry(P * 0.55, 32, 16, 0, 6.283, 0, 0.9), new THREE.MeshPhysicalMaterial({ color: 0xffffff, transmission: 0.8, roughness: 0.05, transparent: true, opacity: 0.6 }));
+      lens.position.set(sx * P / 2, 2.8 - P * 0.55 * Math.cos(0.9), sz_ * P / 2); g.add(lens); });
+    label(["phone camera pixels", "four photosites, 1 µm → 10 m each, under red, green, green and blue filters",
+      "each glass dome is a micro-lens funnelling light into its pixel", "a 50-megapixel sensor has 50 million of these: here it would be 80 km across"], new THREE.Vector3(118, 0, NZ + 9), 1.4);
+    ladder.push({ name: "camera pixels", real: 1 * um, x: 118, z: NZ + 9 }); }
+  // hard-drive bits: magnetised patches, with the read head flying over them
+  { const g = new THREE.Group(); g.position.set(118, 0, NZ - 9); scene.add(g);
+    const plat = new THREE.Mesh(new THREE.BoxGeometry(8, 0.3, 4), M(0x7f8c8d, { metalness: 0.8, roughness: 0.3 })); plat.position.y = 0.15; g.add(plat);
+    const bw = 0.25, bl = 0.5, nb = 0, bits = new THREE.InstancedMesh(new THREE.BoxGeometry(bw * 0.9, 0.02, bl * 0.9), M(0xffffff), 32 * 8); let k = 0;
+    for (let i = 0; i < 32; i++) for (let j = 0; j < 8; j++) { O3.position.set(-4 + (i + 0.5) * bw, 0.31, -2 + (j + 0.5) * bl); O3.rotation.set(0, 0, 0); O3.scale.setScalar(1); O3.updateMatrix(); bits.setMatrixAt(k, O3.matrix);
+      bits.setColorAt(k++, C3.set(rnd() < 0.5 ? 0xc0392b : 0x2471a3)); }
+    g.add(bits);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.15, 0.3), M(0xd4ac0d, { metalness: 0.7 })); g.add(head);
+    procAnim.push(t => { head.position.set(-3.8 + ((t * 0.6) % 7.6), 0.31 + 0.03 + 0.075, -2 + 3 * bl / 2 + 0.25); });   // flies 3 nm → 3 cm above
+    label(["hard-drive bits", "each bit is a magnetised patch ~25 × 50 nm → 25 × 50 cm (red north, blue south: 1s and 0s)",
+      "the gold read head flies over it only ~3 nm → 3 cm above the platter, at about 100 km/h real speed",
+      "like a jumbo jet flying a centimetre off the ground"], new THREE.Vector3(118, 0, NZ - 9), 1.1);
+    ladder.push({ name: "hard-drive bits", real: 50 * nm, x: 118, z: NZ - 9 }); }
+  // IBM's logo spelled in 35 xenon atoms on nickel (Eigler & Schweizer, 1989)
+  { const g = new THREE.Group(); plinth(130, NZ + 7, 1.0, 0.9); g.position.set(130, 1.0, NZ + 7); scene.add(g);
+    const ni = [], xe = [], a = sz(0.249 * nm);
+    for (let i = -14; i <= 14; i++) for (let j = -7; j <= 7; j++) ni.push(new THREE.Vector3(i * a, 0.006, j * a * 0.866 + (i % 2) * 0.5 * a * 0.866));
+    const L = { I: ["X", "X", "X", "X", "X"], B: ["XX.", "X.X", "XX.", "X.X", "XX."], M: ["X...X", "XX.XX", "X.X.X", "X...X", "X...X"] };
+    let ox = -11; for (const ch of "IBM") { const rows = L[ch]; rows.forEach((r, y) => [...r].forEach((c, x) => { if (c === "X") xe.push(new THREE.Vector3((ox + x * 1.6) * a, 0.006 + sz(0.22 * nm), (y - 2) * 1.6 * a)); }));
+      ox += rows[0].length * 1.6 + 2; }
+    g.add(atoms(ni, sz(0.124 * nm), M(0x95a5a6, { metalness: 0.7 })), atoms(xe, sz(0.216 * nm), M(0x5dade2, { emissive: 0x0b3a5a })));
+    label(["'IBM' in 35 xenon atoms", "in 1989 Don Eigler pushed single xenon atoms (blue) into place on nickel (grey)",
+      "with a scanning tunnelling microscope: the letters are 5 nm → 5 cm tall", "the first time anyone built something one atom at a time"], new THREE.Vector3(130, 0, NZ + 7), 0.7);
+    ladder.push({ name: "IBM xenon atoms", real: 5 * nm, x: 130, z: NZ + 7 }); }
+  // pencil lead: graphite, sheets of graphene stacked 0.335 nm apart
+  { const g = new THREE.Group(); plinth(136, NZ + 7, 1.0, 0.9); g.position.set(136, 1.0, NZ + 7); scene.add(g);
+    const pts = [], a = 0.246 * nm, W = 12 * nm;
+    for (let l = 0; l < 10; l++) for (let i = -30; i < 30; i++) for (let j = -30; j < 30; j++) for (const [bx, by] of [[0, 0], [a / 2, a / (2 * Math.sqrt(3))]]) {
+      const x = i * a + j * a / 2 + bx + (l % 2) * a / 2, z = j * a * Math.sqrt(3) / 2 + by;
+      if (Math.abs(x) < W / 2 && Math.abs(z) < W / 2) pts.push(new THREE.Vector3(sz(x), 0.01 + l * sz(0.335 * nm), sz(z))); }
+    g.add(atoms(pts, sz(0.035 * nm), M(0x34495e)));
+    label(["pencil lead (graphite)", "sheets of carbon hexagons, each one graphene, stacked 0.335 nm → 3.4 mm apart",
+      "the sheets barely hold each other, so they slide off onto the paper: that's writing",
+      `${pts.length.toLocaleString()} atoms in this 12 nm crumb`], new THREE.Vector3(136, 0, NZ + 7), 0.7);
+    ladder.push({ name: "graphite", real: 12 * nm, x: 136, z: NZ + 7 }); }
+  // a soap film: 1 µm at the bottom, draining to ~10 nm at the top just before it pops
+  { const g = new THREE.Group(); g.position.set(140, 0, NZ - 10); scene.add(g);
+    const W = 22, Hh = 14, seg = 60, geo = new THREE.BoxGeometry(W, Hh, 1, 40, seg, 1), p = geo.attributes.position, col = new Float32Array(p.count * 3);
+    for (let i = 0; i < p.count; i++) { const y = p.getY(i) + Hh / 2, th = 10 * Math.pow(0.01, y / Hh);      // thickness here, m (10 m → 0.1 m)
+      p.setZ(i, Math.sign(p.getZ(i)) * th / 2);
+      const nmT = th / S * 1e9, hue = ((2 * 1.33 * nmT) % 600) / 600;              // interference colour from the optical path
+      C3.setHSL(hue, 0.8, 0.55); col.set([C3.r, C3.g, C3.b], 3 * i); }
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals();
+    const film = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: 0.6, roughness: 0.1, side: THREE.DoubleSide, depthWrite: false }));
+    film.position.y = Hh / 2 + 0.3; g.add(film);
+    label(["a soap film", "1 µm → 10 m thick at the bottom, draining to ~10 nm → 10 cm at the top, just before it pops",
+      "light reflects off both faces; where the gap fits a wavelength, that colour brightens:", "the swirling colours of a bubble are its thickness, made visible"], new THREE.Vector3(140, 0, NZ - 10), 1.2);
+    ladder.push({ name: "soap film", real: 1 * um, x: 140, z: NZ - 10 }); }
+  // air: a cubic metre here holds the real number of molecules, flying at their real speed
+  { const g = new THREE.Group(); g.position.set(150, 0, NZ + 7); scene.add(g); const B = 1.0, N = Math.round(2.5e25 / S ** 3 * B ** 3);
+    const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(B, B, B)), new THREE.LineBasicMaterial({ color: 0x5d6d7e })); frame.position.y = 1.0 + B / 2; g.add(frame);
+    plinth(150, NZ + 7, 1.0, 1.1);
+    const pos = new Float32Array(N * 3), vel = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) { pos.set([rr(-B / 2, B / 2), 1.0 + rr(0, B), rr(-B / 2, B / 2)], 3 * i);
+      const v = new THREE.Vector3(gauss(), gauss(), gauss()).multiplyScalar(290); vel.set([v.x, v.y, v.z], 3 * i); }   // m/s real; mean speed ~470
+    const ptsA = new THREE.Points(new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(pos, 3)),
+      new THREE.PointsMaterial({ color: 0xaed6f1, size: sz(0.36 * nm), sizeAttenuation: true })); g.add(ptsA);
+    let last = 0;
+    procAnim.push(t => { const dt_ = Math.min(0.05, t - last); last = t; if (!isNear(g.position.clone().add(new THREE.Vector3(0, 1.5, 0)), 25)) return;
+      const k = S * tau() * dt_; if (k * 500 > 0.5) return;                              // too fast to show: frozen
+      for (let i = 0; i < N; i++) for (let c = 0; c < 3; c++) { let x = pos[3 * i + c] + vel[3 * i + c] * k; const lo = c === 1 ? 1.0 : -B / 2, hi = lo + B;
+        if (x < lo || x > hi) { vel[3 * i + c] *= -1; x = Math.min(hi, Math.max(lo, x)); } pos[3 * i + c] = x; }
+      ptsA.geometry.attributes.position.needsUpdate = true; });
+    label(["air, at its real crowding", `${N.toLocaleString()} nitrogen and oxygen molecules in this 1 m³ box (1 µm³ real)`,
+      "they're ~3.3 nm → 3.3 cm apart and fly ~68 nm → 68 cm between collisions",
+      "at 1 ps per second (press 1) you see them drift at their real ~470 m/s"], new THREE.Vector3(150, 0, NZ + 7), 0.8);
+    ladder.push({ name: "air molecules", real: 1 * um, x: 150, z: NZ + 7 }); }
+}
+
+// ==========================================================================================
+//  THE WALK-IN CELL: a human cell settled on the glass, 20 µm across → 200 m. Enter it like
+//  a walk-through aviary. The inside is thinned out: a real cell is too crowded to see into.
+// ==========================================================================================
+{
+  const CX = 160, CZ = -470, RX = 108, RY = 50, CY = 20;             // a flattened dome: 216 m wide, ~70 m tall
+  const floorR = RX * Math.sqrt(1 - (CY / RY) ** 2);                  // where the membrane meets the glass (~99 m)
+  const mem = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 48), new THREE.MeshStandardMaterial({ color: 0xe8c9a0, transparent: true, opacity: 0.2,
+    side: THREE.DoubleSide, depthWrite: false, clippingPlanes: ABOVE_GLASS }));
+  mem.scale.set(RX, RY, RX); mem.position.set(CX, CY, CZ); scene.add(mem);
+  const inside = (x, y, z) => ((x - CX) / RX) ** 2 + ((y - CY) / RY) ** 2 + ((z - CZ) / RX) ** 2 < 0.92 && y > 0.3;
+  // the entrance pavilion where the path meets the membrane
+  const DX = CX - floorR;
+  { const stone = M(0xe8e1d0); for (const sz_ of [-3.5, 3.5]) { const col = new THREE.Mesh(new THREE.BoxGeometry(0.6, 6, 0.6), stone); col.position.set(DX - 2, 3, CZ + sz_); scene.add(col); }
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 8), stone); lintel.position.set(DX - 2, 6.4, CZ); scene.add(lintel);
+    const tg = new THREE.CylinderGeometry(3.4, 3.4, 10, 32, 1, true, 0, Math.PI).rotateZ(Math.PI / 2);   // an arched tunnel along x, through the membrane
+    const tunnel = new THREE.Mesh(tg, new THREE.MeshStandardMaterial({ color: 0xf5cba7, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
+    tunnel.position.set(DX + 3, 0, CZ); scene.add(tunnel);
+    const sign = label(["ENTER A HUMAN CELL", "a typical cell, 20 µm across → 200 m: walk in through the membrane",
+      "inside: the nucleus, ER, Golgi, mitochondria and the cytoskeleton", "(thinned out: in reality it's packed too tightly to see through)"],
+      new THREE.Vector3(DX - 1.6, 8.6, CZ), 2.4, "banner"); sign.rotation.y = -Math.PI / 2; }   // faces you as you arrive
+  // the nucleus, resting near the glass, with nuclear pores
+  const NC = new THREE.Vector3(CX + 18, 24, CZ), NR = 30, NY = 18;
+  const nuc = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 32), M(0x6a4c93, { roughness: 0.7 })); nuc.scale.set(NR, NY, NR); nuc.position.copy(NC); scene.add(nuc);
+  { const n = 1800, pores = new THREE.InstancedMesh(new THREE.TorusGeometry(0.6, 0.18, 6, 12), M(0xd2b4de, { emissive: 0x2e1a3d }), n);
+    for (let i = 0; i < n; i++) { const y = 1 - 2 * (i + 0.5) / n, rad = Math.sqrt(1 - y * y), a = i * 2.39996, d = new THREE.Vector3(Math.cos(a) * rad, y, Math.sin(a) * rad);
+      const p = new THREE.Vector3(d.x * NR, d.y * NY, d.z * NR).add(NC), nn = new THREE.Vector3(d.x / NR, d.y / NY, d.z / NR).normalize();
+      O3.position.copy(p).addScaledVector(nn, 0.1); O3.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), nn); O3.scale.setScalar(1); O3.updateMatrix(); pores.setMatrixAt(i, O3.matrix); }
+    scene.add(pores); }
+  // rough ER: folded sheets around the nucleus, studded with ribosomes
+  { const er = new THREE.MeshStandardMaterial({ color: 0xf1948a, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false });
+    const ribPts = [];
+    for (let l = 0; l < 5; l++) for (let s2 = 0; s2 < 6; s2++) { const r = 1.15 + l * 0.12, a0 = s2 / 6 * 6.283 + l * 0.4, geo = new THREE.SphereGeometry(1, 24, 12, a0, 0.8, 0.6 + l * 0.05, 1.6);
+      const m = new THREE.Mesh(geo, er); m.scale.set(NR * r, NY * r, NR * r); m.position.copy(NC); scene.add(m);
+      for (let k = 0; k < 140; k++) { const th = a0 + rnd() * 0.8, ph = 0.6 + l * 0.05 + rnd() * 1.6;
+        const v = new THREE.Vector3(-Math.cos(th) * Math.sin(ph), Math.cos(ph), Math.sin(th) * Math.sin(ph));
+        ribPts.push(new THREE.Vector3(v.x * NR * r, v.y * NY * r, v.z * NR * r).add(NC)); } }
+    scene.add(atoms(ribPts.filter(p => p.y > 0.2), sz(REAL.ribosome) / 2, M(0x8e44ad))); }
+  // the Golgi: a stack of curved flattened sacs, with vesicles budding off
+  { const GX = CX - 30, GZ = CZ + 22;
+    for (let i = 0; i < 6; i++) { const sac = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 8, 0, 6.283, 0, 0.5), new THREE.MeshStandardMaterial({ color: 0xf7dc6f, side: THREE.DoubleSide, roughness: 0.6 }));
+      sac.scale.set(9 - i * 0.6, 4, 6 - i * 0.4); sac.position.set(GX, 4 + i * 1.1, GZ); scene.add(sac); }
+    for (let i = 0; i < 14; i++) { const v = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 8), M(0xf9e79f)); v.position.set(GX + rr(-10, 10), rr(4, 12), GZ + rr(-8, 8)); scene.add(v); } }
+  // mitochondria: many floating, two big ones cut open to show the inner folds (cristae)
+  { const [mw, ml] = REAL.mito.map(sz), n = 90, mt = new THREE.InstancedMesh(new THREE.CapsuleGeometry(mw / 2, ml - mw, 6, 12), M(0xd35400), n); let k = 0;
+    while (k < n) { const p = new THREE.Vector3(CX + rr(-90, 90), rr(2, 55), CZ + rr(-90, 90));
+      if (!inside(p.x, p.y, p.z) || p.distanceTo(NC) < NR + 8 || (Math.abs(p.z - CZ) < 18 && p.y < 22 && p.x < NC.x)) continue;   // keep the walkway clear
+      O3.position.copy(p); O3.rotation.set(rnd() * 6, rnd() * 6, rnd() * 6); O3.scale.setScalar(1); O3.updateMatrix(); mt.setMatrixAt(k++, O3.matrix); }
+    scene.add(mt);
+    for (const [mx, mz] of [[CX - 55, CZ - 10], [CX - 20, CZ + 14]]) { const g = new THREE.Group(); g.position.set(mx, 4, mz); scene.add(g);
+      g.add(new THREE.Mesh(new THREE.CapsuleGeometry(4, 12, 8, 24, ), new THREE.MeshStandardMaterial({ color: 0xe67e22, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false })));
+      for (let i = 0; i < 9; i++) { const c = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.25, 0.6), M(0xf0b27a)); c.position.set(0, -6.5 + i * 1.6, 0); c.rotation.y = Math.PI / 2; g.add(c); }
+      g.rotation.z = Math.PI / 2; } }
+  // the cytoskeleton: microtubules radiating from the centrosome, vesicles riding along them
+  const CS = new THREE.Vector3(CX - 16, 10, CZ - 4), tubes = [];
+  { const n = 46, mt = new THREE.InstancedMesh(new THREE.CylinderGeometry(sz(REAL.mtOuter) / 2, sz(REAL.mtOuter) / 2, 1, 6), M(0x5dade2), n);
+    for (let i = 0; i < n; i++) { const d = new THREE.Vector3(gauss(), Math.abs(gauss()) * 0.5, gauss()).normalize(); let L = 2;
+      while (inside(CS.x + d.x * (L + 2), CS.y + d.y * (L + 2), CS.z + d.z * (L + 2)) && L < 110) L += 2;
+      O3.position.copy(CS).addScaledVector(d, L / 2); O3.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d); O3.scale.set(1, L, 1); O3.updateMatrix(); mt.setMatrixAt(i, O3.matrix);
+      tubes.push({ d, L }); }
+    scene.add(mt);
+    const cent = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 5, 9), M(0x1b4f72)); cent.position.copy(CS); scene.add(cent);
+    const ves = tubes.slice(0, 24).map((tb, i) => { const v = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 8), M(i % 2 ? 0x58d68d : 0xf5b041)); scene.add(v); return { v, tb, ph: rnd(), out: i % 2 === 0 }; });
+    procAnim.push(t => { if (camW.distanceTo(CS) > 140) return;
+      for (const { v, tb, ph, out } of ves) { const u = (t * 0.03 + ph) % 1, f = out ? u : 1 - u; v.position.copy(CS).addScaledVector(tb.d, f * tb.L); } }); }
+  // lysosomes and peroxisomes
+  for (let i = 0; i < 18; i++) { let p; do { p = new THREE.Vector3(CX + rr(-80, 80), rr(2, 40), CZ + rr(-80, 80)); } while (!inside(p.x, p.y, p.z) || p.distanceTo(NC) < NR + 6);
+    const l = new THREE.Mesh(new THREE.SphereGeometry(rr(1.5, 4), 16, 12), M(i % 3 ? 0x922b21 : 0x7d6608)); l.position.copy(p); scene.add(l); }
+  // free ribosomes drifting through the cytoplasm (a few per cent of the real number)
+  { const pts = []; while (pts.length < 14000) { const p = new THREE.Vector3(CX + rr(-95, 95), rr(0.5, 45), CZ + rr(-95, 95)); if (inside(p.x, p.y, p.z) && p.distanceTo(NC) > NR + 2) pts.push(p); }
+    const rb = new THREE.Points(new THREE.BufferGeometry().setFromPoints(pts), new THREE.PointsMaterial({ color: 0xbb8fce, size: sz(REAL.ribosome), sizeAttenuation: true }));
+    scene.add(rb); }
+  // the path inside, and plaques
+  path([[DX - 4, CZ], [CX - 62, CZ], [CX - 34, CZ - 6], [CX - 16, CZ - 8]], 3);
+  path([[CX - 62, CZ], [CX - 40, CZ + 16], [CX - 30, CZ + 14]], 2.4);
+  path([[CX - 34, CZ - 6], [CX - 22, CZ - 30], [CX + 10, CZ - 36], [CX + 40, CZ - 30]], 2.4);
+  label(sizeLines("the nucleus", REAL.nucleus).concat(["holds 2 m of DNA (20,000 km here!) as chromatin",
+    "each lilac ring is a nuclear pore, 120 nm → 1.2 m wide: the doors for RNA and proteins"]), new THREE.Vector3(CX - 13, 0, CZ - 8), 1.2);
+  label(["the rough endoplasmic reticulum (pink sheets)", "folded membranes wrapped around the nucleus, studded with ribosomes (purple)",
+    "proteins destined for export are built here, threaded straight into the sheets"], new THREE.Vector3(CX + 10, 0, CZ - 34), 1.1);
+  label(["the Golgi apparatus (yellow stack)", "flattened sacs that sort, tag and package proteins",
+    "the small spheres are vesicles budding off to deliver them"], new THREE.Vector3(CX - 33, 0, CZ + 14), 1.1);
+  label(sizeLines("a mitochondrion, cut open", REAL.mito[1]).concat(["the power plant: its folded inner membrane (cristae) is lined with ATP synthase",
+    "a cell like this has hundreds to thousands of them"]), new THREE.Vector3(CX - 55, 0, CZ - 2), 1.1);
+  label(["the cytoskeleton", "microtubules (blue, 25 nm → 25 cm) radiate from the centrosome (dark cylinder)",
+    "kinesin and dynein carry vesicles (orange, green) out and in along them"], new THREE.Vector3(CX - 16, 0, CZ - 12), 1.1);
+  label(["inside a human cell", "everything here is at its real size, but thinned out:",
+    "a real cell is so crowded (proteins fill ~30% of its volume) that you couldn't see a metre",
+    "the faint purple dots are ribosomes; a real cell has about 10 million"], new THREE.Vector3(CX - 70, 0, CZ + 2), 1.2);
+  ladder.push({ name: "inside a human cell", real: REAL.cell, x: CX - 30, z: CZ });
+}
 
 // ---------- the guide: jump to any hall ------------------------------------------------
 window.museum = { rig, HALLS, renderer, scene, get mergeStatic() { return mergeStatic; } };                 // handy from the browser console
