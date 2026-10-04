@@ -2160,6 +2160,79 @@ const C5 = -248;
   ladder.push({ name: "spider silk strand", real: 4 * um, x: FX, z: NZ });
 }
 
+// ==========================================================================================
+//  INTERSTATE 75: the highway behind the museum. The museum is at the middle of the slide, so
+//  the east and west edges are half of 75 mm away: 37.5 mm × 10⁷ = 375 km = 233 miles.
+//  60 mph here is 26.8 m/s ÷ 10⁷ = 2.7 µm/s in reality: slower than a bacterium swims.
+// ==========================================================================================
+{
+  const HZ = 46, L = 3000, MI = 1609.344, halfLenMi = 37.5e-3 * S / MI, halfWidMi = 12.5e-3 * S / MI;
+  const realMph = 60 * 0.44704 / S;                                     // m/s real
+  // asphalt with lane markings: two lanes each way, a median, shoulders
+  const cv = document.createElement("canvas"); cv.width = 512; cv.height = 256; const g = cv.getContext("2d");
+  g.fillStyle = "#3a3d40"; g.fillRect(0, 0, 512, 256);
+  for (let i = 0; i < 4000; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? "255,255,255" : "0,0,0"},0.06)`; g.fillRect(rnd() * 512, rnd() * 256, 2, 2); }
+  const yLine = (y, col, dash) => { g.fillStyle = col; for (let x = 0; x < 512; x += dash ? 64 : 512) g.fillRect(x, y, dash ? 32 : 512, 3); };
+  yLine(14, "#f2f2f2"); yLine(64, "#f2f2f2", true); yLine(116, "#f1c40f"); yLine(140, "#f1c40f"); yLine(192, "#f2f2f2", true); yLine(242, "#f2f2f2");
+  const tex = new THREE.CanvasTexture(cv); tex.wrapS = THREE.RepeatWrapping; tex.repeat.set(L / 24, 1); tex.anisotropy = 8; tex.colorSpace = THREE.SRGBColorSpace;
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(L, 20).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9,
+    polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+  road.position.set(0, 0.015, HZ); scene.add(road);
+  for (const dz of [-10.4, 10.4]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(L, 0.35, 0.12), M(0xbdc3c7, { metalness: 0.7, roughness: 0.4 }));
+    rail.position.set(0, 0.65, HZ + dz); scene.add(rail);
+    const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.12, 0.7, 0.12), M(0x95a5a6), Math.floor(L / 4));
+    for (let i = 0; i < posts.count; i++) { O3.position.set(-L / 2 + i * 4, 0.35, HZ + dz); O3.rotation.set(0, 0, 0); O3.scale.setScalar(1); O3.updateMatrix(); posts.setMatrixAt(i, O3.matrix); }
+    scene.add(posts); }
+  // a sign board: green highway style, white text
+  const board = (w, h, draw, x, y, z, ry = 0) => { const c = document.createElement("canvas"); c.width = 1024; c.height = Math.round(1024 * h / w);
+    const b = c.getContext("2d"); draw(b, c.width, c.height); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide, toneMapped: false,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    m.position.set(x, y, z); m.rotation.y = ry; scene.add(m); return m; };
+  const shield = (b, cx, cy, r) => { b.fillStyle = "#1f4e9c"; b.beginPath(); b.moveTo(cx - r, cy - r * 0.7); b.lineTo(cx + r, cy - r * 0.7); b.lineTo(cx + r, cy + 0.1 * r);
+    b.quadraticCurveTo(cx + r, cy + r, cx, cy + r * 1.2); b.quadraticCurveTo(cx - r, cy + r, cx - r, cy + 0.1 * r); b.closePath(); b.fill();
+    b.fillStyle = "#c0392b"; b.fillRect(cx - r, cy - r * 0.95, 2 * r, r * 0.3); b.fillStyle = "#fff"; b.font = `700 ${r * 0.24}px Helvetica`; b.textAlign = "center";
+    b.fillText("INTERSTATE", cx, cy - r * 0.72); b.font = `700 ${r * 0.95}px Helvetica`; b.fillText("75", cx, cy + r * 0.55); };
+  // the overhead gantry, one sign each way
+  for (const [dir, sx] of [[1, -1], [-1, 1]]) {
+    const gx = 18 * sx, faceZ = HZ - dir * 0.3;
+    for (const dz of [-11, 11]) { const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 8, 12), M(0x7f8c8d, { metalness: 0.6 })); pole.position.set(gx, 4, HZ + dz); scene.add(pole); }
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 22.5), M(0x7f8c8d, { metalness: 0.6 })); beam.position.set(gx, 7.7, HZ); scene.add(beam);
+    board(11, 4.4, (b, W, H) => { b.fillStyle = "#006b3f"; b.fillRect(0, 0, W, H); b.strokeStyle = "#fff"; b.lineWidth = 10; b.strokeRect(14, 14, W - 28, H - 28);
+        shield(b, 130, 175, 95); b.fillStyle = "#fff"; b.textAlign = "left";
+        b.font = "700 74px Helvetica"; b.fillText(dir > 0 ? "EAST" : "WEST", 260, 120);
+        b.font = "600 58px Helvetica"; b.fillText(`End of the State of`, 260, 205); b.fillText(`Microscope Slide`, 260, 272);
+        b.font = "700 88px Helvetica"; b.textAlign = "right"; b.fillText(`${Math.round(halfLenMi)} mi`, W - 50, 318);
+        b.font = "500 44px Helvetica"; b.fillText("here  ·  37.5 mm real", W - 50, 378); },
+      gx - 0.3 * sx, 9.9, HZ, sx > 0 ? -Math.PI / 2 : Math.PI / 2);
+  }
+  // a speed-limit sign on each side, with its conversion
+  for (const [x, z, ry] of [[-14, HZ - 12.5, Math.PI], [60, HZ + 12.5, Math.PI]]) {   // both face the museum side
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 3.2, 8), M(0x95a5a6)); post.position.set(x, 1.6, z); scene.add(post);
+    board(1.2, 1.55, (b, W, H) => { b.fillStyle = "#fff"; b.fillRect(0, 0, W, H); b.strokeStyle = "#111"; b.lineWidth = 14; b.strokeRect(20, 20, W - 40, H - 40);
+        b.fillStyle = "#111"; b.textAlign = "center"; b.font = "700 130px Helvetica"; b.fillText("SPEED", W / 2, 230); b.fillText("LIMIT", W / 2, 390);
+        b.font = "700 420px Helvetica"; b.fillText("60", W / 2, 780);
+        b.font = "600 58px Helvetica"; b.fillText("mph here", W / 2, 860); b.fillText(`= ${(realMph * 1e6).toFixed(1)} µm/s real`, W / 2, 940);
+        b.font = "500 52px Helvetica"; b.fillText("E. coli swims 9× faster", W / 2, 1040); b.fillText("(about 560 mph here)", W / 2, 1110); },
+      x, 3.6, z + (ry ? -0.05 : 0.05), ry);
+  }
+  // a few cars doing the limit (60 mph = 26.8 m/s here, in clock time)
+  const carCols = [0xc0392b, 0x2471a3, 0xf1c40f, 0xecf0f1, 0x27ae60];
+  const cars = [...Array(8)].map((_, i) => { const c = new THREE.Group(), col = M(carCols[i % 5], { metalness: 0.5, roughness: 0.35 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.8, 1.8), col); body.position.y = 0.65; c.add(body);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.65, 1.6), M(0x2c3e50, { metalness: 0.3, roughness: 0.2 })); cab.position.set(-0.2, 1.35, 0); c.add(cab);
+    for (const [wx, wz] of [[-1.4, -0.85], [1.4, -0.85], [-1.4, 0.85], [1.4, 0.85]]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.25, 12), M(0x111111));
+      w.rotation.x = Math.PI / 2; w.position.set(wx, 0.34, wz); c.add(w); }
+    scene.add(c); const east = i % 2 === 0; return { c, east, lane: east ? (i % 4 === 0 ? -6 : -2.4) : (i % 4 === 1 ? 2.4 : 6), ph: rnd() * 600 }; });
+  procAnim.push(t => { if (Math.abs(camW.z - HZ) > 300) return;
+    for (const { c, east, lane, ph } of cars) { const u = ((t * 26.8 + ph) % 600) - 300; c.position.set(camW.x + (east ? u : -u), 0, HZ + lane); c.rotation.y = east ? 0 : Math.PI; } });
+  path([[1.2, 13], [1.2, HZ - 11]], 2.4);
+  label(["Interstate 75 (because a slide is 75 mm long)", `the museum sits at the slide's centre: ${Math.round(halfLenMi)} miles to the east or west edge,`,
+    `${Math.round(halfWidMi)} miles to the north or south edge (37.5 mm and 12.5 mm × 10⁷)`,
+    `60 mph here = ${(realMph * 1e6).toFixed(1)} µm/s in reality -- a car here (4.6 m) would really be 460 nm long`,
+    "one mile here is 161 µm real: about two human hairs side by side"], new THREE.Vector3(5, 0, HZ - 16), 1.3);
+}
+
 // ---------- the guide: jump to any hall ------------------------------------------------
 window.museum = { rig, HALLS, renderer, scene, get mergeStatic() { return mergeStatic; } };                 // handy from the browser console
 {
