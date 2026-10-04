@@ -889,7 +889,7 @@ const HALLS = [   // name, side (-1 left, +1 right), z from, z to, x extent, col
   { id: "entrance",  name: "Entrance",          side: 0,  z0: 7,    z1: -5,   w: 14,  col: 0xffffff, line: "the size ladder and DNA in water" },
   { id: "molecules", name: "Molecules",         side: 1,  z0: -6,   z1: -16,  w: 12,  col: 0x5dade2, line: "the small molecules life is built from" },
   { id: "proteins",  name: "Proteins",          side: -1, z0: -6,   z1: -74,  w: 32,  col: 0xaf7ac5, line: "the machines: carriers, motors, makers" },
-  { id: "processes", name: "Life in action",    side: -1, z0: -62,  z1: -77,  w: 64,  col: 0x48c9b0, line: "proteins at work: vision, insulin, clotting, nerves" },
+  { id: "processes", name: "Life in action",    side: -1, z0: -62,  z1: -79,  w: 64,  col: 0x48c9b0, line: "proteins at work: vision, insulin, clotting, nerves" },
   { id: "nonliving", name: "Non-living things", side: 1,  z0: -18,  z1: -114, w: 104, col: 0x95a5a6, line: "materials, light, a chip and a CD" },
   { id: "viruses",   name: "Viruses",           side: -1, z0: -78,  z1: -120, w: 46,  col: 0xe74c3c, line: "packages of genes that need a cell" },
   { id: "bacteria",  name: "Bacteria",          side: 1,  z0: -124, z1: -215, w: 160,  col: 0x52be80, line: "cells without a nucleus" },
@@ -1582,208 +1582,210 @@ path(curve([[56, -156], [76, -138], [96, -150], [118, -170], [150, -178], [115, 
 path(curve([[-62, -152], [-82, -138], [-100, -160], [-104, -196], [-80, -206], [-40, -205], [-14, -205], [-1.3, -196]]), 2.6);
 
 // ==========================================================================================
-//  LIFE IN ACTION: eight processes at the protein level, around the sarcomere. Real sizes at
-//  ×10⁷; each runs as a loop in clock time, because the real events take from femtoseconds
-//  to minutes -- every plaque gives the real timing.
+//  LIFE IN ACTION: eight processes as walk-around scenes, many molecules at real crowding,
+//  at ×10⁷. Each runs as a loop in clock time (the real events take femtoseconds to minutes;
+//  every plaque gives the real timing). Instanced so the Quest can draw them.
 // ==========================================================================================
 const procAnim = [];
 const ssm = (a, b, t) => THREE.MathUtils.smoothstep(t, a, b);
-function station(x, z, wide = 2.6) {                         // a low exhibit table
-  const g = new THREE.Group(); g.position.set(x, 0, z); scene.add(g);
-  const top = new THREE.Mesh(new THREE.BoxGeometry(wide, 0.06, 1.4), M(0x2e4053)); top.position.y = 0.87; g.add(top);
-  for (const sx of [-1, 1]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.84, 1.2), M(0x34495e)); leg.position.set(sx * (wide / 2 - 0.15), 0.42, 0); g.add(leg); }
-  return g; }
-const membraneSlab = (w, d, col = 0xf5e6a8) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, sz(5 * nm), d),
-  new THREE.MeshStandardMaterial({ color: col, transparent: true, opacity: 0.5, depthWrite: false })); return m; };
-const isNear = (g, r = 40) => camW.distanceTo(g.position) < r;       // only animate what you can see
-const glowBall = (r, col) => new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), new THREE.MeshBasicMaterial({ color: col }));
-const TOP = 0.9;
+const isNear = (p, r = 45) => camW.distanceTo(p) < r;              // only animate what you can see
+const deck = (w, d, y, col = 0xf5e6a8) => {                           // a membrane held at chest height on thin posts
+  const g = new THREE.Group(), m = new THREE.Mesh(new THREE.BoxGeometry(w, sz(5 * nm), d),
+    new THREE.MeshStandardMaterial({ color: col, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
+  m.position.y = y; g.add(m);
+  for (const [sx, sz_] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, y, 6), M(0x7f8c8d));
+    post.position.set(sx * (w / 2 - 0.1), y / 2, sz_ * (d / 2 - 0.1)); g.add(post); }
+  return g; };
+const inst = (geo, mat, n) => { const m = new THREE.InstancedMesh(geo, mat, n); m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); return m; };
+const O3 = new THREE.Object3D(), C3 = new THREE.Color();
+const set = (m, i, x, y, z, s = 1, rx = 0, ry = 0, rz = 0) => { O3.position.set(x, y, z); O3.rotation.set(rx, ry, rz); O3.scale.setScalar(s); O3.updateMatrix(); m.setMatrixAt(i, O3.matrix); };
 
-// 1. vision: a photon flips retinal inside rhodopsin, which then switches on transducin
+// 1. vision: a patch of a rod's disc membrane, packed with rhodopsin, hit by a photon
 {
-  const g = station(-12, -67), mem = membraneSlab(0.6, 0.6); mem.position.y = TOP + sz(2.5 * nm); g.add(mem);
-  const rho = new THREE.Group(); rho.position.y = TOP + sz(2.5 * nm); g.add(rho);
-  const helices = [];
-  for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283, h = new THREE.Mesh(new THREE.CylinderGeometry(sz(0.5 * nm), sz(0.5 * nm), sz(4.5 * nm), 10), M(0xc0392b));
-    h.position.set(Math.cos(a) * sz(1.6 * nm), 0, Math.sin(a) * sz(1.6 * nm)); rho.add(h); helices.push({ h, a }); }
-  const ret = new THREE.Group(); rho.add(ret);                      // retinal: two segments joined at the C11=C12 bond
-  const segA = new THREE.Mesh(new THREE.BoxGeometry(sz(0.9 * nm), sz(0.15 * nm), sz(0.15 * nm)), M(0xf39c12, { emissive: 0x7e5109 }));
-  const segB = segA.clone(); segA.position.x = -sz(0.45 * nm); const hinge = new THREE.Group(); hinge.add(segB); segB.position.x = sz(0.45 * nm); ret.add(segA, hinge);
-  const gt = new THREE.Group(); gt.position.set(0, TOP - 0.004, 0);   // transducin under the membrane: α, β, γ
-  const ga = lumpy(2.2, 0x27ae60, 0.12, 2), gb = lumpy(2.0, 0x16a085, 0.12, 2); ga.position.set(-sz(1.5 * nm), sz(2.8 * nm), 0); gb.position.set(sz(1.6 * nm), sz(2.8 * nm), 0);
-  gt.add(ga, gb); gt.rotation.x = Math.PI; g.add(gt); gt.position.y = TOP + sz(5 * nm) + sz(2 * nm);   // sits on the cytoplasmic face (top here)
-  const photon = glowBall(0.012, 0x7dff7a); g.add(photon);
-  const gaHome = ga.position.clone();
-  procAnim.push(t => { if (!isNear(g)) return; const u = t % 10;
-    photon.visible = u < 1.2; photon.position.set(0.4 - u * 0.33, TOP + 1.2 - u * 0.95, 0.2 - u * 0.15);
-    const flip = ssm(1.2, 1.25, u) * (1 - ssm(8.5, 9.5, u));       // 11-cis (bent 40°) → all-trans (straight)
-    hinge.rotation.z = 0.7 * (1 - flip);
-    for (const { h, a } of helices) h.position.set(Math.cos(a) * sz(1.6 * nm) * (1 + 0.15 * flip * (a > 3 ? 1 : 0)), 0, Math.sin(a) * sz(1.6 * nm));
-    const go = ssm(3, 5, u) * (1 - ssm(8.5, 9.5, u));                // transducin's α breaks away to carry the signal
-    ga.position.copy(gaHome).add(new THREE.Vector3(-go * 0.08, 0, go * 0.05)); });
-  label(["vision: rhodopsin catches a photon", "a green photon (shown as a dot; really a 5 m wave here) hits retinal, the orange kink inside",
-    "retinal straightens from 11-cis to all-trans in 200 femtoseconds -- one of the fastest reactions in life",
-    "rhodopsin changes shape and switches on transducin (green): one rhodopsin activates hundreds",
-    "your rod cells can respond to a single photon · shown slowed to a 10 s loop"], new THREE.Vector3(-12, 0, -67), 1.0);
+  const X = -12, Z = -66.5, Y = 1.15, W = 4, D = 3, g = deck(W, D, Y); g.position.set(X, 0, Z); scene.add(g);
+  const sp = sz(6.3 * nm), nx = Math.floor(W / sp), nz = Math.floor(D / sp), N = nx * nz;   // ~25,000 per µm² in real discs
+  const rho = inst(new THREE.CylinderGeometry(sz(2 * nm), sz(2 * nm), sz(4.5 * nm), 7), M(0xffffff), N);
+  const pos = [];
+  for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) { const x = -W / 2 + (i + 0.5 + (k % 2) * 0.5) * sp + rr(-0.006, 0.006), z = -D / 2 + (k + 0.5) * sp;
+    if (x > W / 2) continue; pos.push([x, z]); set(rho, pos.length - 1, x, Y, z); rho.setColorAt(pos.length - 1, C3.set(0xa93226)); }
+  rho.count = pos.length; g.add(rho);
+  const NT = 500, tr = inst(new THREE.SphereGeometry(sz(2.2 * nm), 8, 6), M(0xffffff), NT), tpos = [];   // transducin on the cytoplasmic face
+  for (let i = 0; i < NT; i++) { tpos.push([rr(-W / 2, W / 2), rr(-D / 2, D / 2), rnd() * 6]); tr.setColorAt(i, C3.set(0x1e8449)); }
+  g.add(tr);
+  const wave = waveTube(sz(530 * nm), 1.2, 0.3, 0.03, 0x7dff7a); g.add(wave.mesh); WAVES.push({ mat: wave.mat, f: C_LIGHT / (530 * nm) });
+  let hit = 0;
+  procAnim.push(t => { if (!isNear(g.position)) return; const u = t % 9, loop = Math.floor(t / 9);
+    hit = (loop * 7919) % rho.count; const [hx, hz] = pos[hit];
+    wave.mesh.position.set(-W / 2 - 3 + u * 2.2, Y + 1.2 - u * 0.12, hz); wave.mesh.visible = u < 3.2;
+    const on = u > 1.6 && u < 8.4, R = on ? Math.min(1.6, (u - 1.6) * 0.5) : 0;     // the cascade spreads outward
+    for (let i = 0; i < pos.length; i += 1) if (i === hit) rho.setColorAt(i, C3.set(on ? 0xffb347 : 0xa93226));
+    rho.instanceColor.needsUpdate = true;
+    for (let i = 0; i < NT; i++) { const [x0, z0, ph] = tpos[i], x = x0 + Math.sin(t * 0.7 + ph) * 0.08, z = z0 + Math.cos(t * 0.6 + ph) * 0.08;
+      set(tr, i, x, Y + sz(5 * nm), z); const d = Math.hypot(x - hx, z - hz); tr.setColorAt(i, C3.set(on && d < R ? 0x7dff9a : 0x1e8449)); }
+    tr.instanceMatrix.needsUpdate = true; tr.instanceColor.needsUpdate = true; });
+  label(["vision: inside a rod cell's disc", `${pos.length.toLocaleString()} rhodopsins (red) at their real crowding, ~25,000 per µm²`,
+    "a green photon (its real 5.3 m wavelength here) flips one rhodopsin's retinal in 200 femtoseconds",
+    "it switches on hundreds of transducins (they light up green) as it wanders the membrane",
+    "that cascade is how one photon becomes a nerve signal · shown as a 9 s loop"], new THREE.Vector3(X, 0, Z), 1.0);
 }
 
-// 2. insulin: the hormone docks, the receptor's kinases switch on, glucose doors open
+// 2. insulin: receptors on a cell membrane; GLUT4 doors arrive from inside; glucose pours in
 {
-  const g = station(-19, -75), mem = membraneSlab(1.2, 0.6); mem.position.y = TOP + sz(2.5 * nm); g.add(mem);
-  const rec = new THREE.Group(); rec.position.set(-0.25, TOP + sz(5 * nm), 0); g.add(rec);
-  for (const sx of [-1, 1]) {                                         // the Λ-shaped receptor dimer
-    const arm = lumpy(3, 0x8e44ad, 0.12, 2); arm.scale.set(0.8, 2.2, 0.8); arm.position.set(sx * sz(3.5 * nm), sz(7 * nm), 0); arm.rotation.z = sx * -0.35; rec.add(arm);
-    const tm = new THREE.Mesh(new THREE.CylinderGeometry(sz(0.5 * nm), sz(0.5 * nm), sz(5 * nm), 8), M(0x6c3483)); tm.position.set(sx * sz(2 * nm), -sz(2.5 * nm), 0); rec.add(tm); }
-  const kin = [-1, 1].map(sx => { const k = lumpy(2.4, 0x5b2c6f, 0.12, 2); k.position.set(sx * sz(2.5 * nm), -sz(5 * nm) - sz(2.5 * nm), 0); rec.add(k); return k; });
-  const phos = []; for (const k of kin) for (let i = 0; i < 3; i++) { const p = glowBall(sz(0.5 * nm), 0xf5b041); p.position.copy(k.position).add(new THREE.Vector3((i - 1) * sz(1.2 * nm), -sz(2 * nm), sz(1 * nm))); p.visible = false; rec.add(p); phos.push(p); }
-  const ins = lumpy(1.3, 0x3498db, 0.15, 2); g.add(ins);              // an insulin monomer, 2.5 nm
-  const glut = new THREE.Group(); glut.position.set(0.3, TOP + sz(2.5 * nm), 0); g.add(glut);   // GLUT4 arriving in the membrane
-  const glutBody = lumpy(2.5, 0x2471a3, 0.1, 2); glutBody.scale.set(1, 1.6, 1); glut.add(glutBody);
-  const ves = new THREE.Mesh(new THREE.SphereGeometry(sz(30 * nm), 24, 16), new THREE.MeshStandardMaterial({ color: 0xf5e6a8, transparent: true, opacity: 0.4, depthWrite: false }));
-  g.add(ves);
-  const glucose = []; for (let i = 0; i < 5; i++) { const gl = new THREE.Mesh(new THREE.CylinderGeometry(sz(0.45 * nm), sz(0.45 * nm), sz(0.2 * nm), 6), M(0xecf0f1)); g.add(gl); glucose.push(gl); }
-  procAnim.push(t => { if (!isNear(g)) return; const u = t % 12;
-    const dock = ssm(0, 2.5, u); ins.position.set(-0.25 + (1 - dock) * 0.3, TOP + sz(5 * nm) + sz(16 * nm) + (1 - dock) * 0.35, (1 - dock) * 0.2);
-    ins.visible = u < 11.5;
-    phos.forEach((p, i) => p.visible = u > 3 + i * 0.25 && u < 11.5);
-    const up = ssm(5, 7, u); ves.position.set(0.3, TOP - sz(30 * nm) * 0.3 - (1 - up) * 0.25, 0); ves.visible = u > 4.5 && u < 7.2;
-    ves.position.y = TOP + sz(5 * nm) + sz(30 * nm) * 1.2 + (1 - up) * 0.35;  // vesicles come from inside the cell (above here)
-    glut.visible = u > 7; glut.scale.setScalar(glut.visible ? 1 : 0.001);
-    glucose.forEach((gl, i) => { const k = ((u - 7.5 - i * 0.7) / 2); gl.visible = k > 0 && k < 1;
-      gl.position.set(0.3, TOP - 0.15 + k * 0.4, 0); }); });
-  label(["insulin: the signal to take in sugar", "insulin (blue, 2.5 nm → 2.5 cm) docks in the receptor's Λ",
-    "the receptor's kinases (dark purple) phosphorylate each other (orange dots)",
-    "the signal sends vesicles carrying GLUT4 doors to the membrane; glucose (white) flows through",
-    "real time: binding in milliseconds, GLUT4 arrives within minutes · shown as a 12 s loop"], new THREE.Vector3(-19, 0, -75), 1.0);
+  const X = -19, Z = -75.5, Y = 1.3, W = 5, D = 3.5, g = deck(W, D, Y); g.position.set(X, 0, Z); scene.add(g);
+  const recs = [];                                                     // outside the cell is above the membrane
+  for (let i = 0; i < 8; i++) { const r = new THREE.Group(), x = -W / 2 + 0.5 + (i % 4) * 1.2 + (i > 3 ? 0.6 : 0), z = i > 3 ? 0.8 : -0.8;
+    r.position.set(x, Y + sz(2.5 * nm), z); g.add(r);
+    for (const sx of [-1, 1]) { const arm = lumpy(3, 0x8e44ad, 0.12, 1); arm.scale.set(0.8, 2.2, 0.8); arm.position.set(sx * sz(3.5 * nm), sz(7 * nm), 0); arm.rotation.z = sx * -0.35; r.add(arm); }
+    const kin = [-1, 1].map(sx => { const k = lumpy(2.4, 0x5b2c6f, 0.12, 1); k.position.set(sx * sz(2.5 * nm), -sz(7 * nm), 0); r.add(k); return k; });
+    const ins = lumpy(1.3, 0x3498db, 0.15, 1); g.add(ins);
+    recs.push({ r, kin, ins, home: new THREE.Vector3(x, Y + sz(20 * nm), z), when: i * 0.6 }); }
+  const NV = 6, ves = inst(new THREE.SphereGeometry(sz(25 * nm), 16, 12), new THREE.MeshStandardMaterial({ color: 0xd6eaf8, transparent: true, opacity: 0.5, depthWrite: false }), NV);
+  const glut = inst(new THREE.CylinderGeometry(sz(2.5 * nm), sz(2.5 * nm), sz(6 * nm), 8), M(0x2471a3), NV); g.add(ves, glut);
+  const NG = 200, gl = inst(new THREE.CylinderGeometry(sz(0.45 * nm), sz(0.45 * nm), sz(0.2 * nm), 6), M(0xffffff), NG); g.add(gl);
+  const gseed = [...Array(NG)].map(() => [rnd(), rnd() * 6]);
+  procAnim.push(t => { if (!isNear(g.position)) return; const u = t % 14;
+    for (const { r, kin, ins, home, when } of recs) { const k = ssm(when, when + 1.5, u);
+      ins.position.copy(home).add(new THREE.Vector3((1 - k) * 0.3, (1 - k) * 0.5, 0)); ins.position.y -= k * sz(4 * nm);
+      ins.visible = u < 13.5; const lit = u > when + 1.6 && u < 13.5;
+      for (const kk of kin) kk.material.emissive.setHex(lit ? 0x7e5109 : 0x000000); }
+    for (let i = 0; i < NV; i++) { const x = -W / 2 + 0.8 + i * 0.75, rise = ssm(5 + i * 0.4, 7 + i * 0.4, u), fused = u > 7 + i * 0.4;
+      set(ves, i, x, Y - 0.9 + rise * 0.65, 0, fused || u > 13.5 ? 0.001 : 1);
+      set(glut, i, x, Y + sz(2.5 * nm), 0, fused && u < 13.5 ? 1 : 0.001); }
+    for (let i = 0; i < NG; i++) { const [a, ph] = gseed[i], door = Math.floor(a * NV), x = -W / 2 + 0.8 + door * 0.75, k = ((u - 8 - ph * 0.8) % 2.5) / 2.5;
+      const open = u > 7.2 + door * 0.4 && u < 13.5;
+      set(gl, i, x + Math.sin(ph * 9) * (k < 0.45 ? 0.6 * (0.45 - k) : 0), Y + 0.5 - k * 1.0, Math.cos(ph * 7) * (k < 0.45 ? 0.6 * (0.45 - k) : 0), open && k > 0 ? 1 : 0.001); }
+    ves.instanceMatrix.needsUpdate = glut.instanceMatrix.needsUpdate = gl.instanceMatrix.needsUpdate = true; });
+  label(["insulin: the signal to take in sugar", "outside the cell (above): insulin (blue) docks in its Λ-shaped receptors; their kinases (below) light up",
+    "inside (below): vesicles carry GLUT4 doors up and fuse into the membrane",
+    "then glucose (white) pours through the doors into the cell",
+    "real time: binding in ms, doors arrive over minutes · 14 s loop · walk under the membrane"], new THREE.Vector3(X, 0, Z), 1.0);
 }
 
-// 3. blood clotting: thrombin cuts fibrinogen, fibrin monomers join a half-staggered fibre
+// 3. blood clotting: a fibrin fibre 100 nm thick (1 m here) growing from hundreds of protofibrils
 {
-  const g = station(-26, -67), L = sz(45 * nm), units = [];
-  const fib = () => { const f = new THREE.Group();
-    for (const [x, r, c] of [[-22.5, 3.2, 0xc0392b], [0, 2.4, 0xe74c3c], [22.5, 3.2, 0xc0392b]]) { const b = lumpy(r, c, 0.1, 1); b.position.x = sz(x * nm); f.add(b); }
-    const rod = new THREE.Mesh(new THREE.CylinderGeometry(sz(0.8 * nm), sz(0.8 * nm), L, 6), M(0xe74c3c)); rod.rotation.z = Math.PI / 2; f.add(rod); return f; };
-  for (let i = 0; i < 8; i++) { const f = fib(); g.add(f); units.push(f); }
-  const thrombin = lumpy(2.2, 0x922b21, 0.15, 2); g.add(thrombin);
-  const bits = [0, 1].map(() => { const b = glowBall(sz(0.6 * nm), 0xf1948a); g.add(b); return b; });
-  const slot = i => new THREE.Vector3(-0.9 + Math.floor(i / 2) * L + (i % 2) * L / 2, TOP + sz(4 * nm) + (i % 2) * sz(7 * nm), 0);   // two strands, offset by half a unit
-  const spare = i => new THREE.Vector3(-0.8 + i * 0.22, TOP + sz(4 * nm), 0.45);
-  procAnim.push(t => { if (!isNear(g)) return; const u = t % 16, k = Math.floor(u / 2);     // one monomer joins every 2 s
-    units.forEach((f, i) => { const joining = i === k, f2 = ssm(0.8, 1.8, u - k * 2);
-      if (i < k) f.position.copy(slot(i)); else if (joining) f.position.lerpVectors(spare(i), slot(i), f2); else f.position.copy(spare(i)); });
-    thrombin.position.copy(spare(Math.min(k, 7))).add(new THREE.Vector3(0, sz(6 * nm), 0.06));
-    bits.forEach((b, j) => { const fly = ssm(0.2, 1.2, u - k * 2); b.visible = fly > 0 && fly < 1;
-      b.position.copy(spare(Math.min(k, 7))).add(new THREE.Vector3((j ? 1 : -1) * 0.05, 0.02 + fly * 0.25, 0.05 + fly * 0.2)); }); });
-  label(["blood clotting: fibrin knits a net", "thrombin (dark red) snips two small peptides off fibrinogen (45 nm → 45 cm)",
-    "the exposed sticky ends lock each fibrin into a two-strand fibre, offset by half a molecule",
-    "hundreds of these fibres bundle and branch into the mesh that holds a clot together",
-    "real time: a clot forms in a few minutes · shown as a 16 s loop"], new THREE.Vector3(-26, 0, -67), 1.0);
+  const X = -26, Z = -66.5, Y = 1.4, L = 5, U = sz(45 * nm), g = new THREE.Group(); g.position.set(X, 0, Z); scene.add(g);
+  const pf = []; for (let r = 0; r <= 0.48; r += 0.09) { const n = Math.max(1, Math.round(6.283 * r / 0.09)); for (let k = 0; k < n; k++) { const a = k / n * 6.283; pf.push([Math.cos(a) * r, Math.sin(a) * r]); } }
+  const per = Math.floor(L / (U / 2)), N = pf.length * per;
+  const rod = inst(new THREE.CapsuleGeometry(sz(3 * nm), U - sz(6 * nm), 3, 6), M(0xc0392b), N); g.add(rod);
+  const order = [...Array(N).keys()].sort((a, b) => (a % per) - (b % per) + (rnd() - 0.5) * 6);   // grows roughly end to end
+  const NT = 40, th = inst(new THREE.IcosahedronGeometry(sz(2.2 * nm), 1), M(0x641e16), NT); g.add(th);
+  procAnim.push(t => { if (!isNear(g.position)) return; const u = t % 20, shown = Math.floor(N * ssm(0, 17, u));
+    for (let j = 0; j < N; j++) { const idx = order[j], p = Math.floor(idx / per), k = idx % per, [y0, z0] = pf[p];
+      const x = -L / 2 + k * U / 2 + (p % 2) * U / 4;
+      set(rod, idx, x, Y + y0, z0, j < shown && u < 19.5 ? 1 : 0.001, 0, 0, Math.PI / 2); }
+    rod.instanceMatrix.needsUpdate = true;
+    const front = -L / 2 + L * ssm(0, 17, u);
+    for (let i = 0; i < NT; i++) set(th, i, front + Math.sin(t * 1.3 + i) * 0.6, Y + Math.cos(t * 1.1 + i * 2) * 0.7, Math.sin(t * 0.9 + i * 3) * 0.7);
+    th.instanceMatrix.needsUpdate = true; });
+  label(["blood clotting: a fibrin fibre assembling", `${pf.length} protofibrils side by side, each a chain of fibrin molecules (45 nm → 45 cm)`,
+    "thrombin (dark red) cuts fibrinogen so it can join; molecules stack half-overlapped",
+    "the finished fibre is ~100 nm thick (1 m here); millions of them make the mesh of a clot",
+    "real time: a clot forms in minutes · shown as a 20 s loop"], new THREE.Vector3(X, 0, Z), 1.0);
 }
 
-// 4. oxygen: haemoglobin binds O₂ cooperatively, shifting from tense to relaxed
+// 4. oxygen: inside a red blood cell, haemoglobin packed shoulder to shoulder, loading O₂
 {
-  const g = station(-33, -75), hb = new THREE.Group(); hb.position.y = TOP + sz(4 * nm); g.add(hb);
-  const subs = [[1, 1, 1], [-1, 1, -1], [1, -1, -1], [-1, -1, 1]].map(([a, b, c], i) => { const s2 = lumpy(1.8, i % 2 ? 0xe67e22 : 0xc0392b, 0.12, 2);
-    s2.position.set(a * sz(1.3 * nm), b * sz(1.2 * nm), c * sz(1.3 * nm)); hb.add(s2); return { s2, home: s2.position.clone() }; });
-  const o2 = subs.map(() => { const m = new THREE.Group(); for (const dx of [-1, 1]) { const at = new THREE.Mesh(new THREE.SphereGeometry(sz(0.15 * nm), 10, 8), M(0xff3b30)); at.position.x = dx * sz(0.06 * nm); m.add(at); }
-    g.add(m); return m; });
-  const starts = o2.map((_, i) => new THREE.Vector3(Math.cos(i * 1.6) * 0.35, TOP + 0.12 + i * 0.04, Math.sin(i * 1.6) * 0.3));
-  const times = [1, 4.2, 4.8, 5.3];                                  // the first is slow; once one binds, the rest follow fast
-  procAnim.push(t => { if (!isNear(g)) return; const u = t % 11, R = ssm(4, 5, u) * (1 - ssm(9.5, 10.5, u));
-    hb.rotation.y = R * 0.26;                                          // the T → R shift: subunit pairs rotate ~15°
-    subs.forEach(({ s2, home }, i) => s2.position.copy(home).multiplyScalar(1 - 0.06 * R));
-    o2.forEach((m, i) => { const k = ssm(times[i] - 0.6, times[i], u) * (1 - ssm(9.5, 10.3, u));
-      m.position.lerpVectors(starts[i], hb.position.clone().add(subs[i].home.clone().multiplyScalar(1.6)), k); }); });
-  label(["oxygen transport: haemoglobin teamwork", "the first O₂ (red pairs) binds slowly; then the four subunits shift together",
-    "from 'tense' to 'relaxed' (a ~15° twist), and the other three bind much more easily",
-    "that cooperativity lets blood load fully in the lungs and unload in the tissues",
-    "each red blood cell holds ~270 million haemoglobins · shown as an 11 s loop"], new THREE.Vector3(-33, 0, -75), 1.0);
+  const X = -33, Z = -75.5, g = new THREE.Group(); g.position.set(X, 0, Z); scene.add(g);
+  const sp = sz(9.5 * nm), nx = 16, ny = 11, nz = 11, N = nx * ny * nz;      // ~5 mM: about one per (9.5 nm)³
+  const hb = inst(new THREE.IcosahedronGeometry(sz(3.1 * nm), 1), M(0xffffff, { flatShading: true }), N), seeds = [];
+  let i = 0; for (let a = 0; a < nx; a++) for (let b = 0; b < ny; b++) for (let c = 0; c < nz; c++, i++) {
+    set(hb, i, (a - nx / 2) * sp + rr(-0.02, 0.02), 0.6 + b * sp + rr(-0.02, 0.02), (c - nz / 2) * sp + rr(-0.02, 0.02), 1, rnd() * 6, rnd() * 6, 0);
+    seeds.push(a / nx); }
+  g.add(hb);
+  const deoxy = new THREE.Color(0x5b1f2a), oxy = new THREE.Color(0xff2a2a);
+  procAnim.push(t => { if (!isNear(g.position)) return; const u = t % 12, front = u < 6 ? u / 5 : 1 - (u - 6) / 5;   // load in the lungs, unload in tissue
+    for (let j = 0; j < N; j++) hb.setColorAt(j, C3.copy(deoxy).lerp(oxy, ssm(seeds[j] - 0.08, seeds[j] + 0.08, front)));
+    hb.instanceColor.needsUpdate = true; });
+  label(["oxygen: inside a red blood cell", `${N.toLocaleString()} haemoglobins at their real crowding: a third of the cell's weight`,
+    "watch them load oxygen (dark red → bright red) as in the lungs, then unload as in the tissues",
+    "the colour change is real: it is why arterial blood is brighter than venous",
+    "each binds 4 O₂, the later ones more easily (cooperativity) · 12 s loop"], new THREE.Vector3(X, 0, Z), 1.0);
 }
 
-// 5. a nerve impulse: sodium channels open in a wave, Na⁺ rushes in, then K⁺ flows out
+// 5. a nerve impulse: a strip of axon membrane; channels open in a travelling wave
 {
-  const g = station(-40, -67), mem = membraneSlab(2.2, 0.6); mem.position.y = TOP + sz(2.5 * nm); g.add(mem);
-  const chans = [];
-  for (let c = 0; c < 4; c++) { const ch = new THREE.Group(), K = c === 3; ch.position.set(-0.75 + c * 0.5, TOP + sz(2.5 * nm), 0); g.add(ch);
-    const doms = []; for (let i = 0; i < 4; i++) { const a = i / 4 * 6.283 + 0.785, d = lumpy(1.6, K ? 0x8e44ad : 0x2e86c1, 0.1, 2); d.scale.set(1, 2.4, 1);
-      d.position.set(Math.cos(a) * sz(1.7 * nm), 0, Math.sin(a) * sz(1.7 * nm)); ch.add(d); doms.push({ d, a }); }
-    const ions = []; for (let i = 0; i < 6; i++) { const ion = glowBall(sz(0.19 * nm) * 3, K ? 0xd35400 : 0xa569bd); ch.add(ion); ions.push(ion); }
-    chans.push({ ch, doms, ions, K }); }
-  procAnim.push(t => { if (!isNear(g)) return; const u = t % 6;
-    chans.forEach(({ doms, ions, K }, c) => { const t0 = K ? 2.6 : 0.5 + c * 0.45, open = ssm(t0, t0 + 0.3, u) * (1 - ssm(t0 + 1.0, t0 + 1.4, u));
-      for (const { d, a } of doms) d.position.set(Math.cos(a) * sz(1.7 * nm) * (1 + 0.35 * open), 0, Math.sin(a) * sz(1.7 * nm) * (1 + 0.35 * open));
-      ions.forEach((ion, i) => { const k = ((u - t0 - i * 0.15) / 0.9); ion.visible = open > 0.3 && k > 0 && k < 1;
-        ion.position.set(0, (K ? -1 : 1) * (0.12 - k * 0.24), 0); }); }); });  // Na⁺ in (downward here), K⁺ out
-  label(["a nerve impulse, one channel at a time", "sodium channels (blue) open in a wave along the membrane; Na⁺ (purple) floods in",
-    "then the potassium channel (violet) opens and K⁺ (orange) flows out, resetting the voltage",
-    "real time: each channel opens for about a millisecond; the impulse travels up to 120 m/s",
-    "millions of ions pass per channel per second · shown as a 6 s loop"], new THREE.Vector3(-40, 0, -67), 1.0);
+  const X = -40, Z = -66.5, Y = 1.2, L = 6, W = 1.6, g = deck(L, W, Y); g.position.set(X, 0, Z); scene.add(g);
+  const NA = 60, NK = 30, na = inst(new THREE.CylinderGeometry(sz(4 * nm), sz(4 * nm), sz(10 * nm), 8), M(0x2e86c1), NA), kk = inst(new THREE.CylinderGeometry(sz(3.5 * nm), sz(3.5 * nm), sz(9 * nm), 8), M(0x8e44ad), NK);
+  const np = [...Array(NA)].map(() => [rr(-L / 2, L / 2), rr(-W / 2.3, W / 2.3)]), kp = [...Array(NK)].map(() => [rr(-L / 2, L / 2), rr(-W / 2.3, W / 2.3)]);
+  const NI = 300, ion = inst(new THREE.SphereGeometry(sz(0.4 * nm), 6, 4), M(0xffffff), NI); const iseed = [...Array(NI)].map(() => [Math.floor(rnd() * 90), rnd()]);
+  g.add(na, kk, ion);
+  procAnim.push(t => { if (!isNear(g.position)) return; const front = -L / 2 - 1 + ((t % 7) / 6) * (L + 2);    // the action potential travels along
+    np.forEach(([x, z], i) => { const open = ssm(0, 0.3, front - x) * (1 - ssm(0.6, 1.0, front - x)); set(na, i, x, Y, z, 1 + 0.4 * open); na.setColorAt(i, C3.set(open > 0.3 ? 0x85c1e9 : 0x1f618d)); });
+    kp.forEach(([x, z], i) => { const open = ssm(0.7, 1.0, front - x) * (1 - ssm(1.6, 2.2, front - x)); set(kk, i, x, Y, z, 1 + 0.4 * open); kk.setColorAt(i, C3.set(open > 0.3 ? 0xd2b4de : 0x6c3483)); });
+    iseed.forEach(([c, ph], i) => { const isK = c >= NA, [x, z] = isK ? kp[c - NA] : np[c], local = front - x - (isK ? 0.7 : 0);
+      const k = ((local + ph * 0.4) % 1.2) / 1.2, open = local > 0 && local < (isK ? 1.2 : 0.6);
+      set(ion, i, x, Y + (isK ? -1 : 1) * (0.3 - k * 0.6), z, open ? 1 : 0.001); ion.setColorAt(i, C3.set(isK ? 0xe67e22 : 0xbb8fce)); });
+    na.instanceMatrix.needsUpdate = kk.instanceMatrix.needsUpdate = ion.instanceMatrix.needsUpdate = true;
+    na.instanceColor.needsUpdate = kk.instanceColor.needsUpdate = ion.instanceColor.needsUpdate = true; });
+  label(["a nerve impulse travelling along an axon", "sodium channels (blue) open as the wave arrives; Na⁺ (lilac) floods in from outside (above)",
+    "just behind, potassium channels (purple) open and K⁺ (orange) flows out, resetting the voltage",
+    "real: the wave moves up to 120 m/s; each channel opens for ~1 ms",
+    "this strip is 600 nm of axon membrane · shown slowed to a 7 s loop"], new THREE.Vector3(X, 0, Z), 1.0);
 }
 
-// 6. DNA replication: helicase unzips the double helix, polymerases copy each strand
+// 6. DNA replication: a 5 m stretch, helicase unzipping, polymerases copying both strands
 {
-  const g = station(-47, -75), X0 = -1.2, X1 = 1.2, R = sz(1 * nm), pitch = sz(3.4 * nm);
+  const X = -47, Z = -75.5, g = new THREE.Group(); g.position.set(X, 0, Z); scene.add(g);
+  const X0 = -2.5, X1 = 2.5, R = sz(1 * nm), pitch = sz(3.4 * nm), y0 = 1.35;
   const keepAhead = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0), keepBehind = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
-  const strand = (y, z, ph, col, clip) => { const pts = [];
-    for (let x = X0; x <= X1; x += pitch / 16) { const a = (x - X0) / pitch * 6.283 + ph; pts.push(new THREE.Vector3(x, y + Math.cos(a) * R, z + Math.sin(a) * R)); }
-    const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length, sz(0.3 * nm), 5), M(col, { clippingPlanes: [clip] })); g.add(m); };
-  const y0 = TOP + sz(3 * nm);
-  strand(y0, 0, 0, 0x2e86c1, keepAhead); strand(y0, 0, 2.7, 0x5dade2, keepAhead);                  // the parent, ahead of the fork
-  for (const [dz, old] of [[-sz(6 * nm), 0x2e86c1], [sz(6 * nm), 0x5dade2]]) {                           // two daughters behind it
-    strand(y0, dz, 0, old, keepBehind); strand(y0, dz, 2.7, 0xf39c12, keepBehind); }                      // orange: new strand
+  const strand = (dy, dz, ph, col, clip) => { const pts = [];
+    for (let x = X0; x <= X1; x += pitch / 12) { const a = (x - X0) / pitch * 6.283 + ph; pts.push(new THREE.Vector3(x, y0 + dy + Math.cos(a) * R, dz + Math.sin(a) * R)); }
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length, sz(0.3 * nm), 5), M(col, { clippingPlanes: [clip] }))); };
+  strand(0, 0, 0, 0x2e86c1, keepAhead); strand(0, 0, 2.7, 0x5dade2, keepAhead);
+  for (const [dy, old] of [[sz(5 * nm), 0x2e86c1], [-sz(5 * nm), 0x5dade2]]) { strand(dy, 0, 0, old, keepBehind); strand(dy, 0, 2.7, 0xf39c12, keepBehind); }
   const heli = new THREE.Group(); for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283, b = lumpy(1.5, 0x7d3c98, 0.1, 1); b.position.set(0, y0 + Math.cos(a) * sz(4 * nm), Math.sin(a) * sz(4 * nm)); heli.add(b); }
   g.add(heli);
-  const pols = [-1, 1].map(s2 => { const p = lumpy(4, 0x1e8449, 0.12, 2); g.add(p); return { p, s2 }; });
-  procAnim.push(t => { if (!isNear(g)) return; const u = (t % 14) / 14, fx = X0 + 0.1 + u * (X1 - X0 - 0.2);
-    keepAhead.constant = -(g.position.x + fx); keepBehind.constant = g.position.x + fx;                 // world-space x of the fork
-    heli.position.x = fx; pols.forEach(({ p, s2 }) => p.position.set(fx - 0.08, y0, s2 * sz(6 * nm))); });
+  const pols = [1, -1].map(sy => { const p = lumpy(4, 0x1e8449, 0.12, 1); g.add(p); return { p, sy }; });
+  const stand = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.04, 0.3), M(0x34495e)); stand.position.set(0, 0.9, 0); g.add(stand);
+  procAnim.push(t => { if (!isNear(g.position)) return; const fx = X0 + 0.1 + ((t % 18) / 18) * (X1 - X0 - 0.2);
+    keepAhead.constant = -(g.position.x + fx); keepBehind.constant = g.position.x + fx;
+    heli.position.x = fx; pols.forEach(({ p, sy }) => p.position.set(fx - 0.09, y0 + sy * sz(5 * nm), 0)); });
   label(["DNA replication: copying the code", "helicase (purple ring) unzips the double helix; a polymerase (green) on each strand",
-    "builds a new partner (orange) letter by letter: every daughter is half old, half new",
-    "real speed: ~1,000 letters a second in bacteria (3.4 cm per ms here), ~50 in human cells",
-    "errors: about 1 in a billion letters after proofreading · shown as a 14 s loop"], new THREE.Vector3(-47, 0, -75), 1.0);
+    "builds a new partner (orange): every daughter molecule is half old, half new",
+    "real speed: ~1,000 letters a second in bacteria (this whole 5 m stretch in about 0.15 s)",
+    "a human cell copies 6 billion letters with about one uncorrected error per billion · 18 s loop"], new THREE.Vector3(X, 0, Z), 1.0);
 }
 
-// 7. translation: a ribosome reads mRNA and threads out a growing protein
+// 7. translation: a polysome -- many ribosomes reading one mRNA at once
 {
-  const g = station(-54, -67), rb = ribosome(); rb.position.y = TOP + sz(12 * nm); g.add(rb);
-  const mrna = new THREE.Mesh(new THREE.CylinderGeometry(sz(0.6 * nm), sz(0.6 * nm), 1.8, 6), M(0x5dade2)); mrna.rotation.z = Math.PI / 2; mrna.position.set(0, TOP + sz(5 * nm), sz(2 * nm)); g.add(mrna);
-  const N = 40, chain = new THREE.InstancedMesh(new THREE.SphereGeometry(sz(0.4 * nm), 8, 6), M(0xf4d03f), N), o = new THREE.Object3D(); g.add(chain);
-  const trna = lumpy(1.6, 0xec7063, 0.15, 1); trna.scale.set(0.6, 1.6, 0.6); g.add(trna);
-  procAnim.push(t => { if (!isNear(g)) return; const u = t % 12, n = Math.min(N, Math.floor(u * 3.4));
-    for (let i = 0; i < n; i++) { const k = n - i; o.position.set(-sz(2 * nm) - k * sz(0.35 * nm) * 0.9, TOP + sz(22 * nm) + Math.sin(k * 0.6) * sz(1 * nm) + k * sz(0.12 * nm), Math.cos(k * 0.5) * sz(1 * nm));
-      o.updateMatrix(); chain.setMatrixAt(i, o.matrix); }
-    chain.count = n; chain.instanceMatrix.needsUpdate = true;
-    mrna.position.x = -((u * 3.4) % 1) * sz(1 * nm);
-    const f = (u * 3.4) % 1; trna.position.set(sz(4 * nm) + (1 - ssm(0, 0.5, f)) * 0.12, TOP + sz(14 * nm) + (1 - ssm(0, 0.5, f)) * 0.12, 0); });
-  label(["making a protein: the ribosome at work", "the ribosome reads the mRNA (blue) three letters at a time",
-    "tRNAs (pink) bring matching amino acids; the chain (yellow) grows out of a tunnel",
-    "real speed: ~20 amino acids a second in bacteria; a typical protein takes 10-20 s",
-    "the chain folds as it emerges · shown at real-ish pace, looping every 12 s"], new THREE.Vector3(-54, 0, -67), 1.0);
+  const X = -54, Z = -66.5, L = 5, Y = 1.3, g = new THREE.Group(); g.position.set(X, 0, Z); scene.add(g);
+  const mrna = new THREE.Mesh(new THREE.CylinderGeometry(sz(0.6 * nm), sz(0.6 * nm), L, 6), M(0x5dade2)); mrna.rotation.z = Math.PI / 2; mrna.position.y = Y; g.add(mrna);
+  const NR = 8, ribs = [], NB = 60;
+  for (let i = 0; i < NR; i++) { const rb = ribosome(); g.add(rb);
+    const ch = inst(new THREE.SphereGeometry(sz(0.4 * nm), 6, 4), M(0xf4d03f), NB); g.add(ch); ribs.push({ rb, ch, ph: i / NR }); }
+  procAnim.push(t => { if (!isNear(g.position)) return;
+    for (const { rb, ch, ph } of ribs) { const u = (t / 24 + ph) % 1, x = -L / 2 + u * L;
+      rb.position.set(x, Y + sz(8 * nm), 0);
+      const n = Math.floor(u * NB); for (let k = 0; k < NB; k++) set(ch, k, x - sz(3 * nm) - Math.sin(k * 0.4) * 0.05, Y + sz(20 * nm) + k * sz(0.35 * nm) * 0.8, Math.cos(k * 0.5) * 0.05, k < n ? 1 : 0.001);
+      ch.instanceMatrix.needsUpdate = true; } });
+  label(["making proteins: a polysome", "8 ribosomes read the same mRNA (blue) at once, each a little further along",
+    "each grows its own protein chain (yellow): the further along, the longer the chain",
+    "real speed: ~20 amino acids a second; one mRNA can make dozens of copies",
+    "shown slowed: one pass every 24 s"], new THREE.Vector3(X, 0, Z), 1.0);
 }
 
-// 8. immunity: antibodies coat a virus and block its spikes
+// 8. immunity: two viruses being coated by antibodies
 {
-  const g = new THREE.Group(); g.position.set(-61, 0, -75); scene.add(g);
-  const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.25, 0.75, 16), M(0x34495e)); stand.position.y = 0.375; g.add(stand);
-  const vir = virus(); vir.position.y = 0.75 + sz(REAL.virus) / 2 + sz(REAL.spike); g.add(vir);
-  const R = sz(REAL.virus) / 2 + sz(REAL.spike) * 0.85, n = 26, abs = [];
-  for (let i = 0; i < n; i++) { const y = 1 - 2 * (i + 0.5) / n, rad = Math.sqrt(1 - y * y), a = i * 2.39996, d = new THREE.Vector3(Math.cos(a) * rad, y, Math.sin(a) * rad);
-    if (i % 2) continue;
-    const ab = new THREE.Group(), arm = ang => { const c = new THREE.Mesh(new THREE.CapsuleGeometry(sz(1.4 * nm), sz(4.5 * nm), 4, 8), M(0xf5f5f5));
-      c.rotation.z = ang; c.position.set(-Math.sin(ang) * sz(3.5 * nm), Math.cos(ang) * sz(3.5 * nm), 0); return c; };
-    ab.add(arm(0.95), arm(-0.95), arm(Math.PI)); g.add(ab);
-    abs.push({ ab, d, from: d.clone().multiplyScalar(R + 0.6 + rnd() * 0.4).add(new THREE.Vector3(0, 0.3, 0)), when: 1 + abs.length * 0.55 }); }
-  procAnim.push(t => { if (!isNear(g)) return; const u = t % 12;
-    for (const { ab, d, from, when } of abs) { const k = ssm(when, when + 1.2, u) * (1 - ssm(11, 11.8, u));
-      const at = d.clone().multiplyScalar(R + sz(9 * nm));
-      ab.position.lerpVectors(from, at, k).add(vir.position);
-      ab.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), d); ab.visible = k > 0.01; } });
-  label(["immunity: antibodies neutralise a virus", "antibodies (white Ys, 15 nm → 15 cm) clamp onto the virus's spike proteins",
-    "with its spikes blocked, the virus can't grab our cells, and immune cells spot the coated virus",
-    "vaccines train your body to make exactly these antibodies before the real virus arrives",
-    "real time: binding takes seconds to minutes · shown as a 12 s loop"], new THREE.Vector3(-61, 0, -75), 1.0);
+  for (const [vx, vz, delay] of [[-60, -75.5, 0], [-63, -77.5, 4]]) {
+    const g = new THREE.Group(); g.position.set(vx, 0, vz); scene.add(g);
+    const vir = virus(); vir.position.y = 1.4; g.add(vir);
+    const R = sz(REAL.virus) / 2 + sz(REAL.spike) * 0.85, n = 26, abs = [];
+    for (let i = 0; i < n; i++) { const y = 1 - 2 * (i + 0.5) / n, rad = Math.sqrt(1 - y * y), a = i * 2.39996, d = new THREE.Vector3(Math.cos(a) * rad, y, Math.sin(a) * rad);
+      const ab = new THREE.Group(), arm = ang => { const c = new THREE.Mesh(new THREE.CapsuleGeometry(sz(1.4 * nm), sz(4.5 * nm), 3, 6), M(0xf5f5f5));
+        c.rotation.z = ang; c.position.set(-Math.sin(ang) * sz(3.5 * nm), Math.cos(ang) * sz(3.5 * nm), 0); return c; };
+      ab.add(arm(0.95), arm(-0.95), arm(Math.PI)); g.add(ab);
+      abs.push({ ab, d, from: d.clone().multiplyScalar(R + 0.8 + rnd() * 0.6), when: delay + 0.5 + i * 0.3 }); }
+    procAnim.push(t => { if (!isNear(g.position)) return; const u = t % 16;
+      for (const { ab, d, from, when } of abs) { const k = ssm(when, when + 1.2, u) * (1 - ssm(15, 15.8, u));
+        ab.position.lerpVectors(from, d.clone().multiplyScalar(R + sz(9 * nm)), k).add(vir.position);
+        ab.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), d); ab.visible = k > 0.01; } });
+  }
+  label(["immunity: antibodies neutralise viruses", "antibodies (white Ys, 15 nm → 15 cm) clamp onto every spike of the virus",
+    "a coated virus can't grab our cells, and immune cells recognise it and eat it",
+    "vaccines train your body to make exactly these antibodies in advance",
+    "real time: seconds to minutes · 16 s loop"], new THREE.Vector3(-61.5, 0, -75.5), 1.0);
 }
-path([[-5.4, -69], [-5.4, -71], [-64, -71]], 2); path([[-1.3, -71], [-5.4, -71]], 2);
+path([[-5.4, -69], [-5.4, -71], [-66, -71]], 2); path([[-1.3, -71], [-5.4, -71]], 2);
 ladder.push({ name: "Life in action (processes)", real: 20 * nm, x: -35, z: -71 });
 
 // ---------- the guide: jump to any hall ------------------------------------------------
