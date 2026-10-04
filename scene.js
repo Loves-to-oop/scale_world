@@ -517,18 +517,101 @@ const atoms = (pos, r, mat) => {           // many identical atoms as one instan
   q.position.y = 1.03 + sz(2.5 * nm); g.add(q);
   onTable(g, 5.6, "quantum dot (CdSe)", 5 * nm, ["glows orange because it is 5 nm; smaller ones glow blue"]);
 }
-{ // X-ray and visible light wavelengths, drawn as waves across the path
-  const wave = (lambda, amp, x0, x1, y, z, col, r) => {
-    const pts = []; for (let x = x0; x <= x1; x += lambda / 24) pts.push(new THREE.Vector3(x, y + amp * Math.sin((x - x0) / lambda * 6.2832), z));
-    const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length * 2, r, 5),
-      M(col, { emissive: col, emissiveIntensity: 0.5 })); scene.add(m); };
-  const lam = sz(REAL.lightGreen); wave(lam, 0.9, 4, 4 + lam * 7, 3.2, -34, 0x2ecc40, 0.06);
-  label(["green light", `wavelength 530 nm → ${fmt(lam)}`, "light is far bigger than molecules: you could not really see them"],
-    new THREE.Vector3(4 + lam * 3.5, 4.8, -34), 1.3);
-  wave(sz(REAL.xray), 0.0005, 6, 7, 1.4, -30, 0x8e44ad, 0.00015);
-  const xs = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.02, 0.02), M(0x4a5a6a)); xs.position.set(6.5, 1.3, -30); scene.add(xs);
-  label(["an X-ray", `wavelength 0.1 nm → ${fmt(sz(REAL.xray))}`, "(the purple thread: atom-sized, which is why X-rays reveal atoms)"],
-    new THREE.Vector3(6.5, 1.75, -30), 0.5);
+// ---------- the Light gallery: the electromagnetic spectrum at ×10⁷ ------------------------
+// Each wave is a tube whose shape is computed on the GPU: y = A sin(2π x / λ − φ), with
+// the phase φ advancing at the light's real frequency f = c/λ times the time scale.
+const C_LIGHT = 2.998e8, H_EV = 1239.84;                     // m/s; h·c in eV·nm
+const WAVES = [];                                             // {mat, f} -- phases advance in the loop
+function waveTube(lambdaM, cycles, amp, r, col) {             // lambdaM: wavelength here (m)
+  const L = lambdaM * cycles, geo = new THREE.CylinderGeometry(r, r, L, 6, Math.max(60, Math.round(cycles * 48)), true);
+  geo.rotateZ(-Math.PI / 2); geo.translate(L / 2, 0, 0);
+  const mat = new THREE.ShaderMaterial({ uniforms: { lam: { value: lambdaM }, amp: { value: amp }, phase: { value: 0 }, col: { value: new THREE.Color(col) } },
+    vertexShader: `#include <common>
+      #include <logdepthbuf_pars_vertex>
+      uniform float lam, amp, phase; varying vec3 vn;
+      void main(){ vec3 p = position; float a = 6.2831853 * p.x / lam - phase;
+        p.y += amp * sin(a); vn = normalize(normalMatrix * vec3(-amp * 6.2831853 / lam * cos(a), 1.0, 0.0) + normal * 0.6);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+        #include <logdepthbuf_vertex>
+      }`,
+    fragmentShader: `#include <common>
+      #include <logdepthbuf_pars_fragment>
+      uniform vec3 col; varying vec3 vn;
+      void main(){
+        #include <logdepthbuf_fragment>
+        float sh = 0.55 + 0.45 * abs(normalize(vn).y); gl_FragColor = vec4(col * sh + col * 0.25, 1.0); }` });
+  return { mesh: new THREE.Mesh(geo, mat), mat, L };
+}
+const fmtHz = f => f >= 1e18 ? `${+(f / 1e18).toPrecision(3)} EHz` : f >= 1e15 ? `${+(f / 1e15).toPrecision(3)} PHz` :
+  f >= 1e12 ? `${+(f / 1e12).toPrecision(3)} THz` : f >= 1e9 ? `${+(f / 1e9).toPrecision(3)} GHz` : `${+(f / 1e6).toPrecision(3)} MHz`;
+const fmtEV = e => e >= 1e3 ? `${+(e / 1e3).toPrecision(3)} keV` : e >= 0.1 ? `${+e.toPrecision(3)} eV` : `${+(e * 1e3).toPrecision(3)} meV`;
+function spectrumLine(lamReal, name, note) {                  // plaque text with real physics
+  const f = C_LIGHT / lamReal, E = H_EV / (lamReal / nm);
+  return [name, `wavelength ${fmtReal(lamReal)} → ${fmt(sz(lamReal))} here`,
+          `frequency ${fmtHz(f)} · photon energy ${fmtEV(E)}${E > 3.5 ? " -- enough to break chemical bonds" : ""}`, note]; }
+const LG = { x0: 52, z0: -20 };                               // the gallery's corner
+{
+  // the rainbow wall: seven visible wavelengths stacked on one frame, so you can compare them
+  const vis = [[700, 0xff2a1a, "red"], [610, 0xff8c1a, "orange"], [580, 0xffe11a, "yellow"], [530, 0x34e04a, "green"],
+               [490, 0x1ad0e6, "cyan"], [450, 0x2d5bff, "blue"], [400, 0x8a3dff, "violet"]];
+  const fx = LG.x0, fz = LG.z0 - 4, frameL = sz(700 * nm) * 2 + 1;
+  for (const px of [fx - 0.3, fx + frameL]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 4.6, 0.12), M(0x2c3e50)); post.position.set(px, 2.3, fz); scene.add(post); }
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(frameL + 0.5, 0.1, 0.12), M(0x2c3e50)); beam.position.set(fx + frameL / 2 - 0.15, 4.6, fz); scene.add(beam);
+  vis.forEach(([l, col, n], i) => { const w = waveTube(sz(l * nm), 2, 0.17, 0.035, col); w.mesh.position.set(fx, 0.85 + i * 0.52, fz); scene.add(w.mesh);
+    WAVES.push({ mat: w.mat, f: C_LIGHT / (l * nm) });
+    const tag = label([`${n} ${l} nm`], new THREE.Vector3(fx - 0.9, 0.85 + i * 0.52, fz), 0.32, "banner"); });
+  label(["the visible rainbow", "violet 400 nm → 4 m  ·  red 700 nm → 7 m: two waves of each",
+         "every colour you have ever seen fits between these", "at 1 femtosecond per second (press 0) they move: green oscillates every 1.8 s"],
+    new THREE.Vector3(fx + 6, 0, fz + 2), 1.0);
+  ladder.push({ name: "visible light", real: 530 * nm, x: fx + 6, z: fz });
+}
+{
+  // the rest of the spectrum, shortest first, each on its own rack along a path
+  const items = [
+    [1e-12 * 1, 0xffffff, "gamma ray", "from atomic nuclei · too fine to see even here: 0.01 mm waves", 40, 0.000004],
+    [1.97e-12, 0x9fdfff, "electrons in a 300 kV microscope", "waves this short are why electron microscopes see atoms", 40, 0.000006],
+    [0.1 * nm, 0xc39bd3, "X-ray", "the size of an atom: X-rays map where atoms sit in crystals", 6, 0.00025],
+    [1 * nm, 0xa569bd, "soft X-ray", "absorbed by air; used to image cells' insides", 6, 0.0025],
+    [13.5 * nm, 0x7d3c98, "extreme ultraviolet", "the light that prints today's chips (see the chip nearby)", 6, 0.02],
+    [254 * nm, 0x6c3483, "UV-C (germicidal)", "127× wider than DNA, but each photon can break it", 2, 0.35],
+    [300 * nm, 0x884ea0, "UV-B", "the sunburn band", 2, 0.4],
+    [365 * nm, 0x9b59b6, "UV-A (black light)", "makes white shirts glow at a party", 2, 0.45],
+    [1 * um, 0x7b241c, "near infrared", "TV remotes, night-vision cameras", 1.5, 0.9],
+    [1.55 * um, 0x641e16, "telecom infrared", "the internet travels through glass fibres at this wavelength", 1.25, 1.2],
+  ];
+  const zRow = LG.z0 - 13; let x = LG.x0;
+  for (const [lam, col, name, note, cycles, amp] of items) {
+    const L = sz(lam) * cycles, r = Math.max(sz(lam) * 0.04, 0.00025);   // the shortest are drawn as a fine visible thread
+    const w = waveTube(sz(lam), cycles, amp, r, col); w.mesh.position.set(x, 1.15, zRow); scene.add(w.mesh); WAVES.push({ mat: w.mat, f: C_LIGHT / lam });
+    const rack = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.3, L) + 0.2, 0.05, 0.25), M(0x34495e)); rack.position.set(x + L / 2, 0.85, zRow); scene.add(rack);
+    for (const px of [x - 0.1, x + Math.max(0.3, L) + 0.1]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.85, 0.05), M(0x34495e)); leg.position.set(px, 0.425, zRow); scene.add(leg); }
+    label(spectrumLine(lam, name, note), new THREE.Vector3(x + Math.max(0.3, L) / 2, 0, zRow), 0.7);
+    ladder.push({ name, real: lam, x: x + L / 2, z: zRow });
+    x += Math.max(1.6, L + 1.6);
+  }
+  // thermal infrared: a single 100 m wave arching over the gallery
+  const lamT = 10 * um, wT = waveTube(sz(lamT), 1, 14, 0.25, 0xc0392b);
+  wT.mesh.position.set(LG.x0 - 2, 14.5, LG.z0 - 28); scene.add(wT.mesh); WAVES.push({ mat: wT.mat, f: C_LIGHT / lamT });
+  label(spectrumLine(lamT, "thermal infrared (the red arch)", "the light YOU glow with: body heat peaks near 10 µm"), new THREE.Vector3(LG.x0 + 4, 0, LG.z0 - 27), 1.2);
+  ladder.push({ name: "thermal infrared", real: lamT, x: LG.x0 + 48, z: LG.z0 - 28 });
+  // the rest of the spectrum won't fit on the slide
+  label(["beyond the slide ▶", `a 12 cm microwave would be ${fmtReal(sz(0.12)).replace(" m", " m")} here = ${(sz(0.12) / 1000).toLocaleString()} km long`,
+         `an FM radio wave (3 m) would be ${(sz(3) / 1000).toLocaleString()} km -- wider than the Earth`,
+         "the whole spectrum runs over 15 powers of ten; your eyes see one narrow band"], new THREE.Vector3(LG.x0 + 46, 0, LG.z0 - 13), 1.0);
+}
+{
+  // why a light microscope can't see molecules: the diffraction limit
+  const cx = LG.x0 + 6, cz = LG.z0 - 22, d = sz(0.61 * 530 * nm / 1.4) * 2;   // Rayleigh: 0.61 λ / NA, NA = 1.4 oil
+  const dotPair = (sep, x0) => { for (const sx of [-sep / 2, sep / 2]) {
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffffff })); dot.position.set(x0 + sx, 1.6, cz); scene.add(dot);
+      const blur = new THREE.Mesh(new THREE.CircleGeometry(d / 2, 48), new THREE.MeshBasicMaterial({ color: 0x7dff9a, transparent: true, opacity: 0.32, depthWrite: false }));
+      blur.position.set(x0 + sx, 1.6, cz - 0.01); scene.add(blur); } };
+  dotPair(d * 1.15, cx); dotPair(d * 0.4, cx + 7);
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(13, 3.2), M(0x10202a)); board.position.set(cx + 3.5, 1.6, cz - 0.05); scene.add(board);
+  label(["the diffraction limit", `even a perfect light microscope blurs each point into a disc ~${fmtReal(0.61 * 530 * nm / 1.4 * 2)} wide (${fmt(d)} here)`,
+         "left: two points far enough apart to tell apart · right: closer, and they merge into one blur",
+         "so a virus (1 m here) or a protein (5 cm) can't be seen with light -- electrons or X-rays are needed"], new THREE.Vector3(cx + 3.5, 0, cz + 2), 1.0);
+  ladder.push({ name: "diffraction limit", real: 0.23 * um, x: cx + 3.5, z: cz });
 }
 { // a modern chip: silicon fins with gates wrapped over them ("3 nm-class" process)
   const C = new THREE.Group(); C.position.set(12, 0, -46); scene.add(C);
@@ -1480,6 +1563,7 @@ const onPlinth = (obj, x, z, name, realM, extra, top = 1.0, w = 0.5) => {
       "our own cells may descend from a partnership between one of these and a bacterium"], 8, 4); }
 }
 // paths to the new exhibits
+path([[50, -25.6], [52, -21.2], [70, -21.2]], 1.8); path([[50, -25.6], [50, -35.8], [86, -35.8]], 1.8); path([[50, -35.8], [50, -44.8], [72, -44.8]], 1.8);   // the Light gallery
 path([[-5.4, -32.4], [-30, -32.4]], 1.8); path([[-5.4, -40.4], [-30, -40.4]], 1.8);
 path([[-5.4, -50], [-26, -50]], 1.6); path([[-5.4, -60], [-26, -60]], 1.6);
 path([[-1.3, -117.6], [-32, -117.6]], 2); path(curve([[-34, -100], [-40, -95], [-42, -86]]), 2); path([[-34, -103], [-46, -110]], 2);
@@ -1498,10 +1582,10 @@ window.museum = { rig, HALLS };                 // handy from the browser consol
 }
 
 // ---------- time: real rates at a chosen time scale --------------------------------
-const TAUS = [1e-12, 1e-11, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1];
-const TAU_NAMES = ["1 picosecond", "10 ps", "100 ps", "1 nanosecond", "10 ns", "100 ns", "1 microsecond",
+const TAUS = [1e-18, 1e-17, 1e-16, 1e-15, 1e-14, 1e-13, 1e-12, 1e-11, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1];
+const TAU_NAMES = ["1 attosecond", "10 as", "100 as", "1 femtosecond", "10 fs", "100 fs", "1 picosecond", "10 ps", "100 ps", "1 nanosecond", "10 ns", "100 ns", "1 microsecond",
   "10 µs", "100 µs", "1 millisecond", "10 ms", "100 ms", "1 second"];
-let tauI = 0;                              // start slow enough to see water move
+let tauI = TAUS.indexOf(1e-12);            // start slow enough to see water move
 const tau = () => TAUS[tauI];
 // E. coli run-and-tumble: runs ~1 s straight, tumbles ~0.1 s to a new direction
 const ecoliState = { dir: new THREE.Vector3(1, 0, 0), run: 1, tumble: 0 };
@@ -1512,7 +1596,8 @@ const keys = {};
 addEventListener("keydown", e => {
   keys[e.code] = true; start();
   if (e.code === "BracketRight") tauI = Math.min(TAUS.length - 1, tauI + 1);
-  if (e.code === "Digit1") tauI = 0;                 // 1 ps: water
+  if (e.code === "Digit0") tauI = TAUS.indexOf(1e-15); // 1 fs: light
+  if (e.code === "Digit1") tauI = TAUS.indexOf(1e-12); // 1 ps: water
   if (e.code === "Digit2") tauI = TAUS.indexOf(1e-3); // 1 ms: bacteria, flagella
   if (e.code === "Digit3") tauI = TAUS.indexOf(1e-2); // 10 ms: motors, muscle
   if (e.code === "BracketLeft") tauI = Math.max(0, tauI - 1);
@@ -1535,7 +1620,7 @@ const Q = new URLSearchParams(location.search);
 if (Q.has("shot")) start();
 if (Q.get("cam")) { const [x, y, z, yw, pt] = Q.get("cam").split(",").map(Number);
   rig.position.set(x, y, z); yaw = yw; pitch = pt || 0; }
-if (Q.get("tau")) tauI = Number(Q.get("tau"));
+if (Q.get("tau")) tauI = TAUS.indexOf(Number(Q.get("tau"))) >= 0 ? TAUS.indexOf(Number(Q.get("tau"))) : Number(Q.get("tau"));
 
 // VR: Enter VR, left stick to fly where you look, right stick to snap-turn
 const vrBtn = document.getElementById("vr");
@@ -1556,7 +1641,7 @@ function readout(v) {
   const n = near.reduce((a, b) => b.pos.distanceTo(rig.position) < a.pos.distanceTo(rig.position) ? b : a);
   const dWater = Math.sqrt(6 * REAL.dWater * tau()) * S;        // rms 3D step of a water molecule, per second here
   hud.innerHTML = `<b>×10,000,000</b> &nbsp;·&nbsp; you are 1.7 m here = <b>170 nm</b> real<br>
-    time: 1 second here = <b>${TAU_NAMES[tauI]}</b> real &nbsp;<span class="k">[ ]</span> or <span class="k">1</span> water · <span class="k">2</span> bacteria · <span class="k">3</span> motors &amp; muscle<br>
+    time: 1 second here = <b>${TAU_NAMES[tauI]}</b> real &nbsp;<span class="k">[ ]</span> or <span class="k">0</span> light · <span class="k">1</span> water · <span class="k">2</span> bacteria · <span class="k">3</span> motors &amp; muscle<br>
     ${flying ? "jetpack" : "walking"} <span class="k">F</span> &nbsp;·&nbsp; speed ${fmt(v)}/s here = <b>${fmtReal(realSpeed)}/s</b> real
     <span class="k">− =</span> or scroll<br>
     height above the slide: ${fmt(Math.max(0, h))} = ${fmtReal(Math.max(0, h) / S)}<br>
@@ -1616,6 +1701,8 @@ renderer.setAnimationLoop(() => {
   // flagella turn at 100 Hz real; the bacterium runs and tumbles
   for (const f of flagella) f.userData.spin.rotation.x += REAL.flagellumHz * 6.283 * T * dt;
   updateMotors(T * dt); updateMuscle(T * dt); for (const f of animate) f(T * dt);
+  for (const w of WAVES) {                    // light: phase advances 2π f per real second
+    const dph = 6.2831853 * w.f * T * dt; if (dph < 3) w.mat.uniforms.phase.value = (w.mat.uniforms.phase.value + dph) % 6.2831853; }
   const es = ecoliState;
   if (es.tumble > 0) { es.tumble -= T * dt; if (es.tumble <= 0) {
       es.dir.set(gauss(), 0, gauss()).normalize(); es.run = -Math.log(rnd()) * 1.0; } }   // it glides along the glass
