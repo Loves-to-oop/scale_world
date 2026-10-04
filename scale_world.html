@@ -53210,18 +53210,19 @@ function label(lines, pos, scale = 1, kind = "plaque") {
   const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 8;
   const W = THREE.MathUtils.clamp(c.width / 600 * scale, kind === "floor" ? 0.05 : 0.45, 12), Hh = W * c.height / c.width;
   const face = new THREE.Mesh(new THREE.PlaneGeometry(W, Hh), new THREE.MeshBasicMaterial({ map: tx, transparent: true, toneMapped: false,
-    depthWrite: kind !== "floor" }));
+    depthWrite: kind !== "floor", polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));   // always in front of its board
+  const gap = Math.max(0.02, W * 0.012);                     // the face stands clear of the backing board
   const g3 = new THREE.Group(); scene.add(g3);
   const rec = { g: g3, face, W, H: Hh, kind, anchor: new THREE.Vector3(pos.x, 0, pos.z), y: pos.y, mats: [face.material] };
   if (kind === "floor") { face.rotation.x = -Math.PI / 2; face.position.y = 0.012; g3.add(face); g3.position.set(pos.x, 0, pos.z); }
   else if (kind === "banner") { face.position.y = pos.y; g3.add(face);
-    const back = new THREE.Mesh(new THREE.BoxGeometry(W * 1.02, Hh * 1.04, Math.max(0.02, W * 0.01)), M(0x2c3e50)); back.position.set(0, pos.y, -Math.max(0.011, W * 0.0051)); g3.add(back);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(W * 1.02, Hh * 1.04, Math.max(0.02, W * 0.01)), M(0x2c3e50)); back.position.set(0, pos.y, -gap - Math.max(0.01, W * 0.005)); g3.add(back);
     g3.position.set(pos.x, 0, pos.z); }
   else {                                                     // a plaque: a lectern for small signs, a two-post board for big ones
     const stand = M(0x34495e), backMat = M(0x2c3e50, { transparent: true });
     const back = new THREE.Mesh(new THREE.BoxGeometry(W * 1.03, Hh * 1.05, Math.max(0.02, W * 0.012)), backMat);
     rec.mats.push(backMat);
-    const holder = new THREE.Group(); holder.add(back, face); face.position.z = Math.max(0.011, W * 0.0061);
+    const holder = new THREE.Group(); holder.add(back, face); face.position.z = Math.max(0.01, W * 0.006) + gap;
     if (W < 1.6) { const tilt = 0.5, top = 0.95;               // lectern, tilted back toward the reader
       holder.rotation.x = -tilt; holder.position.set(0, top + Math.sin(tilt) * 0 + Hh / 2 * Math.cos(tilt), -Hh / 2 * Math.sin(tilt));
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, top, 8), stand); post.position.y = top / 2; g3.add(post);
