@@ -53654,8 +53654,14 @@ const LG = { x0: 52, z0: -20 };                               // the gallery's c
   const beam = new THREE.Mesh(new THREE.BoxGeometry(frameL + 0.5, 0.1, 0.12), M(0x2c3e50)); beam.position.set(fx + frameL / 2 - 0.15, 4.6, fz); scene.add(beam);
   vis.forEach(([l, col, n], i) => { const w = waveTube(sz(l * nm), 2, 0.17, 0.035, col); w.mesh.position.set(fx, 0.85 + i * 0.52, fz); scene.add(w.mesh);
     WAVES.push({ mat: w.mat, f: C_LIGHT / (l * nm) });
-    const tag = label([`${n} ${l} nm`], new THREE.Vector3(fx - 0.9, 0.85 + i * 0.52, fz), 0.32, "banner"); });
-  label(["the visible rainbow", "violet 400 nm → 4 m  ·  red 700 nm → 7 m: two waves of each",
+    const tag = label([`${n} ${l} nm`], new THREE.Vector3(fx - 0.9, 0.85 + i * 0.52, fz), 0.32, "banner");
+    // a measuring bracket under the first wave: exactly one wavelength, crest to crest
+    const lam = sz(l * nm), y = 0.85 + i * 0.52 - 0.25, mat = new THREE.MeshBasicMaterial({ color: col });
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(lam, 0.012, 0.012), mat); bar.position.set(fx + lam / 2, y, fz); scene.add(bar);
+    for (const ex of [0, lam]) { const tick = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.09, 0.012), mat); tick.position.set(fx + ex, y, fz); scene.add(tick); }
+    label([`one wavelength: ${l} nm → ${fmt(lam)}`], new THREE.Vector3(fx + lam / 2, y - 0.07, fz + 0.02), 0.22, "banner"); });
+  label(["the visible rainbow", "each line shows TWO waves; the bracket under it marks ONE wavelength",
+         "violet 400 nm → 4 m  ·  red 700 nm → 7 m",
          "every colour you have ever seen fits between these", "at 1 femtosecond per second (press 0) they move: green oscillates every 1.8 s"],
     new THREE.Vector3(fx + 6, 0, fz + 2), 1.0);
   ladder.push({ name: "visible light", real: 530 * nm, x: fx + 6, z: fz });
