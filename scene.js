@@ -904,7 +904,7 @@ for (const h of HALLS) {
   label([h.name.toUpperCase(), h.line], new THREE.Vector3(px, 2.6 * big, h.z0 + 0.06 * big), 1.1 * big, "banner");
 }
 const plinth = (x, z, top = 0.9, w = 0.5) => { const p = new THREE.Mesh(new THREE.BoxGeometry(w, top, w), M(0xe5ecef, { roughness: 0.8 }));
-  p.position.set(x, top / 2, z); scene.add(p); return top; };
+  p.position.set(x, top / 2, z); p.userData.plinth = true; scene.add(p); return top; };
 const exhibit = (obj, x, z, name, real, extra = [], labelY = 1.6, ls = 0.42) => {
   obj.position.x += x; obj.position.z += z; scene.add(obj);
   label(sizeLines(name, real).concat(extra), new THREE.Vector3(x, labelY, z), ls);
@@ -2560,3 +2560,35 @@ renderer.setAnimationLoop(() => {
     if (renderer.xr.isPresenting) { hudT = 0.35; try { drawWrist(v); } catch (e) { console.warn(e); } } else { readout(v); hudT = 0.2; } }
   renderer.render(scene, camera);
 });
+
+// ==========================================================================================
+//  CAPTURE MODE, for micrographs.py only (needs ?cap=... in the address; the museum is
+//  otherwise untouched). Renders one top-down (or tilted) orthographic view of the museum
+//  at its true size and posts it back:
+//    mode=lm   colour, as a light microscope sees it (glass slide invisible, bright field)
+//    mode=sem  surface normals, which micrographs.py turns into secondary-electron contrast
+//    mode=tem  a thin horizontal section (y0..y1), every surface drawn faintly dark and
+//              stacked, so overlapping material reads as electron density
+// ==========================================================================================
+if (Q.has("cap")) setTimeout(() => {
+  const [x0, x1, z0, z1] = Q.get("box").split(",").map(Number), mode = Q.get("mode"), tilt = Number(Q.get("tilt") || 0) * Math.PI / 180;
+  const N = Number(Q.get("px") || 1600);
+  renderer.setAnimationLoop(null); renderer.setSize(N, N); renderer.setPixelRatio(1);
+  scene.fog = null; PLAQUES.forEach(p => p.g.visible = false);
+  scene.traverse(o => { if (o.isPoints || o.isSprite || o.isLine || o.isLineSegments) o.visible = false; });
+  const W = x1 - x0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  const cam = new THREE.OrthographicCamera(-W / 2, W / 2, W / 2, -W / 2, 0.01, 20000);
+  const D = 5000; cam.position.set(cx, Math.cos(tilt) * D, cz + Math.sin(tilt) * D);
+  cam.up.set(0, 0, -1); if (tilt) cam.up.set(0, 1, 0); cam.lookAt(cx, 0, cz); cam.updateProjectionMatrix();
+  const slide = window.__slide;
+  if (mode === "lm") { slide.visible = false; scene.background = new THREE.Color(0xf4f2ea); }
+  if (mode === "sem") { scene.background = new THREE.Color(0x8080ff); scene.overrideMaterial = new THREE.MeshNormalMaterial({ side: THREE.DoubleSide }); }
+  if (mode === "tem") { const y0 = Number(Q.get("y0") || 0), y1 = Number(Q.get("y1") || 1e9);
+    slide.visible = false; scene.background = new THREE.Color(0xffffff);
+    if (Q.has("bare")) scene.traverse(o => { if (o.isMesh && (o.userData.plinth || o.material === pathMat)) o.visible = false; });   // free particles on the grid, no stands
+    renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -y0), new THREE.Plane(new THREE.Vector3(0, -1, 0), y1)];
+    scene.overrideMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: Number(Q.get("op") || 0.12),
+      side: THREE.DoubleSide, depthTest: false, depthWrite: false }); }
+  renderer.render(scene, cam);
+  renderer.domElement.toBlob(b => fetch("/shot", { method: "POST", body: b }), "image/png");
+}, Number(Q.get("wait") || 4000));
