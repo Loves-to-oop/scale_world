@@ -57,7 +57,10 @@ const REAL = {
 };
 
 // ---------- renderer: depth from millimetres to kilometres -----------------------
-const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
+// On a headset (Quest browser) use a standard depth buffer: the logarithmic one, needed on the
+// desktop to span millimetres to kilometres, makes the ground and what's under it flicker in VR.
+const IS_HEADSET = /OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent);
+const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: !IS_HEADSET });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -70,7 +73,7 @@ const scene = new THREE.Scene();
 const WATERCOL = new THREE.Color(0x9cc4d8);        // everything here is under water
 scene.background = WATERCOL;
 scene.fog = new THREE.FogExp2(0x9cc4d8, 0.0009);
-const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.0005, 20000);
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, IS_HEADSET ? 0.01 : 0.0005, IS_HEADSET ? 3000 : 20000);
 const rig = new THREE.Group(); rig.add(camera); scene.add(rig);
 camera.position.y = 1.65;
 scene.add(new THREE.HemisphereLight(0xeaf4ff, 0x506070, 1.5));
@@ -438,7 +441,7 @@ label(sizeLines("animal cell", REAL.cell).concat(["nucleus " + fmt(sz(REAL.nucle
 {
   const RX = -2.2, z0 = 3.5, LEN = 720, dark = M(0x23404f);
   const strip = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.004, LEN), M(0xf2ede0));
-  strip.position.set(RX, 0.002, z0 - LEN / 2); scene.add(strip);
+  strip.position.set(RX, 0.002 + (IS_HEADSET ? 0.03 : 0), z0 - LEN / 2); scene.add(strip);   // raised a little on headsets
   const ticks = [];                      // [distance m, tick length m]
   for (let d = 0; d <= 1.0001; d += 0.01) ticks.push([d, Math.round(d * 100) % 10 ? 0.06 : 0.14]);
   for (let d = 1.1; d <= 10.0001; d += 0.1) ticks.push([d, Math.round(d * 10) % 10 ? 0.1 : 0.25]);
@@ -446,7 +449,7 @@ label(sizeLines("animal cell", REAL.cell).concat(["nucleus " + fmt(sz(REAL.nucle
   for (let d = 110; d <= LEN; d += 10) ticks.push([d, d % 50 ? 0.2 : 0.45]);
   const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.006, 1), dark, ticks.length), o = new THREE.Object3D();
   ticks.forEach(([d, l], i) => { const w = d <= 1 ? 0.003 : d <= 10 ? 0.012 : d <= 100 ? 0.05 : 0.2;
-    o.position.set(RX - 0.25 + l / 2, 0.006, z0 - d); o.scale.set(l, 1, w); o.updateMatrix(); im.setMatrixAt(i, o.matrix); });
+    o.position.set(RX - 0.25 + l / 2, 0.006 + (IS_HEADSET ? 0.03 : 0), z0 - d); o.scale.set(l, 1, w); o.updateMatrix(); im.setMatrixAt(i, o.matrix); });
   scene.add(im);
   const marks = [0.1, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 300, 400, 500, 600, 700];
   for (const d of marks) label([fmtReal(d / S)], new THREE.Vector3(RX - 0.75 - d * 0.008, 0, z0 - d), 0.22 + d * 0.012, "floor");
