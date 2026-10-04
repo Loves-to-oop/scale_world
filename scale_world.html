@@ -53167,6 +53167,8 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
 renderer.xr.enabled = true;
+renderer.localClippingEnabled = true;
+const ABOVE_GLASS = [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)];   // clip anything below y = 0
 document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const WATERCOL = new THREE.Color(0x9cc4d8);        // everything here is under water
@@ -53269,8 +53271,9 @@ const sizeLines = (name, real) => [name, `real ${fmtReal(real)}  ·  here ${fmt(
   const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(4000, 4000);
   tex.anisotropy = 8; tex.colorSpace = THREE.SRGBColorSpace;
   const slide = new THREE.Mesh(new THREE.PlaneGeometry(40000, 40000).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({ map: tex, roughness: 0.25, metalness: 0.05, color: 0xdbe9ee }));
-  scene.add(slide);
+    new THREE.MeshStandardMaterial({ map: tex, roughness: 0.25, metalness: 0.05, color: 0xdbe9ee,
+      polygonOffset: true, polygonOffsetFactor: 4, polygonOffsetUnits: 4 }));   // no shimmer with paths and floors
+  scene.add(slide); window.__slide = slide;
 }
 
 // ---------- the size ladder: real molecules, standing in a row ---------------------
@@ -53479,7 +53482,7 @@ for (let i = 0; i < 5; i++) {
   const L = sz(REAL.flagellumLen), turns = 3.5, amp = 2.4, pts = [];
   for (let j = 0; j <= 160; j++) { const u = j / 160;
     pts.push(new THREE.Vector3(u * L, Math.cos(u * turns * 6.283) * amp * Math.min(1, u * 6), Math.sin(u * turns * 6.283) * amp * Math.min(1, u * 6))); }
-  const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 400, sz(REAL.flagellumD) / 2, 6), M(0xd8e8c8));
+  const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 400, sz(REAL.flagellumD) / 2, 6), M(0xd8e8c8, { clippingPlanes: ABOVE_GLASS }));
   f.add(tube); f.rotation.set(0, Math.PI + rr(-0.15, 0.15), rr(-0.15, 0.15)); f.userData.spin = tube;
   ECOLI.add(f); flagella.push(f);
 }
@@ -53995,7 +53998,8 @@ const HALLS = [   // name, side (-1 left, +1 right), z from, z to, x extent, col
 for (const h of HALLS) {
   const cx = h.side === 0 ? 0 : h.side * (2 + h.w / 2), len = h.z0 - h.z1;
   const mat = new THREE.Mesh(new THREE.BoxGeometry(h.w, 0.004, len), new THREE.MeshStandardMaterial({
-    color: h.col, transparent: true, opacity: h.id === "entrance" ? 0.0 : 0.16, depthWrite: false }));
+    color: h.col, transparent: true, opacity: h.id === "entrance" ? 0.0 : 0.16, depthWrite: false,
+    polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 }));
   mat.position.set(cx, 0.003, (h.z0 + h.z1) / 2); scene.add(mat);
   h.entry = new THREE.Vector3(h.side === 0 ? 0.8 : h.side * 1.0, 0, h.z0 - 1);
   h.look = new THREE.Vector3(cx, 0, (h.z0 + h.z1) / 2);
@@ -54171,7 +54175,7 @@ function cytoplasm(g, n, within, col = 0x9b59b6, r = sz(REAL.ribosome) / 2) {   
     for (let i = 0; i <= 20; i++) { const u = i / 20 - 0.5; pts.push(new THREE.Vector3(u * L, -Math.cos(u * 2.2) * 4 + 4, 0)); }
     g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 60, r, 24, false), cellMat(0x76d7c4, 0.45)));
     const fl = []; for (let i = 0; i <= 120; i++) { const u = i / 120; fl.push(new THREE.Vector3(L / 2 + u * 50, pts.at(-1).y + Math.sin(u * 30) * 1.5 * Math.min(1, u * 5), Math.cos(u * 30) * 1.5 * Math.min(1, u * 5))); }
-    const flag = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(fl), 300, sz(REAL.flagellumD) / 2, 5), M(0xd8e8c8)); flag.userData.dynamic = true; g.add(flag);
+    const flag = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(fl), 300, sz(REAL.flagellumD) / 2, 5), M(0xd8e8c8, { clippingPlanes: ABOVE_GLASS })); flag.userData.dynamic = true; g.add(flag);
     animate.push(Treal => { flag.rotation.x += Treal * 1000 * 6.283; });     // its sodium-driven motor turns up to ~1,700 Hz
     g.position.y = 2.2; exhibit(g, 22, -170, "Vibrio cholerae", 2 * um, ["comma-shaped · one whip-like flagellum, one of the fastest swimmers"], 18, 3); }
   // Caulobacter crescentus: a crescent on a thin stalk with a sticky holdfast
@@ -54202,7 +54206,7 @@ function cytoplasm(g, n, within, col = 0x9b59b6, r = sz(REAL.ribosome) / 2) {   
     const arch = new THREE.Group(); arch.userData.dynamic = true; g.add(arch);
     for (let i = 0; i < 20; i++) { const d = new THREE.Vector3(1, rr(-0.25, 0.25), rr(-0.25, 0.25)).normalize(), pts = [];
       for (let j = 0; j <= 40; j++) { const u = j / 40; pts.push(d.clone().multiplyScalar(R + u * 35).add(new THREE.Vector3(0, Math.sin(u * 14 + i) * 1.2, Math.cos(u * 14 + i) * 1.2))); }
-      arch.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 80, sz(6 * nm), 4), M(0xf0b27a))); }
+      arch.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 80, sz(6 * nm), 4), M(0xf0b27a, { clippingPlanes: ABOVE_GLASS }))); }
     animate.push(Treal => { arch.rotation.x += Treal * 30 * 6.283; });          // archaella rotate like flagella
     g.position.y = R - 0.4; exhibit(g, -30, -175, "Methanocaldococcus jannaschii", 1.5 * um, ["lives at 85 °C in deep-sea vents, makes methane",
       "its tuft of archaella spins like a propeller (different machinery from bacteria)"], 2 * R + 10, 3); }
@@ -54261,7 +54265,8 @@ const stoneTex = (() => { const c = document.createElement("canvas"); c.width = 
   g.strokeStyle = "rgba(90,80,65,.25)"; g.lineWidth = 2;
   for (let y = 0; y < 256; y += 64) { g.beginPath(); g.moveTo(0, y); g.lineTo(256, y); g.stroke(); }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; })();
-const pathMat = new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 0.9, color: 0xd8c9a8, side: THREE.DoubleSide });
+const pathMat = new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 0.9, color: 0xd8c9a8, side: THREE.DoubleSide,
+  polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
 const PATHS = [];                                        // [points, width]
 function path(pts, w = 2.2) {                            // a flat paved ribbon along a polyline
   const P = pts.map(([x, z]) => new THREE.Vector2(x, z)), pos = [], uv = [], idx = [];
@@ -54649,7 +54654,7 @@ const onPlinth = (obj, x, z, name, realM, extra, top = 1.0, w = 0.5) => {
     const tuft = new THREE.Group(); tuft.userData.dynamic = true; tuft.position.y = R - 0.5; g.add(tuft);
     for (let i = 0; i < 14; i++) { const d = new THREE.Vector3(-1, rr(-0.3, 0.3), rr(-0.3, 0.3)).normalize(), pts = [];
       for (let j = 0; j <= 30; j++) { const u = j / 30; pts.push(d.clone().multiplyScalar(R + u * 30).add(new THREE.Vector3(0, Math.sin(u * 12 + i) * 1.5, Math.cos(u * 12 + i) * 1.5))); }
-      tuft.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 60, sz(6 * nm), 4), M(0xf1948a))); }
+      tuft.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 60, sz(6 * nm), 4), M(0xf1948a, { clippingPlanes: ABOVE_GLASS }))); }
     animate.push(Treal => { tuft.rotation.x += Treal * 30 * 6.283; });
     exhibit(g, -14, -200, "Pyrococcus furiosus", 2 * um, ["'rushing fireball': grows best at 100 °C, boiling water"], 2 * R + 6, 3); }
   // Nitrosopumilus: one of the smallest free-living cells, abundant in the oceans
@@ -54807,10 +54812,17 @@ if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { i
     await renderer.xr.setSession(s); camera.position.y = 0; start(); vrBtn.textContent = "Enter VR";
     const far0 = camera.far, fog0 = scene.fog.density;
     camera.far = VR_FAR; camera.updateProjectionMatrix(); scene.fog.density = 0.006;   // draw less in the distance
+    const slide = window.__slide, map0 = slide.material.map, geo0 = slide.geometry;    // plain glass: the fine speckle sparkles in a headset
+    slide.material.map = null; slide.material.color.set(0xc9dde4); slide.material.needsUpdate = true;
+    slide.geometry = new THREE.PlaneGeometry(VR_FAR * 3, VR_FAR * 3).rotateX(-Math.PI / 2);
+    s.requestAnimationFrame(function f() { slide.position.x = rig.position.x; slide.position.z = rig.position.z; if (renderer.xr.isPresenting) s.requestAnimationFrame(f); });
     s.addEventListener("end", () => { camera.position.y = 1.65; rig.rotation.y = 0;
-      camera.far = far0; camera.updateProjectionMatrix(); scene.fog.density = fog0; }); }; });
+      camera.far = far0; camera.updateProjectionMatrix(); scene.fog.density = fog0;
+      slide.material.map = map0; slide.material.color.set(0xdbe9ee); slide.material.needsUpdate = true;
+      slide.geometry.dispose(); slide.geometry = geo0; slide.position.set(0, 0, 0); }); }; });
 let snap = true, hallI = 0, vrSticks = "", fpsN = 0, fpsT = 0, fps = 0;
 const VR_FAR = 260;                                       // metres drawn in VR
+let animDt = 0, animFrame = 0;
 const pressed = {};                                       // edge detection for controller buttons
 const tap = (hand, i, gp) => { const k = hand + i, now = !!gp.buttons[i]?.pressed, was = pressed[k]; pressed[k] = now; return now && !was; };
 function jumpToHall(i) { hallI = (i + HALLS.length) % HALLS.length; const h = HALLS[hallI];
@@ -54904,7 +54916,11 @@ renderer.setAnimationLoop(() => {
   }
   // flagella turn at 100 Hz real; the bacterium runs and tumbles
   for (const f of flagella) f.userData.spin.rotation.x += REAL.flagellumHz * 6.283 * T * dt;
-  updateMotors(T * dt); updateMuscle(T * dt, vrFar(SAR.position.x, 2, SAR.position.z, 70), vrFar(NMJ.position.x, NMJ.position.y, NMJ.position.z, 260)); for (const f of animate) f(T * dt);
+  const vr = renderer.xr.isPresenting; animDt += T * dt; animFrame++;
+  if (!vr || animFrame % 3 === 0) {             // in VR the animations update every third frame (same speed, less work)
+    if (!vrFar(9, 1.5, MTZ, 40)) updateMotors(animDt);
+    updateMuscle(animDt, vrFar(SAR.position.x, 2, SAR.position.z, 70), vrFar(NMJ.position.x, NMJ.position.y, NMJ.position.z, 260));
+    for (const f of animate) f(animDt); animDt = 0; }
   for (const w of WAVES) {                    // light: phase advances 2π f per real second
     const dph = 6.2831853 * w.f * T * dt; if (dph < 3) w.mat.uniforms.phase.value = (w.mat.uniforms.phase.value + dph) % 6.2831853; }
   const es = ecoliState;
