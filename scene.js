@@ -1681,7 +1681,8 @@ function drawWrist(v) {
   line(`speed ${fmt(v)}/s = ${fmtReal(v / S / tau())}/s real`, 145, 28);
   line(`nearest: ${n.name}`, 195, 28, "#ffe9a8");
   line(`real ${fmtReal(n.real)}  ·  here ${fmt(sz(n.real))}`, 237, 26);
-  line("left stick fly · right stick turn · right trigger fast", 300, 22, "#a9c6d4");
+  line("left stick fly · right stick: forward/back + turn · trigger fast", 300, 22, "#a9c6d4");
+  line(`sticks: ${vrSticks}`, 375, 20, "#7f9fb0");
   line("A / B  slower / faster time  ·  X / Y  previous / next hall", 335, 22, "#a9c6d4");
   wristTex.needsUpdate = true;
 }
@@ -1698,7 +1699,7 @@ if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { i
     renderer.xr.setReferenceSpaceType("local-floor"); renderer.xr.setFoveation(1.0);
     await renderer.xr.setSession(s); camera.position.y = 0; start(); vrBtn.textContent = "Enter VR";
     s.addEventListener("end", () => { camera.position.y = 1.65; rig.rotation.y = 0; }); }; });
-let snap = true, hallI = 0;
+let snap = true, hallI = 0, vrSticks = "";
 const pressed = {};                                       // edge detection for controller buttons
 const tap = (hand, i, gp) => { const k = hand + i, now = !!gp.buttons[i]?.pressed, was = pressed[k]; pressed[k] = now; return now && !was; };
 function jumpToHall(i) { hallI = (i + HALLS.length) % HALLS.length; const h = HALLS[hallI];
@@ -1753,13 +1754,20 @@ renderer.setAnimationLoop(() => {
         if (tap("R", 5, gp)) tauI = Math.min(TAUS.length - 1, tauI + 1); }                     // B: faster time
       if (src.handedness === "left") { if (tap("L", 4, gp)) jumpToHall(hallI - 1);             // X: previous hall
         if (tap("L", 5, gp)) jumpToHall(hallI + 1); } }                                        // Y: next hall
-    for (const src of s?.inputSources || []) { const a = src.gamepad?.axes; if (!a || a.length < 4) continue;
-      const ax = Math.abs(a[2]) > 0.12 ? a[2] : 0, ay = Math.abs(a[3]) > 0.12 ? a[3] : 0;  // dead zone
-      if (src.handedness === "left") { camera.getWorldDirection(fwd); side.crossVectors(fwd, upV).normalize();
-        rig.position.addScaledVector(fwd, -ay * speed * boost * dt).addScaledVector(side, ax * speed * boost * dt);
-        if (ax || ay) moved = speed * boost; }
-      else if (Math.abs(a[2]) > 0.7 && snap) { rig.rotation.y -= Math.sign(a[2]) * Math.PI / 6; snap = false; }
-      else if (Math.abs(a[2]) < 0.3) snap = true; }
+    // read each stick wherever the browser puts it (axes 2,3 on Quest; 0,1 on some browsers)
+    const stick = a => { if (!a) return [0, 0]; const p = a.length >= 4 && (Math.abs(a[2]) + Math.abs(a[3]) >= Math.abs(a[0]) + Math.abs(a[1])) ? 2 : 0;
+      const x = a[p] || 0, y = a[p + 1] || 0; return [Math.abs(x) > 0.12 ? x : 0, Math.abs(y) > 0.12 ? y : 0]; };
+    let mx = 0, my = 0; vrSticks = "";
+    for (const src of s?.inputSources || []) { const [ax, ay] = stick(src.gamepad?.axes);
+      vrSticks += `${src.handedness[0] || "?"} ${ax.toFixed(2)},${ay.toFixed(2)}  `;
+      if (src.handedness === "left") { mx += ax; my += ay; }
+      else { my += ay;                                            // right stick forward/back moves too
+        if (Math.abs(ax) > 0.7 && snap) { rig.rotation.y -= Math.sign(ax) * Math.PI / 6; snap = false; }
+        else if (Math.abs(ax) < 0.3) snap = true; } }
+    if (mx || my) {                                               // fly where the headset looks
+      const xrCam = renderer.xr.getCamera(); xrCam.getWorldDirection(fwd); side.crossVectors(fwd, upV).normalize();
+      rig.position.addScaledVector(fwd, -my * speed * boost * dt).addScaledVector(side, mx * speed * boost * dt);
+      moved = speed * boost * Math.min(1, Math.hypot(mx, my)); }
   }
   if (!flying) { vy -= 9.8 * dt; rig.position.y += vy * dt; if (rig.position.y < 0) { rig.position.y = 0; vy = 0;
     if (keys.Space) vy = 3.5; } } else vy = 0;
@@ -1800,6 +1808,6 @@ renderer.setAnimationLoop(() => {
     const d = Math.hypot(camW.x - r.g.position.x, camW.z - r.g.position.z), o = THREE.MathUtils.clamp((r.reach - d) / (r.reach * 0.35), 0, 1);
     r.g.visible = o > 0.01; if (r.g.visible) for (const m of r.mats) m.opacity = o; }
   hudT -= dt; if (hudT <= 0) { const v = moved > 0 ? moved : speed;
-    if (renderer.xr.isPresenting) { drawWrist(v); hudT = 0.35; } else { readout(v); hudT = 0.2; } }
+    if (renderer.xr.isPresenting) { hudT = 0.35; try { drawWrist(v); } catch (e) { console.warn(e); } } else { readout(v); hudT = 0.2; } }
   renderer.render(scene, camera);
 });
