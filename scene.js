@@ -890,6 +890,7 @@ const HALLS = [   // name, side (-1 left, +1 right), z from, z to, x extent, col
   { id: "molecules", name: "Molecules",         side: 1,  z0: -6,   z1: -16,  w: 12,  col: 0x5dade2, line: "the small molecules life is built from" },
   { id: "proteins",  name: "Proteins",          side: -1, z0: -6,   z1: -74,  w: 32,  col: 0xaf7ac5, line: "the machines: carriers, motors, makers" },
   { id: "processes", name: "Life in action",    side: -1, z0: -62,  z1: -79,  w: 64,  col: 0x48c9b0, line: "proteins at work: vision, insulin, clotting, nerves" },
+  { id: "surfaces",  name: "Surfaces",          side: -1, z0: -1,   z1: -84,  w: 168, cx: -148, entryAt: [-62, 0, -42.5], col: 0xd4ac0d, line: "walk on glass, steel, paper, skin, a lotus leaf, a butterfly wing" },
   { id: "nonliving", name: "Non-living things", side: 1,  z0: -18,  z1: -114, w: 104, col: 0x95a5a6, line: "materials, light, a chip and a CD" },
   { id: "viruses",   name: "Viruses",           side: -1, z0: -78,  z1: -120, w: 46,  col: 0xe74c3c, line: "packages of genes that need a cell" },
   { id: "bacteria",  name: "Bacteria",          side: 1,  z0: -124, z1: -215, w: 160,  col: 0x52be80, line: "cells without a nucleus" },
@@ -897,12 +898,12 @@ const HALLS = [   // name, side (-1 left, +1 right), z from, z to, x extent, col
   { id: "eukaryotes",name: "Eukaryotes",        side: 0,  z0: -230, z1: -580, w: 380, col: 0xec7063, line: "cells with a nucleus: yeast to muscle" },
 ];
 for (const h of HALLS) {
-  const cx = h.side === 0 ? 0 : h.side * (2 + h.w / 2), len = h.z0 - h.z1;
+  const cx = h.cx ?? (h.side === 0 ? 0 : h.side * (2 + h.w / 2)), len = h.z0 - h.z1;
   const mat = new THREE.Mesh(new THREE.BoxGeometry(h.w, 0.004, len), new THREE.MeshStandardMaterial({
     color: h.col, transparent: true, opacity: h.id === "entrance" ? 0.0 : 0.16, depthWrite: false,
     polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 }));
   mat.position.set(cx, 0.003, (h.z0 + h.z1) / 2); scene.add(mat);
-  h.entry = new THREE.Vector3(h.side === 0 ? 0.8 : h.side * 1.0, 0, h.z0 - 1);
+  h.entry = h.entryAt ? new THREE.Vector3(...h.entryAt) : new THREE.Vector3(h.side === 0 ? 0.8 : h.side * 1.0, 0, h.z0 - 1);
   h.look = new THREE.Vector3(cx, 0, (h.z0 + h.z1) / 2);
   if (h.id === "entrance") continue;
   // a banner at the entrance, sized to the hall
@@ -1288,7 +1289,7 @@ for (const h of HALLS) if (h.id !== "entrance") {
   const mx = x => 384 + x * 1.05, mz = z => 130 - z * 1.38;
   g.fillStyle = "#cfc6b4"; g.fillRect(mx(-1.3), mz(9), 5 * 1.05, mz(-645) - mz(9));
   for (const h of HALLS) { if (h.id === "entrance") continue;
-    const cx = h.side === 0 ? 0 : h.side * (2 + h.w / 2);
+    const cx = h.cx ?? (h.side === 0 ? 0 : h.side * (2 + h.w / 2));
     g.fillStyle = "#" + h.col.toString(16).padStart(6, "0") + "88"; g.fillRect(mx(cx - h.w / 2), mz(h.z0), h.w * 1.05, (h.z0 - h.z1) * 1.38);
     g.fillStyle = "#1b2631"; g.font = "600 22px -apple-system, Helvetica"; g.fillText(h.name, mx(cx - h.w / 2) + 4, mz(h.z0) + 24); }
   g.fillStyle = "#c0392b"; g.beginPath(); g.arc(mx(AVX), mz(4), 9, 0, 6.3); g.fill(); g.fillText("you are here", mx(AVX) + 14, mz(4) + 8);
@@ -1788,6 +1789,125 @@ const set = (m, i, x, y, z, s = 1, rx = 0, ry = 0, rz = 0) => { O3.position.set(
 path([[-5.4, -69], [-5.4, -71], [-66, -71]], 2); path([[-1.3, -71], [-5.4, -71]], 2);
 ladder.push({ name: "Life in action (processes)", real: 20 * nm, x: -35, z: -71 });
 
+// ==========================================================================================
+//  SURFACES: familiar surfaces at ×10⁷, each a 36 m tile = 3.6 µm of the real thing, walkable.
+//  Roughness values: glass 0.3-0.5 nm RMS; Si(111) atomic steps 0.31 nm; polished stainless
+//  ~5 nm RMS with ~20 nm scratches; foil rolling ridges ~0.1 µm; paper macrofibril bundles
+//  20-50 nm; corneocytes 0.3-0.5 µm thick; lotus wax tubules ~1 µm × 0.1 µm; Morpho ridges
+//  ~0.8 µm apart with lamellae every ~0.2 µm.
+// ==========================================================================================
+const TILES = [], TS = 36, G = 145;                          // walk grid: 145 × 145 samples per tile
+function groundH(x, z) {
+  for (const t of TILES) { const lx = x - t.cx, lz = z - t.cz;
+    if (Math.abs(lx) < TS / 2 && Math.abs(lz) < TS / 2) {
+      const fx = (lx + TS / 2) / TS * (G - 1), fz = (lz + TS / 2) / TS * (G - 1), i = Math.floor(fx), k = Math.floor(fz), a = fx - i, b = fz - k;
+      const v = (ii, kk) => t.grid[Math.min(G - 1, kk) * G + Math.min(G - 1, ii)];
+      return (v(i, k) * (1 - a) + v(i + 1, k) * a) * (1 - b) + (v(i, k + 1) * (1 - a) + v(i + 1, k + 1) * a) * b; } }
+  return 0; }
+function surfaceTile(cx, cz, { seg = 96, h, walk, color, mat, colorAt }) {
+  const t = { cx, cz, grid: new Float32Array(G * G) };
+  const w = walk || h;
+  for (let k = 0; k < G; k++) for (let i = 0; i < G; i++) t.grid[k * G + i] = Math.max(0, w(-TS / 2 + i / (G - 1) * TS, -TS / 2 + k / (G - 1) * TS));
+  TILES.push(t);
+  if (h) {
+    const geo = new THREE.PlaneGeometry(TS, TS, seg, seg).rotateX(-Math.PI / 2), p = geo.attributes.position, col = colorAt ? new Float32Array(p.count * 3) : null;
+    for (let i = 0; i < p.count; i++) { const lx = p.getX(i), lz = p.getZ(i), y = h(lx, lz); p.setY(i, y + 0.01);
+      if (col) { colorAt(lx, lz, y, C3); col.set([C3.r, C3.g, C3.b], 3 * i); } }
+    if (col) geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, mat || M(color, colorAt ? { vertexColors: true } : {})); m.position.set(cx, 0, cz); scene.add(m);
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(TS + 0.4, 0.15, TS + 0.4), M(0x5d6d7e)); edge.position.set(cx, -0.06, cz); scene.add(edge);
+  }
+  return t; }
+const vnoise2 = (() => { const P = [...Array(512)].map(() => rnd()); const f = t => t * t * (3 - 2 * t);
+  return (x, z) => { const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi, H = (a, b) => P[((a * 73856093) ^ (b * 19349663)) & 511];
+    const u = f(xf), v = f(zf); return (H(xi, zi) * (1 - u) + H(xi + 1, zi) * u) * (1 - v) + (H(xi, zi + 1) * (1 - u) + H(xi + 1, zi + 1) * u) * v - 0.5; }; })();
+const fbm2 = (x, z, o = 4) => { let s2 = 0, a = 1, f = 1; for (let i = 0; i < o; i++) { s2 += vnoise2(x * f, z * f) * a; a *= 0.5; f *= 2.07; } return s2; };
+const R1 = -21, R2 = -64, C1 = -88, C2 = -128, C3x = -168, C4 = -208;
+const tileLabel = (cx, cz, lines) => label(lines, new THREE.Vector3(cx, 0, cz + (cz > -42.5 ? 1 : -1) * 17), 1.1);
+
+// 1. window glass: amorphous silica, flat to a few millimetres here
+surfaceTile(C1, R1, { seg: 96, h: (x, z) => 0.012 + 0.004 * fbm2(x * 0.6, z * 0.6, 4),
+  mat: new THREE.MeshPhysicalMaterial({ color: 0xd6eef5, roughness: 0.05, metalness: 0, clearcoat: 1 }) });
+tileLabel(C1, R1, ["window glass", "this tile is 3.6 µm of a windowpane: bumps of 0.3-0.5 nm → 3-5 mm here",
+  "atoms in no particular order (it's a frozen liquid), so there are no steps or grains",
+  "as flat as a calm lake, even at ten million times"]);
+// 2. silicon wafer: terraces one atomic step apart (0.314 nm → 3.1 mm)
+{ const step = 0.00314, terr = 1.8;
+  const hW = (x, z) => 0.12 - step * Math.floor((x + TS / 2 + 0.6 * Math.sin(z * 0.25)) / terr);
+  surfaceTile(C2, R1, { seg: 140, h: hW, mat: M(0x7f8c8d, { metalness: 0.6, roughness: 0.25, vertexColors: true }),
+    colorAt: (x, z, y, c) => c.setHSL(0.58, 0.08, 0.42 + 0.06 * (Math.floor((x + TS / 2 + 0.6 * Math.sin(z * 0.25)) / terr) % 2)) });
+  tileLabel(C2, R1, ["a silicon wafer, polished for chips", "the flattest surface people make: broad terraces (light, dark) ~180 nm → 1.8 m wide",
+    "each step down is a single layer of atoms: 0.31 nm → 3 mm here", "you are walking down a staircase one atom high per step"]); }
+// 3. polished stainless steel: gentle hills, polishing scratches, a grain boundary
+{ const scr = [...Array(14)].map(() => ({ a: rr(-0.25, 0.25) + 0.9, o: rr(-16, 16), d: rr(0.08, 0.22), w: rr(0.4, 1.2) }));
+  const hS = (x, z) => { let y = 0.75 + 0.05 * fbm2(x * 0.12, z * 0.12, 4);    // base high enough that the deepest groove stays above the edging
+    for (const s2 of scr) { const d = x * Math.sin(s2.a) - z * Math.cos(s2.a) - s2.o; y -= s2.d * Math.exp(-((d / s2.w) ** 2)); }
+    const gb = x * 0.35 + z - 4; y -= 0.25 * Math.exp(-((gb / 0.9) ** 2)); return y; };
+  surfaceTile(C3x, R1, { seg: 160, h: hS, mat: M(0xc8ccd0, { metalness: 0.95, roughness: 0.22 }) });
+  tileLabel(C3x, R1, ["polished stainless steel", "mirror-smooth to you, but here: hills of ~5 nm → 5 cm and polishing scratches 20 nm → 20 cm deep",
+    "the deeper groove is a grain boundary, where two crystals of iron meet",
+    "a chromium-oxide film 2 nm → 2 cm thick covers it all: that's why it doesn't rust"]); }
+// 4. aluminium foil: parallel ridges left by the rolling mill
+{ const hF = (x, z) => 0.6 + 0.45 * Math.sin(x * 6.283 / 11 + 0.8 * fbm2(z * 0.05, x * 0.02, 2)) + 0.06 * Math.sin(x * 6.283 / 1.3 + z * 0.03) + 0.04 * fbm2(x * 0.5, z * 0.08, 3);
+  surfaceTile(C4, R1, { seg: 140, h: hF, mat: M(0xdfe3e6, { metalness: 0.9, roughness: 0.3 }) });
+  tileLabel(C4, R1, ["aluminium foil (the shiny side)", "rolling-mill ridges ~100 nm → 1 m high, a micrometre or so → ~11 m apart",
+    "the dull side was rolled against another sheet, so it's rougher",
+    "the whole foil is ~16 µm thick: 160 m here, a cliff the height of a tall building"]); }
+// 5. paper: a jumble of cellulose fibril bundles, with a chalk filler boulder
+{ const logs = [];
+  for (let layer = 0; layer < 5; layer++) { const base = rr(-0.5, 0.5) + 0.35 * layer;
+    for (let i = 0; i < 70; i++) { const r = rr(0.12, 0.25), a = base + rr(-0.35, 0.35), L = rr(10, 30);
+      logs.push({ x: rr(-17, 17), z: rr(-17, 17), a, L, r, y: 0.2 + layer * 0.32 + r }); } }
+  const box = [[1, 0, 0, -(C1 - TS / 2)], [-1, 0, 0, C1 + TS / 2], [0, 0, 1, -(R2 - TS / 2)], [0, 0, -1, R2 + TS / 2]]   // trim at the tile's edges
+    .map(([a, b, c, d]) => new THREE.Plane(new THREE.Vector3(a, b, c), d));
+  const cyl = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 8, 1), M(0xf2ead9, { roughness: 0.95, clippingPlanes: box }), logs.length);
+  logs.forEach((l, i) => { O3.position.set(C1 + l.x, l.y, R2 + l.z); O3.rotation.set(0, l.a, Math.PI / 2); O3.scale.set(l.r, l.L, l.r); O3.updateMatrix(); cyl.setMatrixAt(i, O3.matrix);
+    cyl.setColorAt(i, C3.setHSL(0.11, 0.25, 0.85 + rr(-0.06, 0.05))); });
+  scene.add(cyl);
+  const chalk = new THREE.Mesh(new THREE.BoxGeometry(9, 7, 8), M(0xfdfefe, { roughness: 0.6 })); chalk.position.set(C1 + 9, 3.5, R2 + 6); chalk.rotation.set(0.35, 0.6, 0.25); scene.add(chalk);
+  const hP = (x, z) => { let y = 0.1; for (const l of logs) { const dx = x - l.x, dz = z - l.z, along = dx * Math.cos(l.a) - dz * Math.sin(l.a), across = dx * Math.sin(l.a) + dz * Math.cos(l.a);
+      if (Math.abs(along) < l.L / 2 && Math.abs(across) < l.r) y = Math.max(y, l.y + Math.sqrt(l.r * l.r - across * across)); }
+    if (Math.hypot(x - 9, z - 6) < 4.5) y = Math.max(y, 7.5); return y; };
+  surfaceTile(C1, R2, { seg: 48, h: (x, z) => 0.05, walk: hP, color: 0xb9ad94 });
+  tileLabel(C1, R2, ["a sheet of paper", "you're on top of one wood fibre (it's 25 µm wide: 250 m here)",
+    "these logs are bundles of cellulose chains, 20-50 nm → 20-50 cm thick, layered in a mat",
+    "the white block is chalk filler (calcium carbonate) that makes paper bright and smooth"]); }
+// 6. skin: the edge of a flat dead skin cell, and a bacterium living on it
+{ const edge = (x, z) => z + 3 * Math.sin(x * 0.18) + 1.5 * fbm2(x * 0.15, 0, 3);
+  const hK = (x, z) => { const top = edge(x, z) < 0 ? 4 : 0; return 0.2 + top + 0.25 * fbm2(x * 0.9, z * 0.9, 3) + 0.15 * Math.max(0, Math.sin(x * 2.1) * Math.sin(z * 2.3)); };
+  surfaceTile(C2, R2, { seg: 150, h: hK, mat: M(0xe8c3a8, { roughness: 0.85, vertexColors: true }),
+    colorAt: (x, z, y, c) => c.setHSL(0.07, 0.38, y > 2 ? 0.74 : 0.66) });
+  const staph = new THREE.Mesh(new THREE.SphereGeometry(5, 32, 24), cellMat(0xf4d03f, 0.6)); staph.position.set(C2 - 6, 5, R2 + 9); scene.add(staph);
+  tileLabel(C2, R2, ["the surface of your skin", "dead, flattened cells (corneocytes) stacked like roof tiles: each 30 µm → 300 m wide",
+    "but only 0.3-0.5 µm → 4 m thick: you're standing at the edge of one, stepping down to the next",
+    "the yellow ball is Staphylococcus, a bacterium that lives on almost everyone's skin"]); }
+// 7. lotus leaf: the flank of a waxy bump, forested with wax crystals
+{ const hL = (x, z) => Math.max(0, Math.sqrt(Math.max(0, 70 * 70 - (x - 40) ** 2 - (z - 5) ** 2)) - 52);
+  surfaceTile(C3x, R2, { seg: 96, h: hL, color: 0x7dab55 });
+  const N = 420, tub = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.5, 0.5, 1, 7), M(0xeef6e4, { roughness: 0.4 }), N);
+  for (let i = 0; i < N; i++) { const x = rr(-17.5, 17.5), z = rr(-17.5, 17.5), y = hL(x, z), Ln = rr(7, 12);
+    const n = new THREE.Vector3(-(hL(x + 0.5, z) - hL(x - 0.5, z)), 1, -(hL(x, z + 0.5) - hL(x, z - 0.5))).normalize().add(new THREE.Vector3(rr(-0.3, 0.3), 0, rr(-0.3, 0.3))).normalize();
+    O3.position.set(C3x + x, y, R2 + z).addScaledVector(n, Ln / 2); O3.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), n); O3.scale.set(1, Ln, 1); O3.updateMatrix(); tub.setMatrixAt(i, O3.matrix); }
+  scene.add(tub);
+  tileLabel(C3x, R2, ["a lotus leaf", "the leaf is covered in bumps 10-20 µm tall (100-200 m here); you're on the side of one",
+    "and every bump is a forest of wax crystals ~1 µm → 10 m tall, 0.1 µm → 1 m thick",
+    "a raindrop (2 mm → 20 km here!) only touches the tips, so it beads up and rolls off, taking dirt with it"]); }
+// 8. Morpho butterfly wing: canyons between 'Christmas tree' ridges that make the blue
+{ const ridges = [-12, -4, 4, 12], blue = new THREE.MeshStandardMaterial({ color: 0x1f5fd6, emissive: 0x0b2a7a, metalness: 0.3, roughness: 0.35 });
+  const lamGeo = new THREE.BoxGeometry(1, 1, 1), lam = new THREE.InstancedMesh(lamGeo, blue, ridges.length * 8 * 2), web = new THREE.InstancedMesh(lamGeo, blue, ridges.length);
+  let k = 0; ridges.forEach((rx, j) => { O3.position.set(C4 + rx, 6, R2); O3.rotation.set(0, 0, 0); O3.scale.set(0.5, 12, TS); O3.updateMatrix(); web.setMatrixAt(j, O3.matrix);
+    for (let l = 0; l < 8; l++) for (const sd of [-1, 1]) { const y = 2.2 + l * 1.4, wd = 2.2 - l * 0.18;
+      O3.position.set(C4 + rx + sd * wd / 2, y, R2); O3.rotation.set(0, 0, sd * -0.12); O3.scale.set(wd, 0.12, TS); O3.updateMatrix(); lam.setMatrixAt(k++, O3.matrix); } });
+  scene.add(lam, web);
+  const hM = (x, z) => ridges.some(rx => Math.abs(x - rx) < 0.6) ? 12 : 0.1;
+  surfaceTile(C4, R2, { seg: 32, h: (x, z) => 0.05, walk: hM, color: 0x25304a });
+  tileLabel(C4, R2, ["a blue Morpho butterfly's wing", "each wing scale is lined with ridges ~0.8 µm → 8 m apart; you're in a canyon between two",
+    "every ridge is a 'Christmas tree' of thin layers spaced ~0.2 µm → 2 m",
+    "the layers reflect blue light in step (interference): the blue is structure, not pigment"]); }
+path([[-5.4, -42.5], [-230, -42.5]], 2.4);
+ladder.push({ name: "Surfaces", real: 3.6 * um, x: -148, z: -42.5 });
+
 // ---------- the guide: jump to any hall ------------------------------------------------
 window.museum = { rig, HALLS, renderer, scene, get mergeStatic() { return mergeStatic; } };                 // handy from the browser console
 {
@@ -2015,7 +2135,7 @@ const clock = new THREE.Clock(), fwd = new THREE.Vector3(), side = new THREE.Vec
 let hudT = 0;
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05), T = tau();
-  let moved = 0;
+  let moved = 0; const prevX = rig.position.x, prevZ = rig.position.z;
   if (!renderer.xr.isPresenting) {
     camera.rotation.set(pitch, yaw, 0, "YXZ");
     const sp = speed * (keys.ShiftLeft || keys.ShiftRight ? 4 : 1) * dt;
@@ -2055,9 +2175,12 @@ renderer.setAnimationLoop(() => {
       rig.position.addScaledVector(fwd, -my * speed * boost * dt).addScaledVector(side, mx * speed * boost * dt);
       moved = speed * boost * Math.min(1, Math.hypot(mx, my)); }
   }
-  if (!flying) { vy -= 9.8 * dt; rig.position.y += vy * dt; if (rig.position.y < 0) { rig.position.y = 0; vy = 0;
+  // the ground: 0 on the slide, the surface itself in the Surfaces hall; steps over 0.7 m are walls when walking
+  if (!flying && groundH(rig.position.x, rig.position.z) > groundH(prevX, prevZ) + 0.7) { rig.position.x = prevX; rig.position.z = prevZ; }
+  const gh = groundH(rig.position.x, rig.position.z);
+  if (!flying) { vy -= 9.8 * dt; rig.position.y += vy * dt; if (rig.position.y < gh) { rig.position.y = gh; vy = 0;
     if (keys.Space) vy = 3.5; } } else vy = 0;
-  rig.position.y = Math.max(0, rig.position.y);
+  rig.position.y = Math.max(gh, rig.position.y);
 
   // water: Brownian steps, rms sqrt(2 D tau dt) per axis, scaled by S
   const sw = Math.sqrt(2 * REAL.dWater * T * dt) * S;
