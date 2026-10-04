@@ -54787,6 +54787,8 @@ function drawWrist(v) {
   line(`real ${fmtReal(n.real)}  ·  here ${fmt(sz(n.real))}`, 237, 26);
   line("left stick fly · right stick: forward/back + turn · trigger fast", 300, 22, "#a9c6d4");
   line(`sticks: ${vrSticks}`, 375, 20, "#7f9fb0");
+  g.fillStyle = fps >= 70 ? "#7dff9a" : fps >= 50 ? "#ffd166" : "#ff6b6b"; g.font = "700 30px -apple-system, Helvetica, sans-serif";
+  g.fillText(`${fps.toFixed(0)} fps`, 500, 50);
   line("A / B  slower / faster time  ·  X / Y  previous / next hall", 335, 22, "#a9c6d4");
   wristTex.needsUpdate = true;
 }
@@ -54803,8 +54805,12 @@ if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { i
     renderer.xr.setReferenceSpaceType("local-floor"); renderer.xr.setFoveation(1.0);
     renderer.xr.setFramebufferScaleFactor(0.8);              // fewer pixels per eye: steadier frame rate
     await renderer.xr.setSession(s); camera.position.y = 0; start(); vrBtn.textContent = "Enter VR";
-    s.addEventListener("end", () => { camera.position.y = 1.65; rig.rotation.y = 0; }); }; });
-let snap = true, hallI = 0, vrSticks = "";
+    const far0 = camera.far, fog0 = scene.fog.density;
+    camera.far = VR_FAR; camera.updateProjectionMatrix(); scene.fog.density = 0.006;   // draw less in the distance
+    s.addEventListener("end", () => { camera.position.y = 1.65; rig.rotation.y = 0;
+      camera.far = far0; camera.updateProjectionMatrix(); scene.fog.density = fog0; }); }; });
+let snap = true, hallI = 0, vrSticks = "", fpsN = 0, fpsT = 0, fps = 0;
+const VR_FAR = 260;                                       // metres drawn in VR
 const pressed = {};                                       // edge detection for controller buttons
 const tap = (hand, i, gp) => { const k = hand + i, now = !!gp.buttons[i]?.pressed, was = pressed[k]; pressed[k] = now; return now && !was; };
 function jumpToHall(i) { hallI = (i + HALLS.length) % HALLS.length; const h = HALLS[hallI];
@@ -54911,6 +54917,7 @@ renderer.setAnimationLoop(() => {
   ECOLI.quaternion.slerp(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), es.dir), Math.min(1, T * dt * 20));
 
   camera.getWorldPosition(camW);
+  if (renderer.xr.isPresenting) { fpsN++; fpsT += dt; if (fpsT >= 1) { fps = fpsN / fpsT; fpsN = 0; fpsT = 0; } }
   for (const r of PLAQUES) if (r.kind === "plaque") {          // plaques come into view as you walk up to them
     const d = Math.hypot(camW.x - r.g.position.x, camW.z - r.g.position.z), o = THREE.MathUtils.clamp((r.reach - d) / (r.reach * 0.35), 0, 1);
     r.g.visible = o > 0.01; if (r.g.visible) for (const m of r.mats) m.opacity = o; }
