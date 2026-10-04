@@ -2341,7 +2341,8 @@ function drawWrist(v) {
   const line = (t, y, sz_, col = "#e6f3f9", w = 400) => { g.fillStyle = col; g.font = `${w} ${sz_}px -apple-system, Helvetica, sans-serif`; g.fillText(t, 22, y); };
   line(`${hall.name}  ·  ×10,000,000`, 50, 34, "#ffffff", 700);
   line(`time: 1 s here = ${TAU_NAMES[tauI]}`, 100, 28);
-  line(`speed ${fmt(v)}/s = ${fmtReal(v / S / tau())}/s real`, 145, 28);
+  line(`speed ${fmt(v)}/s here = ${fmtReal(v / S)}/s real`, 145, 28);
+  line(`(with time slowed to ${TAU_NAMES[tauI]}/s: ${fmtReal(v / S / tau())}/s)`, 172, 20, "#a9c6d4");
   line(`nearest: ${n.name}`, 195, 28, "#ffe9a8");
   line(`real ${fmtReal(n.real)}  ·  here ${fmt(sz(n.real))}`, 237, 26);
   line("left stick fly · right stick: forward/back + turn · trigger fast", 300, 22, "#a9c6d4");
@@ -2393,7 +2394,8 @@ function readout(v) {
   const dWater = Math.sqrt(6 * REAL.dWater * tau()) * S;        // rms 3D step of a water molecule, per second here
   hud.innerHTML = `<b>×10,000,000</b> &nbsp;·&nbsp; you are 1.7 m here = <b>170 nm</b> real<br>
     time: 1 second here = <b>${TAU_NAMES[tauI]}</b> real &nbsp;<span class="k">[ ]</span> or <span class="k">0</span> light · <span class="k">1</span> water · <span class="k">2</span> bacteria · <span class="k">3</span> motors &amp; muscle<br>
-    ${flying ? "jetpack" : "walking"} <span class="k">F</span> &nbsp;·&nbsp; speed ${fmt(v)}/s here = <b>${fmtReal(realSpeed)}/s</b> real
+    ${flying ? "jetpack" : "walking"} <span class="k">F</span> &nbsp;·&nbsp; speed ${fmt(v)}/s here = <b>${fmtReal(v / S)}/s</b> real size
+    <span class="dim">(with time slowed: ${fmtReal(realSpeed)}/s)</span>
     <span class="k">− =</span> or scroll<br>
     height above the slide: ${fmt(Math.max(0, h))} = ${fmtReal(Math.max(0, h) / S)}<br>
     nearest: <b>${n.name}</b> — real ${fmtReal(n.real)}, here ${fmt(sz(n.real))}<br>
