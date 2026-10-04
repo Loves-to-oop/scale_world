@@ -53979,7 +53979,7 @@ const HALLS = [   // name, side (-1 left, +1 right), z from, z to, x extent, col
   { id: "proteins",  name: "Proteins",          side: -1, z0: -6,   z1: -74,  w: 32,  col: 0xaf7ac5, line: "the machines: carriers, motors, makers" },
   { id: "processes", name: "Life in action",    side: -1, z0: -62,  z1: -79,  w: 64,  col: 0x48c9b0, line: "proteins at work: vision, insulin, clotting, nerves" },
   { id: "surfaces",  name: "Surfaces",          side: -1, z0: -1,   z1: -84,  w: 210, cx: -168, entryAt: [-62, 0, -42.5], col: 0xd4ac0d, line: "walk on glass, steel, paper, skin, a lotus leaf, a butterfly wing" },
-  { id: "nonliving", name: "Non-living things", side: 1,  z0: -18,  z1: -114, w: 162, col: 0x95a5a6, line: "materials, light, a chip and a CD" },
+  { id: "nonliving", name: "Non-living things", side: 1,  z0: -18,  z1: -114, w: 250, col: 0x95a5a6, line: "materials, light, a chip and a CD" },
   { id: "viruses",   name: "Viruses",           side: -1, z0: -78,  z1: -120, w: 46,  col: 0xe74c3c, line: "packages of genes that need a cell" },
   { id: "bacteria",  name: "Bacteria",          side: 1,  z0: -124, z1: -215, w: 160,  col: 0x52be80, line: "cells without a nucleus" },
   { id: "archaea",   name: "Archaea",           side: -1, z0: -124, z1: -215, w: 120,  col: 0xf5b041, line: "the other cells without a nucleus" },
@@ -55029,7 +55029,7 @@ const C5 = -248;
 // ==========================================================================================
 {
   const NZ = -53;
-  path([[3.7, NZ], [162, NZ]], 2.2);
+  path([[3.7, NZ], [176, NZ]], 2.2);
   // phone camera pixels: 1 µm photosites, each under a colour filter and a micro-lens
   { const g = new THREE.Group(); g.position.set(118, 0, NZ + 9); scene.add(g); const P = 10;
     [[0xd62728, -1, -1], [0x2ca02c, 1, -1], [0x2ca02c, -1, 1], [0x1f77b4, 1, 1]].forEach(([c, sx, sz_]) => {
@@ -55199,6 +55199,69 @@ const C5 = -248;
     "a real cell is so crowded (proteins fill ~30% of its volume) that you couldn't see a metre",
     "the faint purple dots are ribosomes; a real cell has about 10 million"], new THREE.Vector3(CX - 70, 0, CZ + 2), 1.2);
   ladder.push({ name: "inside a human cell", real: REAL.cell, x: CX - 30, z: CZ });
+}
+
+// ==========================================================================================
+//  SPIDER SILK: a dragline strand ~4 µm thick (40 m here), cut open. Inside, β-sheet
+//  nanocrystals (~2 × 5 × 7 nm) of poly-alanine sit in a stretchy glycine-rich matrix --
+//  the crystals give strength, the tangle gives stretch.
+// ==========================================================================================
+{
+  const NZ = -53, FX = 180, R = sz(2 * um), LEN = 80;               // the cut face is at x = FX, facing the path
+  // the strand, lying on the slide
+  const strand = new THREE.Mesh(new THREE.CylinderGeometry(R, R, LEN, 96, 1, true), M(0xf4f1e8, { roughness: 0.35, side: THREE.DoubleSide }));
+  strand.rotation.z = Math.PI / 2; strand.position.set(FX + LEN / 2, R, NZ); scene.add(strand);
+  // the cut face: a disc showing the nanofibrils (20 nm → 20 cm) end-on
+  const cv = document.createElement("canvas"); cv.width = cv.height = 1024; const g2 = cv.getContext("2d");
+  g2.fillStyle = "#d8cfb8"; g2.fillRect(0, 0, 1024, 1024);
+  for (let i = 0; i < 26000; i++) { const a = rnd() * 6.283, r = Math.sqrt(rnd()) * 505;
+    g2.fillStyle = `rgba(${rnd() < 0.5 ? "250,246,236" : "190,180,160"},0.9)`; g2.beginPath(); g2.arc(512 + Math.cos(a) * r, 512 + Math.sin(a) * r, 2.6, 0, 6.3); g2.fill(); }
+  const ft = new THREE.CanvasTexture(cv); ft.colorSpace = THREE.SRGBColorSpace;
+  const face = new THREE.Mesh(new THREE.CircleGeometry(R, 96), new THREE.MeshStandardMaterial({ map: ft, roughness: 0.8, side: THREE.DoubleSide }));
+  face.rotation.y = -Math.PI / 2; face.position.set(FX + 0.05, R, NZ); scene.add(face);
+  // a cutaway at the foot of the face: β-sheet nanocrystals in the amorphous matrix, at real density
+  const box = { x0: FX - 3.2, x1: FX - 0.2, y0: 0.05, y1: 3.0, z0: NZ - 2.5, z1: NZ + 2.5 };
+  const crystals = [], cs = 0.16;                                       // centres ~16 nm apart
+  for (let x = box.x0 + cs / 2; x < box.x1; x += cs) for (let y = box.y0 + cs / 2; y < box.y1; y += cs) for (let z = box.z0 + cs / 2; z < box.z1; z += cs)
+    if (rnd() < 0.55) crystals.push(new THREE.Vector3(x + rr(-0.03, 0.03), y + rr(-0.03, 0.03), z + rr(-0.03, 0.03)));
+  const cm = new THREE.InstancedMesh(new THREE.BoxGeometry(sz(7 * nm), sz(2 * nm), sz(5 * nm)), M(0xd4ac0d, { roughness: 0.5 }), crystals.length);
+  crystals.forEach((p, i) => { O3.position.copy(p); O3.rotation.set(rr(-0.15, 0.15), rr(-0.15, 0.15), rr(-0.15, 0.15)); O3.scale.setScalar(1); O3.updateMatrix(); cm.setMatrixAt(i, O3.matrix); });
+  scene.add(cm);
+  const chains = [];                                                    // loose chains linking neighbouring crystals
+  for (let i = 0; i < crystals.length; i += 2) { const a = crystals[i], b = crystals[(i + 1 + Math.floor(rnd() * 6)) % crystals.length];
+    if (a.distanceTo(b) > 0.4) continue; const m = a.clone().lerp(b, 0.5).add(new THREE.Vector3(rr(-0.05, 0.05), rr(-0.05, 0.05), rr(-0.05, 0.05)));
+    chains.push(a, m, m, b); }
+  scene.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(chains), new THREE.LineBasicMaterial({ color: 0x9c8f73 })));
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(box.x1 - box.x0, box.y1 - box.y0, box.z1 - box.z0),
+    new THREE.MeshStandardMaterial({ color: 0xf4f1e8, transparent: true, opacity: 0.12, depthWrite: false }));
+  glass.position.set((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2, NZ); scene.add(glass);
+  // one nanocrystal on a plinth, residue by residue: an antiparallel β-pleated sheet stack
+  { const PX = FX - 6, PZ = NZ + 4.5; plinth(PX, PZ, 1.0, 0.6);
+    const g = new THREE.Group(); g.position.set(PX, 1.0 + 0.03, PZ); scene.add(g);
+    const nRes = 20, rise = sz(0.35 * nm), dStrand = sz(0.47 * nm), pleat = sz(0.1 * nm), sheets = 4, strands = 6;
+    const bb = M(0x7b241c), side = M(0x95a5a6), hb = new THREE.LineDashedMaterial({ color: 0x3498db, dashSize: 0.0015, gapSize: 0.001 });
+    for (let k = 0; k < sheets; k++) { const y = k * sz((k % 2 ? 1.06 : 0.53) * nm) + (k > 1 ? sz(0.53 * nm) : 0);
+      for (let j = 0; j < strands; j++) { const z = (j - strands / 2) * dStrand, pts = [];
+        for (let i = 0; i <= nRes; i++) pts.push(new THREE.Vector3((i - nRes / 2) * rise * (j % 2 ? -1 : 1), y + (i % 2 ? pleat : -pleat), z));   // zig-zag: the pleat
+        g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0), nRes * 3, sz(0.06 * nm), 5), bb));
+        const head = new THREE.Mesh(new THREE.ConeGeometry(sz(0.12 * nm), sz(0.3 * nm), 6), bb);        // arrow: which way the strand runs
+        head.position.copy(pts[nRes]); head.rotation.z = j % 2 ? Math.PI / 2 : -Math.PI / 2; g.add(head);
+        for (let i = 0; i <= nRes; i++) { const sc = new THREE.Mesh(new THREE.SphereGeometry(sz(0.09 * nm), 6, 4), side);  // alanine side chains, alternately up and down
+          sc.position.copy(pts[i]).add(new THREE.Vector3(0, (i % 2 ? 1 : -1) * sz(0.18 * nm), 0)); g.add(sc);
+          if (j < strands - 1 && i % 2 === 0) { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([pts[i], pts[i].clone().add(new THREE.Vector3(0, 0, dStrand))]), hb);
+            l.computeLineDistances(); g.add(l); } } } }
+    label(["one β-sheet nanocrystal, residue by residue", "protein strands (dark red) lie side by side, running in alternate directions (arrows)",
+      "hydrogen bonds (blue dashes) zip each strand to its neighbours, 0.47 nm → 4.7 mm apart",
+      "the backbone zig-zags (the 'pleat'); alanine side chains (grey) point alternately up and down",
+      "sheets stack on top of each other: a crystal ~7 nm → 7 cm long"], new THREE.Vector3(PX, 0, PZ), 0.75);
+    ladder.push({ name: "β-pleated sheet", real: 7 * nm, x: PX, z: PZ }); }
+  label(sizeLines("a strand of spider silk", 4 * um).concat(["dragline silk: by weight, stronger than steel and tougher than Kevlar",
+    "the cut end shows it's a bundle of nanofibrils (20 nm → 20 cm)",
+    "the glass case at its foot shows what's inside: β-sheet crystals (gold) tied together by loose chains"]), new THREE.Vector3(FX - 3, 0, NZ - 5), 1.4);
+  label(["inside the silk: crystals and tangles", `${crystals.length.toLocaleString()} β-sheet nanocrystals (~2 × 5 × 7 nm → cm-sized gold blocks)`,
+    "made of alanine-rich stretches that stack into sheets; they make silk strong",
+    "the loose glycine-rich chains between them uncoil when it's pulled: that's why silk stretches"], new THREE.Vector3(FX - 2, 0, NZ + 3), 0.9);
+  ladder.push({ name: "spider silk strand", real: 4 * um, x: FX, z: NZ });
 }
 
 // ---------- the guide: jump to any hall ------------------------------------------------
