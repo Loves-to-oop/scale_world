@@ -1599,7 +1599,8 @@ const tau = () => TAUS[tauI];
 const ecoliState = { dir: new THREE.Vector3(1, 0, 0), run: 1, tumble: 0 };
 
 // ---------- moving: walk on the slide, or fly with the jetpack ---------------------
-rig.position.copy(START); let yaw = 0, pitch = 0, flying = true, speed = 2, vy = 0;
+// start 2.5 m in front of the park map (at -6, 6.5, turned 0.6 rad), looking at it
+rig.position.set(-6 + Math.sin(0.6) * 2.5, 0, 6.5 + Math.cos(0.6) * 2.5); let yaw = 0.6, pitch = -0.08, flying = true, speed = 2, vy = 0;
 const keys = {};
 addEventListener("keydown", e => {
   keys[e.code] = true; start();
@@ -1746,6 +1747,58 @@ function readout(v) {
     ${dWater > 0.05 ? "— too fast to follow, shown frozen" : ""}</span>`;
 }
 
+// ---------- the grand entrance: an arch where the plaza becomes the avenue ----------------
+{
+  const AZ = -4.0, half = 2.9, Hp = 7.2, stone = M(0xe8e1d0, { roughness: 0.75 }), gold = M(0xc9a227, { metalness: 0.7, roughness: 0.35 });
+  for (const sx of [-1, 1]) {
+    const x = AVX + sx * half;
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.9), stone); base.position.set(x, 0.25, AZ); scene.add(base);
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, Hp, 20), stone); col.position.set(x, 0.5 + Hp / 2, AZ); scene.add(col);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.3, 0.85), stone); cap.position.set(x, 0.5 + Hp + 0.15, AZ); scene.add(cap);
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.28, 20, 14), gold); orb.position.set(x, 0.5 + Hp + 0.6, AZ); scene.add(orb);   // an atom, finial-sized
+    for (let k = 0; k < 3; k++) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.025, 8, 40), gold);
+      ring.position.copy(orb.position); ring.rotation.set(k * 1.05, k * 0.6, 0); scene.add(ring); }
+  }
+  const arch = new THREE.Mesh(new THREE.TorusGeometry(half, 0.22, 12, 48, Math.PI), stone); arch.position.set(AVX, 0.5 + Hp, AZ); scene.add(arch);
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(2 * half + 0.6, 0.25, 0.4), gold); beam.position.set(AVX, 0.5 + Hp - 2.4, AZ); scene.add(beam);
+  label(["TEN MILLION TIMES BIGGER", "If an atom were a grain of sand…",
+         "everything in this park is 10,000,000 × its real size", "1 nanometre → 1 centimetre  ·  1 micrometre → 10 metres"],
+    new THREE.Vector3(AVX, 0.5 + Hp - 1.35, AZ + 0.45), 3.2, "banner");   // fits between the pillars, in front of them
+}
+// ---------- the flag of the State of Microscope Slide --------------------------------
+const wallAnim = [];                                   // things that move with clock time, not the time scale
+{
+  const FX = -9.2, FZ = 3.6, poleH = 8;
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, poleH, 12), M(0xbfc5ca, { metalness: 0.8, roughness: 0.3 }));
+  pole.position.set(FX, poleH / 2, FZ); scene.add(pole);
+  const top = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), M(0xc9a227, { metalness: 0.8 })); top.position.set(FX, poleH + 0.1, FZ); scene.add(top);
+  const c = document.createElement("canvas"); c.width = 900; c.height = 600; const g = c.getContext("2d");
+  g.fillStyle = "#1f4e8c"; g.fillRect(0, 0, 900, 600);                                   // field
+  g.fillStyle = "#e6eef3"; g.fillRect(0, 0, 900, 70); g.fillRect(0, 530, 900, 70);       // the slide's frosted ends, as stripes
+  g.save(); g.translate(450, 300);
+  g.fillStyle = "rgba(220,240,250,.92)"; g.strokeStyle = "#c9a227"; g.lineWidth = 8;   // the slide itself, 3:1
+  g.fillRect(-270, -90, 540, 180); g.strokeRect(-270, -90, 540, 180);
+  g.fillStyle = "#f4d03f"; g.beginPath(); g.arc(0, 0, 18, 0, 6.3); g.fill();          // the nucleus of an atom on the slide
+  g.strokeStyle = "#c0392b"; g.lineWidth = 5;
+  for (let k = 0; k < 3; k++) { g.beginPath(); g.ellipse(0, 0, 70, 24, k * Math.PI / 3, 0, 6.3); g.stroke(); }
+  g.fillStyle = "#ffffff"; g.font = "700 38px Georgia, serif"; g.textAlign = "center";
+  g.fillText("STATE OF MICROSCOPE SLIDE", 0, -125); g.font = "italic 30px Georgia, serif"; g.fillText("Ex Parvis Magna", 0, 150);
+  g.restore();
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const FW = 3.0, FH = 2.0, geo = new THREE.PlaneGeometry(FW, FH, 24, 12); geo.translate(FW / 2, 0, 0);
+  const flag = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.8 }));
+  flag.position.set(FX + 0.06, poleH - FH / 2 - 0.15, FZ); flag.rotation.y = -0.3; scene.add(flag);
+  const base = geo.attributes.position.array.slice();
+  wallAnim.push(t => { const p = geo.attributes.position.array;              // a gentle ripple, stronger toward the fly end
+    for (let i = 0; i < p.length; i += 3) { const x = base[i], u = x / FW;
+      p[i + 2] = Math.sin(x * 2.2 - t * 3.0) * 0.12 * u + Math.sin(base[i + 1] * 3 - t * 2.1) * 0.03 * u; }
+    geo.attributes.position.needsUpdate = true; });
+  label(["the flag of the State of Microscope Slide", "a 75 × 25 mm glass slide at ×10⁷ is 750 × 250 km:",
+         "187,500 km², about the area of Washington State (shaped more like Tennessee)",
+         "and its 1 mm of thickness is 10 km deep · motto: Ex Parvis Magna, 'from small things, great'"],
+    new THREE.Vector3(FX, 0, FZ), 0.9);
+}
+
 placePlaques();
 const camW = new THREE.Vector3();
 // ---------- the loop -----------------------------------------------------------------
@@ -1833,6 +1886,7 @@ renderer.setAnimationLoop(() => {
 
   camera.getWorldPosition(camW);
   if (renderer.xr.isPresenting) { fpsN++; fpsT += dt; if (fpsT >= 1) { fps = fpsN / fpsT; fpsN = 0; fpsT = 0; } }
+  for (const f of wallAnim) f(clock.elapsedTime);
   for (const r of PLAQUES) if (r.kind === "plaque") {          // plaques come into view as you walk up to them
     const d = Math.hypot(camW.x - r.g.position.x, camW.z - r.g.position.z), o = THREE.MathUtils.clamp((r.reach - d) / (r.reach * 0.35), 0, 1);
     r.g.visible = o > 0.01; if (r.g.visible) for (const m of r.mats) m.opacity = o; }
