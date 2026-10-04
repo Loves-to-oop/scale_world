@@ -54801,6 +54801,7 @@ if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { i
     mergeStatic();
     const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] });
     renderer.xr.setReferenceSpaceType("local-floor"); renderer.xr.setFoveation(1.0);
+    renderer.xr.setFramebufferScaleFactor(0.8);              // fewer pixels per eye: steadier frame rate
     await renderer.xr.setSession(s); camera.position.y = 0; start(); vrBtn.textContent = "Enter VR";
     s.addEventListener("end", () => { camera.position.y = 1.65; rig.rotation.y = 0; }); }; });
 let snap = true, hallI = 0, vrSticks = "";
@@ -54869,7 +54870,9 @@ renderer.setAnimationLoop(() => {
         if (Math.abs(ax) > 0.7 && snap) { rig.rotation.y -= Math.sign(ax) * Math.PI / 6; snap = false; }
         else if (Math.abs(ax) < 0.3) snap = true; } }
     if (mx || my) {                                               // fly where the headset looks
-      const xrCam = renderer.xr.getCamera(); xrCam.getWorldDirection(fwd); side.crossVectors(fwd, upV).normalize();
+      // the headset's gaze (camera.quaternion holds its pose relative to the rig), turned by the rig's snap turns
+      fwd.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(rig.quaternion).normalize();
+      side.crossVectors(fwd, upV).normalize();
       rig.position.addScaledVector(fwd, -my * speed * boost * dt).addScaledVector(side, mx * speed * boost * dt);
       moved = speed * boost * Math.min(1, Math.hypot(mx, my)); }
   }
