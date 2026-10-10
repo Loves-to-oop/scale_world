@@ -56716,6 +56716,202 @@ const wSign = (z, east, lines) => macroSign(lines, east ? WX + 2.2 : WX - 2.2, z
     "red: its heart, beating ~4 times a second (shown at its real rate)  ·  green: its gut, full of algae",
     "brown: eggs in its brood pouch; the leaf-like legs underneath pump water through a filter of fine hairs",
     "it rows with its big branched antennae in jerky hops: the 'flea'  ·  one black compound eye"]); }
+
+// ---------- the small-animals hall: east of the anatomy hall, along x = 60 ----------
+const NX_ = 60;
+macroPath([[24, -45], [NX_, -45]]); macroPath([[NX_, -20], [NX_, -118]]);
+macroSign(["SMALL ANIMALS", "metazoans 0.15–3 mm long: big enough here to walk round, small enough to see their cells",
+  "Trichoplax, Hydra, a human embryo, a sea urchin larva, the smallest insect, a copepod, a springtail, a flatworm, a fish embryo"], 40, -45, WEST, 3.2, 2.2);
+const nSign = (z, east, lines) => macroSign(lines, east ? NX_ + 2.2 : NX_ - 2.2, z, east ? EASTF : WEST, 2.0, 1.6);
+const seeThru = (col, op = 0.4) => new THREE.MeshStandardMaterial({ color: col, transparent: true, opacity: op, roughness: 0.35, depthWrite: false, side: THREE.DoubleSide });
+
+// Trichoplax adhaerens: a flat, gliding sheet ~1 mm → 10 m wide and ~20 µm → 20 cm thick. No organs, nerves or
+// muscles; a few thousand to tens of thousands of cells of only a handful of kinds. It glides on cilia and keeps changing shape.
+{ const TC = V3(50, 0, -30), n = 64, sh = new THREE.Shape(), ph = Array.from({ length: 5 }, () => rnd() * 6.28);
+  for (let i = 0; i <= n; i++) { const a = i / n * 6.283; const r = 5 * (1 + 0.15 * Math.sin(3 * a + ph[0]) + 0.1 * Math.sin(5 * a + ph[1])); i ? sh.lineTo(r * Math.cos(a), r * Math.sin(a)) : sh.moveTo(r * Math.cos(a), r * Math.sin(a)); }
+  const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.2, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.15, bevelSegments: 3, curveSegments: 2 }).rotateX(-Math.PI / 2);
+  const base = geo.attributes.position.array.slice(), pos = geo.attributes.position.array;
+  const tri = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xe8d6b0, transparent: true, opacity: 0.72, roughness: 0.5 })); tri.position.copy(TC).setY(0.06); MACRO.add(tri);
+  const shiny = new THREE.InstancedMesh(new THREE.SphereGeometry(0.07, 8, 6), M(0xfff6d8, { roughness: 0.1, metalness: 0.2 }), 90);
+  for (let k = 0; k < 90; k++) { const a = rnd() * 6.283, r = Math.sqrt(rnd()) * 4.2; O3.position.set(r * Math.cos(a), 0.3, r * Math.sin(a)); O3.rotation.set(0, 0, 0); O3.scale.setScalar(1); O3.updateMatrix(); shiny.setMatrixAt(k, O3.matrix); }
+  tri.add(shiny); shiny.position.y = -0.06;
+  procAnim.push(t => { if (!inMacro) return;
+    for (let i = 0; i < pos.length; i += 3) { const x = base[i], z = base[i + 2], a = Math.atan2(z, x), f = 1 + 0.12 * Math.sin(2 * a + t * 0.2 + ph[2]) + 0.08 * Math.sin(3 * a - t * 0.13 + ph[3]); pos[i] = x * f; pos[i + 2] = z * f; }
+    geo.attributes.position.needsUpdate = true; tri.rotation.y = t * 0.01; tri.position.x = TC.x + 1.2 * Math.sin(t * 0.03); });
+  MACRO_EX.push({ name: "Trichoplax (a placozoan)", real: 1e-3, pos: TC });
+  nSign(-30, false, ["Trichoplax: perhaps the simplest animal", "real ~1 mm wide, 20 µm thick  ·  here 10 m wide, 20 cm thick",
+    "no mouth, gut, nerves or muscles: just a sandwich of a few kinds of cells",
+    "it glides on cilia underneath, lies over a patch of algae and digests it from below",
+    "it keeps changing shape (watch the outline)  ·  the shiny dots are 'shiny spheres', cells holding fat droplets"]); }
+
+// a human blastocyst: the embryo 5 days after fertilisation, 0.15 mm → 1.5 m, cut open.
+// ~100–200 cells: a hollow ball of flat trophectoderm cells (the future placenta) and the inner cell mass (the future you)
+{ const BC = V3(50, 1.9, -52);
+  const pl = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.0, 2.2), M(0xe5ecef, { roughness: 0.8 })); pl.position.set(BC.x, 0.5, BC.z); MACRO.add(pl);
+  const pts = []; for (let i = 0; i < 160; i++) { const y = 1 - 2 * (i + 0.5) / 160, r = Math.sqrt(1 - y * y), a = i * 2.39996, d = V3(r * Math.cos(a), y, r * Math.sin(a)); if (!(d.x > 0.25 && d.z > -0.2)) pts.push(d); }
+  const cells = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 10), M(0xf2c9b0, { roughness: 0.55 }), pts.length);
+  pts.forEach((d, i) => { O3.position.copy(BC).addScaledVector(d, 0.68); O3.quaternion.setFromUnitVectors(V3(0, 1, 0), d); O3.scale.set(0.16, 0.05, 0.16); O3.updateMatrix(); cells.setMatrixAt(i, O3.matrix); });
+  MACRO.add(cells);
+  const icm = new THREE.InstancedMesh(new THREE.SphereGeometry(0.1, 12, 8), M(0xd99a8a, { roughness: 0.5 }), 24);
+  for (let k = 0; k < 24; k++) { O3.position.copy(BC).add(V3(-0.1 + (rnd() - 0.5) * 0.35, 0.42 + (rnd() - 0.5) * 0.2, (rnd() - 0.5) * 0.35)); O3.rotation.set(0, 0, 0); O3.scale.setScalar(1); O3.updateMatrix(); icm.setMatrixAt(k, O3.matrix); }
+  MACRO.add(icm);
+  const zona = new THREE.Mesh(new THREE.SphereGeometry(0.82, 40, 28, 0, Math.PI * 1.55), seeThru(0xe6f2f6, 0.25)); zona.position.copy(BC); zona.rotation.y = 0.6; MACRO.add(zona);
+  MACRO_EX.push({ name: "human blastocyst (5-day embryo)", real: 0.15e-3, pos: BC });
+  nSign(-52, false, ["a human embryo, 5 days old (a blastocyst), cut open", "real 0.15 mm  ·  here 1.5 m  ·  about 100–200 cells",
+    "the hollow ball of flat cells (trophectoderm) will become the placenta",
+    "the clump inside (the inner cell mass) will become the whole body: these are embryonic stem cells",
+    "around it, the zona pellucida (the egg's clear shell), which it hatches out of before it implants"]); }
+
+// a sea urchin larva (an eight-armed echinopluteus), 0.3 mm → 3 m: see-through, with arms held out by calcite rods
+{ const PC = V3(50, 1.2, -72), g = new THREE.Group(); g.position.copy(PC); MACRO.add(g);
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.2, 1.2, 8).translate(0, -0.6, 0), M(0x34495e)); g.add(stand);
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 20), seeThru(0xf0e2c8, 0.4)); body.scale.set(0.6, 0.55, 0.45); body.position.y = 0.45; body.renderOrder = 2; g.add(body);
+  const st = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12), M(0xd9a35a)); st.position.y = 0.35; g.add(st);
+  g.add(tubeM([V3(0, 0.95, 0.1), V3(0, 0.75, 0.15), V3(0, 0.5, 0.08)], 0.06, M(0xe8c48a), 10, 8));
+  const rod = M(0xffffff, { roughness: 0.15 }), armM = seeThru(0xf0e2c8, 0.32), band = M(0xc87a3a);
+  for (const [len, ax, az, up] of [[2.4, 0.45, 0.25, 1.3], [1.9, 0.75, 0.05, 1.0], [1.4, 0.3, 0.5, 1.1], [1.1, 0.85, 0.4, 0.8]]) for (const sd of [-1, 1]) {
+    const a = V3(sd * 0.3, 0.8, 0), d = V3(sd * ax, up, az).normalize(), b = a.clone().addScaledVector(d, len);
+    const arm = limb(a, b, 0.14, 0.05, armM, g, false); arm.renderOrder = 2;
+    limb(a.clone().add(V3(0, -0.3, 0)), b, 0.018, 0.012, rod, g, false);
+    limb(a.clone().add(V3(0, 0, 0.12)), b.clone().add(V3(0, 0, 0.05)), 0.02, 0.02, band, g, false); }
+  procAnim.push(t => { if (inMacro) g.rotation.y = 0.15 * Math.sin(t * 0.3); });
+  MACRO_EX.push({ name: "sea urchin larva (pluteus)", real: 0.3e-3, pos: PC });
+  nSign(-72, false, ["a sea urchin larva (pluteus)", "real 0.3 mm  ·  here 3 m  ·  it swims in the plankton for weeks before it becomes an urchin",
+    "its arms are held out by rods of calcite (white): a skeleton made inside single cells, crystal by crystal",
+    "the brown band along the arms is cilia: it beats to swim and to sweep algae to the mouth",
+    "inside: the gut (gold stomach); the adult urchin grows from a small pocket on one side"]); }
+
+// a fairyfly (Mymaridae), among the smallest insects: ~0.2 mm → 2 m, smaller than a paramecium.
+// Its wings are narrow paddles fringed with long bristles: at its size, air is thick, and it rows through it.
+{ const FC = V3(50, 1.35, -95), g = new THREE.Group(); g.position.copy(FC); MACRO.add(g);
+  const pl = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.0, 2.6), M(0xe5ecef, { roughness: 0.8 })); pl.position.set(FC.x, 0.5, FC.z); MACRO.add(pl);
+  const sh = M(0x3a3020, { roughness: 0.35 }), wingM = seeThru(0xd8d8d0, 0.5), seta = M(0x6a6050);
+  for (const [x, sx, sy, sz_] of [[0.75, 0.17, 0.16, 0.18], [0.35, 0.26, 0.2, 0.2], [-0.35, 0.42, 0.22, 0.2]]) { const b = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), sh); b.scale.set(sx, sy, sz_); b.position.set(x, 0, 0); g.add(b); }
+  for (const sd of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), M(0x8a1a12)); e.position.set(0.85, 0.06, sd * 0.11); g.add(e);
+    let a = V3(0.9, 0.08, sd * 0.06); for (let k = 0; k < 6; k++) { const b = a.clone().add(V3(0.12, 0.08 - k * 0.02, sd * 0.05)); limb(a, b, 0.018, 0.016, sh, g); a = b; }
+    for (const x of [0.5, 0.35, 0.2]) { const c = V3(x, -0.12, sd * 0.12); limb(c, V3(x + 0.05, -0.2, sd * 0.32), 0.02, 0.016, sh, g); limb(V3(x + 0.05, -0.2, sd * 0.32), V3(x + 0.1, -0.33, sd * 0.4), 0.016, 0.01, sh, g); }
+    for (const [ang, L] of [[0.35, 1.1], [0.75, 0.8]]) { const w = new THREE.Group(); w.position.set(0.4, 0.15, sd * 0.12); w.rotation.set(sd * -0.15, sd * -ang, 0); g.add(w);
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(L * 0.18, 0.004, 0.04).translate(L * 0.09, 0, 0), wingM); blade.rotation.y = Math.PI; w.add(blade);
+      const stalk = new THREE.Mesh(new THREE.BoxGeometry(L, 0.004, 0.012).translate(-L / 2, 0, 0), wingM); w.add(stalk);
+      for (let k = 0; k < 26; k++) { const x = -L * 0.35 - k * L * 0.025; for (const s2 of [-1, 1]) limb(V3(x, 0, 0), V3(x - 0.06, 0, s2 * 0.28), 0.004, 0.002, seta, w, false); } } }
+  MACRO_EX.push({ name: "fairyfly (one of the smallest insects)", real: 0.2e-3, pos: FC });
+  nSign(-95, false, ["a fairyfly: one of the smallest insects", "real ~0.2 mm  ·  here 2 m: smaller than the paramecia in the pond drop",
+    "a wasp that lays its eggs inside the eggs of other insects",
+    "its wings are stalks fringed with long bristles: at this size air is thick like syrup, so it rows rather than glides",
+    "some have so little room that most of their neurons lose their nuclei as they mature"]); }
+
+// Hydra viridissima, green with symbiotic algae: this one 1.5 mm tall → 15 m (stretched out, Hydra reach 1 cm+).
+// Its tentacles carry batteries of stinging cells (cnidocytes, ~10 µm → 10 cm), and a bud is growing on its side.
+{ const HC = V3(76, 0, -34), hy = M(0x6faa4a, { roughness: 0.55 }), seg = [];
+  const col = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.5, 11, 32, 8), hy); col.position.set(HC.x, 5.7, HC.z); MACRO.add(col);
+  const foot = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.8, 0.25, 32), M(0x5a8a3a)); foot.position.set(HC.x, 0.12, HC.z); MACRO.add(foot);
+  const hyp = new THREE.Mesh(new THREE.ConeGeometry(1.1, 1.3, 28), hy); hyp.position.set(HC.x, 11.85, HC.z); MACRO.add(hyp);
+  const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), M(0x2a3a1a)); mouth.position.set(HC.x, 12.45, HC.z); MACRO.add(mouth);
+  const batt = new THREE.SphereGeometry(0.08, 8, 6), bM = M(0xeaf2d8, { roughness: 0.3 });
+  const tent = (base, dir0, n, L, r, store) => { let parent = new THREE.Group(); parent.position.copy(base); parent.quaternion.setFromUnitVectors(V3(0, 1, 0), dir0); MACRO.add(parent);
+    for (let k = 0; k < n; k++) { const s_ = new THREE.Group(); if (k) s_.position.y = L; parent.add(s_);
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(r * (1 - k / n * 0.6), r * (1 - (k + 1) / n * 0.6), L, 10).translate(0, L / 2, 0), hy); s_.add(c);
+      for (let j = 0; j < 4; j++) { const b = new THREE.Mesh(batt, bM); const a = j * 1.57 + k; b.position.set(r * 0.9 * Math.cos(a), L * (j + 0.5) / 4, r * 0.9 * Math.sin(a)); s_.add(b); }
+      store.push(s_); parent = s_; } };
+  const tentacles = [];
+  for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283, segs = []; tent(V3(HC.x + 0.8 * Math.cos(a), 11.6, HC.z + 0.8 * Math.sin(a)), V3(Math.cos(a), 0.9, Math.sin(a)).normalize(), 12, 0.9, 0.32, segs); tentacles.push([segs, a]); }
+  const bud = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.6, 3.2, 20), hy); bud.position.set(HC.x + 2.4, 5.0, HC.z + 0.2); bud.rotation.z = -1.0; MACRO.add(bud);
+  const budTop = V3(HC.x + 3.75, 5.9, HC.z + 0.2), budT = [];
+  for (let i = 0; i < 5; i++) { const a = i / 5 * 6.283; tent(budTop, V3(0.9 + 0.5 * Math.cos(a), 0.5, 0.6 * Math.sin(a)).normalize(), 5, 0.35, 0.12, budT); }
+  procAnim.push(t => { if (!inMacro) return; for (const [segs, a] of tentacles) segs.forEach((s_, k) => { s_.rotation.set(0.12 * Math.sin(t * 0.4 + a + k * 0.5), 0, 0.1 * Math.sin(t * 0.33 + a * 2 + k * 0.4) + 0.04 * k); }); });
+  MACRO_EX.push({ name: "Hydra", real: 1.5e-3, pos: V3(HC.x, 6, HC.z) });
+  nSign(-34, true, ["Hydra, a tiny freshwater relative of jellyfish", "this one 1.5 mm → 15 m; stretched out they reach over a centimetre",
+    "the white bumps on the tentacles are batteries of stinging cells (cnidocytes, ~10 µm → 10 cm):",
+    "each fires a coiled harpoon in under a microsecond, one of the fastest events in biology",
+    "green from algae living inside its cells, which feed it sugar  ·  the side branch is a bud: a new Hydra growing",
+    "Hydra seem not to age: their stem cells keep renewing the whole body"]); }
+
+// a copepod (a cyclopoid, Cyclops), 1 mm → 10 m: the most numerous animals on Earth. One red eye, long first
+// antennae held out like a T, and two egg sacs. It swims in hops by kicking all its legs at once.
+{ const CC = V3(77, 3.2, -58), g = new THREE.Group(); g.position.copy(CC); g.rotation.y = Math.PI / 2; MACRO.add(g);   // head to the north
+  const shM = seeThru(0xd8c8a0, 0.5);
+  const pro = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 22), shM); pro.scale.set(3.2, 1.35, 1.4); pro.position.set(1.2, 0, 0); pro.renderOrder = 2; g.add(pro);
+  for (let k = 0; k < 4; k++) { const r = new THREE.Mesh(new THREE.TorusGeometry(1, 0.04, 6, 30), M(0xb8a070)); const x = 0.2 - k * 0.8, f = Math.sqrt(Math.max(0.1, 1 - ((x - 1.2) / 3.2) ** 2)); r.scale.set(1.35 * f, 1.4 * f, 1); r.rotation.y = Math.PI / 2; r.position.set(x, 0, 0); g.add(r); }
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 8), M(0xd0201a, { emissive: 0x400808 })); eye.position.set(4.1, 0.35, 0); g.add(eye);
+  const gut = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), M(0x8a6a2a)); gut.scale.set(2.2, 0.35, 0.35); gut.position.set(0.8, 0.1, 0); g.add(gut);
+  for (let k = 0; k < 4; k++) { const s_ = new THREE.Mesh(new THREE.CylinderGeometry(0.5 - k * 0.07, 0.45 - k * 0.07, 0.8, 16).rotateZ(Math.PI / 2), shM); s_.position.set(-2.4 - k * 0.8, -0.1, 0); g.add(s_); }
+  for (const sd of [-1, 1]) { limb(V3(-5.2, -0.1, sd * 0.15), V3(-6.2, -0.2, sd * 0.45), 0.08, 0.05, M(0xb8a070), g); for (let k = 0; k < 3; k++) limb(V3(-6.2, -0.2, sd * 0.45), V3(-7.6, -0.3 + k * 0.15, sd * (0.5 + k * 0.25)), 0.02, 0.01, M(0x8a7a50), g, false);
+    const sac = new THREE.InstancedMesh(new THREE.SphereGeometry(0.22, 10, 8), M(0x4a5a7a, { roughness: 0.5 }), 18);
+    for (let k = 0; k < 18; k++) { O3.position.set(-2.6 - (k % 6) * 0.42, -0.2 + Math.floor(k / 6) * 0.35 - 0.3, sd * (0.9 + (k % 2) * 0.25)); O3.rotation.set(0, 0, 0); O3.scale.setScalar(1); O3.updateMatrix(); sac.setMatrixAt(k, O3.matrix); }
+    g.add(sac);
+    let a = V3(4, 0.4, sd * 0.4); for (let k = 0; k < 10; k++) { const b = a.clone().add(V3(-0.15, 0.04, sd * 0.85)); limb(a, b, 0.09 - k * 0.006, 0.08 - k * 0.006, M(0xc8b890), g); if (k % 2) limb(b, b.clone().add(V3(0.2, 0.4, 0)), 0.01, 0.005, M(0x8a7a50), g, false); a = b; }
+    for (let k = 0; k < 4; k++) limb(V3(2.5 - k * 0.7, -1.0, sd * 0.3), V3(2.2 - k * 0.7, -1.9, sd * 0.8), 0.06, 0.03, M(0xc8b890), g); }
+  procAnim.push(t => { if (!inMacro) return; const p_ = (t % 2.2) / 2.2; g.position.y = CC.y + (p_ < 0.06 ? p_ / 0.06 * 0.6 : 0.6 * (1 - (p_ - 0.06) / 0.94)); });
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.3, 2.2, 8), M(0x34495e)); stand.position.set(CC.x, 1.1, CC.z); MACRO.add(stand);
+  MACRO_EX.push({ name: "copepod (Cyclops)", real: 1e-3, pos: CC });
+  nSign(-58, true, ["a copepod (Cyclops)", "real 1 mm  ·  here 10 m  ·  a crustacean, and likely the most numerous animal on Earth",
+    "its single red eye gave it the name of the one-eyed giant", "the long first antennae sense the water movement of prey and predators",
+    "the blue clusters are egg sacs  ·  it swims in sudden hops (shown) by kicking its legs, reaching hundreds of body lengths a second"]); }
+
+// a springtail (Collembola), 1.5 mm → 15 m: not an insect but a close relative. Under its tail is a forked spring
+// (the furcula) held by a catch; released, it flicks down and throws the animal ~10 cm: 1 km at this scale.
+{ const SC = V3(77, 0, -82), g = new THREE.Group(); g.position.copy(SC); g.rotation.y = Math.PI / 2; MACRO.add(g);   // head to the north
+  const sk = M(0x6a7a8a, { roughness: 0.4 }), legS = M(0x8a96a2);
+  const segs = [[5.2, 1.4, 1.5], [3.4, 1.3, 1.45], [1.6, 1.45, 1.55], [-0.2, 1.5, 1.55], [-1.9, 1.5, 1.5], [-3.5, 1.45, 1.4], [-5.0, 1.25, 1.2], [-6.2, 1.0, 0.95]];
+  segs.forEach(([x, ry, rz]) => { const b = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), sk); b.scale.set(1.1, ry, rz); b.position.set(x, 2.4, 0); g.add(b); });
+  const head = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), sk); head.scale.set(1.5, 1.3, 1.4); head.position.set(7.2, 2.2, 0); g.add(head);
+  for (const sd of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 8), M(0x111111)); e.position.set(7.6, 2.9, sd * 1.05); g.add(e);
+    let a = V3(8.4, 2.9, sd * 0.5); for (let k = 0; k < 4; k++) { const b = a.clone().add(V3(1.0, 0.45, sd * 0.45)); limb(a, b, 0.22, 0.18, legS, g); a = b; }
+    for (const x of [5, 3.4, 1.6]) { const c = V3(x, 1.4, sd * 1.1), k = V3(x + 0.3, 1.0, sd * 2.6); limb(c, k, 0.28, 0.22, legS, g); limb(k, V3(x + 0.6, 0.05, sd * 3.0), 0.22, 0.12, legS, g); } }
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.3, 1.2, 12), M(0x8a96a2)); tube.position.set(0.3, 0.9, 0); g.add(tube);   // the collophore
+  const fur = new THREE.Group(); fur.position.set(-5.0, 1.3, 0); g.add(fur);
+  limb(V3(0, 0, 0), V3(2.0, -0.4, 0), 0.25, 0.22, legS, fur); for (const sd of [-1, 1]) limb(V3(2.0, -0.4, 0), V3(5.2, -0.6, sd * 0.35), 0.18, 0.08, legS, fur);
+  procAnim.push(t => { if (!inMacro) return; const p_ = (t % 7) / 7; fur.rotation.z = p_ < 0.03 ? -Math.PI * 0.9 * p_ / 0.03 : p_ < 0.4 ? -Math.PI * 0.9 * (1 - (p_ - 0.03) / 0.37) : 0;
+    g.position.y = p_ < 0.03 ? p_ / 0.03 * 0.8 : p_ < 0.1 ? 0.8 * (1 - (p_ - 0.03) / 0.07) : 0; });
+  MACRO_EX.push({ name: "springtail", real: 1.5e-3, pos: SC });
+  nSign(-82, true, ["a springtail (Collembola)", "real 1.5 mm  ·  here 15 m  ·  a six-legged relative of insects, in every handful of soil",
+    "under its tail is a forked spring, the furcula, held cocked by a catch (watch it flick)",
+    "released, it throws the springtail ~10 cm in a few milliseconds: 1 km at this scale",
+    "the tube under its belly (the collophore) takes up water and helps it stick to surfaces"]); }
+
+// a small planarian flatworm, 3 mm → 30 m: flat, gliding on cilia, with 'cross-eyed' eyespots, a gut branching
+// through its whole body, and a mouth tube (the pharynx) that comes out of the middle of its belly to feed.
+{ const PC = V3(80, 0, -102), sh = new THREE.Shape(); sh.moveTo(15, 0);
+  const outline = []; for (let i = 0; i <= 60; i++) { const u = i / 60, x = 15 - 30 * u; let w = 3.2 * Math.pow(Math.sin(Math.PI * Math.min(1, u * 1.05)), 0.6);
+    if (u < 0.14) w = 2.6 + 1.6 * Math.exp(-(((u - 0.07) / 0.03) ** 2)) - 1.5 * (0.14 - u) / 0.14 * 1.3; outline.push([x, Math.max(0.05, w)]); }
+  outline.forEach(([x, w]) => sh.lineTo(x, w)); for (let i = outline.length - 1; i >= 0; i--) sh.lineTo(outline[i][0], -outline[i][1]);
+  const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.3, bevelEnabled: true, bevelThickness: 0.25, bevelSize: 0.3, bevelSegments: 4 }).rotateX(-Math.PI / 2);
+  const worm = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x8a5a3a, transparent: true, opacity: 0.6, roughness: 0.5, depthWrite: false })); worm.position.copy(PC).setY(0.3); worm.rotation.y = Math.PI; worm.renderOrder = 2; MACRO.add(worm);   // lying east-west, head toward the path
+  const gutM = M(0x5a3a1a, { roughness: 0.6 }), inner = new THREE.Group(); inner.position.copy(worm.position).setY(0.45); inner.rotation.y = Math.PI; MACRO.add(inner);
+  const trunk = (pts, r) => inner.add(tubeM(pts.map(([x, z]) => V3(x, 0, z)), r, gutM, 30, 6));
+  trunk([[9, 0], [12, 0]], 0.3); for (const sd of [-1, 1]) { trunk([[9, 0], [2, sd * 1.2], [-12, sd * 1.0]], 0.28);
+    for (let k = 0; k < 9; k++) { const x = 10.5 - k * 2.4, z0 = x > 9 ? 0 : sd * 1.1; trunk([[x, z0], [x - 0.5, sd * (1.8 + 0.4 * (k % 2))], [x - 0.3, sd * 2.4]], 0.12); } }
+  const phx = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 2.4, 16), M(0xe8d0b0)); phx.position.set(PC.x + 1, 0.15, PC.z); MACRO.add(phx);
+  for (const sd of [-1, 1]) { const cup = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 10), M(0xf2ece0)); cup.position.set(PC.x - 11.8, 0.9, PC.z + sd * 0.7); MACRO.add(cup);
+    const pig = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 8, 0, Math.PI), M(0x111111)); pig.position.set(PC.x - 11.8, 1.0, PC.z + sd * 0.82); pig.rotation.y = sd > 0 ? 0.8 : Math.PI - 0.8; MACRO.add(pig); }
+  MACRO_EX.push({ name: "planarian flatworm", real: 3e-3, pos: PC });
+  nSign(-100, true, ["a planarian flatworm", "this one 3 mm → 30 m long  ·  it glides on a film of mucus with cilia, ~1.5 mm/s (15 m/s here)",
+    "two eyespots: pigment cups (black) shading light-sensing cells, so it can tell where light comes from: the 'cross-eyed' look",
+    "dark brown: the gut, branching through the whole body because it has no blood to carry food",
+    "the pale tube is its pharynx, which pushes out from the middle of its belly to suck in food",
+    "cut one into pieces and each grows into a whole new worm"]); }
+
+// a zebrafish embryo inside its egg (chorion), ~1 day old: egg 1.2 mm → 12 m. The embryo is see-through, curled round
+// its yolk, with its eyes, its somites (the blocks that become muscle and backbone), and a heart that has just started to beat.
+{ const ZC = V3(77, 6.05, -114);
+  const ch = new THREE.Mesh(new THREE.SphereGeometry(6, 48, 32), seeThru(0xe4f2f4, 0.18)); ch.position.copy(ZC); ch.renderOrder = 3; MACRO.add(ch);
+  const yolk = new THREE.Mesh(new THREE.SphereGeometry(3.3, 40, 28), M(0xe8c470, { roughness: 0.6 })); yolk.position.copy(ZC).add(V3(0, -1.5, 0)); MACRO.add(yolk);
+  const Y = yolk.position, arc = []; for (let k = 0; k <= 40; k++) { const a = -0.4 + k / 40 * 4.2, r = 3.3 + 0.75 + (k > 34 ? (k - 34) * 0.05 : 0); arc.push(V3(Y.x + r * Math.cos(a) * 0.98, Y.y + r * Math.sin(a), Y.z + (k > 30 ? (k - 30) * 0.12 : 0))); }
+  const bc = new THREE.CatmullRomCurve3(arc), bodyM = seeThru(0xf0e8dc, 0.55);
+  const body = new THREE.Mesh(new THREE.TubeGeometry(bc, 80, 0.75, 14), bodyM); body.renderOrder = 2; MACRO.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(1.2, 24, 16), bodyM); head.position.copy(bc.getPointAt(0)); head.renderOrder = 2; MACRO.add(head);
+  for (const sd of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 10), M(0x6a6a7a)); e.position.copy(head.position).add(V3(0.3, 0.2, sd * 0.85)); MACRO.add(e); }
+  const som = new THREE.InstancedMesh(new THREE.TorusGeometry(0.55, 0.05, 4, 6, Math.PI), M(0xc8b8a0), 28);
+  for (let k = 0; k < 28; k++) { const u = 0.18 + k * 0.028, p_ = bc.getPointAt(u), tg = bc.getTangentAt(u); O3.position.copy(p_); O3.quaternion.setFromUnitVectors(V3(0, 0, 1), tg); O3.scale.setScalar(1); O3.updateMatrix(); som.setMatrixAt(k, O3.matrix); }
+  MACRO.add(som);
+  const heart = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 8), M(0xd04040, { emissive: 0x401010 })); heart.position.copy(bc.getPointAt(0.06)).add(V3(0, -0.9, 0)); MACRO.add(heart);
+  procAnim.push(t => { if (inMacro) heart.scale.setScalar(1 + 0.35 * Math.max(0, Math.sin(t * 2.2 * 2 * Math.PI))); });
+  MACRO_EX.push({ name: "zebrafish embryo in its egg", real: 1.2e-3, pos: ZC });
+  nSign(-111, true, ["a zebrafish embryo, about a day old, in its egg", "egg (chorion) 1.2 mm → 12 m  ·  the embryo curls round its yellow yolk",
+    "it is see-through, so biologists watch every organ form live under the microscope",
+    "the bands along its back are somites: blocks that become muscle and backbone",
+    "the red dot is its heart, which starts beating at about a day (shown at ~2 beats a second)",
+    "it hatches at 2–3 days and swims by day 5"]); }
 function makeMini() {                                   // photograph the museum from above, once
   const N = IS_HEADSET ? 2048 : 4096, rt = new THREE.WebGLRenderTarget(N, N, { samples: 4 });
   rt.texture.colorSpace = THREE.SRGBColorSpace; rt.texture.generateMipmaps = true;
