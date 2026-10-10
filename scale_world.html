@@ -55592,7 +55592,9 @@ const PORTAL = new THREE.Vector3(11, 0, 3);            // on the east side of th
 const BACK = new THREE.Vector3(14.5, 0, 4.2);          // the way home, beside the shrunken museum
 const SLAB = { cx: PORTAL.x, cz: PORTAL.z, L: 75e-3 * K4, W: 25e-3 * K4, T: 1e-3 * K4 };   // 750 × 250 × 10 m
 const AIRCOL = new THREE.Color(0xcfe3ee), macroFog = new THREE.FogExp2(0xcfe3ee, 0.0012), museumFog = scene.fog;
-function macroGround(x, z) {                           // the top of the slab, or 10 m down on the bench
+const MACRO_SOLIDS = [];                                // things you can stand on: { in(x, z), h }
+function macroGround(x, z) {                           // a solid exhibit, the top of the slab, or 10 m down on the bench
+  for (const o of MACRO_SOLIDS) if (o.in(x, z)) return o.h;
   return Math.abs(x - SLAB.cx) < SLAB.L / 2 && Math.abs(z - SLAB.cz) < SLAB.W / 2 ? 0 : -SLAB.T; }
 function portalGate(parent, pos, ry, col, lines) {     // a ring you walk through, with a swirl inside
   const g = new THREE.Group(); g.position.copy(pos); g.rotation.y = ry; parent.add(g);
@@ -55735,6 +55737,264 @@ MACRO_EX.push({ name: "the museum you came from", real: 240e-6, pos: new THREE.V
     "cream: eggs  ·  red: the muscular pharynx that pumps its food  ·  black: two eyespots",
     "8 stubby legs, each with 4 claws (10 µm → 10 cm)  ·  walking at its real speed, ~80 µm/s",
     "dried out it curls into a 'tun' and can survive for years"], PORTAL.x + 2.3, TC.z, -Math.PI / 2, 2.0, 1.7);
+}
+
+// helpers for the exhibits below
+const arenaRail = (c, r) => {                          // a low railed ring on the glass
+  const rail = new THREE.Mesh(new THREE.TorusGeometry(r, 0.035, 8, 120).rotateX(Math.PI / 2), M(0xc9a227, { metalness: 0.6, roughness: 0.35 }));
+  rail.position.set(c.x, 0.75, c.z); MACRO.add(rail);
+  const n = Math.round(r * 4.4), posts = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.035, 0.035, 0.75, 8).translate(0, 0.375, 0), M(0x34495e), n);
+  for (let k = 0; k < n; k++) { const q = k / n * Math.PI * 2; O3.position.set(c.x + r * Math.cos(q), 0, c.z + r * Math.sin(q));
+    O3.rotation.set(0, 0, 0); O3.scale.setScalar(1); O3.updateMatrix(); posts.setMatrixAt(k, O3.matrix); }
+  MACRO.add(posts); };
+const limb = (A, B, r1, r2, mat, parent, joint = true) => {   // a tapered cylinder from A (radius r1) to B (r2)
+  const d = B.clone().sub(A), L = d.length(), m = new THREE.Mesh(new THREE.CylinderGeometry(r2, r1, L, 10), mat);
+  m.position.copy(A).addScaledVector(d, 0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); parent.add(m);
+  if (joint) { const j = new THREE.Mesh(new THREE.SphereGeometry(r2 * 1.05, 10, 8), mat); j.position.copy(B); parent.add(j); }
+  return m; };
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const canvasTex = (w, h, draw, rep = [1, 1]) => { const c = document.createElement("canvas"); c.width = w; c.height = h; draw(c.getContext("2d"), w, h);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...rep); t.anisotropy = 8; return t; };
+const WEST = Math.PI / 2, EASTF = -Math.PI / 2;        // sign turns: facing +x (on the west side) / facing -x (east side)
+
+// C. elegans: 1 mm → 10 m, 65 µm wide → 0.65 m; exactly 959 cells in the adult hermaphrodite.
+// It crawls on its side in a wave, the body following its own track; ~0.15 mm/s (1.6 m/s here).
+// Each purple dot is the nucleus of one cell (2–3 µm → 2–3 cm).
+{
+  const EC = V3(PORTAL.x - 12.5, 0, PORTAL.z + 17), R0 = 5.2, L = 10, A = 0.9, LAM = 6, V = 1.6, RAD = 0.33, NS = 140, NR = 16;
+  const track = s => { const a = s / R0, r = R0 + A * Math.sin(2 * Math.PI * s / LAM); return V3(EC.x + r * Math.cos(a), RAD + 0.01, EC.z + r * Math.sin(a)); };
+  const radAt = u => RAD * Math.max(0.05, Math.min(1, Math.pow(u / 0.3, 0.8)) * Math.min(1, Math.pow((1 - u) / 0.05, 0.5)));
+  const pos = new Float32Array((NS + 1) * NR * 3), nor = new Float32Array(pos.length), idx = [];
+  for (let i = 0; i < NS; i++) for (let j = 0; j < NR; j++) { const a = i * NR + j, b = i * NR + (j + 1) % NR; idx.push(a, a + NR, b, b, a + NR, b + NR); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); geo.setAttribute("normal", new THREE.BufferAttribute(nor, 3)); geo.setIndex(idx);
+  const worm = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xece6d6, transparent: true, opacity: 0.3, roughness: 0.3, depthWrite: false, side: THREE.DoubleSide }));
+  worm.frustumCulled = false; worm.renderOrder = 2; MACRO.add(worm);
+  const parts = [];                                    // things inside, fixed in body coordinates (u along, angle, fraction of radius)
+  const mk = (n, geo_, mat, place) => { const im = new THREE.InstancedMesh(geo_, mat, n); im.frustumCulled = false; MACRO.add(im);
+    for (let k = 0; k < n; k++) parts.push({ im, k, ...place(k) }); };
+  mk(959, new THREE.SphereGeometry(0.028, 8, 6), M(0x7d6aa0), () => ({ u: 0.02 + rnd() * 0.96, th: rnd() * 6.283, rr: 0.35 + rnd() * 0.55, s: 1 }));
+  mk(64, new THREE.SphereGeometry(0.11, 12, 8), M(0x8b6b45, { roughness: 0.7 }), k => ({ u: 0.12 + k * 0.012, th: 0, rr: 0, s: 1 }));   // the intestine
+  mk(10, new THREE.SphereGeometry(1, 14, 10), M(0xf3e5c0), k => ({ u: 0.4 + 0.022 * k, th: k % 2 ? 1.57 : -1.57, rr: 0.4, s: [0.25, 0.15, 0.15] }));   // eggs, 50 × 30 µm
+  mk(2, new THREE.SphereGeometry(1, 14, 10), M(0xa0524a), k => ({ u: k ? 0.95 : 0.885, th: 0, rr: 0, s: k ? 0.11 : 0.14 }));             // pharynx: median and terminal bulbs
+  const C = [], T = [], N = []; for (let i = 0; i <= NS; i++) { C.push(V3(0, 0, 0)); T.push(V3(0, 0, 0)); N.push(V3(0, 0, 0)); }
+  const up = V3(0, 1, 0), X1 = V3(1, 0, 0), q = new THREE.Quaternion();
+  const head = V3(0, 0, 0);
+  procAnim.push(t => {
+    if (!inMacro) return;
+    const h = V * t + L;
+    for (let i = 0; i <= NS; i++) C[i].copy(track(h - L * (1 - i / NS)));
+    for (let i = 0; i <= NS; i++) { T[i].subVectors(C[Math.min(NS, i + 1)], C[Math.max(0, i - 1)]).normalize(); N[i].crossVectors(up, T[i]).normalize(); }
+    for (let i = 0; i <= NS; i++) { const r = radAt(i / NS);
+      for (let j = 0; j < NR; j++) { const a = j / NR * 6.283, cx = Math.cos(a), sy = Math.sin(a), o = (i * NR + j) * 3;
+        const nx = cx * N[i].x, ny = sy, nz = cx * N[i].z;
+        pos[o] = C[i].x + r * nx; pos[o + 1] = C[i].y + r * ny; pos[o + 2] = C[i].z + r * nz; nor[o] = nx; nor[o + 1] = ny; nor[o + 2] = nz; } }
+    geo.attributes.position.needsUpdate = true; geo.attributes.normal.needsUpdate = true;
+    for (const p_ of parts) { const i = Math.round(p_.u * NS), r = radAt(p_.u) * p_.rr, cx = Math.cos(p_.th), sy = Math.sin(p_.th);
+      O3.position.set(C[i].x + r * cx * N[i].x, C[i].y + r * sy, C[i].z + r * cx * N[i].z);
+      O3.quaternion.copy(q.setFromUnitVectors(X1, T[i])); if (Array.isArray(p_.s)) O3.scale.set(...p_.s); else O3.scale.setScalar(p_.s);
+      O3.updateMatrix(); p_.im.setMatrixAt(p_.k, O3.matrix); }
+    for (const im of new Set(parts.map(p_ => p_.im))) im.instanceMatrix.needsUpdate = true;
+    head.copy(C[NS]); });
+  arenaRail(EC, R0 + A + 1.4);
+  MACRO_EX.push({ name: "C. elegans (a nematode worm)", real: 1e-3, pos: head });
+  macroSign(["C. elegans, a nematode worm", "real 1 mm  ·  here 10 m  ·  exactly 959 cells (not counting eggs and sperm)",
+    "each purple dot is the nucleus of one cell (2–3 µm → 2–3 cm)",
+    "brown: the intestine  ·  cream: eggs (50 µm → 50 cm)  ·  red: the pharynx bulbs that pump in bacteria",
+    "it crawls on its side, its body following its own wavy track, at its real speed (~0.15 mm/s)",
+    "the first animal to have every cell's ancestry and every nerve connection mapped"], PORTAL.x - 2.3, EC.z, WEST, 2.0, 1.7);
+}
+
+// the house dust mite: 0.3 mm → 3 m, an arachnid. Ridged cuticle, no eyes, breathes through its skin.
+// Around it: the skin flakes it eats (one dead cell each, ~40 µm → 40 cm) and its droppings.
+{
+  const MC = V3(PORTAL.x + 13, 0, PORTAL.z + 58);
+  const mite = new THREE.Group(); mite.position.copy(MC); mite.rotation.y = 2.4; MACRO.add(mite);
+  const ridges = canvasTex(512, 512, (g, w, h) => { g.fillStyle = "#efe6d2"; g.fillRect(0, 0, w, h); g.strokeStyle = "rgba(140,115,80,.55)"; g.lineWidth = 2.5;
+    for (let k = 0; k < 64; k++) { g.beginPath(); for (let x = 0; x <= w; x += 8) g.lineTo(x, k * 8 + 3 * Math.sin(x * 0.03 + k * 0.4)); g.stroke(); } }, [5, 3]);
+  const skin = new THREE.MeshStandardMaterial({ map: ridges, roughness: 0.5 }), legM = M(0xd9c39a, { roughness: 0.5 }), hairM = M(0xbfa27a);
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 28), skin); body.scale.set(1.5, 0.75, 1.05); body.position.y = 1.0; mite.add(body);
+  const front = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), skin); front.scale.set(0.7, 0.55, 0.75); front.position.set(1.0, 1.08, 0); mite.add(front);
+  const gnath = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), M(0xc9a77a)); gnath.scale.set(0.35, 0.22, 0.28); gnath.position.set(1.72, 0.88, 0); mite.add(gnath);
+  for (const sd of [-1, 1]) limb(V3(1.9, 0.9, sd * 0.08), V3(2.15, 0.82, sd * 0.1), 0.06, 0.03, M(0xb08a5a), mite);   // chelicerae
+  for (const [x, fw] of [[1.15, 0.7], [0.6, 0.35], [-0.5, -0.35], [-1.0, -0.7]]) for (const sd of [-1, 1]) {
+    const a = V3(x, 0.75, sd * 0.85), k = V3(x + fw * 0.5, 1.25, sd * 1.6), f = V3(x + fw, 0.04, sd * 2.05);
+    limb(a, k, 0.11, 0.08, legM, mite); limb(k, f, 0.08, 0.05, legM, mite); }
+  for (const [x, y, z, dx, dy, dz, L] of [[-1.45, 1.0, 0.25, -1, 0.1, 0.2, 1.6], [-1.45, 1.0, -0.25, -1, 0.1, -0.2, 1.6], [-1.2, 1.4, 0.5, -0.6, 0.6, 0.5, 0.7],
+      [-1.2, 1.4, -0.5, -0.6, 0.6, -0.5, 0.7], [0.2, 1.65, 0.6, 0, 1, 0.4, 0.5], [0.2, 1.65, -0.6, 0, 1, -0.4, 0.5], [1.2, 1.5, 0.3, 0.6, 0.8, 0.3, 0.45], [1.2, 1.5, -0.3, 0.6, 0.8, -0.3, 0.45]]) {
+    const a = V3(x, y, z), d = V3(dx, dy, dz).normalize(); limb(a, a.clone().addScaledVector(d, L), 0.014, 0.006, hairM, mite, false); }
+  for (let k = 0; k < 5; k++) { const sh = new THREE.Shape(), R = 0.25 + rnd() * 0.2, n = 6 + (k % 3);   // skin flakes: flat polygons, 5 mm thick
+    for (let i = 0; i < n; i++) { const a = i / n * 6.283 + rnd() * 0.3, r = R * (0.75 + rnd() * 0.3); i ? sh.lineTo(r * Math.cos(a), r * Math.sin(a)) : sh.moveTo(r * Math.cos(a), r * Math.sin(a)); }
+    const fl = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.006, bevelEnabled: false }).rotateX(-Math.PI / 2), M(0xf1e2cf, { roughness: 0.8 }));
+    const a = k * 1.3 + 0.5; fl.position.set(MC.x + 3 * Math.cos(a), 0.01, MC.z + 3 * Math.sin(a)); fl.rotation.y = rnd() * 6; MACRO.add(fl); }
+  for (let k = 0; k < 6; k++) { const r = 0.1 + rnd() * 0.05, pel = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 9), M(0x6e4b2a, { roughness: 0.9 }));
+    const a = k * 1.05 + 2.2; pel.position.set(MC.x + 2.4 * Math.cos(a), r, MC.z + 2.4 * Math.sin(a)); MACRO.add(pel); }
+  arenaRail(MC, 4.2);
+  MACRO_EX.push({ name: "house dust mite", real: 0.3e-3, pos: MC });
+  macroSign(["house dust mite", "real 0.3 mm  ·  here 3 m  ·  an arachnid: 8 legs, like spiders and ticks",
+    "its cuticle is ridged like a fingerprint (ridges ~1–2 µm → 1–2 cm); no eyes; it breathes through its skin",
+    "it eats the skin flakes we shed: each flake is one dead cell (~40 µm → 40 cm)",
+    "brown balls: its droppings (10–40 µm), carrying the protein most dust allergies react to"], PORTAL.x + 2.3, MC.z, EASTF, 2.0, 1.7);
+}
+
+// a worker ant, 5 mm → 50 m, standing over the walkway: walk under it. Its compound eyes are made of
+// ommatidia ~20 µm across (20 cm here), each a tiny eye of about 8 cells.
+{
+  const ant = new THREE.Group(); ant.position.set(PORTAL.x, 0, PORTAL.z + 97); ant.rotation.y = Math.PI / 2; MACRO.add(ant);   // head to the north
+  const shell = M(0x2a1d17, { roughness: 0.32, metalness: 0.15 }), legA = M(0x3a281e, { roughness: 0.4 });
+  const blob = (x, y, z, sx, sy, sz_, rz = 0, mat = shell) => { const m = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 28), mat); m.scale.set(sx, sy, sz_); m.position.set(x, y, z); m.rotation.z = rz; ant.add(m); return m; };
+  blob(-14, 11, 0, 9, 6.5, 7, 0.12);                  // gaster
+  blob(-4.6, 12.4, 0, 1.4, 2.4, 1.6);                 // petiole node
+  blob(4, 12, 0, 8, 3.6, 3.4, -0.12);                 // mesosoma
+  blob(14.5, 14, 0, 4.8, 4.4, 4.6);                   // head
+  const facets = canvasTex(256, 256, (g, w) => { g.fillStyle = "#1a1410"; g.fillRect(0, 0, w, w); const r = 16;
+    for (let row = 0; row < 12; row++) for (let col = 0; col < 10; col++) { const cx = col * r * 1.732 + (row % 2) * r * 0.866, cy = row * r * 1.5;
+      g.beginPath(); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + Math.PI / 6; g.lineTo(cx + r * 0.93 * Math.cos(a), cy + r * 0.93 * Math.sin(a)); }
+      const gr = g.createRadialGradient(cx - 4, cy - 4, 1, cx, cy, r); gr.addColorStop(0, "#8a7a6a"); gr.addColorStop(1, "#2a2018"); g.fillStyle = gr; g.fill(); } }, [6, 3]);
+  for (const sd of [-1, 1]) {
+    const eye = blob(15.6, 15.4, sd * 4.15, 1.7, 1.45, 0.9, 0, new THREE.MeshStandardMaterial({ map: facets, roughness: 0.25, metalness: 0.2 }));
+    const mand = new THREE.Mesh(new THREE.ConeGeometry(0.9, 4.2, 8).rotateZ(-Math.PI / 2), shell); mand.position.set(20.2, 11.6, sd * 1.7); mand.rotation.y = sd * 0.45; ant.add(mand);
+    const ag = new THREE.Group(); ag.position.set(17.5, 16.8, sd * 1.8); ant.add(ag);            // antenna: scape to the elbow, then the funiculus
+    const el = V3(3.6, 7.2, sd * 4.6), tip = V3(13.5, 4.6, sd * 9.4);
+    limb(V3(0, 0, 0), el, 0.55, 0.45, legA, ag); limb(el, tip, 0.45, 0.55, legA, ag);
+    procAnim.push(t => { if (inMacro) ag.rotation.set(0.08 * Math.sin(t * 1.3 + sd), 0.1 * Math.sin(t * 0.9 + sd * 2), 0.06 * Math.sin(t * 1.7)); });
+    for (const [x, kx, ax, tx] of [[7.5, 4, 9, 14], [4, 0, 1, 2], [0.5, -5, -13, -19]]) {   // coxa → knee → ankle → foot
+      const c = V3(x, 9.6, sd * 2.2), k = V3(x + kx, 15.5, sd * 13), a = V3(x + ax, 4.5, sd * 22), f = V3(x + tx, 0.25, sd * 27);
+      limb(c, k, 1.1, 0.85, legA, ant); limb(k, a, 0.75, 0.55, legA, ant); limb(a, f, 0.45, 0.28, legA, ant); } }
+  MACRO_EX.push({ name: "worker ant", real: 5e-3, pos: V3(PORTAL.x, 12, PORTAL.z + 97) });
+  macroSign(["a worker ant", "real 5 mm  ·  here 50 m  ·  you can walk under it", "its compound eyes are made of facets ~20 µm across (20 cm here): each facet is a tiny eye of ~8 cells",
+    "it smells and touches with its elbowed antennae, and carries ~10–50× its own weight",
+    "an ant runs ~3 cm/s: at this scale that is 300 m/s, nearly the speed of sound"], PORTAL.x + 2.3, PORTAL.z + 70, EASTF, 2.2, 1.8);
+}
+
+// a piece of a grass blade lying on the glass: 4 × 4 mm, 0.25 mm thick → 40 × 40 m, 2.5 m thick.
+// The top: long epidermal cells in files, with rows of stomata (dumbbell guard cells, ~30 µm → 30 cm).
+// The cut end: epidermis, green mesophyll cells packed with chloroplasts, and veins.
+{
+  const GX0 = PORTAL.x - 56, GX1 = PORTAL.x - 16, GZ0 = PORTAL.z + 25, GZ1 = PORTAL.z + 65, GT = 2.5;
+  const top = canvasTex(1024, 1024, (g, w, h) => {      // 2 m across × 4 m along: 512 px/m across, 256 px/m along
+    g.fillStyle = "#a9d27a"; g.fillRect(0, 0, w, h);
+    for (let f = 0; f < 10; f++) { const x0 = f * 102.4; let y = (f * 137) % 300 - 300;
+      while (y < h) { const len = 256 + ((f * 7919 + y * 31) % 512 + 512) % 512, isSt = f === 3 || f === 7;
+        g.fillStyle = `hsl(${88 + (f % 3) * 4},45%,${66 + (y % 5)}%)`; g.fillRect(x0 + 3, y + 3, 96, len - 6);
+        g.strokeStyle = "#5f8f3a"; g.lineWidth = 4; g.strokeRect(x0 + 2, y + 2, 98, len - 4);
+        if (isSt) for (let sy = y + 60; sy < y + len - 90; sy += 150) {            // a stoma: two dumbbell guard cells between subsidiary cells
+          g.fillStyle = "#c9e3a6"; g.beginPath(); g.ellipse(x0 + 51, sy + 38, 44, 44, 0, 0, 6.283); g.fill();
+          g.fillStyle = "#4f8a2e"; for (const sd of [-1, 1]) { g.beginPath(); g.ellipse(x0 + 51 + sd * 9, sy + 38, 8, 36, 0, 0, 6.283); g.fill(); }
+          g.fillStyle = "#2d4a1c"; g.fillRect(x0 + 49, sy + 10, 4, 56); }
+        y += len; } } }, [20, 10]);
+  const sect = canvasTex(4096, 256, (g, w, h) => {      // 40 m × 2.5 m: ~102 px/m
+    g.fillStyle = "#6d9a45"; g.fillRect(0, 0, w, h);
+    const cell = (x, y, r, col) => { g.fillStyle = col; g.beginPath(); g.arc(x, y, r, 0, 6.283); g.fill(); g.strokeStyle = "#3f6a22"; g.lineWidth = 1.5; g.stroke(); };
+    for (let y = 40; y < h - 40; y += 16) for (let x = (y % 32) / 2; x < w; x += 17) {   // mesophyll with chloroplasts
+      cell(x + rnd() * 3, y + rnd() * 3, 7 + rnd() * 2, "#79b84a"); g.fillStyle = "#2f6b1c"; for (let k = 0; k < 4; k++) g.fillRect(x - 5 + rnd() * 9, y - 5 + rnd() * 9, 2.5, 2.5); }
+    for (const [y0, y1] of [[0, 22], [h - 22, h]]) for (let x = 0; x < w; x += 22) { g.fillStyle = "#cfe8b0"; g.fillRect(x + 1, y0 + 1, 20, y1 - y0 - 2);
+      g.strokeStyle = "#5f8f3a"; g.lineWidth = 2; g.strokeRect(x + 1, y0 + 1, 20, y1 - y0 - 2); }
+    for (let x = 160; x < w; x += 330) {                   // veins: bundle sheath ring, big xylem vessels, phloem
+      cell(x, h / 2, 62, "#dbe9c4"); for (let a = 0; a < 6.28; a += 0.33) cell(x + 55 * Math.cos(a), h / 2 + 55 * Math.sin(a), 11, "#b9d98e");
+      cell(x - 18, h / 2 - 10, 13, "#f3f0e2"); cell(x + 18, h / 2 - 10, 13, "#f3f0e2"); for (let k = 0; k < 7; k++) cell(x - 15 + k * 5, h / 2 + 22, 4, "#e8dcc0"); }
+    for (let x = 90; x < w; x += 240) { g.fillStyle = "#2b3b20"; g.fillRect(x, h - 22, 6, 22); g.fillStyle = "#4a6a30"; g.beginPath(); g.ellipse(x + 3, h - 34, 16, 10, 0, 0, 6.283); g.fill(); }   // stomata below, with air chambers
+  });
+  const side = M(0x7fae55, { roughness: 0.6 }), topM = new THREE.MeshStandardMaterial({ map: top, roughness: 0.55 }), endM = new THREE.MeshStandardMaterial({ map: sect, roughness: 0.6 });
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(GX1 - GX0, GT, GZ1 - GZ0, 20, 1, 20), [side, side, topM, side, endM, endM]);
+  blade.position.set((GX0 + GX1) / 2, GT / 2, (GZ0 + GZ1) / 2); MACRO.add(blade);
+  MACRO_SOLIDS.push({ in: (x, z) => x > GX0 && x < GX1 && z > GZ0 && z < GZ1, h: GT });
+  MACRO_EX.push({ name: "a piece of a grass blade", real: 4e-3, pos: V3(GX1, 0, (GZ0 + GZ1) / 2) });
+  macroSign(["a piece of a grass blade", "real 4 × 4 mm, 0.25 mm thick  ·  here 40 × 40 m, 2.5 m thick",
+    "the top is paved with long epidermal cells (0.1–0.3 mm → 1–3 m) in neat files",
+    "rows of stomata: pairs of dumbbell-shaped guard cells (~30 µm → 30 cm) that open to let CO₂ in",
+    "the cut end (north) shows the inside: green mesophyll cells full of chloroplasts, and the veins",
+    "each vein looks like a face (two big xylem vessels over the phloem): botanists call it the 'monkey face'",
+    "fly up (jetpack) and walk on it"], PORTAL.x - 2.3, GZ0 + 6, WEST, 2.0, 1.7);
+}
+
+// along the path to the penny: everyday tiny things
+macroPath([[PORTAL.x + 1.5, PORTAL.z + 42], [PORTAL.x + 69, PORTAL.z + 42]]);
+{
+  const Z = PORTAL.z + 36, SZ = PORTAL.z + 39.8;
+  const smallSign = (x, lines) => macroSign(lines, x, SZ, 0, 1.6, 1.0);
+  const salt = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 3), new THREE.MeshStandardMaterial({ color: 0xf4f8fb, roughness: 0.15, transparent: true, opacity: 0.82 }));
+  salt.position.set(PORTAL.x + 11, 1.5, Z - 1); salt.rotation.y = 0.35; MACRO.add(salt);
+  smallSign(PORTAL.x + 11, ["a grain of table salt", "real 0.3 mm  ·  here 3 m", "a cube, because its sodium and chloride ions stack in a cubic lattice"]);
+  const sg = new THREE.IcosahedronGeometry(2.5, 4), sp = sg.attributes.position;
+  for (let i = 0; i < sp.count; i++) { const v = V3(sp.getX(i), sp.getY(i), sp.getZ(i)).normalize();
+    const r = 2.5 * (1 + 0.13 * Math.sin(3 * v.x + 1) * Math.sin(2 * v.y + 2) * Math.sin(4 * v.z) + 0.06 * Math.sin(7 * v.x + 3 * v.z)) * (v.y < 0 ? 0.8 : 1);
+    sp.setXYZ(i, v.x * r * 1.15, v.y * r * 0.85, v.z * r); }
+  sg.computeVertexNormals();
+  const sand = new THREE.Mesh(sg, M(0xd2b48c, { roughness: 0.9 })); sand.position.set(PORTAL.x + 21, 1.75, Z - 1.5); MACRO.add(sand);
+  smallSign(PORTAL.x + 21, ["a grain of sand (quartz)", "real 0.5 mm  ·  here 5 m", "worn round by water and wind over thousands of years"]);
+  const plinth4 = (x, h = 1) => { const b = new THREE.Mesh(new THREE.BoxGeometry(1.4, h, 0.8), M(0xe5ecef, { roughness: 0.8 })); b.position.set(x, h / 2, Z); MACRO.add(b); return h; };
+  { const x = PORTAL.x + 31, h = plinth4(x);
+    const sun = new THREE.Mesh(new THREE.SphereGeometry(0.15, 24, 16), M(0xf4c430, { roughness: 0.6 })); sun.position.set(x - 0.35, h + 0.2, Z); MACRO.add(sun);
+    const spine = new THREE.ConeGeometry(0.018, 0.06, 6).translate(0, 0.03, 0);
+    const sps = new THREE.InstancedMesh(spine, M(0xe0a820), 60); for (let k = 0; k < 60; k++) { const y = 1 - 2 * (k + 0.5) / 60, r = Math.sqrt(1 - y * y), a = k * 2.4;
+      const d = V3(Math.cos(a) * r, y, Math.sin(a) * r); O3.position.copy(sun.position).addScaledVector(d, 0.145); O3.quaternion.setFromUnitVectors(V3(0, 1, 0), d); O3.scale.setScalar(1); O3.updateMatrix(); sps.setMatrixAt(k, O3.matrix); }
+    MACRO.add(sps);
+    const pine = new THREE.Group(); pine.position.set(x + 0.3, h + 0.28, Z); MACRO.add(pine);
+    const pb = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), M(0xe6c86e)); pb.scale.set(0.24, 0.17, 0.2); pine.add(pb);
+    for (const sd of [-1, 1]) { const sac = new THREE.Mesh(new THREE.SphereGeometry(0.2, 20, 14), new THREE.MeshStandardMaterial({ color: 0xf2e2a8, transparent: true, opacity: 0.75 })); sac.position.set(sd * 0.27, -0.05, 0); pine.add(sac); }
+    smallSign(x, ["pollen grains", "sunflower: 30 µm → 30 cm, spiky to cling to bees", "pine: 70 µm → 70 cm, with two air sacs to ride the wind"]); }
+  { const x = PORTAL.x + 42, E = V3(x, 0.78, Z);       // a human egg in its zona pellucida, with corona cells, and sperm
+    const egg = new THREE.Mesh(new THREE.SphereGeometry(0.6, 40, 28), M(0xf2d7b6, { roughness: 0.7 })); egg.position.copy(E); MACRO.add(egg);
+    const zona = new THREE.Mesh(new THREE.SphereGeometry(0.75, 40, 28), new THREE.MeshStandardMaterial({ color: 0xe8f4f8, transparent: true, opacity: 0.35, depthWrite: false, roughness: 0.1 }));
+    zona.position.copy(E); MACRO.add(zona);
+    const cor = new THREE.InstancedMesh(new THREE.SphereGeometry(0.075, 10, 8), M(0xf5e6d0), 46);
+    for (let k = 0; k < 46; k++) { const y = 1 - 2 * (k + 0.5) / 46, r = Math.sqrt(1 - y * y), a = k * 2.4; O3.position.set(E.x + 0.84 * r * Math.cos(a), E.y + 0.84 * y, E.z + 0.84 * r * Math.sin(a));
+      O3.rotation.set(0, 0, 0); O3.scale.setScalar(1); O3.updateMatrix(); cor.setMatrixAt(k, O3.matrix); }
+    MACRO.add(cor);
+    for (let k = 0; k < 4; k++) { const a = -0.5 + k * 0.55, dir = V3(Math.cos(a), 0, Math.sin(a) + 0.6).normalize(), H = E.clone().addScaledVector(dir, 0.95).setY(0.45 + 0.12 * k);
+      const hd = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), M(0xd8c8f0)); hd.scale.set(0.05, 0.03, 0.015); hd.position.copy(H);
+      hd.quaternion.setFromUnitVectors(V3(1, 0, 0), dir.clone().negate()); MACRO.add(hd);
+      const tp = new Float32Array(31 * 3), tl = new THREE.Line(new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(tp, 3)), new THREE.LineBasicMaterial({ color: 0xb8a8d8 }));
+      tl.frustumCulled = false; MACRO.add(tl);
+      procAnim.push(t => { if (!inMacro) return; const side_ = V3(-dir.z, 0, dir.x);
+        for (let i = 0; i <= 30; i++) { const d = 0.04 + i / 30 * 0.5, w = 0.04 * (i / 30) * Math.sin(i / 30 * 9 - t * 12 + k);
+          tp[i * 3] = H.x + dir.x * d + side_.x * w; tp[i * 3 + 1] = H.y; tp[i * 3 + 2] = H.z + dir.z * d + side_.z * w; }
+        tl.geometry.attributes.position.needsUpdate = true; }); }
+    smallSign(x, ["a human egg cell, with sperm", "egg 120 µm → 1.2 m: the largest human cell, just visible to the eye",
+      "its clear shell (zona pellucida) is 15 µm → 15 cm  ·  sperm head 5 µm → 5 cm, tail 50 µm → 50 cm"]);
+    MACRO_EX.push({ name: "human egg cell", real: 120e-6, pos: E }); }
+  { const x = PORTAL.x + 52, h = plinth4(x), prof = [];  // red blood cells: biconcave discs
+    for (let i = 0; i <= 16; i++) { const r = 0.0375 * i / 16, th = 0.0125 * (0.35 + 1.6 * (r / 0.0375) ** 2) * Math.sqrt(Math.max(0, 1 - (r / 0.0375) ** 2)) + 0.002; prof.push(new THREE.Vector2(r, th)); }
+    for (let i = 16; i >= 0; i--) prof.push(new THREE.Vector2(prof[i].x, -prof[i].y));
+    const rbcG = new THREE.LatheGeometry(prof, 32), rbcM = M(0xc0392b, { roughness: 0.55 });
+    for (let k = 0; k < 7; k++) { const c = new THREE.Mesh(rbcG, rbcM); c.position.set(x - 0.5 + (k % 4) * 0.14, h + 0.015, Z - 0.15 + Math.floor(k / 4) * 0.2); MACRO.add(c); }
+    for (let k = 0; k < 9; k++) { const c = new THREE.Mesh(rbcG, rbcM); c.rotation.z = Math.PI / 2; c.position.set(x + 0.25 + k * 0.026, h + 0.04, Z); MACRO.add(c); }   // a rouleau, stacked like coins
+    smallSign(x, ["red blood cells", "real 7.5 µm  ·  here 7.5 cm  ·  dimpled discs with no nucleus",
+      "you have about 25 trillion; in the museum you came from, one was 75 m across"]);
+    MACRO_EX.push({ name: "red blood cells", real: 7.5e-6, pos: V3(x, 1, Z) }); }
+  MACRO_EX.push({ name: "a grain of salt", real: 0.3e-3, pos: salt.position }, { name: "a grain of sand", real: 0.5e-3, pos: sand.position });
+}
+
+// a US penny: 19.05 mm across, 1.52 mm thick → 190 m across, 15 m tall. Land on it with the jetpack.
+{
+  const PC = V3(PORTAL.x + 164, 0, PORTAL.z + 27), PR = 19.05e-3 / 2 * K4, PT = 1.52e-3 * K4;
+  const face = (shade) => canvasTex(2048, 2048, (g, w) => {   // the 2010- reverse: union shield, ONE CENT scroll, lettering
+    const base = shade ? "#5a5a5a" : "#b8693a", hi = shade ? "#ffffff" : "#e09a62", lo = shade ? "#3a3a3a" : "#8e4a26";
+    g.fillStyle = base; g.fillRect(0, 0, w, w); const c = w / 2;
+    g.strokeStyle = hi; g.lineWidth = 46; g.beginPath(); g.arc(c, c, c * 0.955, 0, 6.283); g.stroke();
+    g.fillStyle = hi; g.font = "700 118px Georgia, serif"; g.textAlign = "center"; g.textBaseline = "middle";
+    const arc = (txt, r, a0, a1) => { const n = txt.length; for (let i = 0; i < n; i++) { const a = a0 + (a1 - a0) * (i + 0.5) / n;
+      g.save(); g.translate(c + r * Math.cos(a), c + r * Math.sin(a)); g.rotate(a + Math.PI / 2); g.fillText(txt[i], 0, 0); g.restore(); } };
+    arc("UNITED STATES OF AMERICA", c * 0.8, -Math.PI * 0.92, -Math.PI * 0.08);
+    g.font = "700 96px Georgia, serif"; g.fillText("E · PLURIBUS · UNUM", c, c * 0.52);
+    const sx = c * 0.48, top = c * 0.68, bot = c * 1.62;      // the shield
+    g.beginPath(); g.moveTo(c - sx, top); g.lineTo(c + sx, top); g.lineTo(c + sx, c * 1.25); g.quadraticCurveTo(c + sx, bot - 120, c, bot); g.quadraticCurveTo(c - sx, bot - 120, c - sx, c * 1.25); g.closePath();
+    g.save(); g.clip(); g.fillStyle = lo; g.fillRect(0, 0, w, w); g.fillStyle = hi; g.fillRect(c - sx, top, 2 * sx, c * 0.22);
+    for (let k = 0; k < 13; k++) { const x = c - sx + (k + 0.15) * 2 * sx / 13; g.fillRect(x, top + c * 0.22, 2 * sx / 13 * 0.6, bot); } g.restore();
+    g.strokeStyle = hi; g.lineWidth = 18; g.stroke();
+    g.fillStyle = shade ? "#e0e0e0" : "#d88c55"; g.beginPath(); g.moveTo(c - c * 0.72, c * 1.02); g.quadraticCurveTo(c, c * 0.92, c + c * 0.72, c * 1.02);   // the scroll
+    g.lineTo(c + c * 0.72, c * 1.2); g.quadraticCurveTo(c, c * 1.1, c - c * 0.72, c * 1.2); g.closePath(); g.fill();
+    g.fillStyle = lo; g.font = "700 120px Georgia, serif"; g.fillText("ONE CENT", c, c * 1.09); });
+  const copper = M(0xc27a48, { metalness: 0.35, roughness: 0.42 });   // not very metallic: with nothing to reflect, real metal settings look black
+  const topM = new THREE.MeshStandardMaterial({ map: face(false), bumpMap: face(true), bumpScale: 4, metalness: 0.35, roughness: 0.4 });
+  const coin = new THREE.Mesh(new THREE.CylinderGeometry(PR, PR, PT, 256, 1), [copper, topM, copper]);
+  coin.position.set(PC.x, PT / 2, PC.z); coin.rotation.y = 0; MACRO.add(coin);   // the design reads from the west, where the path arrives
+  MACRO_SOLIDS.push({ in: (x, z) => Math.hypot(x - PC.x, z - PC.z) < PR, h: PT });
+  MACRO_EX.push({ name: "a US penny", real: 19.05e-3, pos: V3(PC.x - PR, 0, PC.z) });
+  macroSign(["a US penny (one cent)", "real 19 mm across, 1.5 mm thick  ·  here 190 m across and 15 m tall",
+    "its letters are ~1 mm tall → 10 m: the museum you came from (2.4 m) would fit inside the O of ONE",
+    "the copper is only a skin ~10 µm thick (10 cm here) over a zinc core",
+    "fly up with the jetpack (F, then space) and land on it"], PORTAL.x + 66, PORTAL.z + 38.5, EASTF, 2.4, 2.0);
 }
 function makeMini() {                                   // photograph the museum from above, once
   const N = IS_HEADSET ? 2048 : 4096, rt = new THREE.WebGLRenderTarget(N, N, { samples: 4 });
