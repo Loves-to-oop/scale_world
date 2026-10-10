@@ -55594,7 +55594,7 @@ const SLAB = { cx: PORTAL.x, cz: PORTAL.z, L: 75e-3 * K4, W: 25e-3 * K4, T: 1e-3
 const AIRCOL = new THREE.Color(0xcfe3ee), macroFog = new THREE.FogExp2(0xcfe3ee, 0.0012), museumFog = scene.fog;
 const MACRO_SOLIDS = [];                                // things you can stand on: { in(x, z), h }
 function macroGround(x, z) {                           // a solid exhibit, the top of the slab, or 10 m down on the bench
-  for (const o of MACRO_SOLIDS) if (o.in(x, z)) return o.h;
+  for (const o of MACRO_SOLIDS) if (o.in(x, z)) return typeof o.h === "function" ? o.h(x, z) : o.h;
   return Math.abs(x - SLAB.cx) < SLAB.L / 2 && Math.abs(z - SLAB.cz) < SLAB.W / 2 ? 0 : -SLAB.T; }
 function portalGate(parent, pos, ry, col, lines) {     // a ring you walk through, with a swirl inside
   const g = new THREE.Group(); g.position.copy(pos); g.rotation.y = ry; parent.add(g);
@@ -56536,6 +56536,186 @@ const striTex = (rep) => canvasTex(64, 256, (g, w, h) => { g.fillStyle = "#c9655
     "every scale is a flattened single cell's dried-out wall, ridged lengthwise (ridges ~1.5 µm → 1.5 cm apart)",
     "in blue butterflies those ridges make the colour by light interference, with no pigment at all",
     "the dust on your fingers after touching a butterfly is these scales"]); }
+
+// ---------- the west lane: everyday things and small creatures ----------
+const WX = -85;                                        // the lane runs north along x = -85
+macroPath([[PORTAL.x - 1.5, PORTAL.z + 4.2], [WX, PORTAL.z + 4.2], [WX, -112]]);
+macroSign(["EVERYDAY THINGS AND SMALL CREATURES", "a snowflake, your fingertip, a spider's thread, a phone screen, a CD,",
+  "a flea and a water flea  ·  this way, then north"], -3, PORTAL.z + 4.2, WEST, 3.2, 2.2);
+const wSign = (z, east, lines) => macroSign(lines, east ? WX + 2.2 : WX - 2.2, z, east ? EASTF : WEST, 2.0, 1.6);
+
+// a snowflake: a stellar dendrite 2 mm across → 20 m, standing on one tip. Ice plates ~20 µm thick → 20 cm.
+{ const SC = V3(-101, 10.6, -14), g = new THREE.Group(); g.position.copy(SC); g.rotation.y = Math.PI / 2; MACRO.add(g);   // its face toward the lane (east)
+  const ice = new THREE.MeshStandardMaterial({ color: 0xe4f6ff, emissive: 0x16303c, transparent: true, opacity: 0.78, roughness: 0.06, metalness: 0.1 });
+  const bar = (x0, y0, a, len, w) => { const m = new THREE.Mesh(new THREE.BoxGeometry(len, w, 0.2), ice); m.position.set(x0 + Math.cos(a) * len / 2, y0 + Math.sin(a) * len / 2, 0); m.rotation.z = a; g.add(m); };
+  const hex = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.26, 6).rotateX(Math.PI / 2), ice); g.add(hex);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.06, 4, 6).rotateZ(Math.PI / 6), M(0xffffff, { roughness: 0.1 })); ring.position.z = 0.14; g.add(ring);
+  for (let k = 0; k < 6; k++) { const a = Math.PI / 2 + k * Math.PI / 3, ca = Math.cos(a), sa = Math.sin(a);
+    bar(0, 0, a, 10, 0.7);
+    for (let j = 1; j <= 5; j++) { const d = 1.6 + j * 1.55, L = (4.2 - j * 0.6) * (j % 2 ? 1 : 0.7), x = ca * d, y = sa * d;
+      for (const sd of [-1, 1]) { const b = a + sd * Math.PI / 3; bar(x, y, b, L, 0.42);
+        for (let q = 1; q < 3 && L > 1.6; q++) { const dd = L * q / 3, xx = x + Math.cos(b) * dd, yy = y + Math.sin(b) * dd; bar(xx, yy, a, L * 0.3, 0.22); } } }
+    const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.22, 6).rotateX(Math.PI / 2), ice); tip.position.set(ca * 10, sa * 10, 0); g.add(tip); }
+  MACRO_EX.push({ name: "a snowflake", real: 2e-3, pos: SC });
+  wSign(-14, false, ["a snowflake (a stellar dendrite)", "real 2 mm across  ·  here 20 m  ·  its arms are ice plates ~20 µm → 20 cm thick",
+    "six arms because water molecules lock into a hexagonal lattice: the shape of the ice crystal at the museum's scale shows up here",
+    "each arm grows side branches as it falls through air of changing temperature and humidity;",
+    "all six arms meet the same conditions at the same moment, which is why they match"]); }
+
+// fingertip skin: a 2.4 × 2.4 mm patch → 24 m, ridges ~0.5 mm apart (5 m) and ~60 µm high (60 cm),
+// with sweat pores along their crests. Walk on it. The surface is flat dead cells (corneocytes, 30 µm → 30 cm).
+{ const FC = V3(-108, 0, -47), S_ = 24, BASE = 0.45, AMP = 0.8, core = V3(FC.x + 3, 0, FC.z - 2);
+  const hAt = (x, z) => { const r = Math.hypot((x - core.x) * 1.0, (z - core.z) * 1.35) + 0.4 * Math.sin(Math.atan2(z - core.z, x - core.x) * 2);
+    return BASE + AMP * Math.pow(0.5 + 0.5 * Math.cos(2 * Math.PI * r / 5), 1.6); };
+  const corneo = canvasTex(512, 512, (g, w) => { g.fillStyle = "#e9c2a6"; g.fillRect(0, 0, w, w); g.strokeStyle = "rgba(150,95,70,.55)"; g.lineWidth = 2;
+    for (let k = 0; k < 90; k++) { const cx = rnd() * w, cy = rnd() * w, r = 26 + rnd() * 14; g.beginPath(); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + rnd() * 0.4; g.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a)); } g.closePath(); g.stroke(); } }, [12, 12]);
+  const geo = new THREE.PlaneGeometry(S_, S_, 160, 160).rotateX(-Math.PI / 2), pp = geo.attributes.position;
+  const vc = new Float32Array(pp.count * 3);
+  for (let i = 0; i < pp.count; i++) { const h = hAt(FC.x + pp.getX(i), FC.z + pp.getZ(i)); pp.setY(i, h);
+    const f = 0.55 + 0.45 * (h - BASE) / AMP; vc[i * 3] = f; vc[i * 3 + 1] = f * 0.95; vc[i * 3 + 2] = f * 0.92; }   // furrows darker
+  geo.setAttribute("color", new THREE.BufferAttribute(vc, 3)); geo.computeVertexNormals();
+  const top = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: corneo, roughness: 0.75, vertexColors: true })); top.position.set(FC.x, 0, FC.z); MACRO.add(top);
+  const sideM = M(0xd8a68a, { roughness: 0.8 });
+  for (const [dx, dz, w, d] of [[0, -S_ / 2, S_, 0.05], [0, S_ / 2, S_, 0.05], [-S_ / 2, 0, 0.05, S_], [S_ / 2, 0, 0.05, S_]]) { const b = new THREE.Mesh(new THREE.BoxGeometry(w, BASE, d), sideM); b.position.set(FC.x + dx, BASE / 2, FC.z + dz); MACRO.add(b); }
+  const pores = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.32, 0.22, 0.06, 14), M(0x5a2e22, { roughness: 0.4 }), 200); let n = 0;
+  for (let ring = 1; ring < 7; ring++) { const r = ring * 5, steps = Math.round(2 * Math.PI * r / 4);
+    for (let k = 0; k < steps && n < 200; k++) { const a = k / steps * 6.283 + ring; let x = core.x + r * Math.cos(a), z = core.z + r * Math.sin(a) / 1.35;
+      for (let it = 0; it < 6; it++) { const rr = Math.hypot(x - core.x, (z - core.z) * 1.35) + 0.4 * Math.sin(Math.atan2(z - core.z, x - core.x) * 2); const f = r / rr; x = core.x + (x - core.x) * f; z = core.z + (z - core.z) * f; }
+      if (Math.abs(x - FC.x) > S_ / 2 - 0.6 || Math.abs(z - FC.z) > S_ / 2 - 0.6) continue;
+      O3.position.set(x, hAt(x, z) + 0.01, z); O3.rotation.set(0, 0, 0); O3.scale.setScalar(1); O3.updateMatrix(); pores.setMatrixAt(n++, O3.matrix); } }
+  pores.count = n; MACRO.add(pores);
+  MACRO_SOLIDS.push({ in: (x, z) => Math.abs(x - FC.x) < S_ / 2 && Math.abs(z - FC.z) < S_ / 2, h: hAt });
+  MACRO_EX.push({ name: "fingertip skin", real: 2.4e-3, pos: FC });
+  wSign(-47, false, ["your fingertip: a 2.4 mm patch of fingerprint", "real ridges ~0.5 mm apart and ~60 µm high  ·  here 5 m apart and 60 cm high: walk across them",
+    "the surface is flat dead cells (corneocytes, ~30 µm → 30 cm), shed and replaced every few weeks",
+    "the dark holes along the crests are sweat pores (~0.1 mm → 1 m): sweat helps your fingers grip",
+    "the ridge pattern is set before birth and never changes, even in identical twins"]); }
+
+// an orb-web's capture thread: 2 µm → 2 cm, strung with glue droplets (~30 µm → 30 cm) like beads,
+// crossing the stiffer radial threads (4 µm → 4 cm). A frame holds a 20 × 12 m piece of web.
+{ const X = -100, Z0 = -95, Z1 = -73, Hh = 13, hub = V3(X, -30, (Z0 + Z1) / 2);
+  const post = M(0x8a7a6a, { roughness: 0.7 });
+  for (const z of [Z0, Z1]) { const p_ = new THREE.Mesh(new THREE.BoxGeometry(0.5, Hh, 0.5), post); p_.position.set(X, Hh / 2, z); MACRO.add(p_); }
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, Z1 - Z0 + 0.5), post); beam.position.set(X, Hh, (Z0 + Z1) / 2); MACRO.add(beam);
+  const radM = M(0xe8e8e0, { roughness: 0.3 }), capM = M(0xd8d8d0, { roughness: 0.3 });
+  const inFrame = v => v.y > 0.4 && v.y < Hh - 0.3 && v.z > Z0 + 0.3 && v.z < Z1 - 0.3;
+  for (const a of [-0.32, -0.12, 0.08, 0.28]) { const d = V3(0, Math.cos(a), Math.sin(a)); let A = null, B = null;
+    for (let t = 0; t < 60; t += 0.1) { const v = hub.clone().addScaledVector(d, t); if (inFrame(v)) { if (!A) A = v; B = v; } }
+    if (A) MACRO.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(A, B), 4, 0.02, 6), radM)); }
+  const drops = []; 
+  for (let r = 32; r < 44; r += 2.2) { const pts = [];
+    for (let a = -0.45; a <= 0.45; a += 0.004) { const v = hub.clone().add(V3(0, r * Math.cos(a), r * Math.sin(a))); v.y -= 0.25 * Math.cos(a * 18) ** 2; if (inFrame(v)) pts.push(v); }
+    if (pts.length < 2) continue; MACRO.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length, 0.01, 5), capM));
+    const cv = new THREE.CatmullRomCurve3(pts), L = cv.getLength();
+    for (let s_ = 0.4; s_ < L; s_ += 0.8 + rnd() * 0.5) drops.push([cv.getPointAt(s_ / L), 0.1 + rnd() * 0.08]); }
+  const dr = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 10), new THREE.MeshStandardMaterial({ color: 0xf0f4f0, transparent: true, opacity: 0.6, roughness: 0.02, metalness: 0.1 }), drops.length);
+  drops.forEach(([v, r], i) => { O3.position.copy(v); O3.rotation.set(0, 0, 0); O3.scale.set(r, r * 1.15, r); O3.updateMatrix(); dr.setMatrixAt(i, O3.matrix); });
+  MACRO.add(dr);
+  const pol = new THREE.Mesh(new THREE.SphereGeometry(0.15, 20, 14), M(0xf4c430)); pol.position.copy(drops[Math.floor(drops.length * 0.4)][0]).add(V3(0.1, 0, 0)); MACRO.add(pol);
+  MACRO_EX.push({ name: "spider web capture thread", real: 2e-6, pos: V3(X, 6, (Z0 + Z1) / 2) });
+  wSign(-84, false, ["a piece of an orb web", "the sticky spiral thread is ~2 µm → 2 cm thick, beaded with glue droplets ~30 µm → 30 cm",
+    "the thread starts as an evenly coated line; within seconds the glue pulls itself into beads",
+    "the straight radial threads (~4 µm → 4 cm) are dry: the spider walks on those",
+    "silk is stronger than steel for its weight  ·  stuck in the glue: a sunflower pollen grain"]); }
+
+// phone-screen pixels: an LCD at 326 pixels per inch, each pixel 78 µm → 78 cm, three subpixel stripes
+{ const NX = 8, NY = 6, PX_ = 96, c = document.createElement("canvas"); c.width = NX * PX_; c.height = NY * PX_; const g = c.getContext("2d");
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(NX * 0.78, NY * 0.78), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
+  panel.position.set(-71, 0.6 + NY * 0.39, -14); panel.rotation.y = -Math.PI / 2; MACRO.add(panel);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.3, NY * 0.78 + 0.3, NX * 0.78 + 0.3), M(0x1a1a1a)); back.position.set(-70.8, panel.position.y, -14); MACRO.add(back);
+  for (const dz of [-2.6, 2.6]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), M(0x1a1a1a)); leg.position.set(-70.8, 0.35, -14 + dz); MACRO.add(leg); }
+  const scenes = [(x, y) => [1, 1, 1], (x, y) => [1, 1, 0], (x, y) => [0, 1, 1], (x, y) => [1, 0, 1],
+    (x, y) => { const h = x / (NX - 1); return [Math.max(0, 1 - 2 * h), 1 - Math.abs(2 * h - 1), Math.max(0, 2 * h - 1)].map(v => v * (1 - y / (NY + 2))); },
+    (x, y) => { const on = [[2, 1], [3, 1], [4, 1], [1, 2], [5, 2], [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [1, 4], [2, 5], [3, 5], [4, 5]].some(([a, b]) => a === x && b === y); return on ? [1, 1, 1] : [0.1, 0.15, 0.4]; }];
+  const names = ["white = red + green + blue, all full", "yellow = red + green", "cyan = green + blue", "magenta = red + blue", "a rainbow fade", "a white letter on blue: part of a lower-case e"];
+  let last = -1;
+  procAnim.push(t => { if (!inMacro) return; const k = Math.floor(t / 3) % scenes.length; if (k === last) return; last = k;
+    g.fillStyle = "#050505"; g.fillRect(0, 0, c.width, c.height);
+    for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++) { const v = scenes[k](x, y);
+      ["255,40,30", "40,255,60", "40,90,255"].forEach((col, i) => { g.fillStyle = `rgba(${col},${0.08 + 0.92 * v[i]})`; g.fillRect(x * PX_ + i * 32 + 4, y * PX_ + 6, 24, PX_ - 12); }); }
+    tex.needsUpdate = true; status.textContent = names[k]; });
+  const status = { textContent: "" };
+  MACRO_EX.push({ name: "phone screen pixels", real: 78e-6, pos: panel.position });
+  wSign(-14, true, ["a phone screen, 8 × 6 pixels of it", "each pixel 78 µm → 78 cm (326 per inch), made of red, green and blue subpixel stripes",
+    "every colour you see is these three mixed: watch it cycle through white, yellow, cyan, magenta, a rainbow and a letter",
+    "from normal viewing distance the eye cannot tell them apart (it resolves ~75 µm), so they blend",
+    "a single pixel here is about the size of the tardigrade's head"]); }
+
+// a CD's data track: pits 0.5 µm wide → 5 mm, 0.83–3.6 µm long → 8–36 mm, tracks 1.6 µm apart → 1.6 cm
+{ const CC = V3(-71, 0, -33), W = 2.2;
+  const pl = new THREE.Mesh(new THREE.BoxGeometry(W + 0.4, 1.0, W + 0.4), M(0xe5ecef, { roughness: 0.8 })); pl.position.set(CC.x, 0.5, CC.z); MACRO.add(pl);
+  const disc = new THREE.Mesh(new THREE.BoxGeometry(W, 0.02, W), M(0xd8dde2, { metalness: 0.9, roughness: 0.12 })); disc.position.set(CC.x, 1.01, CC.z); MACRO.add(disc);
+  const nT = Math.floor(W / 0.016), pits = []; 
+  for (let t = 0; t < nT; t++) { let x = -W / 2 + rnd() * 0.02; while (true) { const len = 0.0083 + Math.floor(rnd() * 9) * 0.00346, gap = 0.0083 + Math.floor(rnd() * 9) * 0.00346;
+      if (x + len > W / 2) break; pits.push([x + len / 2, -W / 2 + 0.008 + t * 0.016, len]); x += len + gap; } }
+  const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.003, 0.005), M(0x6a7078, { metalness: 0.6, roughness: 0.35 }), pits.length);
+  pits.forEach(([x, z, len], i) => { O3.position.set(CC.x + z, 1.021, CC.z + x); O3.rotation.set(0, Math.PI / 2, 0); O3.scale.set(len, 1, 1); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); });
+  MACRO.add(im);
+  const spot = new THREE.Mesh(new THREE.CircleGeometry(0.008, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xff2020, toneMapped: false }));
+  const halo = new THREE.Mesh(new THREE.CircleGeometry(0.05, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xff3030, transparent: true, opacity: 0.25, toneMapped: false, depthWrite: false }));
+  MACRO.add(spot, halo);
+  procAnim.push(t => { if (!inMacro) return; const z = CC.z - W / 2 + ((t * 0.06) % W), x = CC.x - W / 2 + 0.008 + 0.016 * 60; spot.position.set(x, 1.024, z); halo.position.set(x, 1.025, z); });
+  MACRO_EX.push({ name: "a CD's data track", real: 0.5e-6, pos: CC });
+  wSign(-33, true, ["a CD's data track (a 0.22 mm square of it)", "pits 0.5 µm wide → 5 mm, 0.8–3.6 µm long → 8–36 mm; tracks 1.6 µm apart → 1.6 cm",
+    "the red dot is the laser spot (~1.6 µm → 1.6 cm), shown crawling: really it reads 1.2 m of track a second (12 km/s here)",
+    "each edge of a pit is a 1, each flat stretch between edges a run of 0s",
+    "DVD tracks are 0.74 µm apart, Blu-ray 0.32 µm (3.2 mm here): smaller pits, shorter-wavelength light",
+    "the rainbow on a CD comes from these tracks acting as a diffraction grating"]); }
+
+// a cat flea, 2.5 mm → 25 m: flattened side to side to slip between hairs, armoured, combs of spines
+// that catch in fur, backward-pointing bristles, and huge hind legs that fling it 100 times its length
+{ const FC = V3(-60, 0, -52), fl = new THREE.Group(); fl.position.copy(FC); MACRO.add(fl);   // head to the north
+  fl.rotation.y = Math.PI / 2;
+  const sh = M(0x6b3a1e, { roughness: 0.3, metalness: 0.1 }), legF = M(0x7a4626, { roughness: 0.35 }), spine = M(0x2a160a);
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 30), sh); body.scale.set(11, 7.5, 3.6); body.position.set(-1.5, 11, 0); body.rotation.z = 0.12; fl.add(body);
+  for (let k = 0; k < 9; k++) { const x = 7 - k * 2.2, r = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 6, 40), M(0x4a2410)); r.scale.set(0.4, 7.0 * Math.sqrt(Math.max(0.05, 1 - ((x + 1.5) / 11) ** 2)), 3.5 * Math.sqrt(Math.max(0.05, 1 - ((x + 1.5) / 11) ** 2))); r.rotation.y = Math.PI / 2; r.position.set(x, 11, 0); fl.add(r); }
+  const head = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), sh); head.scale.set(3.6, 4, 2.4); head.position.set(10.5, 9.2, 0); fl.add(head);
+  for (const sd of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.55, 12, 8), M(0x111111, { roughness: 0.2 })); e.position.set(11.6, 10.2, sd * 2.1); fl.add(e);
+    for (let k = 0; k < 8; k++) limb(V3(11 + k * 0.25, 6.4 + k * 0.1, sd * 1.6), V3(11.3 + k * 0.25, 4.9, sd * 1.8), 0.13, 0.03, spine, fl, false);       // genal comb
+    for (let k = 0; k < 16; k++) { const a = -0.9 + k * 0.12; limb(V3(7.6, 11 + 7 * Math.sin(a), sd * 3.4 * Math.cos(a)), V3(6.4, 11 + 7.3 * Math.sin(a), sd * 3.6 * Math.cos(a)), 0.1, 0.03, spine, fl, false); }   // pronotal comb
+    for (let k = 0; k < 40; k++) { const x = 5 - rnd() * 15, a = (rnd() - 0.3) * 1.4, r = Math.sqrt(Math.max(0.05, 1 - ((x + 1.5) / 11) ** 2));
+      const b = V3(x, 11 + 7.4 * r * Math.sin(a), sd * 3.6 * r * Math.cos(a)); limb(b, b.clone().add(V3(-1.4, 0.4 * Math.sin(a), sd * 0.3)), 0.06, 0.02, spine, fl, false); }   // backward bristles
+    limb(V3(12.5, 7, sd * 0.8), V3(13.6, 3.8, sd * 0.9), 0.25, 0.1, M(0x5a2a10), fl);   // mouthparts
+    for (const [x, kx, kz, fx, fz, r] of [[7, 10, 4.5, 11, 6, 0.8], [2.5, 2.8, 5.5, 3.5, 7.5, 0.9], [-3, -9, 6, -1, 9.5, 1.4]]) {
+      const c = V3(x, 6, sd * 2.4), k = V3(kx, x < 0 ? 9 : 4.5, sd * kz), a = V3((k.x + fx) / 2 + (x < 0 ? 3 : 0.8), 2.4, sd * (kz + fz) / 2), f = V3(fx + (x < 0 ? 5 : 1.6), 0.15, sd * fz);
+      limb(c, k, r, r * 0.8, legF, fl); limb(k, a, r * 0.75, r * 0.5, legF, fl); limb(a, f, r * 0.45, r * 0.25, legF, fl); } }
+  MACRO_EX.push({ name: "cat flea", real: 2.5e-3, pos: V3(FC.x, 8, FC.z) });
+  wSign(-52, true, ["a cat flea (they bite dogs and people too)", "real 2.5 mm  ·  here 25 m  ·  flattened side to side to slip between hairs",
+    "the rows of dark spines are combs (on its cheek and behind its head) that catch in fur, and its bristles all point backward:",
+    "it moves forward through fur easily, and is very hard to pull out",
+    "it jumps 100 times its length: a pad of rubbery resilin in its body is cocked like a spring and released, at ~100 g"]); }
+
+// a water flea (Daphnia) in its own tank of water: 2 mm → 20 m, see-through, so you watch its heart
+// beat (~4 times a second), its gut, its eggs, its legs pumping water and its big swimming antennae
+{ const DC = V3(-60, 12, -100), tank = new THREE.Mesh(new THREE.BoxGeometry(30, 24, 30), new THREE.MeshStandardMaterial({ color: 0x9fd0dc, transparent: true, opacity: 0.16, roughness: 0.05, side: THREE.DoubleSide, depthWrite: false }));
+  tank.position.set(DC.x, 12.02, DC.z); tank.renderOrder = 3; MACRO.add(tank);
+  const dp = new THREE.Group(); dp.position.copy(DC); dp.rotation.y = Math.PI / 2; MACRO.add(dp);   // head to the north
+  const shellM = new THREE.MeshStandardMaterial({ color: 0xe8e0c0, transparent: true, opacity: 0.3, roughness: 0.25, depthWrite: false });
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 28), shellM); shell.scale.set(7, 5.5, 3.2); shell.position.set(-1, 0, 0); shell.renderOrder = 2; dp.add(shell);
+  limb(V3(-7.5, 1.5, 0), V3(-13, 3.5, 0), 0.5, 0.05, shellM, dp, false);                                         // tail spine
+  const hd = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 20), shellM); hd.scale.set(3, 3, 2.4); hd.position.set(6.5, 1.5, 0); hd.renderOrder = 2; dp.add(hd);
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(1.1, 20, 14), M(0x111111, { roughness: 0.2 })); eye.position.set(8.2, 1.8, 0); dp.add(eye);
+  const gutPts = [V3(7, 0.5, 0), V3(4, -0.5, 0), V3(0, -1.2, 0), V3(-4, -1, 0), V3(-6.5, 0.6, 0)];
+  dp.add(tubeM(gutPts, 0.55, M(0x5a8a2a, { roughness: 0.6 }), 40, 10));
+  const heart = new THREE.Mesh(new THREE.SphereGeometry(0.9, 16, 12), M(0xd05050, { emissive: 0x3a0a0a })); heart.position.set(3.4, 3.2, 0); dp.add(heart);
+  for (let k = 0; k < 7; k++) { const egg = new THREE.Mesh(new THREE.SphereGeometry(0.75, 14, 10), M(0x6a5a2a)); egg.position.set(-1 - (k % 4) * 1.6, 2.8 + Math.floor(k / 4) * 0.9, (k % 2 ? 0.7 : -0.7)); dp.add(egg); }
+  const legs = []; for (let k = 0; k < 5; k++) { const lg = new THREE.Group(); lg.position.set(3 - k * 1.5, -2.6, 0); dp.add(lg);
+    lg.add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.6, 2.2).translate(0, -0.9, 0), new THREE.MeshStandardMaterial({ color: 0xd8d0b0, transparent: true, opacity: 0.6 }))); legs.push(lg); }
+  const ants = []; for (const sd of [-1, 1]) { const a = new THREE.Group(); a.position.set(6, 0.5, sd * 2); dp.add(a); ants.push([a, sd]);
+    const L1 = V3(-1, 3.5, sd * 4); limb(V3(0, 0, 0), L1, 0.5, 0.35, M(0xd8cfa8), a);
+    for (const br of [-1, 1]) { const tip = L1.clone().add(V3(-6, 2 + br * 2.5, sd * 3)); limb(L1, tip, 0.25, 0.15, M(0xd8cfa8), a);
+      for (let k = 1; k < 5; k++) { const q = L1.clone().lerp(tip, k / 5); limb(q, q.clone().add(V3(-0.6, 1.4, sd * 0.4)), 0.04, 0.02, M(0xcfc6a0), a, false); } } }
+  procAnim.push(t => { if (!inMacro) return; const hb = Math.sin(t * 4 * 2 * Math.PI); heart.scale.setScalar(1 + 0.25 * Math.max(0, hb));
+    legs.forEach((lg, k) => { lg.rotation.z = 0.35 * Math.sin(t * 5 * 2 * Math.PI - k * 0.8); });
+    const st = (t % 1.4) / 1.4, pw = st < 0.25 ? Math.sin(st / 0.25 * Math.PI) : 0;
+    for (const [a, sd] of ants) a.rotation.set(0, 0, -0.5 + (st < 0.25 ? 1.2 * st / 0.25 : 1.2 * (1 - (st - 0.25) / 0.75)));
+    dp.position.y = DC.y + 1.2 * Math.sin(t * 2 * Math.PI / 1.4 - 1.2); });
+  MACRO_EX.push({ name: "water flea (Daphnia)", real: 2e-3, pos: DC });
+  wSign(-100, true, ["a water flea (Daphnia), in a tank of pond water", "real 2 mm  ·  here 20 m  ·  a crustacean, related to shrimp and crabs, and see-through",
+    "red: its heart, beating ~4 times a second (shown at its real rate)  ·  green: its gut, full of algae",
+    "brown: eggs in its brood pouch; the leaf-like legs underneath pump water through a filter of fine hairs",
+    "it rows with its big branched antennae in jerky hops: the 'flea'  ·  one black compound eye"]); }
 function makeMini() {                                   // photograph the museum from above, once
   const N = IS_HEADSET ? 2048 : 4096, rt = new THREE.WebGLRenderTarget(N, N, { samples: 4 });
   rt.texture.colorSpace = THREE.SRGBColorSpace; rt.texture.generateMipmaps = true;
