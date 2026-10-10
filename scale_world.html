@@ -55459,8 +55459,9 @@ function drawWrist(v) {
   line(`time: 1 s here = ${TAU_NAMES[tauI]}`, 100, 28);
   line(`speed ${fmt(v)}/s here = ${fmtReal(v / k)}/s real`, 145, 28);
   line(`(with time slowed to ${TAU_NAMES[tauI]}/s: ${fmtReal(v / k / tau())}/s)`, 172, 20, "#a9c6d4");
-  line(inMacro ? "nearest: the museum you came from" : `nearest: ${n.name}`, 195, 28, "#ffe9a8");
-  line(inMacro ? "real 240 µm  ·  here 2.4 m, on the glass" : `real ${fmtReal(n.real)}  ·  here ${fmt(sz(n.real))}`, 237, 26);
+  const nn = inMacro ? nearMacro() : n;
+  line(`nearest: ${nn.name}`, 195, 28, "#ffe9a8");
+  line(`real ${fmtReal(nn.real)}  ·  here ${fmt(nn.real * k)}`, 237, 26);
   line("left stick fly · right stick: forward/back + turn · trigger fast", 300, 22, "#a9c6d4");
   line(`sticks: ${vrSticks}`, 375, 20, "#7f9fb0");
   g.fillStyle = fps >= 70 ? "#7dff9a" : fps >= 50 ? "#ffd166" : "#ff6b6b"; g.font = "700 30px -apple-system, Helvetica, sans-serif";
@@ -55641,6 +55642,100 @@ const miniMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const hair = new THREE.Mesh(new THREE.CylinderGeometry(R, R, L, 64, 1), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 }));
   hair.rotation.set(0, 0.35, Math.PI / 2);
   hair.position.set(PORTAL.x + (0 - PORTAL.x) / 1000, R, PORTAL.z + (-1150 - PORTAL.z) / 1000); MACRO.add(hair); }
+// ---------- THE ×10,000 MUSEUM: small animals, big enough that their cells are fist-sized ----------
+// A walkway runs south from where you arrive. Animals move at their real speed here (clock time):
+// the museum's time setting slows molecules, which would freeze anything this big.
+const MACRO_EX = [];                                  // { name, real, pos } for the readout
+const macroSign = (lines, x, z, ry, y = 2.2, scale = 1.6) => {   // a board on two posts, facing +z turned by ry
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; MACRO.add(g);
+  const b = label(lines, new THREE.Vector3(0, y, 0), scale, "banner"); b.position.set(0, 0, 0); g.add(b);
+  const w = THREE.MathUtils.clamp(scale * 1.6, 0.8, 5) / 2;
+  for (const sx of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, y, 8), M(0x34495e));
+    post.position.set(sx * w, y / 2, -0.06); g.add(post); }
+  return g; };
+const macroPath = (pts, w = 3) => {                    // a paved walkway on the glass, 3 cm up
+  const P = pts.map(([x, z]) => new THREE.Vector2(x, z)), pos = [], uv = [], idx = []; let run = 0;
+  P.forEach((q, i) => { const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)], t = b.clone().sub(a).normalize(), n = new THREE.Vector2(-t.y, t.x);
+    if (i) run += q.distanceTo(P[i - 1]);
+    pos.push(q.x + n.x * w / 2, 0.03, q.y + n.y * w / 2, q.x - n.x * w / 2, 0.03, q.y - n.y * w / 2); uv.push(0, run / w, 1, run / w);
+    if (i) { const k = 2 * i; idx.push(k - 2, k - 1, k, k - 1, k + 1, k); } });
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+  MACRO.add(new THREE.Mesh(g, pathMat)); };
+macroPath([[PORTAL.x, PORTAL.z + 3.6], [PORTAL.x, PORTAL.z + 90]]);
+macroSign(["THE ×10,000 MUSEUM", "tiny animals, big enough to walk around",
+  "at this scale a cell is 1–10 cm: you can see what they are made of", "the exhibits are straight ahead, along the walkway"], PORTAL.x, PORTAL.z + 8, Math.PI, 3.0, 2.2);
+MACRO_EX.push({ name: "the museum you came from", real: 240e-6, pos: new THREE.Vector3(PORTAL.x, 0, PORTAL.z - 0.5) },
+  { name: "a human hair", real: 80e-6, pos: new THREE.Vector3(PORTAL.x, 0, PORTAL.z - 1.15) });
+
+// the tardigrade (water bear), Hypsibius-like: 0.4 mm long → 4 m. About 1,000 cells. Its cuticle is
+// see-through, so you see storage cells (~12 µm → 12 cm) drifting in the body cavity, the gut green
+// with algae, the eggs, the muscular pharynx and its two stylets, two eyespots, and four claws on
+// each of its eight stubby legs (claws ~10 µm → 10 cm). It walks ~80 µm/s (0.8 m/s here).
+{
+  const TC = new THREE.Vector3(PORTAL.x + 10, 0, PORTAL.z + 17), TR = 6, TV = 0.8, STEP = 1.4;   // arena centre, circle radius, speed m/s, steps/s
+  const tg = new THREE.Group(); MACRO.add(tg);
+  const body = new THREE.Group(); body.position.y = 0.62; tg.add(body);
+  // the cuticle: a lathe along x with four shallow segment grooves; the snout end (+x) narrower
+  const prof = []; for (let i = 0; i <= 48; i++) { const x = -2 + 4 * i / 48, u = 1 - (x / 2) ** 2;
+    const r = 0.55 * Math.pow(Math.max(u, 0), 0.42) * (1 - 0.07 * (0.5 + 0.5 * Math.cos(2 * Math.PI * (x + 2) / 0.8))) * (x > 1.2 ? 1 - 0.3 * (x - 1.2) / 0.8 : 1);
+    prof.push(new THREE.Vector2(Math.max(r, 0.001), x)); }
+  const cg = new THREE.LatheGeometry(prof, 40).rotateZ(-Math.PI / 2); cg.scale(1, 0.86, 1);
+  const cut = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({ color: 0xe8d9b0, transparent: true, opacity: 0.36, roughness: 0.35, depthWrite: false }));
+  cut.renderOrder = 2; body.add(cut);
+  const inside = (x, y, z) => (x / 1.8) ** 2 + (y / 0.38) ** 2 + (z / 0.44) ** 2 < 1;
+  // gut: green-brown with eaten algae; eggs above it at the back; brain and pharynx in the head
+  const gut = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 14), M(0x5f7a2e, { roughness: 0.7 })); gut.scale.set(1.1, 0.2, 0.24); gut.position.set(-0.2, -0.02, 0); body.add(gut);
+  for (const [x, z] of [[-0.55, 0.08], [-0.85, -0.1], [-1.12, 0.05]]) { const egg = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), M(0xf3e5c0, { roughness: 0.5 })); egg.position.set(x, 0.2, z); body.add(egg); }
+  const brain = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), M(0xe8d6c8)); brain.scale.set(0.16, 0.11, 0.2); brain.position.set(1.5, 0.16, 0); body.add(brain);
+  const phar = new THREE.Mesh(new THREE.SphereGeometry(0.17, 18, 12), M(0xa0524a, { roughness: 0.5 })); phar.position.set(1.28, -0.04, 0); body.add(phar);
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 8).rotateZ(Math.PI / 2), M(0xe0d0b0)); tube.position.set(1.66, -0.05, 0); body.add(tube);
+  for (const sz_ of [-1, 1]) { const sty = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.012, 0.42, 6).rotateZ(Math.PI / 2), M(0x8a6d3b));
+    sty.position.set(1.64, -0.02, sz_ * 0.05); sty.rotation.y = sz_ * 0.12; body.add(sty);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), M(0x111111)); eye.position.set(1.66, 0.2, sz_ * 0.19); body.add(eye); }
+  // storage cells, free in the body cavity
+  { const pts = []; while (pts.length < 170) { const x = (rnd() * 2 - 1) * 1.8, y = (rnd() * 2 - 1) * 0.38, z = (rnd() * 2 - 1) * 0.44;
+      if (!inside(x, y, z) || ((x + 0.2) / 1.2) ** 2 + (y / 0.25) ** 2 + (z / 0.3) ** 2 < 1 || x > 1.1) continue; pts.push([x, y, z]); }
+    const im = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 12, 9), M(0xd9853b, { roughness: 0.55 }), pts.length);
+    pts.forEach(([x, y, z], i) => { O3.position.set(x, y, z); O3.rotation.set(0, 0, 0); O3.scale.setScalar(0.04 + rnd() * 0.02); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); });
+    body.add(im); }
+  // eight lobopod legs: three pairs under the body, the fourth pair at the back pointing backward
+  const legMat = new THREE.MeshStandardMaterial({ color: 0xe8d9b0, transparent: true, opacity: 0.55, roughness: 0.4, depthWrite: false });
+  const clawMat = M(0x8a6d3b, { roughness: 0.4 }), LL = 0.36;
+  const legGeo = new THREE.CylinderGeometry(0.15, 0.1, LL, 12).translate(0, -LL / 2, 0);
+  const clawGeo = new THREE.ConeGeometry(0.014, 0.1, 6).translate(0, -0.05, 0);
+  const legs = [];
+  for (let i = 0; i < 4; i++) for (const sd of [-1, 1]) {
+    const hip = new THREE.Group(), rear = i === 3;
+    hip.position.set(rear ? -1.72 : 1.0 - i * 0.8, rear ? -0.12 : -0.28, sd * (rear ? 0.25 : 0.36)); body.add(hip);
+    const leg = new THREE.Mesh(legGeo, legMat); leg.renderOrder = 1; hip.add(leg);
+    for (let c = 0; c < 4; c++) { const cl = new THREE.Mesh(clawGeo, clawMat); cl.position.set(0, -LL + 0.02, 0);
+      cl.rotation.set((c % 2 ? 1 : -1) * 0.35 * sd, 0, (c < 2 ? 0.45 : -0.15)); leg.add(cl); }
+    legs.push({ hip, sd, i, rear }); }
+  tg.position.copy(TC);
+  procAnim.push(t => {
+    if (!inMacro) return;
+    const a = t * TV / TR, dx = -Math.sin(a), dz = Math.cos(a);
+    tg.position.set(TC.x + TR * Math.cos(a), 0, TC.z + TR * Math.sin(a)); tg.rotation.y = Math.atan2(-dz, dx);
+    body.position.y = 0.62 + 0.012 * Math.sin(t * STEP * 4 * Math.PI);
+    for (const L of legs) { const ph = t * STEP * 2 * Math.PI - L.i * 1.1 + (L.sd > 0 ? Math.PI : 0), sw = Math.sin(ph);
+      if (L.rear) L.hip.rotation.set(-L.sd * 0.25, 0, -1.05 + 0.2 * sw);
+      else L.hip.rotation.set(-L.sd * (0.38 + 0.1 * Math.max(0, Math.cos(ph))), 0, 0.38 * sw); } });
+  MACRO_EX.push({ name: "tardigrade", real: 0.4e-3, pos: tg.position });
+  // the arena: a low rail round its walk
+  const rail = new THREE.Mesh(new THREE.TorusGeometry(TR + 2.2, 0.035, 8, 120).rotateX(Math.PI / 2), M(0xc9a227, { metalness: 0.6, roughness: 0.35 }));
+  rail.position.set(TC.x, 0.75, TC.z); MACRO.add(rail);
+  const posts = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.035, 0.035, 0.75, 8).translate(0, 0.375, 0), M(0x34495e), 36);
+  for (let k = 0; k < 36; k++) { const q = k / 36 * Math.PI * 2; O3.position.set(TC.x + (TR + 2.2) * Math.cos(q), 0, TC.z + (TR + 2.2) * Math.sin(q));
+    O3.rotation.set(0, 0, 0); O3.scale.setScalar(1); O3.updateMatrix(); posts.setMatrixAt(k, O3.matrix); }
+  MACRO.add(posts);
+  macroSign(["tardigrade (water bear)", "real 0.4 mm  ·  here 4 m  ·  about 1,000 cells",
+    "orange: storage cells drifting in its body cavity (~12 µm → 12 cm)",
+    "green: the gut, full of the plant cells it sucks dry through two stylets",
+    "cream: eggs  ·  red: the muscular pharynx that pumps its food  ·  black: two eyespots",
+    "8 stubby legs, each with 4 claws (10 µm → 10 cm)  ·  walking at its real speed, ~80 µm/s",
+    "dried out it curls into a 'tun' and can survive for years"], PORTAL.x + 2.3, TC.z, -Math.PI / 2, 2.0, 1.7);
+}
 function makeMini() {                                   // photograph the museum from above, once
   const N = IS_HEADSET ? 2048 : 4096, rt = new THREE.WebGLRenderTarget(N, N, { samples: 4 });
   rt.texture.colorSpace = THREE.SRGBColorSpace; rt.texture.generateMipmaps = true;
@@ -55679,14 +55774,16 @@ function checkPortals() {
   const at = (p) => Math.hypot(rig.position.x - p.x, rig.position.z - p.z) < 0.55 && rig.position.y < 2.5;
   if (!inMacro && at(PORTAL)) enterMacro(); else if (inMacro && at(BACK)) leaveMacro(true); }
 if (Q.has("macro")) setTimeout(enterMacro, 1500);      // ?macro in the address starts you through the portal
+const nearMacro = () => MACRO_EX.reduce((a, b) => b.pos.distanceTo(rig.position) < a.pos.distanceTo(rig.position) ? b : a);
 function readoutMacro(v) {
-  const h = Math.max(0, rig.position.y + camera.position.y);
+  const h = Math.max(0, rig.position.y + camera.position.y), nm = nearMacro();
   hud.innerHTML = `<b>×10,000</b> &nbsp;·&nbsp; you are 1.7 m here = <b>170 µm</b> real &nbsp;<span class="dim">(you grew 1,000 times)</span><br>
     ${flying ? "jetpack" : "walking"} <span class="k">F</span> &nbsp;·&nbsp; speed ${fmt(v)}/s here = <b>${fmtReal(v / K4)}/s</b> real size
     <span class="k">− =</span> or scroll<br>
     height above the slide: ${fmt(h)} = ${fmtReal(h / K4)}<br>
-    the museum you came from: the <b>2.4 m</b> patch on the glass (really 240 µm)<br>
-    <span class="dim">the slide here is 750 × 250 m of glass, 10 m thick · the blue portal beside the patch takes you back</span>`;
+    nearest: <b>${nm.name}</b> — real ${fmtReal(nm.real)}, here ${fmt(nm.real * K4)}<br>
+    <span class="dim">animals here move at their real speed · the slide is 750 × 250 m of glass, 10 m thick ·
+    the blue portal beside the 2.4 m patch (the museum you came from) takes you back</span>`;
 }
 const camW = new THREE.Vector3();
 // ---------- the loop -----------------------------------------------------------------
