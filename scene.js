@@ -2892,6 +2892,253 @@ macroPath([[PORTAL.x + 1.5, PORTAL.z + 42], [PORTAL.x + 69, PORTAL.z + 42]]);
     "the copper is only a skin ~10 µm thick (10 cm here) over a zinc core",
     "fly up with the jetpack (F, then space) and land on it"], PORTAL.x + 66, PORTAL.z + 38.5, EASTF, 2.4, 2.0);
 }
+
+// ---------- the east lane: a red clover mite, a fruit fly's eyes, a head louse on a hair ----------
+macroPath([[PORTAL.x + 1.5, PORTAL.z + 51], [PORTAL.x + 67, PORTAL.z + 51]]);
+const SOUTHF = Math.PI;                                // sign turn: facing -z (north), seen from a path to its north
+// clover mite (Bryobia): the tiny red mite on walls and pavements. 0.75 mm → 7.5 m. Front legs longer
+// than the body, used as feelers; fan-shaped bristles on the back; all of them female.
+{
+  const CC = V3(PORTAL.x + 33, 0, PORTAL.z + 63), cm = new THREE.Group(); cm.position.copy(CC); cm.rotation.y = 0.3; MACRO.add(cm);   // facing east
+  const red = M(0xb3261e, { roughness: 0.45 }), legR = M(0xc0392b, { roughness: 0.5 }), fanM = M(0xe8b4a8, { side: THREE.DoubleSide });
+  const b = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 24), red); b.scale.set(3.6, 1.4, 2.5); b.position.y = 2.0; cm.add(b);
+  const gn = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), M(0x8e1b14)); gn.scale.set(0.8, 0.5, 0.6); gn.position.set(3.7, 1.6, 0); cm.add(gn);
+  for (const sd of [-1, 1]) for (const dx of [2.3, 2.7]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), M(0x5a0a06, { roughness: 0.2 })); e.position.set(dx, 2.7, sd * 1.75); cm.add(e); }
+  for (const [x, kx, fx, ky, sc] of [[2.4, 3.5, 9.5, 3.4, 1.0], [1.2, 1.5, 3.2, 2.8, 0.75], [-0.6, -1.0, -2.5, 2.7, 0.7], [-1.8, -2.6, -4.8, 2.6, 0.7]]) for (const sd of [-1, 1]) {
+    const a = V3(x, 1.4, sd * 1.9), k = V3(x + kx * 0.5, ky, sd * (2.6 + 1.6 * sc)), f = V3(x + fx * 0.6, 0.05, sd * (3.2 + 2.2 * sc));
+    limb(a, k, 0.22, 0.17, legR, cm); limb(k, f, 0.17, 0.09, legR, cm); }
+  const fan = new THREE.CircleGeometry(0.22, 12, 0, Math.PI).rotateX(-0.4);
+  for (let i = 0; i < 34; i++) { const u = (rnd() * 2 - 1) * 0.85, v = (rnd() * 2 - 1) * 0.8, y = Math.sqrt(Math.max(0, 1 - u * u - v * v));
+    const base = V3(u * 3.6, 2.0 + y * 1.4, v * 2.5), st = limb(base, base.clone().add(V3(0, 0.25, 0)), 0.02, 0.02, fanM, cm, false);
+    const f = new THREE.Mesh(fan, fanM); f.position.copy(base).add(V3(0, 0.35, 0)); f.rotation.y = rnd() * 6; cm.add(f); }
+  arenaRail(CC, 9);
+  MACRO_EX.push({ name: "clover mite", real: 0.75e-3, pos: CC });
+  macroSign(["clover mite: the tiny red mite on walls and pavements", "real 0.75 mm  ·  here 7.5 m  ·  a plant-sucking mite, not an insect: 8 legs",
+    "its front legs are longer than its body and work as feelers", "fan-shaped bristles (~20 µm → 20 cm) stand all over its back",
+    "they are all female: they lay eggs without mating", "squash one and the red smear is its own pigment, not blood"], CC.x - 5, PORTAL.z + 53.2, SOUTHF, 2.0, 1.6);
+}
+// a fruit fly's head: 0.6 mm wide → 6 m. Each red compound eye has ~750 facets (ommatidia), each
+// ~16 µm across (16 cm here) with a bristle between some of them. Beside it, a row of ommatidia
+// cut open: lens, crystalline cone, red pigment cells, and the photoreceptors' light-catching rods.
+{
+  const FC = V3(PORTAL.x + 48, 0, PORTAL.z + 61), fh = new THREE.Group(); fh.position.copy(FC); fh.rotation.y = Math.PI / 2; MACRO.add(fh);   // face toward the path (north)
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 28), M(0x9b7a45, { roughness: 0.55 })); cap.scale.set(2.2, 2.3, 2.6); cap.position.y = 3.2; fh.add(cap);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 1.2, 16), M(0x6e5530)); neck.position.set(-1.4, 0.7, 0); fh.add(neck);
+  const lensG = new THREE.SphereGeometry(1, 8, 6), lensM = M(0xd64a3a, { roughness: 0.18, metalness: 0.05 }), bristle = M(0x3a2a1a);
+  for (const sd of [-1, 1]) {
+    const E = V3(0.6, 3.3, sd * 1.9), RX = 1.35, RY = 2.0, RZ = 1.25;   // the eye: an ellipsoid bulging from the head's side
+    const base = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 24), M(0x7a1a12, { roughness: 0.4 })); base.scale.set(RX, RY, RZ); base.position.copy(E); fh.add(base);
+    const pts = []; for (let i = 0; i < 1500 && pts.length < 750; i++) { const y = 1 - 2 * (i + 0.5) / 1500, r = Math.sqrt(1 - y * y), a = i * 2.39996;
+      const d = V3(r * Math.cos(a), y, r * Math.sin(a)); if (d.z * sd > 0.05) pts.push(d); }
+    const lens = new THREE.InstancedMesh(lensG, lensM, pts.length), br = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.008, 0.012, 0.3, 4).translate(0, 0.15, 0), bristle, Math.ceil(pts.length / 6));
+    let nb = 0;
+    pts.forEach((d, i) => { const p = V3(d.x * RX, d.y * RY, d.z * RZ).add(E), n = V3(d.x / RX, d.y / RY, d.z / RZ).normalize();
+      O3.position.copy(p); O3.quaternion.setFromUnitVectors(V3(0, 1, 0), n); O3.scale.set(0.085, 0.035, 0.085); O3.updateMatrix(); lens.setMatrixAt(i, O3.matrix);
+      if (i % 6 === 3) { O3.scale.setScalar(1); O3.position.addScaledVector(n, 0.03); O3.updateMatrix(); br.setMatrixAt(nb++, O3.matrix); } });
+    br.count = nb; fh.add(lens, br);
+    const ant = V3(2.0, 3.7, sd * 0.6); limb(ant, V3(2.6, 4.1, sd * 0.8), 0.18, 0.2, M(0x9b7a45), fh);           // antenna and its feathery arista
+    const ar0 = V3(2.6, 4.1, sd * 0.8), ar1 = V3(3.4, 5.6, sd * 1.4); limb(ar0, ar1, 0.03, 0.015, bristle, fh, false);
+    for (let k = 1; k < 8; k++) { const q = ar0.clone().lerp(ar1, k / 8); limb(q, q.clone().add(V3(0.25, 0.08, sd * 0.12)), 0.008, 0.006, bristle, fh, false); limb(q, q.clone().add(V3(-0.12, 0.2, -sd * 0.1)), 0.008, 0.006, bristle, fh, false); } }
+  // a row of seven ommatidia, cut lengthwise, on a plinth: each ~16 µm wide and ~100 µm long → 16 cm × 1 m
+  const OX = PORTAL.x + 56, OZ = PORTAL.z + 58.5;
+  const pl = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1, 0.6), M(0xe5ecef, { roughness: 0.8 })); pl.position.set(OX, 0.5, OZ); MACRO.add(pl);
+  const pig = new THREE.MeshStandardMaterial({ color: 0xa8231a, transparent: true, opacity: 0.45, depthWrite: false }), rodM = M(0xf4d03f, { emissive: 0x3a2a00 }), coneM = new THREE.MeshStandardMaterial({ color: 0xeaf6f8, transparent: true, opacity: 0.6 });
+  for (let k = 0; k < 7; k++) { const x = OX - 0.54 + k * 0.18, g = new THREE.Group(); g.position.set(x, 1, OZ); MACRO.add(g);
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.07, 1.0, 6), pig); tube.position.y = 0.5; tube.renderOrder = 2; g.add(tube);
+    const ln = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 8, 0, 6.283, 0, Math.PI / 2), M(0xf0c27a, { roughness: 0.15 })); ln.position.y = 1.0; g.add(ln);
+    const cn = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.2, 10).rotateX(Math.PI), coneM); cn.position.y = 0.9; g.add(cn);
+    for (let r = 0; r < 7; r++) { const a = r / 7 * 6.283; const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.68, 5), rodM); rod.position.set(0.03 * Math.cos(a), 0.44, 0.03 * Math.sin(a)); g.add(rod); } }
+  MACRO_EX.push({ name: "fruit fly head and eyes", real: 0.6e-3, pos: FC });
+  macroSign(["a fruit fly's head and its compound eyes", "head 0.6 mm → 6 m  ·  each eye ~750 facets, ~16 µm → 16 cm each",
+    "every facet is the lens of an ommatidium: a separate little eye, ~100 µm (1 m) deep",
+    "on the plinth, seven cut open: lens (amber), crystalline cone (clear), red pigment cells,",
+    "and in each, 7 yellow rods: the light-catching parts of its photoreceptor cells",
+    "the bristles between facets sense air and touch; the feathery arista on each antenna hears"], FC.x - 1, PORTAL.z + 53.2, SOUTHF, 2.0, 1.6);
+}
+// a head louse clinging to a human hair, with its nits. Louse 2.5 mm → 25 m; head hair 70 µm → 70 cm.
+{
+  const HX = PORTAL.x + 59, Z0 = PORTAL.z + 67, Z1 = PORTAL.z + 121, HR = 0.35;
+  const cut = canvasTex(512, 512, (g, w, h) => { g.fillStyle = "#5a3a22"; g.fillRect(0, 0, w, h);
+    for (let k = 0; k < 8; k++) { const y0 = k * 64 + 10; g.fillStyle = "rgba(25,12,5,.5)"; g.strokeStyle = "rgba(150,110,75,.8)"; g.lineWidth = 3; g.beginPath(); g.moveTo(0, y0);
+      for (let x = 0; x <= w; x += 16) g.lineTo(x, y0 + 7 * Math.sin(x * 0.0245 + k * 1.7)); g.stroke(); g.lineTo(w, y0 + 18); g.lineTo(0, y0 + 18); g.fill(); } }, [3, (Z1 - Z0) / 0.48]);
+  const hair = new THREE.Mesh(new THREE.CylinderGeometry(HR, HR, Z1 - Z0, 40).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ map: cut, roughness: 0.6 }));
+  hair.position.set(HX, HR, (Z0 + Z1) / 2); MACRO.add(hair);
+  const LZ = PORTAL.z + 102, louse = new THREE.Group(); louse.position.set(HX, 0, LZ); louse.rotation.y = Math.PI / 2; MACRO.add(louse);   // head to the north
+  const skinL = new THREE.MeshStandardMaterial({ color: 0xc9b08a, transparent: true, opacity: 0.6, roughness: 0.45, depthWrite: false }), legL = M(0xa88a62, { roughness: 0.5 }), claw = M(0x6b4a2a, { roughness: 0.35 });
+  const prof = []; for (let i = 0; i <= 40; i++) { const x = -8 + 16 * i / 40, u = 1 - (x / 8) ** 2;
+    prof.push(new THREE.Vector2(Math.max(0.01, 4.4 * Math.pow(Math.max(u, 0), 0.5) * (1 - 0.06 * (0.5 + 0.5 * Math.cos(2 * Math.PI * (x + 8) / 2.2)))), x)); }
+  const abd = new THREE.Mesh(new THREE.LatheGeometry(prof, 36).rotateZ(-Math.PI / 2), skinL); abd.scale.set(1, 0.42, 1); abd.position.set(-4.5, 3.4, 0); abd.renderOrder = 2; louse.add(abd);
+  const gut = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), M(0x5e0f0f, { roughness: 0.5 })); gut.scale.set(5.5, 0.9, 1.6); gut.position.set(-3.8, 3.4, 0); louse.add(gut);   // a blood meal
+  const tho = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 18), skinL); tho.scale.set(2.6, 1.5, 3.0); tho.position.set(4.6, 3.3, 0); tho.renderOrder = 2; louse.add(tho);
+  const hd = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 18), M(0xb89c74, { roughness: 0.45 })); hd.scale.set(2.2, 1.3, 1.7); hd.position.set(8.6, 3.2, 0); louse.add(hd);
+  for (const sd of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), M(0x111111)); e.position.set(8.4, 3.6, sd * 1.55); louse.add(e);
+    let a = V3(9.6, 3.5, sd * 1.2); for (let k = 0; k < 5; k++) { const b2 = a.clone().add(V3(0.7, 0.15, sd * 0.35)); limb(a, b2, 0.22, 0.2, legL, louse); a = b2; }   // 5-segmented antenna
+    for (let k = 0; k < 7; k++) { const sp = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), M(0x3a2a1a)); sp.position.set(-1.5 - k * 1.6, 3.45, sd * (4.2 - Math.abs(k - 3) * 0.12)); louse.add(sp); }   // spiracles
+    for (const x of [6.0, 4.6, 3.2]) {                // three legs a side, each ending in a claw that closes round the hair
+      const c = V3(x, 2.4, sd * 2.4), k1 = V3(x + 0.3, 1.8, sd * 4.6), t = V3(x, 0.9, sd * 1.0);
+      limb(c, k1, 0.5, 0.42, legL, louse); limb(k1, t, 0.42, 0.32, legL, louse);
+      const cl = new THREE.Mesh(new THREE.TorusGeometry(HR + 0.12, 0.13, 8, 16, Math.PI * 1.25), claw); cl.position.set(x, HR, 0); cl.rotation.set(0, Math.PI / 2, sd > 0 ? 0.3 : Math.PI - 0.3 + Math.PI * 0.25); louse.add(cl); } }
+  // nits: eggs 0.8 × 0.3 mm → 8 × 3 m, cemented to the hair; one hatched and empty
+  [[PORTAL.z + 72, false], [PORTAL.z + 81, true]].forEach(([z, hatched]) => {
+    const g = new THREE.Group(); g.position.set(HX, HR, z); g.rotation.x = -0.35; MACRO.add(g);
+    const shellN = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 18), new THREE.MeshStandardMaterial({ color: hatched ? 0xf6f2ea : 0xe9dcb8, transparent: true, opacity: hatched ? 0.55 : 0.7, roughness: 0.3, depthWrite: false }));
+    shellN.scale.set(1.5, 1.5, 4); shellN.position.set(0, 1.6, 4.2); shellN.renderOrder = 2; g.add(shellN);
+    const sheath = new THREE.Mesh(new THREE.CylinderGeometry(HR + 0.15, HR + 0.15, 3.5, 20).rotateX(Math.PI / 2), M(0xd9ceb0, { roughness: 0.7 })); sheath.position.set(0, -0.2, 1.6); g.add(sheath);
+    const lid = new THREE.Mesh(new THREE.SphereGeometry(1.2, 20, 10, 0, 6.283, 0, Math.PI / 2), M(0xcfc2a0)); lid.position.set(0, 1.6, 8.1); lid.rotation.x = Math.PI / 2;
+    if (hatched) { lid.position.set(0, 2.9, 8.4); lid.rotation.x = 0.4; } g.add(lid);
+    if (!hatched) { const ny = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), M(0x6b5340)); ny.scale.set(0.9, 0.9, 2.6); ny.position.set(0, 1.6, 4.3); g.add(ny); } });
+  MACRO_EX.push({ name: "head louse on a hair", real: 2.5e-3, pos: V3(HX, 3, LZ) });
+  macroSign(["a head louse on a human hair (look south along the hair)", "louse 2.5 mm → 25 m  ·  the hair, 70 µm → 70 cm thick",
+    "each of its 6 legs ends in a claw curved to the width of a human hair", "dark red inside: its gut, holding a meal of blood (it feeds several times a day)",
+    "nits: its eggs, 0.8 mm → 8 m, cemented to the hair; the near one holds a growing nymph,", "the next has hatched, its lid open"], HX + 1, PORTAL.z + 53.2, SOUTHF, 2.0, 1.6);
+}
+
+// ---------- a drop of pond water, 6.4 mm across → 64 m, 0.6 mm deep → 6 m. Walk in. ----------
+// Everything inside moves at its real speed. At ×10,000 this is what a light microscope shows at
+// 100-400×: cells 1-10 cm; bacteria are the 1-2 cm specks; anything under 0.2 µm (2 mm here) blurs.
+const POND = { x: PORTAL.x - 96, z: PORTAL.z + 77, R: 32, H: 6 };
+const pondFog = new THREE.FogExp2(0x6fa8b4, 0.03), PONDCOL = new THREE.Color(0x7fb3bf);
+macroPath([[PORTAL.x - 1.5, PORTAL.z + 71], [POND.x + 31.5, PORTAL.z + 71]]);
+{
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 72, 20, 0, 6.283, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xa8d8e8, transparent: true,
+    opacity: 0.2, roughness: 0.04, side: THREE.DoubleSide, depthWrite: false }));
+  dome.scale.set(POND.R, POND.H, POND.R); dome.position.set(POND.x, 0, POND.z); dome.renderOrder = 3; MACRO.add(dome);
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(POND.R, 72).rotateX(-Math.PI / 2), M(0xbcd9d4, { roughness: 0.3 })); floor.position.set(POND.x, 0.015, POND.z); MACRO.add(floor);
+  const inPond = (x, y, z) => ((x - POND.x) / POND.R) ** 2 + ((z - POND.z) / POND.R) ** 2 + (y / POND.H) ** 2 < 1;
+  let wasIn = false;
+  procAnim.push(() => { if (!inMacro) { wasIn = false; return; } const c = camera.getWorldPosition(V3(0, 0, 0)), now = inPond(c.x, c.y, c.z);
+    if (now !== wasIn) { scene.fog = now ? pondFog : macroFog; scene.background = now ? PONDCOL : AIRCOL; wasIn = now; } });
+  // bacteria: specks drifting
+  { const n = 1500, bp = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const a = rnd() * 6.283, r = Math.sqrt(rnd()) * POND.R * 0.95, x = POND.x + r * Math.cos(a), z = POND.z + r * Math.sin(a);
+      bp[i * 3] = x; bp[i * 3 + 2] = z; bp[i * 3 + 1] = 0.05 + rnd() * POND.H * Math.sqrt(1 - (r / POND.R) ** 2) * 0.9; }
+    MACRO.add(new THREE.Points(new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(bp, 3)), new THREE.PointsMaterial({ color: 0x55786a, size: 0.018, sizeAttenuation: true }))); }
+  const P = (dx, dz) => V3(POND.x + dx, 0, POND.z + dz);
+  const glassy = (col, op) => new THREE.MeshStandardMaterial({ color: col, transparent: true, opacity: op, roughness: 0.3, depthWrite: false });
+  // the amoeba: Amoeba proteus, 0.5 mm → 5 m, crawling ~3 µm/s (3 cm/s) by flowing into its pseudopods
+  { const ag = new THREE.SphereGeometry(1, 56, 20), base = ag.attributes.position.array.slice(), pos = ag.attributes.position.array;
+    const grp = new THREE.Group(); grp.position.copy(P(4, -14)); MACRO.add(grp);
+    const am = new THREE.Mesh(ag, glassy(0xd2dcd2, 0.5)); am.renderOrder = 2; grp.add(am);
+    const nuc = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), M(0x9a8fb0)); nuc.scale.set(0.3, 0.12, 0.3); nuc.position.y = 0.45; grp.add(nuc);
+    const cv = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), glassy(0xeaf8ff, 0.55)); cv.position.set(-0.8, 0.5, 0.3); grp.add(cv);
+    for (let k = 0; k < 7; k++) { const fv = new THREE.Mesh(new THREE.SphereGeometry(0.1 + rnd() * 0.1, 12, 8), M(k % 2 ? 0x6f8f3a : 0x8a7a4a)); fv.position.set((rnd() - 0.5) * 2, 0.35 + rnd() * 0.3, (rnd() - 0.5) * 2); grp.add(fv); }
+    const gr = new THREE.InstancedMesh(new THREE.SphereGeometry(0.025, 6, 4), M(0x7a7f74), 260);
+    for (let k = 0; k < 260; k++) { const a = rnd() * 6.283, r = Math.sqrt(rnd()) * 1.6; O3.position.set(r * Math.cos(a), 0.15 + rnd() * 0.65, r * Math.sin(a)); O3.rotation.set(0, 0, 0); O3.scale.setScalar(1); O3.updateMatrix(); gr.setMatrixAt(k, O3.matrix); }
+    grp.add(gr);
+    const pods = Array.from({ length: 5 }, (_, i) => ({ phi: i * 1.26 + rnd(), ph: rnd() * 6.28, w: 0.3 + rnd() * 0.2 }));
+    let last = 0; const dir = V3(1, 0, 0);
+    procAnim.push(t => { if (!inMacro) return; const dt = Math.min(0.1, t - last); last = t; let best = 0, bphi = 0;
+      for (const p_ of pods) { p_.A = 0.5 + 0.5 * Math.sin(t * 2 * Math.PI / 45 + p_.ph); p_.phi += 0.002 * Math.sin(t * 0.05 + p_.ph); if (p_.A > best) { best = p_.A; bphi = p_.phi; } }
+      for (let i = 0; i < pos.length; i += 3) { const x = base[i], y = base[i + 1], z = base[i + 2], f = Math.atan2(z, x); let R = 1;
+        for (const p_ of pods) { let d = Math.abs(f - p_.phi) % 6.283; if (d > Math.PI) d = 6.283 - d; R += 0.9 * p_.A * Math.exp(-((d / p_.w) ** 2)); }
+        R *= 1.7; pos[i] = x * R; pos[i + 2] = z * R; pos[i + 1] = y < 0 ? 0.04 + (1 + y) * 0.06 : 0.1 + y * 0.75; }
+      ag.attributes.position.needsUpdate = true; ag.computeVertexNormals();
+      dir.set(Math.cos(bphi), 0, Math.sin(bphi)); grp.position.addScaledVector(dir, 0.03 * dt);
+      if (grp.position.distanceTo(P(0, 0)) > 20) grp.position.lerp(P(0, 0), 0.002);
+      cv.scale.setScalar(0.3 + 0.7 * ((t / 50) % 1)); });            // the contractile vacuole fills, then empties
+    MACRO_EX.push({ name: "amoeba (Amoeba proteus)", real: 0.5e-3, pos: grp.position }); }
+  // paramecia: 0.25 mm → 2.5 m slippers coated in ~5,000 cilia (10 µm → 10 cm); they swim ~0.5 mm/s,
+  // 5 m/s here, spinning on their long axis
+  for (const [r0, h0, sp, ph] of [[16, 2.4, 5, 0], [9, 3.4, 4.2, 2.5]]) {
+    const outer = new THREE.Group(), body = new THREE.Group(); outer.add(body); MACRO.add(outer);
+    const sh = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), glassy(0xd9e6cf, 0.45)); sh.scale.set(1.25, 0.42, 0.38); sh.renderOrder = 2; body.add(sh);
+    const mac = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), M(0x8f7fb0)); mac.scale.set(0.32, 0.17, 0.16); body.add(mac);
+    for (const x of [-0.7, 0.7]) { const v = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8), glassy(0xeaf8ff, 0.7)); v.position.set(x, 0.17, 0); body.add(v);
+      for (let k = 0; k < 7; k++) { const a = k / 7 * 6.283; limb(V3(x, 0.17, 0), V3(x + 0.22 * Math.cos(a), 0.17, 0.22 * Math.sin(a)), 0.012, 0.004, glassy(0xeaf8ff, 0.7), body, false); } }
+    const og = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.45, 10).rotateZ(Math.PI / 2), M(0x9db58a)); og.position.set(0.15, -0.12, 0.25); body.add(og);   // the oral groove's gullet
+    for (let k = 0; k < 9; k++) { const fv = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), M(0x8a6a3a)); fv.position.set((rnd() - 0.5) * 1.6, (rnd() - 0.5) * 0.4, (rnd() - 0.5) * 0.4); body.add(fv); }
+    const n = 900, ci = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.004, 0.004, 0.1, 3).translate(0, 0.05, 0), M(0xc8d8c0), n);
+    for (let i = 0; i < n; i++) { const y = 1 - 2 * (i + 0.5) / n, r = Math.sqrt(1 - y * y), a = i * 2.39996, d = V3(y, r * Math.cos(a), r * Math.sin(a));
+      const p_ = V3(d.x * 1.25, d.y * 0.42, d.z * 0.38), nn = V3(d.x / 1.25, d.y / 0.42, d.z / 0.38).normalize().add(V3(-0.5, 0, 0)).normalize();
+      O3.position.copy(p_); O3.quaternion.setFromUnitVectors(V3(0, 1, 0), nn); O3.scale.setScalar(1); O3.updateMatrix(); ci.setMatrixAt(i, O3.matrix); }
+    body.add(ci);
+    procAnim.push(t => { if (!inMacro) return; const a = t * sp / r0 + ph, dx = -Math.sin(a), dz = Math.cos(a);
+      outer.position.set(POND.x + r0 * Math.cos(a), h0 + 0.4 * Math.sin(t * 0.7 + ph), POND.z + r0 * Math.sin(a)); outer.rotation.y = Math.atan2(-dz, dx); body.rotation.x = t * 5; });
+    MACRO_EX.push({ name: "paramecium", real: 0.25e-3, pos: outer.position }); }
+  // Euglena: 50 µm → 50 cm, green with chloroplasts, a red eyespot, and a whipping flagellum
+  for (let k = 0; k < 4; k++) {
+    const g = new THREE.Group(); MACRO.add(g);
+    const b = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), M(0x4f9e33, { roughness: 0.5 })); b.scale.set(0.25, 0.07, 0.07); g.add(b);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), M(0xe0301e, { emissive: 0x501008 })); eye.position.set(0.19, 0.04, 0); g.add(eye);
+    const fp = new Float32Array(26 * 3), fl = new THREE.Line(new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(fp, 3)), new THREE.LineBasicMaterial({ color: 0x3d6b2a }));
+    fl.frustumCulled = false; g.add(fl);
+    const r0 = 4 + k * 2.2, h0 = 0.8 + k * 0.7, sp = 0.6 + 0.15 * k, ph = k * 1.7;
+    procAnim.push(t => { if (!inMacro) return; for (let i = 0; i <= 25; i++) { const u = i / 25; fp[i * 3] = 0.25 + u * 0.5; fp[i * 3 + 1] = 0.06 * u * Math.sin(u * 8 - t * 14); fp[i * 3 + 2] = 0.03 * u * Math.cos(u * 8 - t * 14); }
+      fl.geometry.attributes.position.needsUpdate = true;
+      const a = -(t * sp / r0 + ph), dx = Math.sin(a), dz = -Math.cos(a);
+      g.position.set(POND.x - 6 + r0 * Math.cos(a), h0, POND.z + 5 + r0 * Math.sin(a)); g.rotation.set(t * 3, Math.atan2(-dz, dx), 0, "YXZ"); });
+    if (!k) MACRO_EX.push({ name: "Euglena", real: 50e-6, pos: g.position }); }
+  // Volvox: a hollow ball of ~2,000 cells, 0.5 mm → 5 m, with daughter colonies inside; it rolls along
+  { const g = new THREE.Group(), spin = new THREE.Group(); g.add(spin); MACRO.add(g);
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(2.5, 40, 28), glassy(0xc0e4a8, 0.14)); shell.renderOrder = 2; spin.add(shell);
+    const n = 2000, cells = new THREE.InstancedMesh(new THREE.SphereGeometry(0.04, 6, 4), M(0x3f9a2a), n);
+    for (let i = 0; i < n; i++) { const y = 1 - 2 * (i + 0.5) / n, r = Math.sqrt(1 - y * y), a = i * 2.39996; O3.position.set(2.5 * r * Math.cos(a), 2.5 * y, 2.5 * r * Math.sin(a));
+      O3.rotation.set(0, 0, 0); O3.scale.setScalar(1); O3.updateMatrix(); cells.setMatrixAt(i, O3.matrix); }
+    spin.add(cells);
+    for (let k = 0; k < 7; k++) { const d = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12), M(0x2f7a22, { roughness: 0.5 })); d.position.set((rnd() - 0.5) * 2.4, (rnd() - 0.5) * 2.4, (rnd() - 0.5) * 2.4).clampLength(0, 1.5); spin.add(d); }
+    procAnim.push(t => { if (!inMacro) return; const a = t * 0.8 / 6; g.position.set(POND.x + 6 * Math.cos(a), 3.0, POND.z + 6 * Math.sin(a)); spin.rotation.set(t * 0.3, t * 0.5, 0); });
+    MACRO_EX.push({ name: "Volvox (a colony of ~2,000 cells)", real: 0.5e-3, pos: g.position }); }
+  // Spirogyra: a filament of cells 40 µm wide (40 cm), each ~100 µm long (1 m), with a green spiral chloroplast
+  const SA = P(-18, 8), SB = P(14, 14), SL = SA.distanceTo(SB), sdir = SB.clone().sub(SA).normalize();
+  { const g = new THREE.Group(); g.position.copy(SA).setY(0.22); g.quaternion.setFromUnitVectors(V3(1, 0, 0), sdir); MACRO.add(g);
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, SL, 24, 1, true).rotateZ(Math.PI / 2).translate(SL / 2, 0, 0), glassy(0xd8f0d0, 0.3)); tube.renderOrder = 2; g.add(tube);
+    const walls = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.2, 0.2, 0.012, 20).rotateZ(Math.PI / 2), M(0xc8e2c0), Math.floor(SL));
+    for (let k = 0; k < walls.count; k++) { O3.position.set(k + 0.5, 0, 0); O3.rotation.set(0, 0, 0); O3.scale.setScalar(1); O3.updateMatrix(); walls.setMatrixAt(k, O3.matrix); }
+    g.add(walls);
+    const hel = []; for (let s_ = 0; s_ <= SL; s_ += 0.04) hel.push(V3(s_, 0.13 * Math.cos(s_ * 6.283 / 0.55), 0.13 * Math.sin(s_ * 6.283 / 0.55)));
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(hel), hel.length, 0.035, 6), M(0x3f9a2a, { roughness: 0.5 }))); }
+  // Vorticella: a bell (100 µm → 1 m) on a spring stalk; it snaps down in a few milliseconds, the
+  // fastest movement any cell makes, then slowly stretches out again
+  for (let k = 0; k < 4; k++) {
+    const at = SA.clone().addScaledVector(sdir, 4 + k * 2.3).add(V3((k % 2 ? 0.8 : -0.8), 0, (k % 2 ? -0.6 : 0.6))), g = new THREE.Group(); g.position.copy(at); MACRO.add(g);
+    const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1, 6).translate(0, 0.5, 0), M(0xc8d4c0)); g.add(stalk);
+    const bell = new THREE.Group(); g.add(bell);
+    const prof = []; for (let i = 0; i <= 12; i++) { const u = i / 12; prof.push(new THREE.Vector2(0.05 + 0.42 * Math.pow(u, 0.7), u * 0.9)); }
+    bell.add(new THREE.Mesh(new THREE.LatheGeometry(prof, 24), new THREE.MeshStandardMaterial({ color: 0xd9e6d0, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false })));
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.05, 6, 24).rotateX(Math.PI / 2), M(0xb8ccb0)); rim.position.y = 0.9; bell.add(rim);
+    const per = 7 + k * 2.3, off = k * 3.1, L = 2;
+    procAnim.push(t => { if (!inMacro) return; const u = ((t + off) % per) / per, len = u < 0.02 ? 0.35 : 0.35 + (L - 0.35) * Math.min(1, (u - 0.02) / 0.4);
+      stalk.scale.y = len; bell.position.y = len; bell.scale.setScalar(u < 0.02 ? 0.7 : 1); });
+    if (!k) MACRO_EX.push({ name: "Vorticella", real: 100e-6, pos: at }); }
+  // a rotifer: an animal of ~1,000 cells, 0.3 mm → 3 m, anchored by its toes; its crown of cilia
+  // looks like two spinning wheels as it sweeps food into its grinding jaws (the mastax)
+  { const g = new THREE.Group(); g.position.copy(P(-10, -10)); MACRO.add(g);
+    const sk = glassy(0xe2e8d8, 0.5);
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.0, 12).translate(0, 0.5, 0), sk); g.add(foot);
+    for (const sd of [-1, 1]) limb(V3(0, 0.05, 0), V3(sd * 0.25, 0.0, 0.1), 0.04, 0.02, sk, g, false);
+    const trunk = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), sk); trunk.scale.set(0.5, 0.95, 0.45); trunk.position.y = 1.85; trunk.renderOrder = 2; g.add(trunk);
+    const mastax = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 8), M(0x6b5a3a)); mastax.position.y = 2.3; g.add(mastax);
+    const st = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), M(0x9a8a4a)); st.scale.set(0.25, 0.35, 0.22); st.position.y = 1.7; g.add(st);
+    const wheels = [];
+    for (const sd of [-1, 1]) { const w = new THREE.Group(); w.position.set(sd * 0.3, 2.85, 0); w.rotation.z = -sd * 0.4; g.add(w); wheels.push([w, sd]);
+      w.add(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.24, 0.12, 20), sk));
+      const cil = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.006, 0.006, 0.14, 3).translate(0, 0.07, 0), M(0xd8e2d0), 40);
+      for (let i = 0; i < 40; i++) { const a = i / 40 * 6.283; O3.position.set(0.28 * Math.cos(a), 0.05, 0.28 * Math.sin(a)); O3.quaternion.setFromUnitVectors(V3(0, 1, 0), V3(Math.cos(a) * 0.5, 1, Math.sin(a) * 0.5).normalize());
+        O3.scale.setScalar(1); O3.updateMatrix(); cil.setMatrixAt(i, O3.matrix); }
+      w.add(cil); }
+    procAnim.push(t => { if (!inMacro) return; for (const [w, sd] of wheels) w.children[1].rotation.y = sd * t * 4; g.rotation.z = 0.08 * Math.sin(t * 0.6); });
+    MACRO_EX.push({ name: "rotifer", real: 0.3e-3, pos: g.position }); }
+  // diatoms on the bottom: algae in glass shells, centric (round) and pennate (boat-shaped), 30–100 µm
+  { const radial = canvasTex(256, 256, (g, w) => { g.fillStyle = "#c9a54a"; g.fillRect(0, 0, w, w); g.strokeStyle = "#8a6a20"; g.lineWidth = 2;
+      for (let k = 0; k < 48; k++) { const a = k / 48 * 6.283; g.beginPath(); g.moveTo(128 + 14 * Math.cos(a), 128 + 14 * Math.sin(a)); g.lineTo(128 + 126 * Math.cos(a), 128 + 126 * Math.sin(a)); g.stroke(); }
+      g.fillStyle = "#6a4a10"; for (let r = 24; r < 126; r += 9) for (let k = 0; k < r * 0.9; k++) { const a = k / (r * 0.9) * 6.283; g.fillRect(128 + r * Math.cos(a), 128 + r * Math.sin(a), 2, 2); } });
+    const striae = canvasTex(256, 64, (g, w, h) => { g.fillStyle = "#c2a04a"; g.fillRect(0, 0, w, h); g.strokeStyle = "#7a5a1a"; g.lineWidth = 2;
+      for (let x = 4; x < w; x += 7) { g.beginPath(); g.moveTo(x, 4); g.lineTo(x, h - 4); g.stroke(); } g.fillStyle = "#5a3a0a"; g.fillRect(0, h / 2 - 2, w, 4); });
+    const cenM = new THREE.MeshStandardMaterial({ map: radial, roughness: 0.2, transparent: true, opacity: 0.88 }), penM = new THREE.MeshStandardMaterial({ map: striae, roughness: 0.2, transparent: true, opacity: 0.88 });
+    for (let k = 0; k < 9; k++) { const a = k * 0.7 + 0.3, r = 6 + k * 1.6, x = POND.x + r * Math.cos(a), z = POND.z + r * Math.sin(a);
+      if (k % 2) { const s_ = 0.15 + rnd() * 0.15, d = new THREE.Mesh(new THREE.CylinderGeometry(s_, s_, s_ * 0.5, 40), [M(0xb08a3a), cenM, cenM]); d.position.set(x, s_ * 0.25 + 0.02, z); MACRO.add(d); }
+      else { const d = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 12), penM); d.scale.set(0.45, 0.07, 0.1); d.position.set(x, 0.09, z); d.rotation.y = rnd() * 3; MACRO.add(d); } }
+    MACRO_EX.push({ name: "diatoms (algae in glass shells)", real: 60e-6, pos: P(9, 4) }); }
+  macroSign(["a drop of pond water: walk in", "real 6.4 mm across, 0.6 mm deep  ·  here 64 m across, 6 m deep  ·  everything moves at its real speed",
+    "an amoeba, paramecia, Euglena, a Volvox colony, Vorticella, a rotifer, diatoms and a Spirogyra filament",
+    "this is light-microscope scale: what you would see at 100–400×", "the tiny specks are bacteria (1–2 µm → 1–2 cm), about the smallest a light microscope can show"],
+    POND.x + 31, PORTAL.z + 67.8, WEST, 2.3, 1.9);
+  const inside = [["amoeba", "0.5 mm → 5 m · crawls ~3 µm/s by flowing into its pseudopods · the clear bubble is its contractile vacuole, pumping out water"],
+    ["paramecium", "0.25 mm → 2.5 m · ~5,000 cilia (10 µm → 10 cm) row it at ~0.5 mm/s, 5 m/s here, spinning as it goes"],
+    ["Volvox", "a hollow ball of ~2,000 cells, each with 2 flagella · the dark green balls inside are its daughter colonies"],
+    ["Vorticella", "a bell on a spring stalk · it snaps down in milliseconds, the fastest motion of any cell"],
+    ["rotifer", "a whole animal of ~1,000 cells, 0.3 mm → 3 m · its crown of cilia looks like two spinning wheels"]];
+  inside.forEach(([n, l], i) => macroSign([n, ...l.split(" · ")], POND.x + 22 - i * 2.5, POND.z - 6 + i * 3.4, Math.PI / 2 - 0.3, 1.0, 0.9));   // facing east, toward the way in
+}
 function makeMini() {                                   // photograph the museum from above, once
   const N = IS_HEADSET ? 2048 : 4096, rt = new THREE.WebGLRenderTarget(N, N, { samples: 4 });
   rt.texture.colorSpace = THREE.SRGBColorSpace; rt.texture.generateMipmaps = true;
