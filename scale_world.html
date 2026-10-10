@@ -55384,7 +55384,8 @@ addEventListener("keydown", e => {
   if (e.code === "Minus") speed = Math.max(0.01, speed / 2);
 });
 addEventListener("keyup", e => keys[e.code] = false);
-addEventListener("wheel", e => { speed = THREE.MathUtils.clamp(speed * (e.deltaY < 0 ? 1.25 : 0.8), 0.01, 800); });
+addEventListener("wheel", e => { if (renderer.xr.isPresenting) return;   // the Quest browser turns thumbstick motion into wheel events
+  speed = THREE.MathUtils.clamp(speed * (e.deltaY < 0 ? 1.25 : 0.8), 0.01, 800); });
 let drag = false, lx = 0, ly = 0;
 renderer.domElement.addEventListener("pointerdown", e => { drag = true; lx = e.clientX; ly = e.clientY; start(); });
 addEventListener("pointerup", () => drag = false);
@@ -56963,10 +56964,12 @@ function readoutMacro(v) {
 }
 const camW = new THREE.Vector3();
 // ---------- the loop -----------------------------------------------------------------
+const VR_SPEED = 1.5;                                    // m/s at full stick in VR (a brisk walk); the trigger makes it 5×
 const clock = new THREE.Clock(), fwd = new THREE.Vector3(), side = new THREE.Vector3(), upV = new THREE.Vector3(0, 1, 0);
 let hudT = 0;
 renderer.setAnimationLoop(() => {
-  const dt = Math.min(clock.getDelta(), 0.05), T = tau();
+  const rawDt = clock.getDelta(), dt = Math.min(rawDt, 0.05), T = tau();
+  const mdt = Math.min(rawDt, 0.15);                     // movement uses the real frame time, so a slow frame rate doesn't slow you down
   let moved = 0; const prevX = rig.position.x, prevZ = rig.position.z;
   if (!renderer.xr.isPresenting) {
     camera.rotation.set(pitch, yaw, 0, "YXZ");
@@ -57004,8 +57007,8 @@ renderer.setAnimationLoop(() => {
       // the headset's gaze (camera.quaternion holds its pose relative to the rig), turned by the rig's snap turns
       fwd.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(rig.quaternion).normalize();
       side.crossVectors(fwd, upV).normalize();
-      rig.position.addScaledVector(fwd, -my * speed * boost * dt).addScaledVector(side, mx * speed * boost * dt);
-      moved = speed * boost * Math.min(1, Math.hypot(mx, my)); }
+      rig.position.addScaledVector(fwd, -my * VR_SPEED * boost * mdt).addScaledVector(side, mx * VR_SPEED * boost * mdt);
+      moved = VR_SPEED * boost * Math.min(1, Math.hypot(mx, my)); }
   }
   // the ground: 0 on the slide, the surface itself in the Surfaces hall; steps over 0.7 m are walls when walking
   if (!flying && groundH(rig.position.x, rig.position.z) > groundH(prevX, prevZ) + 0.7) { rig.position.x = prevX; rig.position.z = prevZ; }
