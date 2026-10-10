@@ -8,6 +8,7 @@
 
 const S = 1e7;                                   // the magnification
 const sz = metres => metres * S;                 // real -> this world
+let inMacro = false;                             // through the portal: the ×10,000 world (see THE PORTAL, near the end)
 const nm = 1e-9, um = 1e-6;
 
 // ---------- the data: real sizes and rates ----------------------------------------
@@ -170,7 +171,9 @@ const sizeLines = (name, real) => [name, `real ${fmtReal(real)}  ·  here ${fmt(
     g.beginPath(); g.arc(rnd() * 512, rnd() * 512, rr(0.5, 2.5), 0, 6.3); g.fill(); }
   const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(4000, 4000);
   tex.anisotropy = 8; tex.colorSpace = THREE.SRGBColorSpace;
-  const slide = new THREE.Mesh(new THREE.PlaneGeometry(40000, 40000).rotateX(-Math.PI / 2),
+  // a fine grid, not two giant triangles: depth across a 40 km triangle is imprecise enough that the
+  // glass drew over paths and floors from some spots (the PC path flicker)
+  const slide = new THREE.Mesh(new THREE.PlaneGeometry(40000, 40000, 200, 200).rotateX(-Math.PI / 2),
     new THREE.MeshStandardMaterial({ map: tex, roughness: 0.25, metalness: 0.05, color: 0xdbe9ee,
       polygonOffset: true, polygonOffsetFactor: 4, polygonOffsetUnits: 4 }));   // no shimmer with paths and floors
   scene.add(slide); window.__slide = slide;
@@ -418,6 +421,7 @@ const CELL = new THREE.Group(); CELL.position.set(160, 20, -470); scene.add(CELL
   const hair = new THREE.Mesh(new THREE.CylinderGeometry(sz(REAL.hair) / 2, sz(REAL.hair) / 2, 20000, 48),
     M(0x4a3020, { roughness: 0.85 }));
   hair.rotation.set(0, 0.35, Math.PI / 2); hair.position.set(0, sz(REAL.hair) / 2, -1150); scene.add(hair);
+  hair.name = "hair"; hair.userData.dynamic = true;       // kept whole: the ×10⁴ world draws its own, solid
   label(sizeLines("a human hair", REAL.hair), new THREE.Vector3(0, sz(REAL.hair) + 90, -950), 160);
 }
 
@@ -1789,6 +1793,7 @@ ladder.push({ name: "Life in action (processes)", real: 20 * nm, x: -35, z: -71 
 // ==========================================================================================
 const TILES = [], TS = 36, G = 145;                          // walk grid: 145 × 145 samples per tile
 function groundH(x, z) {
+  if (inMacro) return macroGround(x, z);
   for (const t of TILES) { const lx = x - t.cx, lz = z - t.cz;
     if (Math.abs(lx) < TS / 2 && Math.abs(lz) < TS / 2) {
       const fx = (lx + TS / 2) / TS * (G - 1), fz = (lz + TS / 2) / TS * (G - 1), i = Math.floor(fx), k = Math.floor(fz), a = fx - i, b = fz - k;
@@ -2245,7 +2250,7 @@ window.museum = { rig, HALLS, renderer, scene, get mergeStatic() { return mergeS
   const guide = document.getElementById("guide");
   guide.innerHTML = "<b>Museum guide</b>" + HALLS.map(h => `<button data-h="${h.id}"><i style="background:#${h.col.toString(16).padStart(6, "0")}"></i>${h.name}</button>`).join("");
   guide.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
-    const h = HALLS.find(x => x.id === b.dataset.h); rig.position.copy(h.entry);
+    const h = HALLS.find(x => x.id === b.dataset.h); leaveMacro(); rig.position.copy(h.entry);
     const d = h.look.clone().sub(h.entry); yaw = Math.atan2(-d.x, -d.z); pitch = -0.05; flying = true; start(); e.stopPropagation(); });
 }
 
@@ -2300,7 +2305,7 @@ let merged = false;
 function mergeStatic() {
   if (merged) return; merged = true;
   scene.updateMatrixWorld(true);
-  const skip = new Set([ECOLI, kinesin.g, dynein.g, SAR, FIB, NMJ, waterPts, ...PLAQUES.map(p => p.g)]);
+  const skip = new Set([ECOLI, kinesin.g, dynein.g, SAR, FIB, NMJ, waterPts, MACRO, ...PLAQUES.map(p => p.g)]);
   const groups = new Map(), victims = [];
   const keyOf = m => [m.type, m.color?.getHex(), m.emissive?.getHex(), m.emissiveIntensity, m.roughness, m.metalness,
     m.flatShading, m.side, m.map?.uuid, m.vertexColors, m.wireframe].join("|");
@@ -2331,7 +2336,7 @@ function mergeStatic() {
     const out = new THREE.BufferGeometry(); out.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     out.setAttribute("normal", new THREE.BufferAttribute(nor, 3)); if (useUV) out.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
     out.setIndex(new THREE.BufferAttribute(idx, 1)); out.computeBoundingSphere();
-    scene.add(new THREE.Mesh(out, mat));
+    WORLD7.add(new THREE.Mesh(out, mat));
     for (const o of list) o.parent?.remove(o);
   }
 }
@@ -2345,12 +2350,13 @@ function drawWrist(v) {
   const hall = HALLS.slice().reverse().find(h => rig.position.z <= h.z0 + 1) || HALLS[0];
   g.fillStyle = "rgba(10,30,45,.88)"; g.fillRect(0, 0, 640, 400); g.strokeStyle = "#c9a227"; g.lineWidth = 6; g.strokeRect(3, 3, 634, 394);
   const line = (t, y, sz_, col = "#e6f3f9", w = 400) => { g.fillStyle = col; g.font = `${w} ${sz_}px -apple-system, Helvetica, sans-serif`; g.fillText(t, 22, y); };
-  line(`${hall.name}  ·  ×10,000,000`, 50, 34, "#ffffff", 700);
+  const k = inMacro ? 1e4 : S;
+  line(inMacro ? "through the portal  ·  ×10,000" : `${hall.name}  ·  ×10,000,000`, 50, 34, "#ffffff", 700);
   line(`time: 1 s here = ${TAU_NAMES[tauI]}`, 100, 28);
-  line(`speed ${fmt(v)}/s here = ${fmtReal(v / S)}/s real`, 145, 28);
-  line(`(with time slowed to ${TAU_NAMES[tauI]}/s: ${fmtReal(v / S / tau())}/s)`, 172, 20, "#a9c6d4");
-  line(`nearest: ${n.name}`, 195, 28, "#ffe9a8");
-  line(`real ${fmtReal(n.real)}  ·  here ${fmt(sz(n.real))}`, 237, 26);
+  line(`speed ${fmt(v)}/s here = ${fmtReal(v / k)}/s real`, 145, 28);
+  line(`(with time slowed to ${TAU_NAMES[tauI]}/s: ${fmtReal(v / k / tau())}/s)`, 172, 20, "#a9c6d4");
+  line(inMacro ? "nearest: the museum you came from" : `nearest: ${n.name}`, 195, 28, "#ffe9a8");
+  line(inMacro ? "real 240 µm  ·  here 2.4 m, on the glass" : `real ${fmtReal(n.real)}  ·  here ${fmt(sz(n.real))}`, 237, 26);
   line("left stick fly · right stick: forward/back + turn · trigger fast", 300, 22, "#a9c6d4");
   line(`sticks: ${vrSticks}`, 375, 20, "#7f9fb0");
   g.fillStyle = fps >= 70 ? "#7dff9a" : fps >= 50 ? "#ffd166" : "#ff6b6b"; g.font = "700 30px -apple-system, Helvetica, sans-serif";
@@ -2375,7 +2381,7 @@ if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { i
     camera.far = VR_FAR; camera.updateProjectionMatrix(); scene.fog.density = 0.006;   // draw less in the distance
     const slide = window.__slide, map0 = slide.material.map, geo0 = slide.geometry;    // plain glass: the fine speckle sparkles in a headset
     slide.material.map = null; slide.material.color.set(0xc9dde4); slide.material.needsUpdate = true;
-    slide.geometry = new THREE.PlaneGeometry(VR_FAR * 3, VR_FAR * 3).rotateX(-Math.PI / 2);
+    slide.geometry = new THREE.PlaneGeometry(VR_FAR * 3, VR_FAR * 3, 40, 40).rotateX(-Math.PI / 2);
     s.requestAnimationFrame(function f() { slide.position.x = rig.position.x; slide.position.z = rig.position.z; if (renderer.xr.isPresenting) s.requestAnimationFrame(f); });
     s.addEventListener("end", () => { camera.position.y = 1.65; rig.rotation.y = 0;
       camera.far = far0; camera.updateProjectionMatrix(); scene.fog.density = fog0;
@@ -2386,7 +2392,7 @@ const VR_FAR = 260;                                       // metres drawn in VR
 let animDt = 0, animFrame = 0;
 const pressed = {};                                       // edge detection for controller buttons
 const tap = (hand, i, gp) => { const k = hand + i, now = !!gp.buttons[i]?.pressed, was = pressed[k]; pressed[k] = now; return now && !was; };
-function jumpToHall(i) { hallI = (i + HALLS.length) % HALLS.length; const h = HALLS[hallI];
+function jumpToHall(i) { hallI = (i + HALLS.length) % HALLS.length; const h = HALLS[hallI]; leaveMacro();
   rig.position.copy(h.entry); const d = h.look.clone().sub(h.entry); rig.rotation.y = Math.atan2(-d.x, -d.z); }
 
 // ---------- the readout --------------------------------------------------------------
@@ -2395,6 +2401,7 @@ const near = [...ladder.map(l => ({ name: l.name, real: l.real, pos: new THREE.V
   { name: "E. coli", real: REAL.ecoliLen, pos: ECOLI.position }, { name: "animal cell", real: REAL.cell, pos: CELL.position },
   { name: "DNA helix", real: REAL.dnaWidth, pos: new THREE.Vector3(0, DY, 3) }];
 function readout(v) {
+  if (inMacro) return readoutMacro(v);
   const h = rig.position.y + camera.position.y, realSpeed = v / S / tau();
   const n = near.reduce((a, b) => b.pos.distanceTo(rig.position) < a.pos.distanceTo(rig.position) ? b : a);
   const dWater = Math.sqrt(6 * REAL.dWater * tau()) * S;        // rms 3D step of a water molecule, per second here
@@ -2462,6 +2469,121 @@ const wallAnim = [];                                   // things that move with 
 }
 
 placePlaques();
+
+// ==========================================================================================
+//  THE PORTAL: step in and grow 1,000 times. Everything you saw becomes 1,000 times smaller,
+//  so the world is ×10,000 instead of ×10,000,000: a micrometre is 1 cm, a millimetre 10 m.
+//  The whole museum (about 240 µm across, really) shrinks to a 2.4 m patch on the glass,
+//  and the slide itself becomes a glass slab 750 × 250 m and 10 m thick, on a lab bench.
+//  Both worlds are built at once; only one is shown. The patch is a picture of the museum
+//  taken from above the first time you step through.
+// ==========================================================================================
+const WORLD7 = new THREE.Group();                      // everything built so far: the ×10⁷ museum
+for (const o of [...scene.children]) if (o !== rig && !o.isLight) WORLD7.add(o);
+scene.add(WORLD7);
+const MACRO = new THREE.Group(); MACRO.visible = false; scene.add(MACRO);
+const K4 = 1e4;                                        // the macro world's magnification
+const PORTAL = new THREE.Vector3(11, 0, 3);            // on the east side of the entrance plaza
+const BACK = new THREE.Vector3(14.5, 0, 4.2);          // the way home, beside the shrunken museum
+const SLAB = { cx: PORTAL.x, cz: PORTAL.z, L: 75e-3 * K4, W: 25e-3 * K4, T: 1e-3 * K4 };   // 750 × 250 × 10 m
+const AIRCOL = new THREE.Color(0xcfe3ee), macroFog = new THREE.FogExp2(0xcfe3ee, 0.0012), museumFog = scene.fog;
+function macroGround(x, z) {                           // the top of the slab, or 10 m down on the bench
+  return Math.abs(x - SLAB.cx) < SLAB.L / 2 && Math.abs(z - SLAB.cz) < SLAB.W / 2 ? 0 : -SLAB.T; }
+function portalGate(parent, pos, ry, col, lines) {     // a ring you walk through, with a swirl inside
+  const g = new THREE.Group(); g.position.copy(pos); g.rotation.y = ry; parent.add(g);
+  const gold = M(col, { metalness: 0.7, roughness: 0.3, emissive: col, emissiveIntensity: 0.15 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.11, 16, 64), gold); ring.position.y = 1.45; g.add(ring);
+  for (const sx of [-1, 1]) { const foot = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.3, 0.6), M(0x34495e)); foot.position.set(sx * 1.05, 0.15, 0); g.add(foot); }
+  const c = document.createElement("canvas"); c.width = c.height = 256; const x = c.getContext("2d");
+  const gr = x.createRadialGradient(128, 128, 4, 128, 128, 128); gr.addColorStop(0, "rgba(255,255,255,.95)"); gr.addColorStop(0.5, "rgba(140,200,255,.55)"); gr.addColorStop(1, "rgba(60,90,200,.25)");
+  x.fillStyle = gr; x.fillRect(0, 0, 256, 256); x.strokeStyle = "rgba(255,255,255,.6)"; x.lineWidth = 5;
+  for (let k = 0; k < 4; k++) { x.beginPath(); for (let a = 0; a < 9; a += 0.05) { const r = 6 + a * 13; x.lineTo(128 + r * Math.cos(a + k * 1.571), 128 + r * Math.sin(a + k * 1.571)); } x.stroke(); }
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(1.15, 48), new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+  disc.position.y = 1.45; g.add(disc); procAnim.push(t => { disc.rotation.z = -t * 0.9; });
+  const sign = label(lines, new THREE.Vector3(0, 3.35, 0), 1.6, "banner"); sign.position.set(0, 0, 0); g.add(sign);
+  return g; }
+portalGate(WORLD7, PORTAL, -Math.PI / 2, 0xc9a227, ["PORTAL: GROW 1,000 TIMES", "step in to see the world at ×10,000 instead of ×10,000,000",
+  "this whole museum will shrink to a 2.4 m patch at your feet"]);
+// the slide at ×10⁴: clear glass with a frosted label end, green at its cut edges
+{ const glass = new THREE.MeshStandardMaterial({ color: 0xdcebf0, roughness: 0.06, metalness: 0.1 }), edge = M(0x9fd3c3, { roughness: 0.2 }),
+    frost = M(0xf3f5f4, { roughness: 0.95 }), FL = SLAB.L * 20 / 75;   // the frosted label end: 20 mm of the 75
+  const clearL = SLAB.L - FL;
+  const a = new THREE.Mesh(new THREE.BoxGeometry(clearL, SLAB.T, SLAB.W, 110, 1, 50), [edge, edge, glass, glass, edge, edge]);   // fine grid: see the slide
+  a.position.set(SLAB.cx - FL / 2, -SLAB.T / 2, SLAB.cz); MACRO.add(a);
+  const b = new THREE.Mesh(new THREE.BoxGeometry(FL, SLAB.T, SLAB.W, 40, 1, 50), [edge, edge, frost, frost, edge, edge]);
+  b.position.set(SLAB.cx + clearL / 2, -SLAB.T / 2, SLAB.cz); MACRO.add(b);
+  const bench = new THREE.Mesh(new THREE.PlaneGeometry(20000, 20000, 100, 100).rotateX(-Math.PI / 2), M(0x2e3338, { roughness: 0.6 }));
+  bench.position.y = -SLAB.T - 0.05; MACRO.add(bench); }
+// the shrunken museum: a picture from straight above, scaled 1/1000 about the portal
+const MINI = { cx: 0, cz: -500, W: 2400 };              // museum metres pictured: x -1200..1200, z -1700..700
+const miniMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+{ const w = MINI.W / 1000, plane = new THREE.Mesh(new THREE.PlaneGeometry(w, w).rotateX(-Math.PI / 2), miniMat);
+  plane.position.set(PORTAL.x + (MINI.cx - PORTAL.x) / 1000, 0.02, PORTAL.z + (MINI.cz - PORTAL.z) / 1000); MACRO.add(plane);
+  // the water it all sits in: a shallow puddle (the museum is under water; ~8 µm deep here is 8 cm)
+  const drop = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({
+    color: 0x9cc4d8, transparent: true, opacity: 0.28, roughness: 0.05, depthWrite: false }));
+  drop.scale.set(w * 0.78, 0.08, w * 0.78); drop.position.copy(plane.position).setY(0.02); MACRO.add(drop); }
+// the museum's human hair, 80 µm thick: 0.8 m here, 20 m long, with its cuticle -- overlapping
+// flat scale cells whose free edges are ~6 µm apart (6 cm here), each ~0.5 µm thick
+{ const c = document.createElement("canvas"); c.width = c.height = 512; const g = c.getContext("2d");
+  g.fillStyle = "#4a3020"; g.fillRect(0, 0, 512, 512);
+  for (let k = 0; k < 8; k++) { const y0 = k * 64 + 10;                 // 8 scale edges per tile, wavy and uneven
+    g.fillStyle = "rgba(20,10,5,.55)"; g.strokeStyle = "rgba(140,100,70,.8)"; g.lineWidth = 3; g.beginPath(); g.moveTo(0, y0);
+    for (let x = 0; x <= 512; x += 16) g.lineTo(x, y0 + 7 * Math.sin(x * 0.0245 + k * 1.7) + 4 * Math.sin(x * 0.07 + k));
+    g.stroke(); g.lineTo(512, y0 + 18); g.lineTo(0, y0 + 18); g.fill(); }
+  const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  const R = 80e-6 * K4 / 2, L = 20000 / 1000; tex.repeat.set(4, L / (8 * 0.06));   // 8 edges per tile, one per 6 cm
+  const hair = new THREE.Mesh(new THREE.CylinderGeometry(R, R, L, 64, 1), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 }));
+  hair.rotation.set(0, 0.35, Math.PI / 2);
+  hair.position.set(PORTAL.x + (0 - PORTAL.x) / 1000, R, PORTAL.z + (-1150 - PORTAL.z) / 1000); MACRO.add(hair); }
+function makeMini() {                                   // photograph the museum from above, once
+  const N = IS_HEADSET ? 2048 : 4096, rt = new THREE.WebGLRenderTarget(N, N, { samples: 4 });
+  rt.texture.colorSpace = THREE.SRGBColorSpace; rt.texture.generateMipmaps = true;
+  rt.texture.minFilter = THREE.LinearMipmapLinearFilter; rt.texture.anisotropy = 8;
+  const h = MINI.W / 2, cam = new THREE.OrthographicCamera(-h, h, h, -h, 1, 6000);
+  cam.position.set(MINI.cx, 3000, MINI.cz); cam.up.set(0, 0, -1); cam.lookAt(MINI.cx, 0, MINI.cz); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+  const slide = window.__slide, keep = { bg: scene.background, fog: scene.fog, xr: renderer.xr.enabled, rt: renderer.getRenderTarget(),
+    cc: renderer.getClearColor(new THREE.Color()), ca: renderer.getClearAlpha(), w7: WORLD7.visible, m: MACRO.visible };
+  const hair = WORLD7.getObjectByName("hair"); hair.visible = false;    // it lies across the patch as a solid log instead
+  slide.visible = false; scene.background = null; scene.fog = null; renderer.xr.enabled = false; WORLD7.visible = true; MACRO.visible = false;
+  renderer.setClearColor(0xdcebf0, 1);                  // bare glass where nothing stands
+  renderer.setRenderTarget(rt); renderer.clear(); renderer.render(scene, cam);
+  renderer.setRenderTarget(keep.rt); renderer.setClearColor(keep.cc, keep.ca); renderer.xr.enabled = keep.xr;
+  hair.visible = true; slide.visible = true; scene.background = keep.bg; scene.fog = keep.fog; WORLD7.visible = keep.w7; MACRO.visible = keep.m;
+  miniMat.map = rt.texture; miniMat.needsUpdate = true; }
+let miniDone = false;
+portalGate(MACRO, BACK, -Math.PI / 2, 0x5dade2, ["PORTAL: SHRINK 1,000 TIMES", "back to the museum at ×10,000,000"]);
+{ const sign = label(["TEN THOUSAND TIMES BIGGER", "you are 1.7 m here = 170 µm real: about two widths of a human hair",
+    "1 micrometre → 1 centimetre  ·  1 millimetre → 10 metres",
+    "the 2.4 m patch in front of you is the whole museum you came from, under its drop of water",
+    "you are standing on the microscope slide: 750 × 250 m of glass, 10 m thick"],
+    new THREE.Vector3(PORTAL.x - 0.5, 3.9, PORTAL.z - 4.6), 3.0, "banner");
+  MACRO.add(sign);
+  for (const sx of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 3.3, 10), M(0x34495e));
+    post.position.set(PORTAL.x - 0.5 + sx * 2.2, 1.65, PORTAL.z - 4.72); MACRO.add(post); } }
+function face(theta) { if (renderer.xr.isPresenting) rig.rotation.y = theta; else { yaw = theta; pitch = -0.2; } }
+function enterMacro() {
+  if (!miniDone) { makeMini(); miniDone = true; }
+  inMacro = true; WORLD7.visible = false; MACRO.visible = true; scene.background = AIRCOL; scene.fog = macroFog;
+  rig.position.set(PORTAL.x, 0, PORTAL.z + 2.4); vy = 0; face(0); hudT = 0; }     // just south of the patch, looking at it
+function leaveMacro(walkedBack) {
+  if (!inMacro) return;
+  inMacro = false; WORLD7.visible = true; MACRO.visible = false; scene.background = WATERCOL; scene.fog = museumFog; hudT = 0;
+  if (walkedBack) { rig.position.set(PORTAL.x - 1.8, 0, PORTAL.z); vy = 0; face(Math.PI / 2); } }   // out of the portal, facing the plaza
+function checkPortals() {
+  const at = (p) => Math.hypot(rig.position.x - p.x, rig.position.z - p.z) < 0.55 && rig.position.y < 2.5;
+  if (!inMacro && at(PORTAL)) enterMacro(); else if (inMacro && at(BACK)) leaveMacro(true); }
+if (Q.has("macro")) setTimeout(enterMacro, 1500);      // ?macro in the address starts you through the portal
+function readoutMacro(v) {
+  const h = Math.max(0, rig.position.y + camera.position.y);
+  hud.innerHTML = `<b>×10,000</b> &nbsp;·&nbsp; you are 1.7 m here = <b>170 µm</b> real &nbsp;<span class="dim">(you grew 1,000 times)</span><br>
+    ${flying ? "jetpack" : "walking"} <span class="k">F</span> &nbsp;·&nbsp; speed ${fmt(v)}/s here = <b>${fmtReal(v / K4)}/s</b> real size
+    <span class="k">− =</span> or scroll<br>
+    height above the slide: ${fmt(h)} = ${fmtReal(h / K4)}<br>
+    the museum you came from: the <b>2.4 m</b> patch on the glass (really 240 µm)<br>
+    <span class="dim">the slide here is 750 × 250 m of glass, 10 m thick · the blue portal beside the patch takes you back</span>`;
+}
 const camW = new THREE.Vector3();
 // ---------- the loop -----------------------------------------------------------------
 const clock = new THREE.Clock(), fwd = new THREE.Vector3(), side = new THREE.Vector3(), upV = new THREE.Vector3(0, 1, 0);
@@ -2514,6 +2636,7 @@ renderer.setAnimationLoop(() => {
   if (!flying) { vy -= 9.8 * dt; rig.position.y += vy * dt; if (rig.position.y < gh) { rig.position.y = gh; vy = 0;
     if (keys.Space) vy = 3.5; } } else vy = 0;
   rig.position.y = Math.max(gh, rig.position.y);
+  checkPortals();
 
   // water: Brownian steps, rms sqrt(2 D tau dt) per axis, scaled by S
   const sw = Math.sqrt(2 * REAL.dWater * T * dt) * S;
