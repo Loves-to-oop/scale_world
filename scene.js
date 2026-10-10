@@ -2518,7 +2518,7 @@ portalGate(WORLD7, PORTAL, -Math.PI / 2, 0xc9a227, ["PORTAL: GROW 1,000 TIMES", 
   const b = new THREE.Mesh(new THREE.BoxGeometry(FL, SLAB.T, SLAB.W, 40, 1, 50), [edge, edge, frost, frost, edge, edge]);
   b.position.set(SLAB.cx + clearL / 2, -SLAB.T / 2, SLAB.cz); MACRO.add(b);
   const bench = new THREE.Mesh(new THREE.PlaneGeometry(20000, 20000, 100, 100).rotateX(-Math.PI / 2), M(0x2e3338, { roughness: 0.6 }));
-  bench.position.y = -SLAB.T - 0.05; MACRO.add(bench); }
+  bench.position.y = -1100; MACRO.add(bench); }   // the lab bench, ~110 mm under the stage
 // the shrunken museum: a picture from straight above, scaled 1/1000 about the portal
 const MINI = { cx: 0, cz: -500, W: 2400 };              // museum metres pictured: x -1200..1200, z -1700..700
 const miniMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
@@ -3809,6 +3809,68 @@ const seeThru = (col, op = 0.4) => new THREE.MeshStandardMaterial({ color: col, 
     "the bands along its back are somites: blocks that become muscle and backbone",
     "the red dot is its heart, which starts beating at about a day (shown at ~2 beats a second)",
     "it hatches at 2–3 days and swims by day 5"]); }
+
+// ---------- the microscope itself, only in this world: the slide lies on its stage, the 40× objective hangs
+// over the museum at its working distance (0.6 mm → 6 m), and a hand points at the specimen ----------
+const PATCH = V3(PORTAL.x + (MINI.cx - PORTAL.x) / 1000, 0, PORTAL.z + (MINI.cz - PORTAL.z) / 1000);
+{ const steel = M(0x1c1f22, { roughness: 0.45, metalness: 0.4 }), chrome = M(0xc4c8cc, { metalness: 0.35, roughness: 0.32, emissive: 0x4a4e54 });   // satin: fully metallic looks black with nothing to reflect
+  // the stage: a black plate ~10 mm thick (100 m) with a 20 mm (200 m) opening under the specimen
+  const sh = new THREE.Shape(); sh.moveTo(-800, -600); sh.lineTo(800, -600); sh.lineTo(800, 600); sh.lineTo(-800, 600); sh.closePath();
+  const hole = new THREE.Path(); hole.absarc(PATCH.x - SLAB.cx, -(PATCH.z - SLAB.cz), 100, 0, Math.PI * 2, true); sh.holes.push(hole);
+  const stage = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 100, bevelEnabled: false, curveSegments: 48 }).rotateX(-Math.PI / 2), steel);
+  stage.position.set(SLAB.cx, -SLAB.T - 0.05 - 100, SLAB.cz); MACRO.add(stage);
+  // the condenser's front lens glowing in the opening, and the light it sends up through the specimen
+  const cond = new THREE.Mesh(new THREE.CylinderGeometry(90, 90, 20, 48), M(0xfffbe8, { emissive: 0xfff2c0, emissiveIntensity: 1.2 }));
+  cond.position.set(PATCH.x, -SLAB.T - 60, PATCH.z); MACRO.add(cond);
+  const glowTex = canvasTex(256, 256, (g, w) => { const gr = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); gr.addColorStop(0, "rgba(255,248,220,.35)"); gr.addColorStop(0.5, "rgba(255,244,210,.12)"); gr.addColorStop(1, "rgba(255,244,210,0)"); g.fillStyle = gr; g.fillRect(0, 0, w, w); });
+  const glow = new THREE.Mesh(new THREE.CircleGeometry(28, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+  glow.position.set(PATCH.x, 0.012, PATCH.z); MACRO.add(glow);
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(24, 40, 6, 48, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff6d8, transparent: true, opacity: 0.07, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  beam.position.set(PATCH.x, 3, PATCH.z); MACRO.add(beam);
+  // two spring clips pressing the slide's ends down
+  for (const sd of [-1, 1]) { const x0 = SLAB.cx + sd * 290, x1 = SLAB.cx + sd * 500;
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(x1 - x0), 3, 80), chrome); strip.position.set((x0 + x1) / 2, 1.5, SLAB.cz); MACRO.add(strip);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(22, 22, 14, 24), steel); post.position.set(SLAB.cx + sd * 470, -3.5, SLAB.cz); MACRO.add(post); }
+  // the objective: front lens 6 m above the slide, nose widening to a 200 m barrel 450 m long, colour-coded light blue (40×)
+  const obj = new THREE.Group(); obj.position.set(PATCH.x, 6, PATCH.z); MACRO.add(obj);
+  const LA = Math.asin(16.6 / 40);                      // the front lens: a shallow glass cap 33 m across, nearly flush
+  const lens = new THREE.Mesh(new THREE.SphereGeometry(40, 48, 8, 0, Math.PI * 2, Math.PI - LA, LA), new THREE.MeshStandardMaterial({ color: 0xbfe0ff, metalness: 0.2, roughness: 0.03, emissive: 0x3a5878 }));
+  lens.position.y = 40.3; obj.add(lens);
+  const ring0 = new THREE.Mesh(new THREE.CylinderGeometry(24, 24, 4, 48, 1, true), chrome); ring0.position.y = 2; obj.add(ring0);
+  const nose = new THREE.Mesh(new THREE.CylinderGeometry(100, 24, 150, 64, 1, true), chrome); nose.position.y = 75; obj.add(nose);
+  const cap = new THREE.Mesh(new THREE.RingGeometry(16.6, 24, 48).rotateX(Math.PI / 2), M(0x202326, { roughness: 0.3 })); cap.position.y = 3.9; obj.add(cap);   // the dark mount round the lens
+  const engr = canvasTex(2048, 256, (g, w, h) => { g.fillStyle = "#d4d8dc"; g.fillRect(0, 0, w, h); g.fillStyle = "#1a1a1a"; g.font = "700 120px Helvetica"; g.textAlign = "center";
+    for (let k = 0; k < 2; k++) g.fillText("40× / 0.65    160 / 0.17", w * (0.25 + 0.5 * k), 170); });
+  engr.wrapS = THREE.RepeatWrapping;
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(100, 100, 300, 64, 1, true), new THREE.MeshStandardMaterial({ map: engr, metalness: 0.7, roughness: 0.3 })); barrel.position.y = 300; obj.add(barrel);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(101, 101, 18, 64, 1, true), M(0x5dade2, { roughness: 0.4 })); band.position.y = 170; obj.add(band);
+  const knurl = new THREE.Mesh(new THREE.CylinderGeometry(104, 104, 40, 96, 1, true), M(0x2a2d30, { roughness: 0.6 })); knurl.position.y = 470; obj.add(knurl);
+  // the revolving nosepiece above, with the other objectives tilted away (4× red, 10× yellow, 100× white)
+  const turret = new THREE.Mesh(new THREE.SphereGeometry(420, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), steel); turret.position.y = 560; turret.scale.y = 0.45; obj.add(turret);
+  for (const [a, col, L] of [[1.2, 0xc0392b, 300], [2.6, 0xf1c40f, 380], [4.3, 0xf5f5f5, 470]]) {
+    const o = new THREE.Group(); o.position.set(260 * Math.cos(a), 560, 260 * Math.sin(a)); o.rotation.set(Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5); obj.add(o);
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(100, 70, L, 48), chrome); b.position.y = -L / 2; o.add(b);
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(101, 101, 16, 48, 1, true), M(col)); c.position.y = -L * 0.4; o.add(c); }
+  MACRO_EX.push({ name: "the microscope's 40× objective lens", real: 0.6e-3, pos: V3(PATCH.x, 6, PATCH.z) });
+}
+// a human finger pointing at the museum: 16 mm wide → 160 m, with fingerprint ridges 0.5 mm → 5 m apart
+{ const R = 80, L = 900, T = V3(PATCH.x - 150, 110, PATCH.z + 130), d = T.clone().sub(V3(PATCH.x, 0, PATCH.z)).normalize();
+  const Z = V3(0, 1, 0).addScaledVector(d, -d.y).normalize(), X = new THREE.Vector3().crossVectors(d, Z);
+  const fg = new THREE.Group(); fg.position.copy(T); fg.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, d, Z)); MACRO.add(fg);
+  const ridges = canvasTex(256, 256, (g, w) => { g.fillStyle = "#e4b296"; g.fillRect(0, 0, w, w); g.strokeStyle = "rgba(150,90,65,.6)"; g.lineWidth = 9;
+    for (let k = 0; k < 8; k++) { g.beginPath(); for (let x = 0; x <= w; x += 8) g.lineTo(x, k * 32 + 16 + 5 * Math.sin(x * 0.05 + k)); g.stroke(); } }, [6, L / 40]);
+  const skin = new THREE.MeshStandardMaterial({ map: ridges, roughness: 0.65 });
+  const finger = new THREE.Mesh(new THREE.CapsuleGeometry(R, L, 16, 48).translate(0, L / 2, 0), skin); fg.add(finger);
+  for (const y of [330, 600]) { const crease = new THREE.Mesh(new THREE.TorusGeometry(R * 1.005, 3, 6, 64).rotateX(Math.PI / 2), M(0xb8826a)); crease.position.y = y; fg.add(crease); }
+  const nail = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 20), new THREE.MeshStandardMaterial({ color: 0xf4d8cc, roughness: 0.2, metalness: 0.05 }));
+  nail.scale.set(R * 0.72, 120, 14); nail.position.set(0, 80, R * 0.9); nail.rotation.x = -0.12; fg.add(nail);
+  const hand = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 24), M(0xe0ae92, { roughness: 0.65 })); hand.scale.set(420, 520, 220); hand.position.set(0, L + 380, -60); fg.add(hand);
+  MACRO_EX.push({ name: "a human finger", real: 16e-3, pos: T });
+}
+macroSign(["LOOK UP: you are on a microscope slide", "6 m above you hangs the 40× objective lens: its working distance, 0.6 mm real",
+  "its barrel is 200 m wide and 450 m long here; the other objectives wait on the turret above",
+  "the slide lies on the stage (100 m thick here), held by two clips; light from the condenser shines up through it",
+  "and someone is pointing at the museum: a fingertip 160 m wide, its ridges 5 m apart"], 4.5, 1.6, WEST, 2.2, 1.8);
 function makeMini() {                                   // photograph the museum from above, once
   const N = IS_HEADSET ? 2048 : 4096, rt = new THREE.WebGLRenderTarget(N, N, { samples: 4 });
   rt.texture.colorSpace = THREE.SRGBColorSpace; rt.texture.generateMipmaps = true;
