@@ -85,3 +85,70 @@ out.write_text(PAGE.replace("__THREE__", three)
                    .replace("__SCENE__", (HERE / "scene.js").read_text(encoding="utf-8")),
                encoding="utf-8")
 print(f"  wrote {out.name}, {out.stat().st_size // 1024} KB")
+
+# ---- the second page: the solar system with the Earth as a 12-inch globe -------------------------
+import base64
+img = lambda f: "data:image/jpeg;base64," + base64.b64encode((HERE / "textures" / f).read_bytes()).decode()
+SOLAR = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The solar system on a desk</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#9ec9ec;
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+  #intro{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(10,30,45,.55);transition:opacity .6s;z-index:3}
+  #intro.gone{opacity:0;pointer-events:none}
+  .card{max-width:640px;background:rgba(245,250,252,.97);color:#16303d;border-radius:14px;
+    padding:24px 28px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  h1{margin:0 0 6px;font:600 28px "Iowan Old Style",Palatino,Georgia,serif}
+  table{border-collapse:collapse;margin:10px 0;font-size:14px}
+  td{padding:2px 14px 2px 0} td:nth-child(2),td:nth-child(3){text-align:right}
+  kbd{background:#e2edf2;border:1px solid #b9cfd9;border-radius:4px;padding:0 6px;font-size:13px}
+  .dim{color:#5a7280;font-size:13px}
+  #hud{position:fixed;left:14px;top:12px;z-index:2;background:rgba(10,30,45,.72);color:#e6f3f9;
+    padding:10px 14px;border-radius:10px;font-size:13.5px;line-height:1.55;max-width:620px}
+  #hud .k{background:rgba(255,255,255,.15);border-radius:4px;padding:0 5px;font-size:12px}
+  #hud .dim{color:#a9c6d4;font-size:12.5px}
+  #guide{position:fixed;right:14px;top:12px;z-index:2;background:rgba(10,30,45,.72);color:#e6f3f9;
+    padding:10px 12px;border-radius:10px;font-size:13px;display:flex;flex-direction:column;gap:3px;min-width:190px}
+  #guide .row{display:flex;justify-content:space-between;gap:6px}
+  #guide button{all:unset;cursor:pointer;padding:3px 6px;border-radius:6px;display:flex;align-items:center;gap:8px}
+  #guide button:hover{background:rgba(255,255,255,.15)}
+  #guide button.drive{font-size:12px;color:#ffe9a8}
+  #guide i{width:10px;height:10px;border-radius:50%;display:inline-block}
+  #vr{display:none;position:fixed;right:18px;bottom:18px;z-index:3;padding:12px 20px;
+    font:600 15px -apple-system,sans-serif;border:0;border-radius:10px;background:#1d4e66;color:#fff;cursor:pointer}
+</style></head><body>
+<div id="intro"><div class="card">
+  <h1>The solar system on a desk</h1>
+  <p>The Earth is a 12-inch desk globe. Everything else is at its real size and real distance for that
+  scale, 1 : 41.8 million, and where it really is in its orbit today.</p>
+  <table>
+    <tr><td>the Moon</td><td>8.3 cm</td><td>9.2 m away</td></tr>
+    <tr><td>the Space Station</td><td></td><td>1 cm above the globe</td></tr>
+    <tr><td>the Sun</td><td>33 m</td><td>3.6 km away</td></tr>
+    <tr><td>Mars</td><td>16 cm</td><td>1&ndash;9 km</td></tr>
+    <tr><td>Jupiter</td><td>3.3 m</td><td>~20 km</td></tr>
+    <tr><td>Neptune</td><td>1.2 m</td><td>~105 km</td></tr>
+    <tr><td>the speed of light</td><td></td><td><b>7.2 m/s</b></td></tr>
+  </table>
+  <p>The ground is the plane of the Earth's orbit. Next to the desk an interstate has an exit for
+  every planet; each road climbs or dips by how far that planet is above or below the plane today.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;·&nbsp; drag to look &nbsp;·&nbsp; scroll: speed &nbsp;·&nbsp;
+  <kbd>F</kbd> jetpack &nbsp;·&nbsp; <kbd>1</kbd>&ndash;<kbd>9</kbd> drive to the Sun or a planet &nbsp;·&nbsp; in the car <kbd>W</kbd>/<kbd>S</kbd> faster / slower, <kbd>E</kbd> out</p>
+  <p class="dim">click anywhere, or press any key, to begin</p>
+</div></div>
+<div id="hud"></div>
+<div id="guide"></div>
+<button id="vr">Enter VR</button>
+<script type="module">
+__THREE__
+const EARTH_JPG = "__EARTH__", MOON_JPG = "__MOON__";
+__SCENE__
+</script></body></html>
+"""
+out2 = HERE / "solar_system.html"
+out2.write_text(SOLAR.replace("__THREE__", three).replace("__EARTH__", img("earth.jpg")).replace("__MOON__", img("moon.jpg"))
+                     .replace("__SCENE__", (HERE / "solar.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out2.name}, {out2.stat().st_size // 1024} KB")
