@@ -53225,32 +53225,52 @@ function sweep(h0, H) { const l = wrap(H - h0); return l <= Math.PI ? [1, l] : [
 BODIES.slice().sort((p, q) => Math.abs(p.x0) - Math.abs(q.x0)).forEach((b, k) => b.exit = k + 1);
 
 // ---------- the ground: flat, except that each road climbs or dips to its body's height ----------
-const RX = Math.max(...BODIES.map(b => Math.hypot(b.w.x, b.w.z))) + 20000, NG = IS_HEADSET ? 256 : 512, CELL = 2 * RX / NG;
-const HG = new Float32Array((NG + 1) * (NG + 1));
-{ const segs = BODIES.map(b => ({ ax: b.E.x, az: b.E.z, bx: b.w.x, bz: b.w.z, h: b.h, s2: b.sigma * b.sigma }));
-  for (let iz = 0; iz <= NG; iz++) for (let ix = 0; ix <= NG; ix++) { const x = ix * CELL - RX, z = iz * CELL - RX; let sw = 0, sh = 0;
-    for (const s of segs) { const dx = s.bx - s.ax, dz = s.bz - s.az, L2 = dx * dx + dz * dz, t = Math.max(0, Math.min(1, ((x - s.ax) * dx + (z - s.az) * dz) / L2));
-      const ex = s.ax + t * dx - x, ez = s.az + t * dz - z, w = Math.exp(-(ex * ex + ez * ez) / s.s2); sw += w; sh += w * s.h * t; }
-    const r = Math.hypot(x, z - 30), flat = THREE.MathUtils.smoothstep(r, 250, 700);   // the desk, car park and interchange stay level
-    HG[iz * (NG + 1) + ix] = flat * sh / Math.max(1, sw); } }
-function terrainH(x, z) {                              // exactly the ground's triangles
-  const fx = THREE.MathUtils.clamp((x + RX) / CELL, 0, NG - 1e-6), fz = THREE.MathUtils.clamp((z + RX) / CELL, 0, NG - 1e-6);
-  const ix = Math.floor(fx), iz = Math.floor(fz), u = fx - ix, v = fz - iz, n = NG + 1;
-  const a = HG[iz * n + ix], b = HG[(iz + 1) * n + ix], c = HG[(iz + 1) * n + ix + 1], d = HG[iz * n + ix + 1];
-  return u + v <= 1 ? a + u * (d - a) + v * (b - a) : c + (1 - u) * (b - c) + (1 - v) * (d - c);
-}
-{ const geo = new THREE.PlaneGeometry(2 * RX, 2 * RX, NG, NG).rotateX(-Math.PI / 2), p = geo.attributes.position, col = new Float32Array(p.count * 3), c = new THREE.Color();
-  for (let i = 0; i < p.count; i++) { const h = HG[i]; p.setY(i, h);
-    const x = p.getX(i), z = p.getZ(i), n = 0.5 + 0.25 * Math.sin(x * 0.00031 + Math.sin(z * 0.00017) * 3) + 0.25 * Math.sin(z * 0.00043 + x * 0.0001);
-    c.setHSL(0.25 + 0.04 * n, 0.42, 0.33 + 0.08 * n);
-    if (h > 900) c.lerp(new THREE.Color(0x8a8478), Math.min(1, (h - 900) / 900)); if (h > 2600) c.lerp(new THREE.Color(0xf4f6f8), Math.min(1, (h - 2600) / 600));
-    if (h < -300) c.lerp(new THREE.Color(0x5a7a48), Math.min(1, -h / 2000));
-    col.set([c.r, c.g, c.b], i * 3); }
-  geo.setAttribute("color", new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals();
-  const gc = document.createElement("canvas"); gc.width = gc.height = 256; const g = gc.getContext("2d"); g.fillStyle = "#c8c8c8"; g.fillRect(0, 0, 256, 256);
+// Two grids: a fine one (40 m) over the inner 16 km, where the Sun, Mercury, Venus and Mars are, and a coarse
+// one beyond. After the smooth road-following shape is laid down, each grid is pulled to every body's true
+// height at the body itself, so the ground really reaches it.
+const SEGS = BODIES.map(b => ({ ax: b.E.x, az: b.E.z, bx: b.w.x, bz: b.w.z, h: b.h, s2: b.sigma * b.sigma }));
+const flatAt = (x, z) => THREE.MathUtils.smoothstep(Math.hypot(x, z - 30), 250, 700);   // the desk, car park and interchange stay level
+function baseH(x, z) { let sw = 0, sh = 0;
+  for (const s of SEGS) { const dx = s.bx - s.ax, dz = s.bz - s.az, L2 = dx * dx + dz * dz, t = Math.max(0, Math.min(1, ((x - s.ax) * dx + (z - s.az) * dz) / L2));
+    const ex = s.ax + t * dx - x, ez = s.az + t * dz - z, w = Math.exp(-(ex * ex + ez * ez) / s.s2); sw += w; sh += w * s.h * t; }
+  return flatAt(x, z) * sh / Math.max(1, sw); }
+function mkGrid(half, N) { const cell = 2 * half / N, H = new Float32Array((N + 1) * (N + 1));
+  for (let iz = 0; iz <= N; iz++) for (let ix = 0; ix <= N; ix++) H[iz * (N + 1) + ix] = baseH(ix * cell - half, iz * cell - half);
+  return { half, N, cell, H }; }
+function gridH(G, x, z) {                              // exactly the grid's triangles (as PlaneGeometry splits them)
+  const fx = THREE.MathUtils.clamp((x + G.half) / G.cell, 0, G.N - 1e-6), fz = THREE.MathUtils.clamp((z + G.half) / G.cell, 0, G.N - 1e-6);
+  const ix = Math.floor(fx), iz = Math.floor(fz), u = fx - ix, v = fz - iz, n = G.N + 1, H = G.H;
+  const a = H[iz * n + ix], b = H[(iz + 1) * n + ix], c = H[(iz + 1) * n + ix + 1], d = H[iz * n + ix + 1];
+  return u + v <= 1 ? a + u * (d - a) + v * (b - a) : c + (1 - u) * (b - c) + (1 - v) * (d - c); }
+function pullTo(G, list, sOf) {                        // bend the ground so it meets each body at its true height
+  const n = G.N + 1;
+  for (let pass = 0; pass < 5; pass++) for (const b of list) {
+    const target = b.id === "sun" ? 0 : b.h, d = target - gridH(G, b.w.x, b.w.z); if (Math.abs(d) < 0.02) continue;
+    const s = sOf(b), r = Math.ceil(3 * s / G.cell), cx = Math.round((b.w.x + G.half) / G.cell), cz = Math.round((b.w.z + G.half) / G.cell);
+    for (let iz = Math.max(0, cz - r); iz <= Math.min(G.N, cz + r); iz++) for (let ix = Math.max(0, cx - r); ix <= Math.min(G.N, cx + r); ix++) {
+      const x = ix * G.cell - G.half, z = iz * G.cell - G.half, e = ((x - b.w.x) ** 2 + (z - b.w.z) ** 2) / (s * s);
+      G.H[iz * n + ix] += d * Math.exp(-e) * flatAt(x, z); } } }
+const RX = Math.max(...BODIES.map(b => Math.hypot(b.w.x, b.w.z))) + 20000;
+const INNER = mkGrid(8000, IS_HEADSET ? 200 : 400), OUTER = mkGrid(RX, IS_HEADSET ? 256 : 512);
+const inInner = (x, z) => Math.abs(x) < INNER.half && Math.abs(z) < INNER.half;
+pullTo(INNER, BODIES.filter(b => Math.abs(b.w.x) < INNER.half - 1500 && Math.abs(b.w.z) < INNER.half - 1500), b => b.id === "sun" ? 120 : 260);
+pullTo(OUTER, BODIES.filter(b => !inInner(b.w.x, b.w.z)), () => Math.max(1600, 2.5 * OUTER.cell));
+function terrainH(x, z) { return gridH(inInner(x, z) ? INNER : OUTER, x, z); }
+{ const gc = document.createElement("canvas"); gc.width = gc.height = 256; const g = gc.getContext("2d"); g.fillStyle = "#c8c8c8"; g.fillRect(0, 0, 256, 256);
   for (let k = 0; k < 5000; k++) { const v = 150 + rnd() * 105 | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(rnd() * 256, rnd() * 256, 1.5, 3); }
-  const gt = new THREE.CanvasTexture(gc); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(2 * RX / 6, 2 * RX / 6); gt.anisotropy = 8;
-  scene.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, map: gt, roughness: 0.95 }))); }
+  const mesh = (G, sinkInner) => {
+    const geo = new THREE.PlaneGeometry(2 * G.half, 2 * G.half, G.N, G.N).rotateX(-Math.PI / 2), p = geo.attributes.position, col = new Float32Array(p.count * 3), c = new THREE.Color();
+    for (let i = 0; i < p.count; i++) { const h = G.H[i], x = p.getX(i), z = p.getZ(i);
+      p.setY(i, sinkInner && Math.abs(x) < INNER.half - 1 && Math.abs(z) < INNER.half - 1 ? h - 2 : h);   // the coarse grid tucks under the fine one
+      const n = 0.5 + 0.25 * Math.sin(x * 0.00031 + Math.sin(z * 0.00017) * 3) + 0.25 * Math.sin(z * 0.00043 + x * 0.0001);
+      c.setHSL(0.25 + 0.04 * n, 0.42, 0.33 + 0.08 * n);
+      if (h > 900) c.lerp(new THREE.Color(0x8a8478), Math.min(1, (h - 900) / 900)); if (h > 2600) c.lerp(new THREE.Color(0xf4f6f8), Math.min(1, (h - 2600) / 600));
+      if (h < -300) c.lerp(new THREE.Color(0x5a7a48), Math.min(1, -h / 2000));
+      col.set([c.r, c.g, c.b], i * 3); }
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals();
+    const gt = new THREE.CanvasTexture(gc); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(2 * G.half / 6, 2 * G.half / 6); gt.anisotropy = 8;
+    scene.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, map: gt, roughness: 0.95 }))); };
+  mesh(OUTER, true); mesh(INNER, false); }
 
 // a paved ribbon along xz points, laid on the ground
 function ribbon(pts, width, mat, lift = 0.12, uvLen = 12) {
@@ -53365,11 +53385,15 @@ const TEX = {
 const sunLight = new THREE.PointLight(0xfff4e0, 3.2, 0, 0);
 for (const b of BODIES) {
   const B = V3(b.w.x, 0, b.w.z), gh = terrainH(B.x, B.z);
-  const pad = new THREE.Mesh(new THREE.CircleGeometry(b.r + 10, 48).rotateX(-Math.PI / 2), M(0xb8b0a0, { roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
-  pad.position.set(B.x, gh + 0.08, B.z); scene.add(pad);
+  const padG = new THREE.CircleGeometry(b.r + 10, 48, 0, Math.PI * 2).rotateX(-Math.PI / 2), pp = padG.attributes.position;   // paving that follows the ground
+  for (let i = 0; i < pp.count; i++) pp.setY(i, terrainH(B.x + pp.getX(i), B.z + pp.getZ(i)) + 0.08);
+  padG.computeVertexNormals(); const pad = new THREE.Mesh(padG, M(0xb8b0a0, { roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+  pad.position.set(B.x, 0, B.z); scene.add(pad);
+  if (b.r < 0.5) { const ring = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.06, 8, 48).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: b.beacon, toneMapped: false }));
+    ring.position.set(B.x, gh + 0.15, B.z); scene.add(ring); }   // small planets are marbles: a bright ring round the foot of the column
   let cy;
   if (b.id === "sun") cy = gh + b.r + 0.6;                       // raised out of the ground (its centre is really at globe height)
-  else if (b.r < Y0 - 0.15) cy = Y0 + b.h;                       // small planets: on a column, at their true height
+  else if (b.r < Y0 - 0.15) cy = Math.max(Y0 + b.h, gh + b.r + 0.05);   // small planets: on a column, at their true height (never underground)
   else cy = Math.max(Y0 + b.h, gh + b.r + 0.4);
   b.c = V3(B.x, cy, B.z);
   const mat = b.id === "sun"
