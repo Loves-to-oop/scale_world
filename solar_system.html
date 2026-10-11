@@ -53561,7 +53561,7 @@ function readout(v) {
   hud.innerHTML = `<b>1 : ${(1 / K / 1e6).toFixed(1)} million</b> &nbsp;·&nbsp; the Earth is a 12-inch globe &nbsp;·&nbsp; positions for ${NOW.toDateString()}<br>
     ${inCar ? "driving" : flying ? "jetpack" : "walking"} ${inCar ? "" : `<span class="k">F</span>`} &nbsp;·&nbsp; ${v.toFixed(v < 10 ? 1 : 0)} m/s here = ${(v / C_HERE).toFixed(2)} × light speed here (${C_HERE.toFixed(1)} m/s)<br>
     from the globe: ${fmtM(d)} = ${fmtKm(d / K / 1000)} real &nbsp;·&nbsp; nearest: <b>${near.name}</b><br>
-    <span class="dim">${inCar ? "W / S faster / slower · space stop · 1–9 pick a destination · E get out" : "WASD walk · drag to look · scroll or − = speed · F jetpack (space / C) · E at the car to get in · 1–9 drive to a planet"}</span>`;
+    <span class="dim">${inCar ? "W / S faster / slower · space stop · 1–9 pick a destination · E get out" : "WASD walk · drag to look · scroll or − = speed · F jetpack (space / C) · E at the car to get in · 1–9 drive to a planet · H markers"}</span>`;
 }
 
 // ---------- VR ----------
@@ -53574,9 +53574,48 @@ const stick = a => { if (!a) return [0, 0]; const p = a.length >= 4 && Math.abs(
   const x = a[p] || 0, y = a[p + 1] || 0; return [Math.abs(x) > 0.12 ? x : 0, Math.abs(y) > 0.12 ? y : 0]; };
 let vrTurn = 0;
 
+// ---------- markers: where everything is, at all times (H turns them off) ----------
+// Desktop: labels over each object; anything off screen or behind you gets an arrow on the screen edge.
+// VR: a floating label 30 m away in the direction of each object, drawn over everything.
+const TARGETS = [{ name: "the globe (Earth)", col: "#3d7cc9", pos: () => GC }, { name: "the Moon", col: "#d8d8d8", pos: () => MC },
+  ...BODIES.map(b => ({ name: b.name, col: b.col, pos: () => b.c })), { name: "the car", col: "#e74c3c", pos: () => car.position }];
+let markersOn = true;
+addEventListener("keydown", e => { if (e.code === "KeyH") { markersOn = !markersOn; markLayer.style.display = markersOn ? "block" : "none"; } });
+const markLayer = document.createElement("div"); markLayer.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:1;font:600 12.5px -apple-system,Helvetica,sans-serif";
+document.body.appendChild(markLayer);
+for (const t of TARGETS) { t.el = document.createElement("div"); t.el.style.cssText = "position:absolute;transform:translate(-50%,-50%);white-space:nowrap;color:#fff;text-shadow:0 1px 3px #000,0 0 6px #000;text-align:center";
+  t.el.innerHTML = `<span class="arr" style="display:inline-block;color:${t.col};font-size:18px">●</span><br><span class="lab"></span>`; markLayer.appendChild(t.el);
+  t.arr = t.el.querySelector(".arr"); t.lab = t.el.querySelector(".lab");
+  const c = document.createElement("canvas"); c.width = 512; c.height = 96; t.ctx = c.getContext("2d"); t.tex = new THREE.CanvasTexture(c); t.tex.colorSpace = THREE.SRGBColorSpace;
+  t.spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: t.tex, depthTest: false, depthWrite: false, transparent: true, toneMapped: false })); t.spr.renderOrder = 999; t.spr.visible = false; scene.add(t.spr); }
+const camP = V3(0, 0, 0), tmpV = V3(0, 0, 0);
+function updateMarkers(vr) {
+  camera.getWorldPosition(camP); const placed = [];
+  for (const t of TARGETS) {
+    const wp = t.pos(), d = camP.distanceTo(wp), txt = `${t.name} · ${fmtM(d)} (${fmtKm(d / K / 1000)})`;
+    if (vr) { t.el.style.display = "none"; t.spr.visible = markersOn && d > 3;
+      if (t.spr.visible) { tmpV.copy(wp).sub(camP).normalize(); t.spr.position.copy(camP).addScaledVector(tmpV, 30); t.spr.scale.set(8, 1.5, 1);
+        if (t.txt !== txt) { t.txt = txt; const g = t.ctx; g.clearRect(0, 0, 512, 96); g.fillStyle = "rgba(10,30,45,.75)"; g.fillRect(0, 18, 512, 60);
+          g.fillStyle = t.col; g.beginPath(); g.arc(34, 48, 14, 0, 6.283); g.fill(); g.fillStyle = "#fff"; g.font = "600 30px -apple-system, Helvetica, sans-serif"; g.fillText(txt, 60, 59); t.tex.needsUpdate = true; } }
+      continue; }
+    t.spr.visible = false; if (!markersOn || d < 2) { t.el.style.display = "none"; continue; } t.el.style.display = "block";
+    tmpV.copy(wp).project(camera); let x = tmpV.x, y = tmpV.y; const behind = tmpV.z > 1; if (behind) { x = -x; y = -y; }
+    const off = behind || Math.abs(x) > 0.95 || Math.abs(y) > 0.92;
+    if (off) { const m = Math.max(Math.abs(x) / 0.93, Math.abs(y) / 0.88, 1e-6); x /= m; y /= m;
+      if (behind && Math.abs(x) < 0.93 && Math.abs(y) < 0.88) { y = -0.88; }                     // straight behind you: show it at the bottom
+      t.arr.textContent = "➤"; t.arr.style.transform = `rotate(${Math.atan2(-y, x)}rad)`; }
+    else { t.arr.textContent = "●"; t.arr.style.transform = ""; }
+    let px = (x + 1) / 2 * innerWidth, py = (1 - y) / 2 * innerHeight;
+    if (off) for (let k = 0; k < 12; k++) { const hit = placed.find(([qx, qy]) => Math.abs(qx - px) < 170 && Math.abs(qy - py) < 34); if (!hit) break; py += py > innerHeight - 60 ? -36 : 36; }   // nudge apart
+    placed.push([px, py]);
+    const ax = x > 0.6 ? "-100%" : x < -0.6 ? "0%" : "-50%";                                       // labels near an edge read inward
+    t.el.style.transform = `translate(${ax},-50%)`; t.el.style.textAlign = x > 0.6 ? "right" : x < -0.6 ? "left" : "center";
+    t.el.style.left = `${px}px`; t.el.style.top = `${py}px`;
+    if (t.txt !== txt) { t.txt = txt; t.lab.textContent = txt; } } }
+
 // ---------- the loop ----------
 const clock = new THREE.Clock(), fwd = V3(0, 0, 0), sideV = V3(0, 0, 0), UP = V3(0, 1, 0);
-let hudT = 0, waveT = -1e9, orientT = 0;
+let hudT = 0, waveT = -1e9, orientT = 0, dashTimer = 0;
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.15), t = clock.elapsedTime, vr = renderer.xr.isPresenting; let moved = 0;
   if (vr) { const s = renderer.xr.getSession(); let mx = 0, my = 0, boost = 1;
@@ -53605,13 +53644,14 @@ renderer.setAnimationLoop(() => {
     placeCar(); moved = carRoute && carS < carRoute.L ? v : 0;
     const seat = V3(-0.42, 0.7, 0.3).applyEuler(car.rotation).add(car.position); rig.position.copy(seat);
     if (vr) rig.rotation.set(0, car.rotation.y + vrTurn, 0); else { rig.rotation.set(0, car.rotation.y, 0); camera.position.y = 0.55; camera.rotation.set(pitch, yaw, 0, "YXZ"); }
-    if (((t * 4) | 0) !== ((((t - dt) * 4) | 0))) drawDash(v); }
+    dashTimer -= dt; if (dashTimer <= 0) { drawDash(v); dashTimer = 0.25; } }
   else if (!vr) rig.rotation.set(0, 0, 0);
   if (t - waveT > 60) { spawnWave(t); waveT = t; }
   for (let i = WAVES.length - 1; i >= 0; i--) { const w = WAVES[i], r = SUN.r + (t - w.t) * C_HERE; w.l.scale.setScalar(r);
     if (r > 6000) { scene.remove(w.l); w.l.material.dispose(); WAVES.splice(i, 1); } }
   orientT -= dt; if (orientT <= 0) { orientGlobe(); orientT = 10; }
   hudT -= dt; if (hudT <= 0 && !vr) { readout(moved); hudT = 0.25; }
+  updateMarkers(vr);
   renderer.render(scene, camera);
 });
 
