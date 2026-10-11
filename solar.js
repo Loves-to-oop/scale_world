@@ -483,8 +483,9 @@ let markersOn = true;
 addEventListener("keydown", e => { if (e.code === "KeyH") { markersOn = !markersOn; markLayer.style.display = markersOn ? "block" : "none"; } });
 const markLayer = document.createElement("div"); markLayer.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:1;font:600 12.5px -apple-system,Helvetica,sans-serif";
 document.body.appendChild(markLayer);
+{ const st = document.createElement("style"); st.textContent = "@keyframes mk{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}"; document.head.appendChild(st); }
 for (const t of TARGETS) { t.el = document.createElement("div"); t.el.style.cssText = "position:absolute;transform:translate(-50%,-50%);white-space:nowrap;color:#fff;text-shadow:0 1px 3px #000,0 0 6px #000;text-align:center";
-  t.el.innerHTML = `<span class="arr" style="display:inline-block;color:${t.col};font-size:18px">●</span><br><span class="lab"></span>`; markLayer.appendChild(t.el);
+  t.el.innerHTML = `<span class="arr"></span><br><span class="lab"></span>`; markLayer.appendChild(t.el);
   t.arr = t.el.querySelector(".arr"); t.lab = t.el.querySelector(".lab");
   const c = document.createElement("canvas"); c.width = 512; c.height = 96; t.ctx = c.getContext("2d"); t.tex = new THREE.CanvasTexture(c); t.tex.colorSpace = THREE.SRGBColorSpace;
   t.spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: t.tex, depthTest: false, depthWrite: false, transparent: true, toneMapped: false })); t.spr.renderOrder = 999; t.spr.visible = false; scene.add(t.spr); }
@@ -496,15 +497,18 @@ function updateMarkers(vr) {
     if (vr) { t.el.style.display = "none"; t.spr.visible = markersOn && d > 3;
       if (t.spr.visible) { tmpV.copy(wp).sub(camP).normalize(); t.spr.position.copy(camP).addScaledVector(tmpV, 30); t.spr.scale.set(8, 1.5, 1);
         if (t.txt !== txt) { t.txt = txt; const g = t.ctx; g.clearRect(0, 0, 512, 96); g.fillStyle = "rgba(10,30,45,.75)"; g.fillRect(0, 18, 512, 60);
-          g.fillStyle = t.col; g.beginPath(); g.arc(34, 48, 14, 0, 6.283); g.fill(); g.fillStyle = "#fff"; g.font = "600 30px -apple-system, Helvetica, sans-serif"; g.fillText(txt, 60, 59); t.tex.needsUpdate = true; } }
+          g.fillStyle = t.col; g.beginPath(); g.arc(36, 48, 20, 0, 6.283); g.fill(); g.strokeStyle = "#fff"; g.lineWidth = 6; g.stroke(); g.fillStyle = "#fff"; g.font = "600 30px -apple-system, Helvetica, sans-serif"; g.fillText(txt, 60, 59); t.tex.needsUpdate = true; } }
       continue; }
     t.spr.visible = false; if (!markersOn || d < 2) { t.el.style.display = "none"; continue; } t.el.style.display = "block";
     tmpV.copy(wp).project(camera); let x = tmpV.x, y = tmpV.y; const behind = tmpV.z > 1; if (behind) { x = -x; y = -y; }
     const off = behind || Math.abs(x) > 0.95 || Math.abs(y) > 0.92;
     if (off) { const m = Math.max(Math.abs(x) / 0.93, Math.abs(y) / 0.88, 1e-6); x /= m; y /= m;
       if (behind && Math.abs(x) < 0.93 && Math.abs(y) < 0.88) { y = -0.88; }                     // straight behind you: show it at the bottom
-      t.arr.textContent = "➤"; t.arr.style.transform = `rotate(${Math.atan2(-y, x)}rad)`; }
-    else { t.arr.textContent = "●"; t.arr.style.transform = ""; }
+      if (t.mode !== "arrow") { t.mode = "arrow"; t.arr.textContent = "➤"; t.arr.style.cssText = `display:inline-block;color:${t.col};font-size:30px;line-height:30px;filter:drop-shadow(0 0 3px #fff) drop-shadow(0 0 6px ${t.col})`; }
+      t.arr.style.transform = `rotate(${Math.atan2(-y, x)}rad)`; }
+    else if (t.mode !== "dot") { t.mode = "dot"; t.arr.textContent = "";                         // a glowing target ring with a bright centre
+      t.arr.style.cssText = `display:inline-block;width:14px;height:14px;border-radius:50%;background:${t.col};border:3px solid #fff;
+        box-shadow:0 0 0 2px #000,0 0 10px 4px ${t.col},0 0 18px 6px rgba(255,255,255,.55);animation:mk 1.6s ease-in-out infinite`; }
     let px = (x + 1) / 2 * innerWidth, py = (1 - y) / 2 * innerHeight;
     if (off) for (let k = 0; k < 12; k++) { const hit = placed.find(([qx, qy]) => Math.abs(qx - px) < 170 && Math.abs(qy - py) < 34); if (!hit) break; py += py > innerHeight - 60 ? -36 : 36; }   // nudge apart
     placed.push([px, py]);
