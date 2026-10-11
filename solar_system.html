@@ -53392,6 +53392,7 @@ const MOONS = {
   neptune: [["Proteus", 420, 117647, 0.5, "#7a7470"], ["Triton", 2707, 354759, 157, "#d8c8c0"]],
   pluto: [["Charon", 1212, 19591, 0.0, "#9a948e"]],
 };
+const MOON_LIST = [];                                    // for the markers
 const sunLight = new THREE.PointLight(0xfff4e0, 3.2, 0, 0);
 for (const b of BODIES) {
   const B = V3(b.w.x, 0, b.w.z), gh = terrainH(B.x, B.z);
@@ -53435,6 +53436,7 @@ for (const b of BODIES) {
         if (q.y - mr > terrainH(q.x, q.z) + 0.3 && Math.hypot(q.x - b.c.x, q.z - b.c.z) > b.r * 0.6) pos = q; }
       if (!pos) continue;
       const m = new THREE.Mesh(new THREE.SphereGeometry(mr, 32, 16), M(mc, { roughness: 0.85 })); m.position.copy(pos); scene.add(m);
+      MOON_LIST.push({ name: mn, col: mc, pos: () => pos, r: mr, planet: b, orbit: a, desc: `moon of ${b.name} · ${md.toLocaleString()} km → ${fmtM(2 * mr)} · ${fmtM(a)} from it` });
       const g0 = terrainH(pos.x, pos.z), rr = Math.min(0.006, Math.max(0.001, mr * 0.15));
       const rod = new THREE.Mesh(new THREE.CylinderGeometry(rr, rr * 1.5, pos.y - mr - g0, 6), glassRod); rod.position.set(pos.x, (pos.y - mr + g0) / 2, pos.z); scene.add(rod);
       const orbit = []; for (let k = 0; k <= 180; k++) { const th = k / 180 * Math.PI * 2; orbit.push(b.c.clone().addScaledVector(u, a * Math.cos(th)).addScaledVector(ax, a * Math.sin(th))); }
@@ -53577,29 +53579,35 @@ let vrTurn = 0;
 // ---------- markers: where everything is, at all times (H turns them off) ----------
 // Desktop: labels over each object; anything off screen or behind you gets an arrow on the screen edge.
 // VR: a floating label 30 m away in the direction of each object, drawn over everything.
-const TARGETS = [{ name: "the globe (Earth)", col: "#3d7cc9", pos: () => GC }, { name: "the Moon", col: "#d8d8d8", pos: () => MC },
-  ...BODIES.map(b => ({ name: b.name, col: b.col, pos: () => b.c })), { name: "the car", col: "#e74c3c", pos: () => car.position }];
+const TARGETS = [{ name: "the globe (Earth)", col: "#3d7cc9", pos: () => GC, r: RE, desc: "12,742 km → 30.5 cm (12 inches)" },
+  { name: "the Moon", col: "#d8d8d8", pos: () => MC, r: RM, desc: `3,475 km → ${fmtM(2 * RM)} · ${fmtM(MOON.w.length())} from the globe` },
+  ...BODIES.map(b => ({ name: b.name, col: b.col, pos: () => b.c, r: b.r, desc: `${b.dkm.toLocaleString()} km → ${fmtM(2 * b.r)} across` })),
+  ...MOON_LIST, { name: "the car", col: "#e74c3c", pos: () => car.position, r: 0.25, desc: "" }];
 let markersOn = true;
 addEventListener("keydown", e => { if (e.code === "KeyH") { markersOn = !markersOn; markLayer.style.display = markersOn ? "block" : "none"; } });
 const markLayer = document.createElement("div"); markLayer.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:1;font:600 12.5px -apple-system,Helvetica,sans-serif";
 document.body.appendChild(markLayer);
 { const st = document.createElement("style"); st.textContent = "@keyframes mk{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}"; document.head.appendChild(st); }
 for (const t of TARGETS) { t.el = document.createElement("div"); t.el.style.cssText = "position:absolute;transform:translate(-50%,-50%);white-space:nowrap;color:#fff;text-shadow:0 1px 3px #000,0 0 6px #000;text-align:center";
-  t.el.innerHTML = `<span class="arr"></span><br><span class="lab"></span>`; markLayer.appendChild(t.el);
+  t.el.innerHTML = `<span class="arr"></span><br><span class="lab"></span>${t.desc ? `<br><span style="font-weight:400;opacity:.85;font-size:11.5px">${t.desc}</span>` : ""}`; markLayer.appendChild(t.el);
   t.arr = t.el.querySelector(".arr"); t.lab = t.el.querySelector(".lab");
-  const c = document.createElement("canvas"); c.width = 512; c.height = 96; t.ctx = c.getContext("2d"); t.tex = new THREE.CanvasTexture(c); t.tex.colorSpace = THREE.SRGBColorSpace;
+  const c = document.createElement("canvas"); c.width = 640; c.height = 128; t.ctx = c.getContext("2d"); t.tex = new THREE.CanvasTexture(c); t.tex.colorSpace = THREE.SRGBColorSpace;
   t.spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: t.tex, depthTest: false, depthWrite: false, transparent: true, toneMapped: false })); t.spr.renderOrder = 999; t.spr.visible = false; scene.add(t.spr); }
 const camP = V3(0, 0, 0), tmpV = V3(0, 0, 0);
 function updateMarkers(vr) {
   camera.getWorldPosition(camP); const placed = [];
   for (const t of TARGETS) {
     const wp = t.pos(), d = camP.distanceTo(wp), txt = `${t.name} · ${fmtM(d)} (${fmtKm(d / K / 1000)})`;
-    if (vr) { t.el.style.display = "none"; t.spr.visible = markersOn && d > 3;
-      if (t.spr.visible) { tmpV.copy(wp).sub(camP).normalize(); t.spr.position.copy(camP).addScaledVector(tmpV, 30); t.spr.scale.set(8, 1.5, 1);
-        if (t.txt !== txt) { t.txt = txt; const g = t.ctx; g.clearRect(0, 0, 512, 96); g.fillStyle = "rgba(10,30,45,.75)"; g.fillRect(0, 18, 512, 60);
-          g.fillStyle = t.col; g.beginPath(); g.arc(36, 48, 20, 0, 6.283); g.fill(); g.strokeStyle = "#fff"; g.lineWidth = 6; g.stroke(); g.fillStyle = "#fff"; g.font = "600 30px -apple-system, Helvetica, sans-serif"; g.fillText(txt, 60, 59); t.tex.needsUpdate = true; } }
+    const near = Math.max(1.5, t.r * 40), fade = THREE.MathUtils.clamp((d - near) / (near * 0.5), 0, 1);   // gone before the object is big enough to cover
+    const show = markersOn && fade > 0.01 && (!t.planet || camP.distanceTo(t.planet.c) < Math.max(60, 3 * t.orbit));        // moons: only near their planet
+    if (vr) { t.el.style.display = "none"; t.spr.visible = show; t.spr.material.opacity = fade;
+      if (t.spr.visible) { tmpV.copy(wp).sub(camP).normalize(); t.spr.position.copy(camP).addScaledVector(tmpV, 30); t.spr.scale.set(8, 1.6, 1);
+        if (t.txt !== txt) { t.txt = txt; const g = t.ctx; g.clearRect(0, 0, 640, 128); g.fillStyle = "rgba(10,30,45,.75)"; g.fillRect(0, 10, 640, 108);
+          g.fillStyle = t.col; g.beginPath(); g.arc(40, 50, 22, 0, 6.283); g.fill(); g.strokeStyle = "#fff"; g.lineWidth = 6; g.stroke();
+          g.fillStyle = "#fff"; g.font = "600 32px -apple-system, Helvetica, sans-serif"; g.fillText(txt, 76, 60);
+          g.fillStyle = "#d5e6ee"; g.font = "400 24px -apple-system, Helvetica, sans-serif"; g.fillText(t.desc, 76, 98); t.tex.needsUpdate = true; } }
       continue; }
-    t.spr.visible = false; if (!markersOn || d < 2) { t.el.style.display = "none"; continue; } t.el.style.display = "block";
+    t.spr.visible = false; if (!show) { t.el.style.display = "none"; continue; } t.el.style.display = "block"; t.el.style.opacity = fade;
     tmpV.copy(wp).project(camera); let x = tmpV.x, y = tmpV.y; const behind = tmpV.z > 1; if (behind) { x = -x; y = -y; }
     const off = behind || Math.abs(x) > 0.95 || Math.abs(y) > 0.92;
     if (off) { const m = Math.max(Math.abs(x) / 0.93, Math.abs(y) / 0.88, 1e-6); x /= m; y /= m;
@@ -53610,12 +53618,19 @@ function updateMarkers(vr) {
       t.arr.style.cssText = `display:inline-block;width:14px;height:14px;border-radius:50%;background:${t.col};border:3px solid #fff;
         box-shadow:0 0 0 2px #000,0 0 10px 4px ${t.col},0 0 18px 6px rgba(255,255,255,.55);animation:mk 1.6s ease-in-out infinite`; }
     let px = (x + 1) / 2 * innerWidth, py = (1 - y) / 2 * innerHeight;
-    if (off) for (let k = 0; k < 12; k++) { const hit = placed.find(([qx, qy]) => Math.abs(qx - px) < 170 && Math.abs(qy - py) < 34); if (!hit) break; py += py > innerHeight - 60 ? -36 : 36; }   // nudge apart
-    placed.push([px, py]);
+    if (off) placed.push({ t, px, py, side: Math.abs(y) >= 0.87 && Math.abs(x) < 0.55 ? (y > 0 ? "top" : "bottom") : x > 0 ? "right" : "left" });
     const ax = x > 0.6 ? "-100%" : x < -0.6 ? "0%" : "-50%";                                       // labels near an edge read inward
     t.el.style.transform = `translate(${ax},-50%)`; t.el.style.textAlign = x > 0.6 ? "right" : x < -0.6 ? "left" : "center";
     t.el.style.left = `${px}px`; t.el.style.top = `${py}px`;
-    if (t.txt !== txt) { t.txt = txt; t.lab.textContent = txt; } } }
+    if (t.txt !== txt) { t.txt = txt; t.lab.textContent = txt; } }
+  // off-screen labels: sorted along each edge and spaced so none overlap
+  for (const side of ["left", "right", "top", "bottom"]) {
+    const g = placed.filter(q => q.side === side), vert = side === "left" || side === "right", gap = vert ? 54 : 250, key = vert ? "py" : "px";
+    const lo = side === "right" ? (guide.getBoundingClientRect().bottom + 30) : vert ? 150 : 40, hi = vert ? innerHeight - 30 : innerWidth - 40;
+    g.sort((a, b) => a[key] - b[key]);
+    for (let i = 1; i < g.length; i++) g[i][key] = Math.max(g[i][key], g[i - 1][key] + gap);
+    const over = g.length ? g[g.length - 1][key] - hi : 0; if (over > 0) for (const q of g) q[key] -= over;
+    for (let i = 0; i < g.length; i++) { if (g[i][key] < lo + i * gap) g[i][key] = lo + i * gap; g[i].t.el.style.left = `${g[i].px}px`; g[i].t.el.style.top = `${g[i].py}px`; } } }
 
 // ---------- the loop ----------
 const clock = new THREE.Clock(), fwd = V3(0, 0, 0), sideV = V3(0, 0, 0), UP = V3(0, 1, 0);
