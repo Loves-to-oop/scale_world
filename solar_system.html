@@ -53429,7 +53429,7 @@ const car = new THREE.Group(); scene.add(car);
   const part = (w, h, d, x, y, z, m = paint) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); car.add(b); };   // an open two-seater
   part(1.8, 0.25, 4.4, 0, 0.45, 0); part(1.8, 0.45, 1.5, 0, 0.8, -1.45); part(1.8, 0.4, 1.1, 0, 0.78, 1.65);
   for (const x of [-0.85, 0.85]) part(0.1, 0.4, 1.8, x, 0.77, 0.0);
-  part(1.6, 0.3, 0.1, 0, 0.88, -0.68, dark);
+  part(1.6, 0.2, 0.1, 0, 0.84, -0.7, dark);
   const seatM = M(0xe8dcc8, { roughness: 0.8 });
   for (const x of [-0.42, 0.42]) { const s = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.12, 0.55), seatM); s.position.set(x, 0.75, 0.25); car.add(s);
     const bk = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.65, 0.1), seatM); bk.position.set(x, 1.05, 0.55); car.add(bk); }
@@ -53439,7 +53439,7 @@ const car = new THREE.Group(); scene.add(car);
     const h = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.25, 16).rotateZ(Math.PI / 2), chrome); h.position.copy(w.position); car.add(h); } }
 const dashC = document.createElement("canvas"); dashC.width = 768; dashC.height = 320;
 const dashT = new THREE.CanvasTexture(dashC); dashT.colorSpace = THREE.SRGBColorSpace;
-{ const d = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.3), new THREE.MeshBasicMaterial({ map: dashT, toneMapped: false })); d.position.set(0.25, 1.17, -0.62); d.rotation.x = -0.3; car.add(d); }
+{ const d = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.25), new THREE.MeshBasicMaterial({ map: dashT, toneMapped: false })); d.position.set(0.3, 1.06, -0.6); d.rotation.x = -0.75; car.add(d); }
 const SPEEDS = [0, 5, 30, 60, 100, 200, 500, 1000, 3000, 10000, 30000, 100000];   // km/h, here
 let carRoute = null, carS = 0, speedI = 4, inCar = false, dest = null;
 function routeFor(b) {
@@ -53464,7 +53464,7 @@ function placeCar() {
   const y = terrainH(r.p.x, r.p.z) + 0.18, pitch = Math.atan2(terrainH(ahead.x, ahead.z) - terrainH(behind.x, behind.z), 4);
   car.position.set(r.p.x, y, r.p.z); car.rotation.set(pitch, Math.atan2(-r.dir.x, -r.dir.z), 0, "YXZ"); }
 placeCar();
-function enterCar() { inCar = true; flying = false; }
+function enterCar() { if (!inCar) { yaw = 0; pitch = -0.1; vrTurn = 0; } inCar = true; flying = false; }   // look out over the hood: in the car, the view is relative to the car
 function exitCar() { inCar = false; yaw += car.rotation.y; const s = V3(-2.2, 0, 0.3).applyEuler(new THREE.Euler(0, car.rotation.y, 0)); rig.position.set(car.position.x + s.x, terrainH(car.position.x + s.x, car.position.z + s.z), car.position.z + s.z); rig.rotation.set(0, 0, 0); camera.position.y = 1.65; }
 function drawDash(v) {
   const g = dashC.getContext("2d"); g.fillStyle = "#0d1a22"; g.fillRect(0, 0, 768, 320); g.strokeStyle = "#c9a227"; g.lineWidth = 6; g.strokeRect(3, 3, 762, 314);
