@@ -282,6 +282,16 @@ const TEX = {
   neptune: () => bands(["#4a6fd8", "#3f62c8", "#5a80e2", "#3555b0"], (g, w, h) => { g.fillStyle = "#26386e"; g.beginPath(); g.ellipse(w * 0.4, h * 0.6, 30, 16, 0, 0, 6.283); g.fill(); }),
   pluto: () => mottled("#c8b090", ["#a07850", "#e8dcc8", "#8a6040"], (g, w, h) => { g.fillStyle = "#f2ebe0"; g.beginPath(); g.ellipse(w * 0.55, h * 0.55, 70, 60, 0, 0, 6.283); g.fill(); }),
 };
+// the larger moons: name, diameter km, orbit radius km, inclination to the planet's equator (°), colour
+const MOONS = {
+  mars: [["Phobos", 22, 9376, 1.1, "#8a7a6a"], ["Deimos", 12, 23463, 1.8, "#9a8a7a"]],
+  jupiter: [["Io", 3643, 421700, 0.04, "#e8d060"], ["Europa", 3122, 671034, 0.47, "#e8dcc8"], ["Ganymede", 5268, 1070412, 0.2, "#9a8e80"], ["Callisto", 4821, 1882709, 0.2, "#5e564e"]],
+  saturn: [["Mimas", 396, 185539, 1.6, "#c8c8c4"], ["Enceladus", 504, 237948, 0.0, "#f4f6f8"], ["Tethys", 1062, 294619, 1.1, "#dcdcd8"], ["Dione", 1123, 377396, 0.0, "#d0ccc4"],
+    ["Rhea", 1527, 527108, 0.3, "#c8c4bc"], ["Titan", 5150, 1221870, 0.3, "#d89a4a"], ["Iapetus", 1469, 3560820, 15.5, "#8a7a62"]],
+  uranus: [["Miranda", 472, 129390, 4.3, "#b8b8b4"], ["Ariel", 1158, 191020, 0.3, "#c4c0b8"], ["Umbriel", 1169, 266000, 0.1, "#7a766e"], ["Titania", 1578, 435910, 0.1, "#b0a89c"], ["Oberon", 1523, 583520, 0.1, "#a09486"]],
+  neptune: [["Proteus", 420, 117647, 0.5, "#7a7470"], ["Triton", 2707, 354759, 157, "#d8c8c0"]],
+  pluto: [["Charon", 1212, 19591, 0.0, "#9a948e"]],
+};
 const sunLight = new THREE.PointLight(0xfff4e0, 3.2, 0, 0);
 for (const b of BODIES) {
   const B = V3(b.w.x, 0, b.w.z), gh = terrainH(B.x, B.z);
@@ -315,6 +325,24 @@ for (const b of BODIES) {
       g.fillStyle = `rgba(${b.id === "saturn" ? "226,206,160" : "200,220,230"},${a * (0.85 + 0.15 * Math.sin(x * 1.7))})`; g.fillRect(x, 0, 1, 4); } });
     const rm = new THREE.Mesh(rg, new THREE.MeshStandardMaterial({ map: rt, transparent: true, side: THREE.DoubleSide, depthWrite: false, roughness: 0.8 }));
     rm.position.copy(b.c); rm.quaternion.copy(body.quaternion); scene.add(rm); }
+  if (MOONS[b.id]) {                                   // moons on glass rods, each on its real orbit (the spot on the orbit is illustrative)
+    const P = radec(...b.pole), u = new THREE.Vector3().crossVectors(P, V3(0, 1, 0)); if (u.length() < 0.1) u.set(1, 0, 0); u.normalize(); const v = new THREE.Vector3().crossVectors(P, u).normalize();
+    const glassRod = new THREE.MeshStandardMaterial({ color: 0xdff4ff, transparent: true, opacity: 0.3 }), names = [];
+    for (const [mn, md, ma, mi, mc] of MOONS[b.id]) {
+      const a = ma * 1000 * K, mr = Math.max(md * 1000 * K / 2, 0.0002), inc = mi * deg, ax = new THREE.Vector3().copy(v).multiplyScalar(Math.cos(inc)).addScaledVector(P, Math.sin(inc));
+      let pos = null;
+      for (let k = 0; k < 64 && !pos; k++) { const th = (k * 137.5 + mn.length * 40) * deg, q = b.c.clone().addScaledVector(u, a * Math.cos(th)).addScaledVector(ax, a * Math.sin(th));
+        if (q.y - mr > terrainH(q.x, q.z) + 0.3 && Math.hypot(q.x - b.c.x, q.z - b.c.z) > b.r * 0.6) pos = q; }
+      if (!pos) continue;
+      const m = new THREE.Mesh(new THREE.SphereGeometry(mr, 32, 16), M(mc, { roughness: 0.85 })); m.position.copy(pos); scene.add(m);
+      const g0 = terrainH(pos.x, pos.z), rr = Math.min(0.006, Math.max(0.001, mr * 0.15));
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(rr, rr * 1.5, pos.y - mr - g0, 6), glassRod); rod.position.set(pos.x, (pos.y - mr + g0) / 2, pos.z); scene.add(rod);
+      const orbit = []; for (let k = 0; k <= 180; k++) { const th = k / 180 * Math.PI * 2; orbit.push(b.c.clone().addScaledVector(u, a * Math.cos(th)).addScaledVector(ax, a * Math.sin(th))); }
+      scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(orbit), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 })));
+      names.push(`${mn}: ${md.toLocaleString()} km → ${fmtM(2 * mr)}, orbit ${fmtKm(ma)} → ${fmtM(a)}`); }
+    const fwd2 = V3(b.w.x - b.E.x, 0, b.w.z - b.E.z).normalize(), side2 = V3(-fwd2.z, 0, fwd2.x), mp = b.stop.clone().addScaledVector(side2, -12).addScaledVector(fwd2, -6);
+    postSign([`the moons of ${b.name}`, ...names, "faint white lines: their orbits, tilted with the planet's equator", "each moon is shown at one point on its orbit, not today's exact spot"],
+      mp.x, mp.z, b.w.x, b.w.z, Math.max(3, Math.min(6, names.length * 0.9)), 1.2); }
   const beam = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 1500, 12, 1, true), new THREE.MeshBasicMaterial({ color: b.beacon, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
   beam.position.set(B.x + b.r + 6, gh + 750, B.z); scene.add(beam);
   const lt = b.distKm / 299792.458, grade = b.h / Math.hypot(b.w.x - b.E.x, b.w.z - b.E.z) * 100;
