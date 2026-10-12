@@ -471,6 +471,7 @@ const VRB = document.getElementById("vr"); let snap = true; const prevB = {};
 const tap = (k, gp, i) => { const p = !!gp.buttons[i]?.pressed, was = prevB[k + i]; prevB[k + i] = p; return p && !was; };
 if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block";
   VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor");
+    renderer.xr.setFoveation(1.0); renderer.xr.setFramebufferScaleFactor(0.8);   // fewer pixels per eye: steadier frame rate
     await renderer.xr.setSession(s); start(); camera.position.set(0, 0, 0); s.addEventListener("end", () => { camera.position.set(0, 1.65, 0); rig.rotation.set(0, 0, 0); }); }; });
 const stick = a => { if (!a) return [0, 0]; const p = a.length >= 4 && Math.abs(a[2]) + Math.abs(a[3]) >= Math.abs(a[0]) + Math.abs(a[1]) ? 2 : 0;
   const x = a[p] || 0, y = a[p + 1] || 0; return [Math.abs(x) > 0.12 ? x : 0, Math.abs(y) > 0.12 ? y : 0]; };
@@ -535,7 +536,10 @@ function updateMarkers(vr) {
 // ---------- the loop ----------
 const clock = new THREE.Clock(), fwd = V3(0, 0, 0), sideV = V3(0, 0, 0), UP = V3(0, 1, 0);
 let hudT = 0, waveT = -1e9, orientT = 0, dashTimer = 0;
-renderer.setAnimationLoop(() => {
+// an error in one frame must not stop the loop: in VR that freezes the headset on its last picture
+let loopErrs = 0;
+renderer.setAnimationLoop(() => { try { frame(); } catch (e) { if (loopErrs++ < 5) console.error(e); renderer.render(scene, camera); } });
+function frame() {
   const dt = Math.min(clock.getDelta(), 0.15), t = clock.elapsedTime, vr = renderer.xr.isPresenting; let moved = 0;
   if (vr) { const s = renderer.xr.getSession(); let mx = 0, my = 0, boost = 1;
     for (const src of s?.inputSources || []) { const gp = src.gamepad; if (!gp) continue; const [ax, ay] = stick(gp.axes);
@@ -543,7 +547,7 @@ renderer.setAnimationLoop(() => {
         if (tap("L", gp, 4)) { if (inCar) exitCar(); else { carRoute = carRoute; enterCar(); } }
         if (tap("L", gp, 5)) { const k = dest ? (BODIES.indexOf(dest) + 1) % BODIES.length : 0; driveTo(BODIES[k]); } }
       else { if (gp.buttons[0]?.value > 0.3) boost = 6; my += ay;
-        if (Math.abs(ax) > 0.7 && snap) { vrTurn -= Math.postSign(ax) * Math.PI / 6; snap = false; } else if (Math.abs(ax) < 0.3) snap = true;
+        if (Math.abs(ax) > 0.7 && snap) { vrTurn -= Math.sign(ax) * Math.PI / 6; snap = false; } else if (Math.abs(ax) < 0.3) snap = true;
         if (inCar && tap("R", gp, 4)) speedI = Math.max(0, speedI - 1); if (inCar && tap("R", gp, 5)) speedI = Math.min(SPEEDS.length - 1, speedI + 1); } }
     if (!inCar) { rig.rotation.y = vrTurn;
       if (mx || my) { fwd.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(rig.quaternion); fwd.y = 0; fwd.normalize(); sideV.crossVectors(fwd, UP).normalize();
@@ -572,4 +576,4 @@ renderer.setAnimationLoop(() => {
   hudT -= dt; if (hudT <= 0 && !vr) { readout(moved); hudT = 0.25; }
   updateMarkers(vr);
   renderer.render(scene, camera);
-});
+}
