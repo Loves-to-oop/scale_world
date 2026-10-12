@@ -152,3 +152,41 @@ out2 = HERE / "solar_system.html"
 out2.write_text(SOLAR.replace("__THREE__", three).replace("__EARTH__", img("earth.jpg")).replace("__MOON__", img("moon.jpg"))
                      .replace("__SCENE__", (HERE / "solar.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out2.name}, {out2.stat().st_size // 1024} KB")
+
+
+# ---- the third page: falling beside the Galileo probe into Jupiter ------------------------------
+GAL = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Into Jupiter with the Galileo probe</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#c8b89a;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+  #intro{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(20,15,10,.55);transition:opacity .6s;z-index:3}
+  #intro.gone{opacity:0;pointer-events:none}
+  .card{max-width:620px;background:rgba(250,246,238,.97);color:#2b2418;border-radius:14px;padding:24px 28px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  h1{margin:0 0 6px;font:600 28px "Iowan Old Style",Palatino,Georgia,serif}
+  kbd{background:#efe6d6;border:1px solid #d4c4a6;border-radius:4px;padding:0 6px;font-size:13px}
+  .dim{color:#7a6a50;font-size:13px}
+  #vr{display:none;position:fixed;right:18px;bottom:18px;z-index:3;padding:12px 20px;font:600 15px -apple-system,sans-serif;border:0;border-radius:10px;background:#7a4a1e;color:#fff;cursor:pointer}
+</style></head><body>
+<div id="intro"><div class="card">
+  <h1>Into Jupiter with the Galileo probe</h1>
+  <p>7 December 1995. You are falling beside NASA's Galileo probe, 1.5 metres (5 feet) away, under its parachute,
+  from the moment it opened until the probe's signal stopped 58 minutes later, 140 km deeper, at 22 times Earth's
+  air pressure and 152 &deg;C. It runs in real time; speed it up to see the whole fall.</p>
+  <p>The probe carried no camera. What you see is rebuilt from what it measured: the pressure, temperature and
+  falling speed, the winds, the thin cloud layers it passed, the fading sunlight, and the radio static of distant lightning.</p>
+  <p><kbd>[</kbd> <kbd>]</kbd> time &times;1 to &times;300 &nbsp;&middot;&nbsp; <kbd>space</kbd> pause &nbsp;&middot;&nbsp; <kbd>R</kbd> restart &nbsp;&middot;&nbsp;
+  <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move round the probe &nbsp;&middot;&nbsp; drag to look<br>
+  In VR: sticks move and turn &nbsp;&middot;&nbsp; <b>A</b>/<b>B</b> time slower/faster &nbsp;&middot;&nbsp; <b>X</b> restart</p>
+  <p class="dim">click anywhere, or press any key, to begin</p>
+</div></div>
+<button id="vr">Enter VR</button>
+<script type="module">
+__THREE__
+__SCENE__
+</script></body></html>
+"""
+out3 = HERE / "galileo_probe.html"
+out3.write_text(GAL.replace("__THREE__", three).replace("__SCENE__", (HERE / "galileo.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out3.name}, {out3.stat().st_size // 1024} KB")
