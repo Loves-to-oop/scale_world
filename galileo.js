@@ -11,7 +11,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWid
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 300000);
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 140000);
 const rig = new THREE.Group(); rig.add(camera); scene.add(rig); camera.position.y = 1.65;
 addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z), M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, ...o });
@@ -24,28 +24,42 @@ const zAt = p => 80.7 * (Math.pow(p, 0.3) - 1);           // km below the 1-bar 
 const tempK = p => 166 * Math.pow(p, 0.304);              // 425 K (152 °C) at 22 bar, as measured
 const vAt = p => V1 * Math.pow(p, -0.35);                 // fall speed, m/s
 const windAt = p => p < 1 ? 100 : p < 4 ? 100 + 70 * (p - 1) / 3 : 175;   // east wind, m/s (rising with depth, as measured)
-const lightAt = p => Math.exp(-Math.pow(p / 6, 1.25));      // fraction of sunlight left
+// ---------- light, in three colour bands (blue 450, green 550, red 650 nm) ----------
+// Rayleigh scattering by H2/He: optical depth per bar of air above ≈ 0.24, 0.10, 0.045 (5× Earth's molecules per bar,
+// each scattering ~0.2× as much as air). Methane absorbs a little red (weak 619 nm band). A trace of the brownish
+// 'chromophore' haze sits in the cloud layers. Scattering conserves light, so it never gets dark in the visible:
+// the light goes from a sun-lit blue sky to a diffuse glow with no Sun disc. (Most of what the probe's radiometer saw
+// vanish was infrared, absorbed by methane.)
+const KR = [0.24, 0.10, 0.045], KCH4 = [0, 0.001, 0.004], MU0 = 0.7;   // 650 nm falls between methane's bands: little red absorbed   // sun ~45° up
+function chrom(p) { const f = q => Math.min(1, Math.max(0, Math.log(p / q[0]) / Math.log(q[1] / q[0])));   // haze absorption crossed so far
+  return [0.10 + 0.06 * f([0.45, 0.75]) + 0.12 * f([1.35, 1.65]), 0.05 + 0.03 * f([0.45, 0.75]) + 0.06 * f([1.35, 1.65]), 0.02 + 0.01 * f([0.45, 0.75]) + 0.02 * f([1.35, 1.65])]; }
+function lightAt(p) {
+  const ca = chrom(p), out = { direct: [], down: [], diffuse: [], up: [] };
+  for (let i = 0; i < 3; i++) { const tr = KR[i] * p, ta = KCH4[i] * p + ca[i];
+    const direct = Math.exp(-(tr + ta) / MU0), down = Math.exp(-1.66 * ta) / (1 + 0.75 * tr);   // two-stream, conservative scattering
+    const w = KR[i] / (KR[i] + KCH4[i] + 0.004), g = Math.sqrt(1 - w), albedo = (1 - g) / (1 + g);    // the deep air below, a semi-infinite scatterer
+    out.direct[i] = direct; out.down[i] = Math.max(down, direct); out.diffuse[i] = down * (1 - Math.exp(-0.9 * tr / MU0)); out.up[i] = albedo * down; }   // skylight: single scattering near the top (blue), the whole flux deep down
+  out.L = out.down[1]; return out; }
+const SUNW = [1.0, 0.97, 0.90];                            // sunlight colour above the atmosphere
+// the bands are stored blue, green, red; brightness compressed as the eyes adapt partly
+const tone = (bgr, k = 1) => { const rgb = [bgr[2], bgr[1], bgr[0]], lum = (rgb[0] + rgb[1] + rgb[2]) / 3 + 1e-6, b = k * Math.pow(lum, 0.55) / lum;
+  const c = rgb.map((v, i) => v * SUNW[i] * b), m = (c[0] + c[1] + c[2]) / 3;   // and the eye's colour adaptation softens tints by ~30%
+  return new THREE.Color().setRGB(...c.map(v => m + 0.7 * (v - m)), THREE.LinearSRGBColorSpace); };
 
 // ---------- sky: a gradient sphere that darkens and browns with depth ----------
 const skyMat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false,
   uniforms: { up: { value: new THREE.Color() }, hor: { value: new THREE.Color() }, down: { value: new THREE.Color() } },
   vertexShader: "varying vec3 vp; void main(){ vp = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }",
   fragmentShader: "uniform vec3 up, hor, down; varying vec3 vp; void main(){ float y = vp.y; vec3 c = y > 0.0 ? mix(hor, up, pow(y, 0.6)) : mix(hor, down, pow(-y, 0.5)); gl_FragColor = vec4(c, 1.0); }" });
-const sky = new THREE.Mesh(new THREE.SphereGeometry(250000, 48, 24), skyMat); scene.add(sky);
+const sky = new THREE.Mesh(new THREE.SphereGeometry(120000, 48, 24), skyMat); scene.add(sky);
 scene.fog = new THREE.FogExp2(0xc8b89a, 0.00003);
 const sun = new THREE.DirectionalLight(0xfff2dc, 2.2); sun.position.set(0.4, 0.75, 0.3); scene.add(sun);
 const amb = new THREE.HemisphereLight(0xbcc8d8, 0x8a6a48, 0.9); scene.add(amb);
 const C = (h) => new THREE.Color(h);
-const SKY = [   // pressure, colour overhead, at the horizon, below (sunlit values; dimmed by lightAt)
-  [0.4, C(0x6f86a8), C(0xd8cdb4), C(0xe6d6b4)],
-  [0.7, C(0x8a98a8), C(0xd6c6a6), C(0xd8c49c)],
-  [1.5, C(0xb4a88e), C(0xc4ac84), C(0xb89870)],
-  [4, C(0xa08460), C(0xa07a52), C(0x8a6440)],
-  [10, C(0xb08454), C(0xa87a4a), C(0x8a5e38)],
-  [22, C(0xa06a3e), C(0x9a6238), C(0x7a4a2a)]];   // deep: lifted, as if your eyes had adapted to the murk
-function skyAt(p) { let i = 0; while (i < SKY.length - 2 && p > SKY[i + 1][0]) i++;
-  const [pa, ua, ha, da] = SKY[i], [pb, ub, hb, db] = SKY[i + 1], f = THREE.MathUtils.clamp(Math.log(p / pa) / Math.log(pb / pa), 0, 1);
-  return [ua.clone().lerp(ub, f), ha.clone().lerp(hb, f), da.clone().lerp(db, f)]; }
+// the Sun's disc: 1/5 of its size seen from Earth (0.1°), fading as its direct beam is scattered away
+const sunDisc = new THREE.Mesh(new THREE.CircleGeometry(1, 32), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, fog: false, toneMapped: false, depthWrite: false }));
+const sunGlow = new THREE.Mesh(new THREE.CircleGeometry(1, 32), new THREE.MeshBasicMaterial({ color: 0xfff4e0, transparent: true, opacity: 0.25, fog: false, depthWrite: false }));
+scene.add(sunGlow, sunDisc);
 
 // ---------- cloud layers at their measured depths (thin and patchy: a dry 'hot spot') ----------
 function cloudTex(cover, tint) { const c = document.createElement("canvas"); c.width = c.height = 512; const g = c.getContext("2d");
@@ -55,8 +69,8 @@ function cloudTex(cover, tint) { const c = document.createElement("canvas"); c.w
     for (const dx of [-512, 0, 512]) for (const dy of [-512, 0, 512]) { g.save(); g.translate(dx, dy); g.beginPath(); g.arc(x, y, r, 0, 6.283); g.fill(); g.restore(); } }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
 const LAYERS = [   // name, top and bottom pressure (bar), sheets, cover, tint
-  { name: "a thin haze of ammonia ice", p0: 0.45, p1: 0.75, n: 5, cover: 0.45, tint: "245,240,228" },
-  { name: "a thin cloud, probably ammonium hydrosulfide", p0: 1.35, p1: 1.65, n: 5, cover: 0.7, tint: "226,206,170" }];
+  { name: "a thin haze of ammonia ice", p0: 0.45, p1: 0.75, n: 3, cover: 0.55, tint: "245,240,228" },
+  { name: "a thin cloud, probably ammonium hydrosulfide", p0: 1.35, p1: 1.65, n: 3, cover: 0.8, tint: "226,206,170" }];
 const fadeTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d"), gr = g.createRadialGradient(128, 128, 0, 128, 128, 128);
   gr.addColorStop(0, "#fff"); gr.addColorStop(0.35, "#bbb"); gr.addColorStop(1, "#000"); g.fillStyle = gr; g.fillRect(0, 0, 256, 256); return new THREE.CanvasTexture(c); })();   // sheets thin out with distance: no hard edge
 for (const L of LAYERS) { L.sheets = [];
@@ -72,7 +86,7 @@ const motes = new THREE.Points(new THREE.BufferGeometry().setAttribute("position
 scene.add(motes);
 
 // ---------- distant lightning: the probe's radio picked up its static from thousands of km away ----------
-const flash = new THREE.PointLight(0xdfe8ff, 0, 0, 0); scene.add(flash); let flashT = -1, nextFlash = 20;
+// (the probe's radio heard lightning thousands of km away, below the horizon: too far to see, so no flashes here)
 
 // ---------- the probe, its parachute, and the heat shield falling away ----------
 const probe = new THREE.Group(); scene.add(probe);
@@ -106,9 +120,11 @@ const EVENTS = [
   ["p", 0.45, "Entering a thin haze of ammonia ice", "far thinner than expected: the probe fell into a dry, clear 'hot spot'"],
   ["p", 1.0, "1 bar: the pressure at sea level on Earth, and Jupiter's reference 'zero'", "−107 °C here, about 1.8 times the density of Earth's air"],
   ["p", 1.35, "A thin cloud deck, probably ammonium hydrosulfide", "the only real cloud the probe ever detected"],
+  ["p", 2.5, "The probe's radio hears lightning", "static from storms thousands of km away, beyond the horizon: too far to see"],
   ["p", 3.5, "The winds are still rising with depth: now ~600 km/h", "so they are driven by heat from inside Jupiter, not by sunlight"],
   ["p", 5, "Here a thick water cloud was expected", "there was none: the hot spot was far drier than Jupiter as a whole"],
-  ["p", 10, "10 bar: the sunlight is almost gone", "the instruments measured light, heat, gases and helium, not pictures"],
+  ["p", 7, "The Sun's disc has faded into the haze", "light now comes evenly from the whole sky: no shadows, a dim, warm glow above, bluer below"],
+  ["p", 12, "Still not dark: blue light is scattered, not absorbed", "it gets dimmer and warmer above, but the deep air keeps glowing, like a dull overcast day"],
   ["p", 16, "The heat is rising fast: past 100 °C", "the probe's electronics are near their design limit"],
   ["p", 22, "22 bar, 152 °C: the signal stops", "58 minutes after the chute opened. The probe sank on, and melted and vaporised far below"]];
 let evI = 0, caption = ["", ""], captionT = 0;
@@ -122,7 +138,7 @@ function drawPanel(st) {
   line(`${m}:${String(s).padStart(2, "0")} after the parachute opened  ·  time ×${SPEEDS[speedI]}${paused ? "  ·  paused" : ""}`, 56, 34, "#ffe9a8", 700);
   line(`pressure ${st.p.toFixed(st.p < 10 ? 2 : 1)} bar  ·  ${st.z >= 0 ? `${st.z.toFixed(1)} km below` : `${(-st.z).toFixed(1)} km above`} the 1-bar level`, 112, 32);
   line(`temperature ${(st.T - 273.15).toFixed(0)} °C  ·  ${st.v ? `falling ${st.v.toFixed(0)} m/s (${(st.v * 3.6).toFixed(0)} km/h)` : "signal lost"}`, 160, 32);
-  line(`wind carrying you east at ${(st.w * 3.6).toFixed(0)} km/h  ·  sunlight ${(st.L * 100).toFixed(0)}% of the top`, 208, 32);
+  line(`wind carrying you east at ${(st.w * 3.6).toFixed(0)} km/h  ·  daylight ${(st.L * 100).toFixed(0)}% of the top  ·  Sun's disc ${st.D > 0.5 ? "bright" : st.D > 0.12 ? "dimming" : st.D > 0.02 ? "faint" : "gone"}`, 208, 32);
   const fit = (txt, y, sz, col, w) => { g.font = `${w} ${sz}px -apple-system, Helvetica, sans-serif`; while (g.measureText(txt).width > 960 && sz > 14) { sz--; g.font = `${w} ${sz}px -apple-system, Helvetica, sans-serif`; } line(txt, y, sz, col, w); };
   fit(caption[0], 290, 34, "#ffffff", 700); fit(caption[1], 338, 27, "#c8dce6", 400);
   line("Galileo probe, 7 December 1995. It had no camera: this view is rebuilt from its measurements.", 440, 23, "#93aebb");
@@ -160,7 +176,7 @@ renderer.setAnimationLoop(() => { try { frame(); } catch (e) { if (loopErrs++ < 
 function frame() {
   const dt = Math.min(clock.getDelta(), 0.1), vr = renderer.xr.isPresenting, rate = paused || !started ? 0 : SPEEDS[speedI];
   simT = Math.min(T_END + 30, simT + dt * rate);
-  const tt = Math.min(simT, T_END), p = pAt(tt), z = zAt(p), v = simT < T_END ? vAt(p) : 0, L = lightAt(p), dim = 0.16 + 0.84 * L;   // a floor of light: as if your eyes adapt (really it gets darker still)
+  const tt = Math.min(simT, T_END), p = pAt(tt), z = zAt(p), v = simT < T_END ? vAt(p) : 0, Lt = lightAt(p), L = Lt.L;
   // moving round the probe (you fall with it, so it stays put; you can walk or float round it)
   if (vr) { const s = renderer.xr.getSession(); let mx = 0, my = 0;
     for (const src of s?.inputSources || []) { const gp = src.gamepad; if (!gp) continue; const [ax, ay] = stick(gp.axes);
@@ -180,22 +196,25 @@ function frame() {
   if (simT < 300) { const a = 4; shieldV += a * dt * rate; shieldY -= shieldV * dt * rate; shield.visible = simT > 8 && shieldY > -4000; } else shield.visible = false;
   if (simT <= 8) { shieldY = -0.6; shieldV = 0; } shield.position.set(0.1, shieldY, 0); shield.rotation.z += dt * 0.4; shield.userData.glow.material.opacity = Math.max(0, 0.5 - simT / 60);
   // the atmosphere moves up past you
-  for (const Lr of LAYERS) for (const sh of Lr.sheets) { sh.m.position.y = (z - sh.z) * 1000; sh.m.material.opacity = dim; sh.m.material.color.setScalar(dim); }
+  const downC = tone(Lt.down, 0.95), upC = tone(Lt.diffuse.map((v, i) => v + 0.02 * Lt.direct[i]), 0.85), belowC = tone(Lt.up, 0.8), horC = upC.clone().lerp(belowC, 0.5).lerp(new THREE.Color(0xffffff), 0.12);
+  for (const Lr of LAYERS) for (const sh of Lr.sheets) { const y = (z - sh.z) * 1000; sh.m.position.y = y; sh.m.visible = Math.abs(y) < 12000;   // only the sheets near you are drawn
+    sh.m.material.color.copy(downC); }
   const pos = motes.geometry.attributes.position.array, rise = Math.min(v * dt * rate, BOX * 0.45), inCloud = LAYERS.some(Lr => p > Lr.p0 * 0.9 && p < Lr.p1 * 1.1);
   for (let i = 0; i < NM; i++) { let y = pos[i * 3 + 1] + rise; if (y > BOX / 2) y -= BOX; pos[i * 3 + 1] = y; }
-  motes.geometry.attributes.position.needsUpdate = true; motes.material.opacity = (inCloud ? 0.85 : 0.35) * dim; motes.position.copy(rig.position);
-  const sd = 0.4 + 0.6 * L; const [u, h, d] = skyAt(p); skyMat.uniforms.up.value.copy(u).multiplyScalar(sd); skyMat.uniforms.hor.value.copy(h).multiplyScalar(sd); skyMat.uniforms.down.value.copy(d).multiplyScalar(sd);
-  scene.fog.color.copy(h).multiplyScalar(sd); scene.fog.density = 0.00004 + 0.00012 * Math.min(1, p / 8); sky.position.copy(rig.position);
-  sun.intensity = 2.4 * L; sun.color.copy(C(0xfff2dc)).lerp(C(0xc87a3a), Math.min(1, p / 8)); amb.intensity = 0.7 + 0.4 * L; amb.color.copy(C(0xd0b090)); lineMat.color.setScalar(0.6 * dim); 
-  // lightning, far off in the deep
-  if (rate && simT > nextFlash && p > 1.5 && simT < T_END) { flashT = 0.25; nextFlash = simT + (60 + rnd() * 120) * Math.max(1, rate / 5);
-    flash.position.set((rnd() - 0.5) * 60000, -20000 - rnd() * 20000, (rnd() - 0.5) * 60000); }
-  if (flashT > 0) { flashT -= dt; flash.intensity = 3 * Math.max(0, Math.sin(flashT * 40)); skyMat.uniforms.down.value.addScalar(0.08 * flash.intensity / 3); } else flash.intensity = 0;
+  motes.geometry.attributes.position.needsUpdate = true; motes.material.opacity = inCloud ? 0.8 : 0.35; motes.material.color.copy(downC); motes.position.copy(rig.position);
+  skyMat.uniforms.up.value.copy(upC); skyMat.uniforms.hor.value.copy(horC); skyMat.uniforms.down.value.copy(belowC);
+  const scat = KR[1] * p / (24.2 * Math.pow(p, 0.304) * 1000);                     // scattering per metre (τ per bar × bar per metre)
+  scene.fog.color.copy(horC); scene.fog.density = scat * 1.2; sky.position.copy(rig.position);
+  const D = Lt.direct, sunC = tone(D, 1.0), sdir = sun.position.clone().normalize(), sunVis = Math.min(1, D[1] * 1.6);
+  sun.intensity = 3.0 * D[1]; sun.color.copy(sunC); amb.intensity = 0.6 + 1.6 * (Lt.diffuse[1] + Lt.up[1]) / 2; amb.color.copy(upC); amb.groundColor.copy(belowC);
+  for (const [m, r, op] of [[sunDisc, 0.09, 1], [sunGlow, 0.5, 0.25]]) { m.position.copy(rig.position).addScaledVector(sdir, 50); m.scale.setScalar(50 * r * Math.PI / 180); m.lookAt(rig.position);
+    m.material.opacity = op * sunVis; m.visible = sunVis > 0.01; }
+  sunDisc.material.color.copy(sunC); lineMat.color.copy(downC).multiplyScalar(0.7);
   // captions
   while (evI < EVENTS.length) { const [kind, k, a, b] = EVENTS[evI]; if (!(kind === "t" ? simT >= k : p >= k * 0.999)) break; caption = [a, b]; evI++; }
   // the panel floats beside the probe, facing you
   const cp = camera.getWorldPosition(V3(0, 0, 0)), toProbe = V3(-cp.x, 0, -cp.z).normalize(), right = V3(toProbe.z, 0, -toProbe.x);
   panel.position.copy(cp).addScaledVector(toProbe, 2.4).addScaledVector(right, -1.05).add(V3(0, 0.15, 0)); panel.lookAt(cp);
-  panelTimer -= dt; if (panelTimer <= 0) { drawPanel({ t: tt, p, z, T: tempK(p), v, w: windAt(p), L }); panelTimer = 0.2; }
+  panelTimer -= dt; if (panelTimer <= 0) { drawPanel({ t: tt, p, z, T: tempK(p), v, w: windAt(p), L, D: Lt.direct[1] }); panelTimer = 0.2; }
   renderer.render(scene, camera);
 }
