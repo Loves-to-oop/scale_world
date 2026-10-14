@@ -212,3 +212,42 @@ GRS = GRS[:i0] + """<div id="intro"><div class="card">
 out4 = HERE / "great_red_spot.html"
 out4.write_text(GRS.replace("__THREE__", three).replace("__SCENE__", (HERE / "grs.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out4.name}, {out4.stat().st_size // 1024} KB")
+
+
+# ---- the fifth page: a day in Çatalhöyük ---------------------------------------------------------
+CAT = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A day in Çatalhöyük, 7000 BC</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#c8d4d8;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+  #intro{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(30,22,12,.55);transition:opacity .6s;z-index:3}
+  #intro.gone{opacity:0;pointer-events:none}
+  .card{max-width:640px;background:rgba(250,244,232,.97);color:#2b2214;border-radius:14px;padding:24px 28px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  h1{margin:0 0 6px;font:600 28px "Iowan Old Style",Palatino,Georgia,serif}
+  kbd{background:#efe2cc;border:1px solid #d4c0a0;border-radius:4px;padding:0 6px;font-size:13px}
+  .dim{color:#7a6a50;font-size:13px}
+  #vr{display:none;position:fixed;right:18px;bottom:18px;z-index:3;padding:12px 20px;font:600 15px -apple-system,sans-serif;border:0;border-radius:10px;background:#7a5a2e;color:#fff;cursor:pointer}
+</style></head><body>
+<div id="intro"><div class="card">
+  <h1>A day in Çatalhöyük</h1>
+  <p>Central Anatolia, about 7000 BC. You live in one of the world's first large towns: several thousand people in
+  mud-brick houses packed wall to wall, with no streets. You walk across the roofs, and climb down a ladder through
+  a hole in the roof to get into a house.</p>
+  <p>Do your chores, talk to your neighbours, and climb into any house: white plastered rooms with ovens, red
+  paintings, aurochs horns on the walls, and the family's dead buried under the sleeping platforms.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>shift</kbd> run &nbsp;&middot;&nbsp;
+  <kbd>E</kbd> act, talk, climb in or out at a roof hatch<br>
+  In VR: left stick walk, right stick turn, trigger run, <b>A</b> to act</p>
+  <p class="dim">The town plan and the land around it are generated, at the real size and density (add ?seed=2 for another).
+  The houses, their insides, the crafts and the landscape follow the excavations. Click to begin.</p>
+</div></div>
+<button id="vr">Enter VR</button>
+<script type="module">
+__THREE__
+__SCENE__
+</script></body></html>
+"""
+out5 = HERE / "catalhoyuk.html"
+out5.write_text(CAT.replace("__THREE__", three).replace("__SCENE__", (HERE / "catal.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out5.name}, {out5.stat().st_size // 1024} KB")
