@@ -190,3 +190,25 @@ __SCENE__
 out3 = HERE / "galileo_probe.html"
 out3.write_text(GAL.replace("__THREE__", three).replace("__SCENE__", (HERE / "galileo.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out3.name}, {out3.stat().st_size // 1024} KB")
+
+
+# ---- the fourth page: falling into the Great Red Spot -------------------------------------------
+GRS = GAL.replace("<title>Into Jupiter with the Galileo probe</title>", "<title>Into the Great Red Spot</title>")
+i0, i1 = GRS.index('<div id="intro">'), GRS.index('<button id="vr">')
+GRS = GRS[:i0] + """<div id="intro"><div class="card">
+  <h1>Into the Great Red Spot</h1>
+  <p>You start 12,000 km above Jupiter's Great Red Spot, a storm wider than the Earth, and fall into its calm centre:
+  through the red haze, then the white-out of the ammonia cloud, the ammonium hydrosulfide and water cloud decks,
+  and down to its roots, about 300 km below the cloud tops, at ~175 times Earth's air pressure and over 500 &deg;C.
+  Your parachute opens at the top of the atmosphere.</p>
+  <p>Nothing has ever gone into the spot. This is rebuilt from telescope and spacecraft images, Juno's microwave
+  and gravity data, and the physics of the light and air. The approach from space is slowed so you can look.</p>
+  <p><kbd>[</kbd> <kbd>]</kbd> time &times;1 to &times;1000 &nbsp;&middot;&nbsp; <kbd>space</kbd> pause &nbsp;&middot;&nbsp; <kbd>R</kbd> restart &nbsp;&middot;&nbsp;
+  drag to look (start by looking down) &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move<br>
+  In VR: look down &nbsp;&middot;&nbsp; sticks move and turn &nbsp;&middot;&nbsp; <b>A</b>/<b>B</b> time slower/faster &nbsp;&middot;&nbsp; <b>X</b> restart</p>
+  <p class="dim">click anywhere, or press any key, to begin</p>
+</div></div>
+""" + GRS[i1:]
+out4 = HERE / "great_red_spot.html"
+out4.write_text(GRS.replace("__THREE__", three).replace("__SCENE__", (HERE / "grs.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out4.name}, {out4.stat().st_size // 1024} KB")

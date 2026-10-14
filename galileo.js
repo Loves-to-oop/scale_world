@@ -50,7 +50,7 @@ const tone = (bgr, k = 1) => { const rgb = [bgr[2], bgr[1], bgr[0]], lum = (rgb[
 const skyMat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false,
   uniforms: { up: { value: new THREE.Color() }, hor: { value: new THREE.Color() }, down: { value: new THREE.Color() } },
   vertexShader: "varying vec3 vp; void main(){ vp = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }",
-  fragmentShader: "uniform vec3 up, hor, down; varying vec3 vp; void main(){ float y = vp.y; vec3 c = y > 0.0 ? mix(hor, up, pow(y, 0.6)) : mix(hor, down, pow(-y, 0.5)); gl_FragColor = vec4(c, 1.0); }" });
+  fragmentShader: "uniform vec3 up, hor, down; varying vec3 vp; void main(){ float y = vp.y; vec3 c = y > 0.0 ? mix(hor, up, pow(y, 0.6)) : mix(hor, down, pow(-y, 0.5)); gl_FragColor = vec4(c, 1.0); \n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}" });   // convert to screen colour like every other material
 const sky = new THREE.Mesh(new THREE.SphereGeometry(120000, 48, 24), skyMat); scene.add(sky);
 scene.fog = new THREE.FogExp2(0xc8b89a, 0.00003);
 const sun = new THREE.DirectionalLight(0xfff2dc, 2.2); sun.position.set(0.4, 0.75, 0.3); scene.add(sun);
