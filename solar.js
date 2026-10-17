@@ -963,7 +963,7 @@ function town(name, C, R, kind, ang) {
     if (rr > R) continue;
     if (kind === "downtown") { const f = 1 - rr / R, lots = 2;
       for (let a = 0; a < lots; a++) for (let b = 0; b < lots; b++) { const lu = u0 + (a + 0.5) * w / lots, lv = v0 + (b + 0.5) * w / lots, [x, z] = P(lu, lv); if (blocked(x, z, 12)) continue;
-        const h = 20 + Math.pow(tr(), 1.6) * (60 + 300 * f * f), fw = w / lots - 4 - tr() * 6; OFFICE.push([x, z, fw, h, fw * (0.7 + tr() * 0.3), ang]); } }
+        const h = 10 + Math.pow(tr(), 1.4) * (8 + 24 * f), fw = w / lots - 4 - tr() * 6; OFFICE.push([x, z, fw, h, fw * (0.7 + tr() * 0.3), ang]); } }
     else if (rr < R * 0.18) { for (let a = 0; a < 4; a++) { const lu = u0 + (a + 0.5) * w / 4, [x, z] = P(lu, v0 + 8); if (!blocked(x, z, 6)) SHOP.push([x, z, w / 4 - 3, 6 + tr() * 8, 14, ang]);   // main street
         const [x2, z2] = P(lu, v0 + w - 8); if (!blocked(x2, z2, 6)) SHOP.push([x2, z2, w / 4 - 3, 6 + tr() * 8, 14, ang]); } }
     else if (rr < R * 0.3 && (i + j) % 3 === 0) { for (let k = 0; k < 14; k++) { const [x, z] = P(u0 + tr() * w, v0 + tr() * w); if (!blocked(x, z, 2)) TREE.push([x, z, 0.8 + tr() * 0.6]); } }   // a park
@@ -971,7 +971,7 @@ function town(name, C, R, kind, ang) {
         const hw = 10 + tr() * 4, hd = 9 + tr() * 3, hh = tr() < 0.25 ? 7 : 4; HOUSE.push([x, z, hw, hh, hd, ang]); ROOF.push([x, z, hw + 0.8, 2.6, hd + 0.8, ang, hh]);
         if (tr() < 0.5) { const [tx, tz] = P(lu + (tr() - 0.5) * 10, side ? lv - 9 : lv + 9); if (!blocked(tx, tz, 1)) TREE.push([tx, tz, 0.7 + tr() * 0.5]); } } } }
   // a welcome sign on the side toward the world
-  const [sx, sz] = P(0, -R - 25); if (!blocked(sx, sz)) postSign([`Welcome to ${name}`, kind === "downtown" ? "the downtown of the solar system, beside the Sun" : `a town beside ${kind}`, "(fictional, for scale: a block is 90 m, a house 10 m)"], sx, sz, C.x, C.z, 5, 2.0); }
+  const [sx, sz] = P(0, -R - 25); if (!blocked(sx, sz)) postSign([`Welcome to ${name}`, kind === "downtown" ? "the downtown of the solar system, beside the Sun: low and mid-rise, so the towers stand out" : `a town beside ${kind}`, "(fictional, for scale: a block is 90 m, a house 10 m)"], sx, sz, C.x, C.z, 5, 2.0); }
 const TOWNS = [["Helios City", SUN, 1100, "downtown"], ["Globeville", null, 420, "Earth"]];
 const TNAMES = { mercury: "Quicksilver", venus: "Venusberg", mars: "Ares Heights", jupiter: "Jove", saturn: "Ringwood", uranus: "Tiltford", neptune: "Neptune Bay", pluto: "Plutonia Springs",
   ceres: "Ceresville", vesta: "Vesta Grove", halley: "Halley's Landing", quaoar: "Quaoar Flats", orcus: "Orcus Hollow", haumea: "Haumea Point", makemake: "Makemake", arrokoth: "Snowman Creek", gonggong: "Gonggong", eris: "Eris Falls", sedna: "Sedna's End" };
