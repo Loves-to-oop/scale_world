@@ -53948,11 +53948,55 @@ const TDESIGN = {
   pluto: { name: "Heart of Pluto", H: 300, deck: 250, rEl: 22, rOut: 30, build(g) {      // a small pale tower crowned with Pluto's heart, Tombaugh Regio
     g.add(lathe([[0, 0], [18, 0], [15, 260], [10, 280], [0, 282]], towerMat("#c8b090", "#f8eedc", 9, 9)));
     const sh = new THREE.Shape(); sh.moveTo(0, -12); sh.bezierCurveTo(-30, 8, -12, 30, 0, 14); sh.bezierCurveTo(12, 30, 30, 8, 0, -12);
-    const heart = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 4, bevelEnabled: true, bevelSize: 1, bevelThickness: 1 }), M(0xf4ece0, { emissive: 0x332a20 })); heart.position.set(0, 290, -2); g.add(heart); } } };
+    const heart = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 4, bevelEnabled: true, bevelSize: 1, bevelThickness: 1 }), M(0xf4ece0, { emissive: 0x332a20 })); heart.position.set(0, 290, -2); g.add(heart); } },
+  ceres: { name: "Occator Tower", H: 340, deck: 300, rEl: 24, rOut: 32, build(g) {       // grey, with Occator crater's bright salt spots glowing near the top
+    g.add(lathe([[0, 0], [20, 0], [18, 320], [12, 336], [0, 338]], towerMat("#6a6864", "#c8c4bc", 10, 10)));
+    for (let k = 0; k < 7; k++) { const a = k * 0.9, sp = new THREE.Mesh(new THREE.CircleGeometry(2 + (k % 3), 20), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }));
+      sp.position.set(Math.cos(a) * 18.1, 250 + k * 9, Math.sin(a) * 18.1); sp.lookAt(Math.cos(a) * 100, 250 + k * 9, Math.sin(a) * 100); g.add(sp); } } },
+  vesta: { name: "Rheasilvia Tower", H: 360, deck: 310, rEl: 30, rOut: 38, build(g) {    // stout, its top scooped into a giant crater bowl with a central peak, like Vesta's south pole
+    g.add(lathe([[0, 0], [26, 0], [24, 340], [27, 352], [26, 356], [10, 344], [4, 350], [0, 356]], towerMat("#a8a090", "#f0e8d8", 12, 11))); } },
+  halley: { name: "Comet Tower", H: 430, deck: 340, rEl: 18, rOut: 26, build(g) {        // a slim dark tower carrying a lumpy black nucleus, its blue tail streaming away from the Sun
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(9, 14, 370, 8), towerMat("#2a2c30", "#8ab0d8", 5, 12)); m.position.y = 185; g.add(m);
+    const ng = new THREE.IcosahedronGeometry(20, 2), pp = ng.attributes.position; for (let i = 0; i < pp.count; i++) { const v = V3(pp.getX(i), pp.getY(i), pp.getZ(i)); v.multiplyScalar(1 + 0.25 * Math.sin(v.x * 0.3) * Math.cos(v.y * 0.25)); pp.setXYZ(i, v.x * 1.6, v.y, v.z); }
+    ng.computeVertexNormals(); const nuc = new THREE.Mesh(ng, M(0x1e1e22, { roughness: 1 })); nuc.position.y = 392; g.add(nuc);
+    const away = SUN.w.clone().sub(g.position).setY(0).normalize().negate();
+    for (const [len, op] of [[180, 0.25], [120, 0.18]]) { const tail = new THREE.Mesh(new THREE.ConeGeometry(22, len, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0xbfe0ff, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false }));
+      tail.position.copy(away.clone().multiplyScalar(len / 2)).setY(400); tail.quaternion.setFromUnitVectors(V3(0, -1, 0), away.clone().setY(0.05).normalize()); g.add(tail); } } },
+  quaoar: { name: "Quaoar Ring Tower", H: 300, deck: 250, rEl: 20, rOut: 28, build(g) {  // reddish, with one wide ring set far out: Quaoar's ring lies where rings shouldn't survive
+    g.add(lathe([[0, 0], [16, 0], [14, 290], [0, 296]], towerMat("#8a5a3e", "#e8c0a0", 8, 9)));
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(46, 1.4, 8, 96).rotateX(Math.PI / 2), M(0xb8a088, { metalness: 0.5 })); ring.position.y = 275; g.add(ring);
+    for (let k = 0; k < 4; k++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(46, 0.6, 0.6), M(0x6a5a4a)); sp.position.set(0, 275, 0); sp.rotation.y = k * Math.PI / 4; sp.scale.x = 2; g.add(sp); } } },
+  orcus: { name: "Orcus and Vanth", H: 300, deck: 250, rEl: 18, rOut: 26, build(g) {      // twin towers, a big one and its moon Vanth, joined by a sky bridge
+    g.add(lathe([[0, 0], [15, 0], [13, 300], [0, 304]], towerMat("#7a7a80", "#d0d4dc", 8, 9)));
+    const v = lathe([[0, 0], [8, 0], [7, 200], [0, 204]], towerMat("#5a5a60", "#c0c4cc", 5, 6)); v.position.set(-45, 0, 0); g.add(v);
+    const br = new THREE.Mesh(new THREE.BoxGeometry(32, 3, 4), M(0xc8ccd4, { metalness: 0.6 })); br.position.set(-26, 170, 0); g.add(br); } },
+  haumea: { name: "Spinning Egg", H: 340, deck: 270, rEl: 20, rOut: 28, build(g) {       // a white tower crowned by a stretched egg and its ring: Haumea spins every four hours
+    g.add(lathe([[0, 0], [16, 0], [12, 300], [0, 304]], towerMat("#c8ccd4", "#ffffff", 8, 9)));
+    const egg = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), M(0xf0f0f4, { roughness: 0.3 })); egg.scale.set(30, 12, 19); egg.position.y = 320; g.add(egg);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(42, 0.8, 6, 96).rotateX(Math.PI / 2), M(0xd8d8e0)); ring.position.y = 320; g.add(ring); } },
+  makemake: { name: "Methane Spire", H: 330, deck: 270, rEl: 20, rOut: 28, build(g) {    // reddish-brown, with frosty white methane-ice facets
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(4, 18, 330, 5), towerMat("#9a5a40", "#ffe8d8", 5, 10)); m.position.y = 165; g.add(m);
+    for (let k = 0; k < 10; k++) { const f = new THREE.Mesh(new THREE.TetrahedronGeometry(6 + (k % 3) * 2), M(0xf4f8fc, { roughness: 0.2, metalness: 0.1 })); const a = k * 1.3, y = 60 + k * 24, r = 18 - y / 330 * 14;
+      f.position.set(Math.cos(a) * r, y, Math.sin(a) * r); g.add(f); } } },
+  arrokoth: { name: "Snowman Tower", H: 270, deck: 200, rEl: 18, rOut: 26, build(g) {     // two flattened red lobes stuck gently together on top, like Arrokoth
+    g.add(lathe([[0, 0], [14, 0], [12, 220], [0, 224]], towerMat("#8a4a34", "#e0b098", 7, 7)));
+    for (const [sx, sy, sz, x] of [[26, 12, 20, 0], [18, 10, 15, 34]]) { const l = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), M(0xb0603e, { roughness: 0.9 })); l.scale.set(sx, sy, sz); l.position.set(x - 12, 240, 0); g.add(l); } } },
+  gonggong: { name: "Gonggong Tower", H: 310, deck: 260, rEl: 18, rOut: 26, build(g) {   // one of the reddest objects known: a deep red tower with a slanting crown
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(10, 15, 290, 12), towerMat("#8a2a20", "#ffb0a0", 6, 9)); m.position.y = 145; g.add(m);
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 12, 40, 12), M(0xb0402e)); c.position.y = 310; c.rotation.z = 0.25; g.add(c); } },
+  eris: { name: "Discord Tower", H: 490, deck: 420, rEl: 28, rOut: 36, build(g) {        // the tallest of the far towers: icy white facets, crowned by Eris's golden apple of discord
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(10, 24, 450, 8, 6), towerMat("#e4e8f0", "#ffffff", 8, 14, { metalness: 0.2, roughness: 0.2 })); m.position.y = 225; g.add(m);
+    const apple = new THREE.Mesh(new THREE.SphereGeometry(13, 32, 24), M(0xe8b030, { metalness: 0.9, roughness: 0.25, emissive: 0x302000 })); apple.scale.y = 0.9; apple.position.y = 466; g.add(apple);
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.2, 8, 8), M(0x6a4a1a)); stem.position.y = 481; g.add(stem);
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), M(0xc89a20, { metalness: 0.9 })); leaf.scale.set(7, 0.6, 3); leaf.position.set(5, 482, 0); leaf.rotation.z = 0.4; g.add(leaf); } },
+  sedna: { name: "Far Tower", H: 360, deck: 300, rEl: 20, rOut: 28, build(g) {           // dark red, ringed by a long, tilted ellipse: Sedna's 11,000-year orbit
+    g.add(lathe([[0, 0], [16, 0], [12, 340], [0, 346]], towerMat("#5a2018", "#e08a70", 8, 11)));
+    const ell = new THREE.Mesh(new THREE.TorusGeometry(30, 0.9, 6, 120), M(0xc0503a, { metalness: 0.6 })); ell.scale.set(2.4, 1, 1); ell.position.y = 330; ell.rotation.x = Math.PI / 2 - 0.2; g.add(ell); } } };
 const towerSpots = { earth: { w: V3(0, 0, 0), r: 0.15, away: V3(-0.8, 0, -0.6) } };
 for (const b of BODIES) { const f = V3(b.w.x - b.E.x, 0, b.w.z - b.E.z).normalize(); towerSpots[b.id] = { w: b.w, r: b.r, away: V3(-f.z, 0, f.x), body: b }; }
+for (const b of SMALL) { const f = V3(b.w.x, 0, b.w.z).normalize(); towerSpots[b.id] = { w: b.w, r: b.r, away: V3(-f.z, 0, f.x), body: b }; }
 const cabMat = new THREE.MeshStandardMaterial({ color: 0xcfe8f5, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide });
-for (const [id, D] of Object.entries(TDESIGN)) { const S = towerSpots[id], dist = id === "earth" ? 95 : S.r + D.rOut + 90, A = V3(S.w.x, 0, S.w.z).addScaledVector(S.away, dist), g0 = terrainH(A.x, A.z);
+for (const [id, D] of Object.entries(TDESIGN)) { const S = towerSpots[id]; if (!S) continue; const dist = id === "earth" ? 95 : S.r + D.rOut + 90, A = V3(S.w.x, 0, S.w.z).addScaledVector(S.away, dist), g0 = terrainH(A.x, A.z);
   const g = new THREE.Group(); g.position.set(A.x, g0, A.z); scene.add(g); D.build(g);
   const plinth = new THREE.Mesh(new THREE.CylinderGeometry(D.rOut + 6, D.rOut + 10, 40, 32), M(0x8a8478)); plinth.position.y = -19.9; g.add(plinth);   // its footing, covering any slope
   const toW = V3(S.w.x - A.x, 0, S.w.z - A.z).normalize(), elDir = toW, base = A.clone().addScaledVector(elDir, D.rEl);   // the elevator runs up the side facing the world it's named for
