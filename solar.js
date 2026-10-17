@@ -935,6 +935,66 @@ function stepLift(dt) { if (!lift.riding) return; lift.t += dt; const f = THREE.
   if (f >= 1) { lift.riding = false; if (lift.to > lift.from) { onDeck = lift.T; const p = lift.T.base.clone().addScaledVector(lift.T.elDir, 2.6); const o = renderer.xr.isPresenting ? headOffset() : V3(0, 0, 0); rig.position.set(p.x - o.x, lift.T.deckY, p.z - o.z); } } }   // step out of the cab, toward the view
 function liftLine() { if (lift.riding) { const h = rig.position.y - lift.T.g0; return `glass elevator, ${lift.T.name}: ${Math.round(h)} m up${lift.to > lift.from ? "" : ", going down"} (9 m/s)`; } return onDeck ? `on the observation deck of ${onDeck.name}, ${onDeck.D.deck} m up · E by the elevator to go down` : ""; }
 
+// ---------- towns: a downtown by the Sun and a municipality beside every world (fictional, for scale) ----------
+// Generated, kept clear of the roads, the railway, the towers and stations. Instanced, so thousands of buildings stay cheap.
+const RAILHASH = new Map(); RAIL.pts.forEach((q, i) => { if (i % 3) return; const k = Math.floor(q.x / 60) + "," + Math.floor(q.z / 60); if (!RAILHASH.has(k)) RAILHASH.set(k, []); RAILHASH.get(k).push(q); });
+const ROADSEGS = []; for (const b of BODIES) { const L = [b.S, ...b.arc, ...b.line]; for (let i = 1; i < L.length; i++) ROADSEGS.push([L[i - 1], L[i]]); }
+function segD(px, pz, a, b) { const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz, t = l2 ? Math.max(0, Math.min(1, ((px - a.x) * dx + (pz - a.z) * dz) / l2)) : 0; return Math.hypot(a.x + t * dx - px, a.z + t * dz - pz); }
+function blocked(x, z, pad = 0) {
+  if (Math.abs(z - ZH) < 30 + pad && x > XMIN && x < XMAX) return true;                                   // the interstate
+  if (Math.hypot(x, z - 30) < 320 + pad) return true;                                                   // the desk, car park and on-ramps
+  for (const T of TOWERS) if (Math.hypot(x - T.A.x, z - T.A.z) < T.D.rOut + 25 + pad) return true;
+  for (const b of BODIES) if (Math.hypot(x - b.w.x, z - b.w.z) < b.r + 40 + pad) return true;
+  for (const b of SMALL) if (Math.hypot(x - b.w.x, z - b.w.z) < 25 + pad) return true;
+  for (const P of PLATFORMS) if (Math.hypot(x - P.c.x, z - P.c.z) < 50 + pad) return true;
+  const gx = Math.floor(x / 60), gz = Math.floor(z / 60);
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const q of RAILHASH.get((gx + i) + "," + (gz + j)) || []) if (Math.hypot(q.x - x, q.z - z) < 14 + pad) return true;
+  for (const [a, b] of ROADSEGS) { if (Math.min(a.x, b.x) - 40 > x || Math.max(a.x, b.x) + 40 < x || Math.min(a.z, b.z) - 40 > z || Math.max(a.z, b.z) + 40 < z) continue; if (segD(x, z, a, b) < 16 + pad) return true; }
+  return false; }
+const OFFICE = [], HOUSE = [], ROOF = [], SHOP = [], STREET = [], TREE = [];
+let tseed = 99; const tr = () => (tseed = (tseed * 16807) % 2147483647) / 2147483647;
+function town(name, C, R, kind, ang) {
+  const ca = Math.cos(ang), sa = Math.sin(ang), P = (u, v) => [C.x + u * ca - v * sa, C.z + u * sa + v * ca];
+  const block = kind === "downtown" ? 70 : 90, st = kind === "downtown" ? 16 : 10, n = Math.ceil(R / block);
+  for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) {             // streets: one short segment per block edge, so they follow the ground
+    for (const [du, dv, w, d] of [[block / 2, 0, block + st, st], [0, block / 2, st, block + st]]) { const u = i * block + du, v = j * block + dv; if (Math.hypot(u, v) > R + block * 0.3) continue;
+      const [x, z] = P(u, v); if (!blocked(x, z, 4)) STREET.push([x, z, w, d, ang]); } }
+  for (let i = -n; i < n; i++) for (let j = -n; j < n; j++) { const u0 = i * block + st / 2, v0 = j * block + st / 2, w = block - st, cu = u0 + w / 2, cv = v0 + w / 2, rr = Math.hypot(cu, cv);
+    if (rr > R) continue;
+    if (kind === "downtown") { const f = 1 - rr / R, lots = 2;
+      for (let a = 0; a < lots; a++) for (let b = 0; b < lots; b++) { const lu = u0 + (a + 0.5) * w / lots, lv = v0 + (b + 0.5) * w / lots, [x, z] = P(lu, lv); if (blocked(x, z, 12)) continue;
+        const h = 20 + Math.pow(tr(), 1.6) * (60 + 300 * f * f), fw = w / lots - 4 - tr() * 6; OFFICE.push([x, z, fw, h, fw * (0.7 + tr() * 0.3), ang]); } }
+    else if (rr < R * 0.18) { for (let a = 0; a < 4; a++) { const lu = u0 + (a + 0.5) * w / 4, [x, z] = P(lu, v0 + 8); if (!blocked(x, z, 6)) SHOP.push([x, z, w / 4 - 3, 6 + tr() * 8, 14, ang]);   // main street
+        const [x2, z2] = P(lu, v0 + w - 8); if (!blocked(x2, z2, 6)) SHOP.push([x2, z2, w / 4 - 3, 6 + tr() * 8, 14, ang]); } }
+    else if (rr < R * 0.3 && (i + j) % 3 === 0) { for (let k = 0; k < 14; k++) { const [x, z] = P(u0 + tr() * w, v0 + tr() * w); if (!blocked(x, z, 2)) TREE.push([x, z, 0.8 + tr() * 0.6]); } }   // a park
+    else { for (let a = 0; a < 3; a++) for (const side of [0, 1]) { const lu = u0 + (a + 0.5) * w / 3, lv = side ? v0 + w - 11 : v0 + 11, [x, z] = P(lu, lv); if (blocked(x, z, 4)) continue;
+        const hw = 10 + tr() * 4, hd = 9 + tr() * 3, hh = tr() < 0.25 ? 7 : 4; HOUSE.push([x, z, hw, hh, hd, ang]); ROOF.push([x, z, hw + 0.8, 2.6, hd + 0.8, ang, hh]);
+        if (tr() < 0.5) { const [tx, tz] = P(lu + (tr() - 0.5) * 10, side ? lv - 9 : lv + 9); if (!blocked(tx, tz, 1)) TREE.push([tx, tz, 0.7 + tr() * 0.5]); } } } }
+  // a welcome sign on the side toward the world
+  const [sx, sz] = P(0, -R - 25); if (!blocked(sx, sz)) postSign([`Welcome to ${name}`, kind === "downtown" ? "the downtown of the solar system, beside the Sun" : `a town beside ${kind}`, "(fictional, for scale: a block is 90 m, a house 10 m)"], sx, sz, C.x, C.z, 5, 2.0); }
+const TOWNS = [["Helios City", SUN, 1100, "downtown"], ["Globeville", null, 420, "Earth"]];
+const TNAMES = { mercury: "Quicksilver", venus: "Venusberg", mars: "Ares Heights", jupiter: "Jove", saturn: "Ringwood", uranus: "Tiltford", neptune: "Neptune Bay", pluto: "Plutonia Springs",
+  ceres: "Ceresville", vesta: "Vesta Grove", halley: "Halley's Landing", quaoar: "Quaoar Flats", orcus: "Orcus Hollow", haumea: "Haumea Point", makemake: "Makemake", arrokoth: "Snowman Creek", gonggong: "Gonggong", eris: "Eris Falls", sedna: "Sedna's End" };
+for (const b of [...BODIES, ...SMALL]) if (TNAMES[b.id]) TOWNS.push([TNAMES[b.id], b, b.id === "jupiter" || b.id === "saturn" ? 520 : 400, b.name]);
+for (const [name, b, R, kind] of TOWNS) {
+  let C, ang;
+  if (!b) { C = V3(-700, 0, -550); ang = 0.3; }
+  else { const S = towerSpots[b.id], away = S ? S.away : V3(1, 0, 0); C = V3(b.w.x, 0, b.w.z).addScaledVector(away, -(b.r + R + 260)); ang = Math.atan2(away.z, away.x); }
+  town(name, C, R, kind, ang); }
+{ // build the instanced meshes
+  const inst = (list, geo, mat, set) => { const im = new THREE.InstancedMesh(geo, mat, Math.max(1, list.length)), c = new THREE.Color(); list.forEach((q, i) => { set(q, O3, c); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); if (im.instanceColor || c.__set) im.setColorAt(i, c); });
+    if (!list.length) im.count = 0; im.frustumCulled = false; scene.add(im); return im; };
+  const box = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+  const offT = winTex("#7a8a9a", "#c8e0f0", 6, 12); offT.repeat.set(1, 1);
+  inst(OFFICE, box, new THREE.MeshStandardMaterial({ map: offT, roughness: 0.35, metalness: 0.4 }), ([x, z, w, h, d, a], O, c) => { O.position.set(x, terrainH(x, z) - 3, z); O.rotation.set(0, -a, 0); O.scale.set(w, h + 3, d); c.setHSL(0.58 + tr() * 0.08, 0.15, 0.55 + tr() * 0.3); c.__set = 1; });
+  inst(SHOP, box, M(0xffffff, { roughness: 0.8 }), ([x, z, w, h, d, a], O, c) => { O.position.set(x, terrainH(x, z) - 2, z); O.rotation.set(0, -a, 0); O.scale.set(w, h + 2, d); c.setHSL(tr(), 0.35, 0.6); c.__set = 1; });
+  inst(HOUSE, box, M(0xffffff, { roughness: 0.85 }), ([x, z, w, h, d, a], O, c) => { O.position.set(x, terrainH(x, z) - 2, z); O.rotation.set(0, -a, 0); O.scale.set(w, h + 2, d); c.set([0xe8d8b8, 0xc8a878, 0xa8c0d0, 0xd8b0a0, 0xb8c8a0, 0xf0e8d8, 0x9aa8b0][(tr() * 7) | 0]); c.__set = 1; });
+  const prism = new THREE.CylinderGeometry(0.5, 0.5, 1, 3).rotateZ(Math.PI / 2).rotateX(Math.PI / 2); prism.scale(1, 1, 1);
+  const roofG = new THREE.CylinderGeometry(0.577, 0.577, 1, 3, 1).rotateX(Math.PI / 2).rotateZ(Math.PI / 2).translate(0, 0.29, 0);
+  inst(ROOF, roofG, M(0xffffff, { roughness: 0.8 }), ([x, z, w, h, d, a, wall], O, c) => { O.position.set(x, terrainH(x, z) + wall, z); O.rotation.set(0, -a, 0); O.scale.set(w, h, d); c.set([0x7a3a2a, 0x4a4a52, 0x6a5a4a, 0x3a4a5a, 0x8a5a3a][(tr() * 5) | 0]); c.__set = 1; });
+  inst(STREET, new THREE.BoxGeometry(1, 0.06, 1), M(0x45484c, { roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2 }), ([x, z, w, d, a], O) => { O.position.set(x, terrainH(x, z) + 0.2, z); O.rotation.set(0, -a, 0); O.scale.set(w, 1, d); });
+  inst(TREE, new THREE.IcosahedronGeometry(4, 0).translate(0, 7, 0), M(0x3f6a2a, { flatShading: true }), ([x, z, s], O, c) => { O.position.set(x, terrainH(x, z), z); O.rotation.set(0, tr() * 6, 0); O.scale.setScalar(s); c.setHSL(0.27 + tr() * 0.06, 0.4, 0.25 + tr() * 0.1); c.__set = 1; }); }
+
 // ---------- the wrist teleporter (VR): a panel on your left wrist; point the right controller at a place and pull the trigger ----------
 const PLACES = [["🚆 board the train", "#b8322a", "train"], ["Earth (the globe)", "#5a9ae8", () => [V3(0, 0, 1.7), GC]], ["the Moon", "#d8d8d8", () => moonSpot()], ["your car", "#ff6a5a", () => [car.position.clone().add(V3(-2.5, 0, 2.5)), car.position]],
   ...BODIES.map(b => [b.name === "the Sun" ? "Sun" : b.name, b.col, () => [b.stop.clone(), b.c]]),
