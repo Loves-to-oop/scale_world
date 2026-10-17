@@ -161,7 +161,7 @@ function terrainH(x, z) { return gridH(inInner(x, z) ? INNER : OUTER, x, z); }
   const mesh = (G, sinkInner) => {
     const geo = new THREE.PlaneGeometry(2 * G.half, 2 * G.half, G.N, G.N).rotateX(-Math.PI / 2), p = geo.attributes.position, col = new Float32Array(p.count * 3), c = new THREE.Color();
     for (let i = 0; i < p.count; i++) { const h = G.H[i], x = p.getX(i), z = p.getZ(i);
-      p.setY(i, sinkInner && Math.abs(x) < INNER.half - 1 && Math.abs(z) < INNER.half - 1 ? h - 2 : h);   // the coarse grid tucks under the fine one
+      p.setY(i, sinkInner && Math.abs(x) < INNER.half && Math.abs(z) < INNER.half ? Math.min(h, gridH(INNER, x, z)) - 4 : h);   // the coarse grid always tucks under the fine one
       const n = 0.5 + 0.25 * Math.sin(x * 0.00031 + Math.sin(z * 0.00017) * 3) + 0.25 * Math.sin(z * 0.00043 + x * 0.0001);
       c.setHSL(0.25 + 0.04 * n, 0.42, 0.33 + 0.08 * n);
       if (h > 900) c.lerp(new THREE.Color(0x8a8478), Math.min(1, (h - 900) / 900)); if (h > 2600) c.lerp(new THREE.Color(0xf4f6f8), Math.min(1, (h - 2600) / 600));
@@ -173,7 +173,11 @@ function terrainH(x, z) { return gridH(inInner(x, z) ? INNER : OUTER, x, z); }
   mesh(OUTER, true); mesh(INNER, false); }
 
 // a paved ribbon along xz points, laid on the ground
-function ribbon(pts, width, mat, lift = 0.12, uvLen = 12) {
+function densify(pts, step = 8) { const out = [pts[0]];
+  for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / step));
+    for (let k = 1; k <= n; k++) out.push(V3(a.x + (b.x - a.x) * k / n, 0, a.z + (b.z - a.z) * k / n)); } return out; }
+const ROAD_LIFT = 0.3;
+function ribbon(pts, width, mat, lift = ROAD_LIFT, uvLen = 12) { pts = densify(pts);
   const pos = [], uv = [], idx = []; let run = 0;
   pts.forEach((q, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], t = V3(b.x - a.x, 0, b.z - a.z).normalize(), n = V3(-t.z, 0, t.x);
     if (i) run += Math.hypot(q.x - pts[i - 1].x, q.z - pts[i - 1].z);
@@ -193,17 +197,17 @@ const laneMat = new THREE.MeshStandardMaterial({ map: roadTex(256, 256, (g, w, h
   g.fillStyle = "#f1c40f"; for (let y = 0; y < h; y += 128) g.fillRect(w / 2 - 3, y, 6, 64); }), ...roadOff });
 const XMAX = Math.max(0, ...BODIES.map(b => b.x0)) + 1500, XMIN = Math.min(0, ...BODIES.map(b => b.x0)) - 1500;
 const hwyPts = []; for (let x = XMIN; x <= XMAX; x += 40) hwyPts.push(V3(x, 0, ZH));
-ribbon(hwyPts, 26, hwyMat, 0.12, 26);
+ribbon(hwyPts, 26, hwyMat, ROAD_LIFT, 26);
 const ONRAMP = [V3(2, 0, 36), V3(30, 0, 37), V3(80, 0, 42), V3(140, 0, 52), V3(200, 0, 60), V3(260, 0, ZE)];
 const ONRAMP_W = [V3(6, 0, 36), V3(-20, 0, 37), V3(-70, 0, 42), V3(-130, 0, 50), V3(-200, 0, ZW)];
-ribbon(new THREE.CatmullRomCurve3(ONRAMP).getPoints(40), 7, laneMat, 0.16, 8); ribbon(new THREE.CatmullRomCurve3(ONRAMP_W).getPoints(30), 7, laneMat, 0.16, 8);
+ribbon(new THREE.CatmullRomCurve3(ONRAMP).getPoints(40), 7, laneMat, ROAD_LIFT + 0.04, 8); ribbon(new THREE.CatmullRomCurve3(ONRAMP_W).getPoints(30), 7, laneMat, ROAD_LIFT + 0.04, 8);
 { const pad = new THREE.Mesh(new THREE.BoxGeometry(24, 0.1, 12), M(0x4a4d50, { roughness: 0.9 })); pad.position.set(4, 0.06, 36); scene.add(pad); }
 for (const b of BODIES) {
   b.arc = []; const n = Math.max(4, Math.ceil(b.th * RR / 8)); for (let k = 0; k <= n; k++) b.arc.push(arcPt(b.S, b.h0, b.turn, b.th * k / n));
   const L = Math.hypot(b.stop.x - b.E.x, b.stop.z - b.E.z), m = Math.max(2, Math.ceil(L / 40)); b.line = [];
   for (let k = 1; k <= m; k++) b.line.push(V3(b.E.x + (b.stop.x - b.E.x) * k / m, 0, b.E.z + (b.stop.z - b.E.z) * k / m));
   const loop = []; for (let k = 0; k <= 48; k++) { const a = k / 48 * Math.PI * 2; loop.push(V3(b.w.x + (b.r + 14) * Math.cos(a), 0, b.w.z + (b.r + 14) * Math.sin(a))); }
-  ribbon([b.S.clone().add(V3(b.east ? -60 : 60, 0, 0)), ...b.arc, ...b.line], 8, laneMat, 0.18, 10); ribbon(loop, 8, laneMat, 0.18, 10);
+  ribbon([b.S.clone().add(V3(b.east ? -60 : 60, 0, 0)), ...b.arc, ...b.line], 8, laneMat, ROAD_LIFT + 0.06, 10); ribbon(loop, 8, laneMat, ROAD_LIFT + 0.06, 10);
 }
 
 // ---------- the desk, the globe, the satellites and the Moon ----------
@@ -391,9 +395,16 @@ const car = new THREE.Group(); scene.add(car);
   const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.022, 8, 24), dark); wheel.position.set(-0.42, 0.86, -0.36); wheel.rotation.x = -0.75; car.add(wheel);
   for (const [x, z] of [[-0.85, -1.4], [0.85, -1.4], [-0.85, 1.4], [0.85, 1.4]]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.24, 20).rotateZ(Math.PI / 2), dark); w.position.set(x, 0.34, z); car.add(w);
     const h = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.25, 16).rotateZ(Math.PI / 2), chrome); h.position.copy(w.position); car.add(h); } }
-const dashC = document.createElement("canvas"); dashC.width = 768; dashC.height = 320;
+// the dashboard: a touch screen. Press a planet to drive there (click it, or point a controller at it and pull the trigger)
+const dashC = document.createElement("canvas"); dashC.width = 1024; dashC.height = 560;
 const dashT = new THREE.CanvasTexture(dashC); dashT.colorSpace = THREE.SRGBColorSpace;
-{ const d = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.25), new THREE.MeshBasicMaterial({ map: dashT, toneMapped: false })); d.position.set(0.3, 1.06, -0.6); d.rotation.x = -0.75; car.add(d); }
+const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 0.45), new THREE.MeshBasicMaterial({ map: dashT, toneMapped: false })); dash.position.set(0.05, 1.0, -0.66); dash.rotation.x = -0.6; car.add(dash);
+const DASH_BTNS = [];
+BODIES.forEach((b, k) => DASH_BTNS.push({ x: 20 + (k % 5) * 198, y: 236 + Math.floor(k / 5) * 96, w: 188, h: 84, label: b.name === "the Sun" ? "Sun" : b.name, col: b.col, act: () => driveTo(b), body: b }));
+DASH_BTNS.push({ x: 812, y: 332, w: 188, h: 84, label: "Desk", col: "#3d7cc9", act: () => driveHome() });
+[["slower", () => { speedI = Math.max(1, speedI - 1); }], ["stop / go", () => { speedI = speedI ? 0 : 4; }], ["faster", () => { speedI = Math.min(SPEEDS.length - 1, speedI + 1); }], ["get out", () => exitCar()]]
+  .forEach(([label, act], k) => DASH_BTNS.push({ x: 20 + k * 250, y: 440, w: 236, h: 100, label, col: k === 3 ? "#b84a3a" : "#4a6a8a", act }));
+function pressDash(uv) { const px = uv.x * 1024, py = (1 - uv.y) * 560, b = DASH_BTNS.find(q => px > q.x && px < q.x + q.w && py > q.y && py < q.y + q.h); if (b) { b.act(); b.flash = 0.25; dashTimer = 0; } return !!b; }
 const SPEEDS = [0, 5, 30, 60, 100, 200, 500, 1000, 3000, 10000, 30000, 100000];   // km/h, here
 let carRoute = null, carS = 0, speedI = 4, inCar = false, dest = null;
 function routeFor(b) {
@@ -412,22 +423,26 @@ function driveTo(b) {                                  // from wherever the car 
   if (carRoute && carS > 1) { const at = routeAt(carRoute, carS), back = [at.p, ...carRoute.pts.slice(0, at.i + 1).reverse()]; carRoute = mkRoute([...back, ...next.pts]); }
   else carRoute = next;
   carS = 0; dest = b; if (speedI === 0) speedI = 4; enterCar(); }
+function driveHome() {                                // back along the road to the car park by the desk
+  if (carRoute && carS > 1) { const at = routeAt(carRoute, carS); carRoute = mkRoute([at.p, ...carRoute.pts.slice(0, at.i + 1).reverse()]); carS = 0; dest = { name: "the desk" }; if (!speedI) speedI = 4; } }
 function placeCar() {
   const r = carRoute ? routeAt(carRoute, carS) : { p: V3(4, 0, 36), dir: V3(1, 0, 0) };
   const ahead = r.p.clone().addScaledVector(r.dir, 2), behind = r.p.clone().addScaledVector(r.dir, -2);
-  const y = terrainH(r.p.x, r.p.z) + 0.18, pitch = Math.atan2(terrainH(ahead.x, ahead.z) - terrainH(behind.x, behind.z), 4);
+  const y = terrainH(r.p.x, r.p.z) + ROAD_LIFT + 0.08, pitch = Math.atan2(terrainH(ahead.x, ahead.z) - terrainH(behind.x, behind.z), 4);
   car.position.set(r.p.x, y, r.p.z); car.rotation.set(pitch, Math.atan2(-r.dir.x, -r.dir.z), 0, "YXZ"); }
 placeCar();
 function enterCar() { if (!inCar) { yaw = 0; pitch = -0.1; vrTurn = 0; } inCar = true; flying = false; }   // look out over the hood: in the car, the view is relative to the car
 function exitCar() { inCar = false; yaw += car.rotation.y; const s = V3(-2.2, 0, 0.3).applyEuler(new THREE.Euler(0, car.rotation.y, 0)); rig.position.set(car.position.x + s.x, terrainH(car.position.x + s.x, car.position.z + s.z), car.position.z + s.z); rig.rotation.set(0, 0, 0); camera.position.y = 1.65; }
 function drawDash(v) {
-  const g = dashC.getContext("2d"); g.fillStyle = "#0d1a22"; g.fillRect(0, 0, 768, 320); g.strokeStyle = "#c9a227"; g.lineWidth = 6; g.strokeRect(3, 3, 762, 314);
+  const g = dashC.getContext("2d"); g.fillStyle = "#0d1a22"; g.fillRect(0, 0, 1024, 560); g.strokeStyle = "#c9a227"; g.lineWidth = 6; g.strokeRect(3, 3, 1018, 554);
+  for (const b of DASH_BTNS) { g.fillStyle = b.flash > 0 ? "#ffe9a8" : b.body && b.body === dest ? "#2a4a3a" : "#1e2e3a"; g.beginPath(); g.roundRect(b.x, b.y, b.w, b.h, 12); g.fill();
+    g.strokeStyle = b.col; g.lineWidth = 4; g.stroke(); g.fillStyle = b.flash > 0 ? "#1a1a1a" : "#ffffff"; g.font = "700 30px -apple-system, Helvetica, sans-serif"; g.textAlign = "center"; g.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 + 11); g.textAlign = "left"; }
   const t = (s, y, sz, col = "#e6f3f9", w = 400) => { g.fillStyle = col; g.font = `${w} ${sz}px -apple-system, Helvetica, sans-serif`; g.fillText(s, 22, y); };
   t(dest ? `→ ${dest.name}` : "pick a destination", 52, 40, "#ffe9a8", 700);
   t(`${SPEEDS[speedI].toLocaleString()} km/h here  =  ${(v / C_HERE).toFixed(v / C_HERE < 10 ? 1 : 0)} × the speed of light here`, 112, 30);
   t(`at real size: ${fmtKm(v / K * 3.6)}/h = ${(v / K / 299792458).toFixed(v / K / 299792458 < 10 ? 1 : 0)} × the real speed of light`, 156, 26, "#a9c6d4");
-  if (carRoute) { const left = carRoute.L - carS; t(`${fmtM(left)} to go${v > 0 ? `  ·  ${fmtT(left / v)}` : ""}`, 206, 30); }
-  t(IS_HEADSET ? "A / B slower / faster  ·  Y next destination  ·  X get out" : "W / S faster / slower  ·  1–9 destination  ·  E get out", 290, 22, "#a9c6d4");
+  if (carRoute) { const left = carRoute.L - carS; t(`${fmtM(left)} to go${v > 0 ? `  ·  ${fmtT(left / v)}` : ""}${left < 1 && dest ? "  ·  arrived: press another planet, or get out" : ""}`, 196, 28); }
+  t(IS_HEADSET ? "point at a button and pull the trigger" : "click a button  ·  or W / S speed, 1–9 destination, E get out", 222, 20, "#a9c6d4");
   dashT.needsUpdate = true; }
 
 // ---------- getting about ----------
@@ -445,7 +460,15 @@ addEventListener("keydown", e => { keys[e.code] = true; start();
   if (e.code === "Equal") speed = Math.min(5000, speed * 2); if (e.code === "Minus") speed = Math.max(0.05, speed / 2); });
 addEventListener("keyup", e => { keys[e.code] = false; });
 addEventListener("wheel", e => { if (renderer.xr.isPresenting) return; speed = THREE.MathUtils.clamp(speed * (e.deltaY < 0 ? 1.25 : 0.8), 0.05, 5000); });
-renderer.domElement.addEventListener("pointerdown", () => { dragging = true; start(); });
+const ray = new THREE.Raycaster();
+renderer.domElement.addEventListener("pointerdown", e => { start();
+  if (inCar) { ray.setFromCamera(new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1), camera); const hit = ray.intersectObject(dash)[0]; if (hit && pressDash(hit.uv)) return; }
+  dragging = true; });
+// VR: a laser from each controller; pull the trigger while pointing at the dashboard to press a button
+for (const i of [0, 1]) { const c = renderer.xr.getController(i); rig.add(c);
+  const laser = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(0, 0, 0), V3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xffe9a8 })); laser.scale.z = 2; laser.visible = false; c.add(laser); c.userData.laser = laser;
+  c.addEventListener("selectstart", () => { if (!inCar) return; const m = new THREE.Matrix4().extractRotation(c.matrixWorld); ray.ray.origin.setFromMatrixPosition(c.matrixWorld); ray.ray.direction.set(0, 0, -1).applyMatrix4(m);
+    const hit = ray.intersectObject(dash)[0]; if (hit) pressDash(hit.uv); }); }
 addEventListener("pointerup", () => dragging = false);
 addEventListener("pointermove", e => { if (!dragging) return; yaw -= e.movementX * 0.004; pitch = THREE.MathUtils.clamp(pitch - e.movementY * 0.004, -1.5, 1.5); });
 intro?.addEventListener("click", start);
@@ -546,7 +569,7 @@ function frame() {
       if (src.handedness === "left") { mx += ax; my += ay;
         if (tap("L", gp, 4)) { if (inCar) exitCar(); else { carRoute = carRoute; enterCar(); } }
         if (tap("L", gp, 5)) { const k = dest ? (BODIES.indexOf(dest) + 1) % BODIES.length : 0; driveTo(BODIES[k]); } }
-      else { if (gp.buttons[0]?.value > 0.3) boost = 6; my += ay;
+      else { if (gp.buttons[0]?.value > 0.3 && !inCar) boost = 6; my += ay;
         if (Math.abs(ax) > 0.7 && snap) { vrTurn -= Math.sign(ax) * Math.PI / 6; snap = false; } else if (Math.abs(ax) < 0.3) snap = true;
         if (inCar && tap("R", gp, 4)) speedI = Math.max(0, speedI - 1); if (inCar && tap("R", gp, 5)) speedI = Math.min(SPEEDS.length - 1, speedI + 1); } }
     if (!inCar) { rig.rotation.y = vrTurn;
@@ -567,8 +590,11 @@ function frame() {
     placeCar(); moved = carRoute && carS < carRoute.L ? v : 0;
     const seat = V3(-0.42, 0.7, 0.3).applyEuler(car.rotation).add(car.position); rig.position.copy(seat);
     if (vr) rig.rotation.set(0, car.rotation.y + vrTurn, 0); else { rig.rotation.set(0, car.rotation.y, 0); camera.position.y = 0.55; camera.rotation.set(pitch, yaw, 0, "YXZ"); }
-    dashTimer -= dt; if (dashTimer <= 0) { drawDash(v); dashTimer = 0.25; } }
+    for (const b of DASH_BTNS) if (b.flash > 0) b.flash -= dt;
+    dashTimer -= dt; if (dashTimer <= 0) { drawDash(v); dashTimer = 0.2; } }
   else if (!vr) rig.rotation.set(0, 0, 0);
+  if (guide.style.display !== (inCar ? "none" : "")) guide.style.display = inCar ? "none" : "";   // the dashboard replaces the guide while you drive
+  for (const i of [0, 1]) { const l = renderer.xr.getController(i).userData.laser; if (l) l.visible = vr && inCar; }
   if (t - waveT > 60) { spawnWave(t); waveT = t; }
   for (let i = WAVES.length - 1; i >= 0; i--) { const w = WAVES[i], r = SUN.r + (t - w.t) * C_HERE; w.l.scale.setScalar(r);
     if (r > 6000) { scene.remove(w.l); w.l.material.dispose(); WAVES.splice(i, 1); } }
