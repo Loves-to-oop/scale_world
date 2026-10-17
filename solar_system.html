@@ -53160,8 +53160,46 @@ const radec = (ra, dec) => eqToWorld(V3(Math.cos(dec * deg) * Math.cos(ra * deg)
 const EARTH = helio("earth");
 const Y0 = 1.06;                                       // the globe's centre above the ground: the ecliptic runs through it
 
+// ---------- exoplanet systems (?system=...): the same 12-inch-globe scale, starting beside the system's best-known planet ----------
+// [letter, radius in Earths, orbit in AU, type, town, facts]. Where each planet is on its orbit is illustrative (all are put on
+// the far side of the star from the desk, so the system lies north of the interstate); orbits are drawn flat.
+const EXOSYS = {
+  trappist1: { name: "TRAPPIST-1", sep: "", ly: 40.7, city: "Ember City", home: "e", star: [0.1192, "#ff8a5a", ["an ultracool red dwarf, barely bigger than Jupiter, 2,566 K", "all seven planets orbit closer to it than Mercury is to the Sun"]],
+    planets: [["b", 1.116, 0.01154, "hot", "Cinderford", ["a year of 1.5 days", "JWST found no thick atmosphere: scorched bare rock"]], ["c", 1.097, 0.0158, "hot", "Ashton", ["a 2.4-day year", "little or no atmosphere"]],
+      ["d", 0.788, 0.02227, "temperate", "Duskmere", ["a 4-day year", "on the inner edge of the habitable zone"]], ["e", 0.92, 0.02925, "temperate", "Evensong", ["a 6-day year", "in the habitable zone: the best chance of liquid water here"]],
+      ["f", 1.045, 0.03849, "ice", "Frostholm", ["a 9-day year", "possibly an ocean world under ice"]], ["g", 1.129, 0.04683, "ice", "Glimmer", ["a 12-day year", "the largest of the seven"]],
+      ["h", 0.755, 0.06189, "ice", "Hollowell", ["a 19-day year", "the outermost and coldest"]]] },
+  proxima: { name: "Proxima Centauri", sep: " ", ly: 4.24, city: "Flare City", home: "b", star: [0.1542, "#ff7a50", ["the nearest star to the Sun: 4.24 light-years", "a small red dwarf that flares violently"]],
+    planets: [["d", 0.81, 0.02885, "hot", "Flarebrook", ["about a quarter of the Earth's mass", "a 5-day year; radius estimated"]],
+      ["b", 1.07, 0.04857, "temperate", "Proxima Landing", ["the nearest known exoplanet, at least 1.07 Earth masses", "in the habitable zone, an 11-day year; radius estimated (it has never been seen to cross its star)"]]] },
+  kepler90: { name: "Kepler-90", sep: "", ly: 2840, city: "Octavia", home: "h", star: [1.2, "#fff4dc", ["a Sun-like star 2,840 light-years away", "eight planets, as many as our solar system, all within 1 AU"]],
+    planets: [["b", 1.31, 0.074, "hot", "Bayside", ["a 7-day year"]], ["c", 1.18, 0.089, "hot", "Cobalt", ["a 9-day year"]], ["i", 1.32, 0.107, "hot", "Ivory", ["found in 2017 by a machine-learning search of Kepler data"]],
+      ["d", 2.88, 0.32, "ice", "Delmar", ["a mini-Neptune"]], ["e", 2.67, 0.42, "ice", "Eastvale", ["a mini-Neptune"]], ["f", 2.89, 0.48, "ice", "Fairhaven", ["a mini-Neptune"]],
+      ["g", 8.13, 0.71, "gas", "Glenmoor", ["Saturn-size, with a puffy, low-density atmosphere"]], ["h", 11.32, 1.01, "gas", "Harborview", ["Jupiter-size, at almost exactly the Earth's distance from its star", "a year of 331 days"]]] },
+  hr8799: { name: "HR 8799", sep: " ", ly: 133, city: "Glowtown", home: "e", star: [1.44, "#f2f4ff", ["a young star, 30-40 million years old, 133 light-years away", "the first planetary system photographed directly (2008)"]],
+    planets: [["e", 13.5, 16.4, "gas", "Embervale", ["about 7 Jupiter masses, still glowing hot from its formation", "radius estimated, ~1.2 Jupiters"]], ["d", 13.5, 27, "gas", "Deepwater", ["about 9 Jupiter masses; radius estimated"]],
+      ["c", 13.5, 41, "gas", "Crestline", ["about 8 Jupiter masses; radius estimated"]], ["b", 13.5, 68, "gas", "Brightwater", ["the outermost: a 460-year orbit; radius estimated"]]] },
+  cancri55: { name: "55 Cancri", sep: " ", ly: 41, city: "Copper City", home: "e", star: [0.943, "#fff0cc", ["a Sun-like star with a red-dwarf companion, 41 light-years away", "five planets, from a lava world to a Jupiter 6 AU out"]],
+    planets: [["e", 1.88, 0.01544, "hot", "Lavaburgh", ["a 'lava world': an 18-hour year, its dayside ~2,400 °C", "JWST hints at an atmosphere"]], ["b", 13, 0.1134, "gas", "Bramble", ["0.8 Jupiter masses; radius estimated"]],
+      ["c", 8, 0.2373, "gas", "Copperfield", ["radius estimated"]], ["f", 7, 0.7708, "gas", "Fernhill", ["in the habitable zone, but a gas giant; radius estimated"]], ["d", 12.5, 5.957, "gas", "Driftwood", ["a Jupiter-like giant 6 AU out; radius estimated"]]] },
+  kepler186: { name: "Kepler-186", sep: "", ly: 580, city: "Amberton", home: "f", star: [0.523, "#ffb37a", ["a red dwarf 580 light-years away", "five small planets"]],
+    planets: [["b", 1.07, 0.0378, "hot", "Brookline", ["a 4-day year"]], ["c", 1.25, 0.0574, "hot", "Cedarton", ["a 7-day year"]], ["d", 1.4, 0.0861, "hot", "Dunmore", ["a 13-day year"]],
+      ["e", 1.27, 0.1216, "temperate", "Elmwood", ["a 22-day year"]], ["f", 1.17, 0.432, "temperate", "Fernvale", ["the first Earth-size planet found in a habitable zone (2014)", "a 130-day year under a dim orange star"]]] } };
+const EXO = EXOSYS[new URLSearchParams(location.search).get("system")] || null;
+const TYPECOL = { hot: "#c8683a", temperate: "#5a8ac0", ice: "#a8d0e4", gas: "#d8b890" };
+let HOME_NAME = "Earth";
+if (EXO) { const pn = l => EXO.name + EXO.sep + l, H = EXO.planets.find(q => q[0] === EXO.home), aH = H[2], star = V3(0, 0, -aH * AU);
+  HOME_NAME = pn(H[0]); EXO.homeP = { name: HOME_NAME, r: H[1] * 6371e3 * K, type: H[3], town: H[4], facts: H[5] };
+  const others = EXO.planets.filter(q => q !== H).sort((a, b) => a[2] - b[2]);
+  EXO.bodies = [{ id: "sun", name: EXO.name + " (the star)", dkm: EXO.star[0] * 1392700, pole: [0, 90], col: EXO.star[1], facts: EXO.star[2] }];
+  others.forEach((q, i) => { const phi = others.length > 1 ? -1.15 + 2.3 * i / (others.length - 1) : 0.6;
+    EXO.bodies.push({ id: "x_" + q[0], name: pn(q[0]), dkm: q[1] * 12742, pole: [0, 90], col: TYPECOL[q[3]], type: q[3], town: q[4], facts: q[5], a: q[2],
+      wSys: star.clone().add(V3(Math.sin(phi), 0, -Math.cos(phi)).multiplyScalar(q[2] * AU)) }); });
+  for (const b of EXO.bodies) { b.w = b.id === "sun" ? star.clone() : b.wSys; b.distKm = b.w.length() / AU * 149597870.7; b.h = 0; b.lat = 0; b.r = b.dkm * 1000 * K / 2;
+    const c = new THREE.Color(b.col); b.beacon = c.getHex(); } }
+
 // ---------- the bodies ----------
-const BODIES = [
+const BODIES = EXO ? EXO.bodies : [
   { id: "sun", name: "the Sun", dkm: 1392700, pole: [286.13, 63.87], col: "#ffd27a", beacon: 0xffd040 },
   { id: "mercury", name: "Mercury", dkm: 4879, pole: [281.01, 61.42], col: "#9a948c", beacon: 0xb0a898 },
   { id: "venus", name: "Venus", dkm: 12104, pole: [272.76, 67.16], col: "#e8d9a8", beacon: 0xf0e0a0 },
@@ -53172,7 +53210,7 @@ const BODIES = [
   { id: "neptune", name: "Neptune", dkm: 49244, pole: [299.36, 43.46], col: "#4a6fd8", beacon: 0x5080ff },
   { id: "pluto", name: "Pluto", dkm: 2377, pole: [132.99, -6.16], col: "#d8c0a0", beacon: 0xffe0c0 },
 ];
-for (const b of BODIES) {
+if (!EXO) for (const b of BODIES) {
   const rel = b.id === "sun" ? EARTH.clone().negate() : helio(b.id).sub(EARTH);
   b.distKm = rel.length() * 149597870.7; b.w = eclToWorld(rel).multiplyScalar(AU);   // world position, from the globe
   b.h = b.w.y; b.r = b.dkm * 1000 * K / 2; b.lat = Math.asin(rel.z / rel.length()) / deg;
@@ -53197,6 +53235,7 @@ const SMALL = [
   { id: "sedna", name: "Sedna", dkm: 995, col: "#c0503a", el: [506, 0.85, 11.93, 144.4, 311.3, 358.2, 2460200.5], kind: "it takes ~11,000 years to orbit, swinging out to ~900 AU (3,200 km here)", more: "it is near its closest to the Sun now" }];
 for (const b of SMALL) { const H = helioEl(...b.el), rel = H.clone().sub(EARTH); b.helio = H; b.au = H.length(); b.distKm = rel.length() * 149597870.7; b.w = eclToWorld(rel).multiplyScalar(AU);
   b.lat = Math.asin(H.z / H.length()) / deg; b.r = Math.max(b.dkm * 1000 * K / 2, 0.00015); }
+if (EXO) SMALL.length = 0;
 // the Moon, low-precision geocentric position
 { const L = 218.316 + 13.176396 * D, Mm = (134.963 + 13.064993 * D) * deg, F = (93.272 + 13.229350 * D) * deg;
   var MOON = { lon: (L + 6.289 * Math.sin(Mm)) * deg, lat: 5.128 * Math.sin(F) * deg, km: 385001 - 20905 * Math.cos(Mm) };
@@ -53274,7 +53313,7 @@ const INNER = mkGrid(8000, IS_HEADSET ? 200 : 400), OUTER = mkGrid(RX, IS_HEADSE
 const inInner = (x, z) => Math.abs(x) < INNER.half && Math.abs(z) < INNER.half;
 pullTo(INNER, BODIES.filter(b => Math.abs(b.w.x) < INNER.half - 1500 && Math.abs(b.w.z) < INNER.half - 1500), b => b.id === "sun" ? 120 : 260);
 pullTo(OUTER, BODIES.filter(b => !inInner(b.w.x, b.w.z)), () => Math.max(1600, 2.5 * OUTER.cell));
-{ const J = BODIES.find(b => b.id === "jupiter"), n = OUTER.N + 1;   // a level plain 1.2 km round Jupiter: its whole system lies nearly flat, in its equator
+if (BODIES.find(b => b.id === "jupiter")) { const J = BODIES.find(b => b.id === "jupiter"), n = OUTER.N + 1;   // a level plain 1.2 km round Jupiter: its whole system lies nearly flat, in its equator
   for (let iz = 0; iz <= OUTER.N; iz++) for (let ix = 0; ix <= OUTER.N; ix++) { const x = ix * OUTER.cell - OUTER.half, z = iz * OUTER.cell - OUTER.half, d = Math.hypot(x - J.w.x, z - J.w.z);
     if (d < 2200) { const w = 1 - THREE.MathUtils.smoothstep(d, 1200, 2200); OUTER.H[iz * n + ix] += (J.h - OUTER.H[iz * n + ix]) * w; } } }
 { const n = INNER.N + 1, band = 2.2 * OUTER.cell;            // the fine grid's edge blends into the coarse surface, so the two meet exactly at the seam
@@ -53351,28 +53390,30 @@ for (const b of BODIES) {
 
 // ---------- the desk, the globe, the satellites and the Moon ----------
 const POLE = radec(0, 90);                              // the Earth's axis points at the celestial pole
-{ const wood = M(0x7a4e2c, { roughness: 0.5 });
+if (!EXO) { const wood = M(0x7a4e2c, { roughness: 0.5 });
   const top = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.05, 0.8), wood); top.position.y = 0.725; scene.add(top);
   for (const [x, z] of [[-0.75, -0.35], [0.75, -0.35], [-0.75, 0.35], [0.75, 0.35]]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.7, 0.05), wood); l.position.set(x, 0.35, z); scene.add(l); }
   const rug = new THREE.Mesh(new THREE.CircleGeometry(2.4, 48).rotateX(-Math.PI / 2), M(0x8a3a2a, { roughness: 1 })); rug.position.y = 0.02; scene.add(rug); }
-const RE = 0.1524, GC = V3(0, Y0, 0);
+const RE = EXO ? EXO.homeP.r : 0.1524, GC = V3(0, EXO ? RE + 0.9 : Y0, 0);   // an exoplanet stands on a pedestal instead of the desk
 const earthTex = new THREE.TextureLoader().load(EARTH_JPG); earthTex.colorSpace = THREE.SRGBColorSpace; earthTex.anisotropy = 8;
 const moonTex = new THREE.TextureLoader().load(MOON_JPG); moonTex.colorSpace = THREE.SRGBColorSpace;
 const globe = new THREE.Mesh(new THREE.SphereGeometry(RE, 128, 64), new THREE.MeshStandardMaterial({ map: earthTex, roughness: 0.55 }));
 globe.position.copy(GC); scene.add(globe);
 function orientGlobe() {                                // spin it to the real time of day: the night side faces away from the Sun
+  if (EXO) return;
   const d = (Date.now() / 86400000 + 2440587.5) - 2451545, G = (280.46061837 + 360.98564736629 * d) * deg;
   const c0 = eqToWorld(V3(Math.cos(G), Math.sin(G), 0)), c1 = eqToWorld(V3(0, 0, 1)), c2 = eqToWorld(V3(Math.sin(G), -Math.cos(G), 0));
   globe.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(c0, c1, c2)); }
 orientGlobe();
-{ const brass = M(0xc9a227, { metalness: 0.7, roughness: 0.3 }), st = new THREE.Group(); st.position.copy(GC); st.quaternion.setFromUnitVectors(V3(0, 1, 0), POLE); scene.add(st);
+if (EXO) { const ped = new THREE.Mesh(new THREE.CylinderGeometry(Math.max(0.2, RE * 0.4), Math.max(0.3, RE * 0.55), 0.9, 32), M(0x2a3a4a, { metalness: 0.4 })); ped.position.y = 0.45; scene.add(ped); }
+if (!EXO) { const brass = M(0xc9a227, { metalness: 0.7, roughness: 0.3 }), st = new THREE.Group(); st.position.copy(GC); st.quaternion.setFromUnitVectors(V3(0, 1, 0), POLE); scene.add(st);
   const mer = new THREE.Mesh(new THREE.TorusGeometry(RE + 0.012, 0.004, 8, 64, Math.PI), brass); mer.rotation.z = -Math.PI / 2; st.add(mer);
   for (const s of [-1, 1]) { const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.03, 8), brass); pin.position.y = s * (RE + 0.006); st.add(pin); }
   const sp = GC.clone().addScaledVector(POLE, -(RE + 0.012)), base = V3(sp.x, 0.75, sp.z);
   const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.01, sp.y - 0.75, 12), brass); stem.position.copy(base).lerp(sp, 0.5); scene.add(stem);
   const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.1, 0.02, 32), M(0x2a1a10, { roughness: 0.4 })); foot.position.copy(base).add(V3(0, 0.01, 0)); scene.add(foot); }
 // satellites, in the globe's frame (attached to it, so they turn with it -- fine for rings of them)
-const SAT = new THREE.Group(); SAT.position.copy(GC); SAT.quaternion.setFromUnitVectors(V3(0, 1, 0), POLE); scene.add(SAT);
+const SAT = new THREE.Group(); SAT.visible = !EXO; SAT.position.copy(GC); SAT.quaternion.setFromUnitVectors(V3(0, 1, 0), POLE); scene.add(SAT);
 const ringLine = (r, tilt, node, col, op = 0.5) => { const pts = []; for (let k = 0; k <= 128; k++) { const a = k / 128 * Math.PI * 2; pts.push(V3(r * Math.cos(a), 0, r * Math.sin(a))); }
   const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: op }));
   const g = new THREE.Group(); g.rotation.y = node; l.rotation.x = tilt; g.add(l); SAT.add(g); return l; };
@@ -53387,8 +53428,8 @@ ringLine(alt(35786), 0, 0, 0xffc060, 0.5); dotsOn(alt(35786), 0, 0, 80, 0xffc060
   for (let k = 0; k < n; k++) { const y = rnd() * 2 - 1, f = rnd() * Math.PI * 2, s = Math.sqrt(1 - y * y) ; const yy = y * 0.89; pos.set([r * s * Math.cos(f), r * yy, r * s * Math.sin(f)], k * 3); }
   SAT.add(new THREE.Points(new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(pos, 3)), new THREE.PointsMaterial({ color: 0xe8f4ff, size: 0.0005, sizeAttenuation: true, transparent: true, opacity: 0.7 }))); }
 // the Moon, 8.3 cm across, 9.2 m away, in its real direction today
-const RM = 3474.8e3 * K / 2, MC = GC.clone().add(MOON.w);
-{ const moon = new THREE.Mesh(new THREE.SphereGeometry(RM, 64, 32), new THREE.MeshStandardMaterial({ map: moonTex, roughness: 0.9 }));
+const RM = 3474.8e3 * K / 2, MC = EXO ? V3(0, -1e5, 0) : GC.clone().add(MOON.w);
+if (!EXO) { const moon = new THREE.Mesh(new THREE.SphereGeometry(RM, 64, 32), new THREE.MeshStandardMaterial({ map: moonTex, roughness: 0.9 }));
   moon.position.copy(MC); moon.quaternion.setFromUnitVectors(V3(0, 1, 0), radec(266.86, 65.64)); moon.lookAt(GC); moon.rotateY(Math.PI / 2); scene.add(moon);
   const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.006, MC.y - RM, 8), new THREE.MeshStandardMaterial({ color: 0xdff4ff, transparent: true, opacity: 0.35 }));
   rod.position.set(MC.x, (MC.y - RM) / 2, MC.z); scene.add(rod);
@@ -53396,7 +53437,11 @@ const RM = 3474.8e3 * K / 2, MC = GC.clone().add(MOON.w);
   postSign(["the Moon", `real 3,475 km across  ·  here ${fmtM(2 * RM)}`, `today ${fmtKm(MOON.km)} away  ·  here ${fmtM(MOON.km * 1000 * K)} from the globe`,
     "lit by the scale Sun, so its phase here is today's real phase", `light takes ${(MOON.km / 299792.458).toFixed(2)} s to cross that gap, here as there`,
     "the 12 Apollo astronauts who walked on it travelled these 9 metres"], MC.x + side.x * 0.9, MC.z + side.z * 0.9, 0, 0, 1.6, 0.6); }
-{ const toSun = V3(SUN.w.x, 0, SUN.w.z).normalize();
+if (EXO) postSign([`THE ${EXO.name.toUpperCase()} SYSTEM`, `${EXO.ly.toLocaleString()} light-years away  ·  the same scale: if the Earth were a 12-inch globe (1 : ${(1 / K / 1e6).toFixed(1)} million)`,
+    `this is ${HOME_NAME}: ${(EXO.homeP.r / (0.1524)).toFixed(2)} times the Earth's width, ${fmtM(2 * EXO.homeP.r)} across here`, ...EXO.homeP.facts,
+    "planets are at their real sizes and orbit sizes; where each is on its orbit is illustrative, and orbits are drawn flat",
+    "the same roads, train, towers, towns and mountains as at home  ·  the portal behind you goes back to the Solar System"], -1.9, -1.4, 0, 1.5, 2.6, 0.5);
+else { const toSun = V3(SUN.w.x, 0, SUN.w.z).normalize();
   postSign(["THE SOLAR SYSTEM ON A DESK", `the Earth is a 12-inch globe: everything is 1 : ${(1 / K / 1e6).toFixed(1)} million, its real size and distance`,
     "the planets are where they really are today, all around you; the ground is the plane of the Earth's orbit",
     `the Sun is a ${fmtM(2 * SUN.r)} ball ${fmtM(Math.hypot(SUN.w.x, SUN.w.z))} away (look ${compass(SUN.w)}): from here it looks exactly as big as the real Sun`,
@@ -53502,6 +53547,9 @@ function jovian(b, P, u, v) {
   postSign(["spacecraft at Jupiter", "Pioneer 10 (1973) and 11 (1974) · Voyager 1 and 2 (1979) · Cassini (2000) · New Horizons (2007): flybys, solid lines",
     "Galileo (pink): arrived 7 Dec 1995, braked into orbit; its first 7-month orbit and a few of its 34 (dashed); its probe (white) dived into the clouds",
     "Juno (teal, dashed): a polar orbit since 2016", "closest distances and the shapes of the paths are real; their directions in space are approximate"], sp.x, sp.z, b.w.x, b.w.z, 6, 1.2); }                                    // for the markers
+function typeTexture(t) { return t === "hot" ? mottled("#6a3018", ["#ff7a2a", "#2a1208", "#c85a28"]) : t === "temperate" ? mottled("#2a5a8a", ["#3a7a3a", "#e8e8e8", "#8a7a5a"])
+  : t === "ice" ? bands(["#c8e0ec", "#b0d0e0", "#e0f0f8", "#98c0d8"]) : bands(["#d8b890", "#c89a68", "#e8d4b0", "#a8805a"]); }
+if (EXO) { for (const b of BODIES) if (!TEX[b.id] && b.type) TEX[b.id] = () => typeTexture(b.type); globe.material.map = typeTexture(EXO.homeP.type); globe.material.needsUpdate = true; }
 const sunLight = new THREE.PointLight(0xfff4e0, 3.2, 0, 0);
 for (const b of BODIES) {
   const B = V3(b.w.x, 0, b.w.z), gh = terrainH(B.x, B.z);
@@ -53520,7 +53568,7 @@ for (const b of BODIES) {
     ? new THREE.MeshBasicMaterial({ map: canvasTex(1024, 512, (g, w, h) => { g.fillStyle = "#fff2c0"; g.fillRect(0, 0, w, h); for (let k = 0; k < 6000; k++) { g.fillStyle = `rgba(255,${180 + rnd() * 60 | 0},80,${rnd() * 0.25})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, 1 + rnd() * 4, 0, 6.283); g.fill(); } }), toneMapped: false })
     : new THREE.MeshStandardMaterial({ map: TEX[b.id](), roughness: 0.8 });
   const body = new THREE.Mesh(new THREE.SphereGeometry(b.r, 96, 48), mat); body.position.copy(b.c); body.quaternion.setFromUnitVectors(V3(0, 1, 0), radec(...b.pole)); scene.add(body);
-  if (b.id === "sun") { sunLight.position.copy(b.c); scene.add(sunLight);
+  if (b.id === "sun") { sunLight.position.copy(b.c); scene.add(sunLight); if (EXO) { body.material.color.set(b.col); sunLight.color.set(b.col); }
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTex(256, 256, (g, w) => { const gr = g.createRadialGradient(w / 2, w / 2, w * 0.2, w / 2, w / 2, w / 2);
       gr.addColorStop(0, "rgba(255,230,160,.7)"); gr.addColorStop(1, "rgba(255,200,120,0)"); g.fillStyle = gr; g.fillRect(0, 0, w, w); }), transparent: true, depthWrite: false, toneMapped: false }));
     glow.scale.setScalar(b.r * 4.5); glow.position.copy(b.c); scene.add(glow);
@@ -53580,12 +53628,12 @@ for (const b of BODIES) {
     uranus: ["it rolls on its side: its axis is tipped 98°", "so its faint rings stand almost upright"],
     neptune: ["the windiest planet: 2,000 km/h", "found in 1846 by mathematics before anyone saw it"],
     pluto: ["a dwarf planet, smaller than the Moon", "its orbit is tilted 17°: its road has the biggest hill or valley here"],
-  }[b.id];
+  }[b.id] || b.facts || [];
   const fwd = V3(b.w.x - b.E.x, 0, b.w.z - b.E.z).normalize(), side = V3(-fwd.z, 0, fwd.x), sp = b.stop.clone().addScaledVector(side, 12).addScaledVector(fwd, -6);
   postSign([b.name === "the Sun" ? "THE SUN" : b.name.toUpperCase(), `real ${b.dkm.toLocaleString()} km across  ·  here ${fmtM(2 * b.r)}`,
-    `today ${fmtKm(b.distKm)} from the Earth  ·  here ${fmtM(b.w.length())} from the globe`,
-    `light takes ${fmtT(lt)} to get here from the Earth: at the scale's light speed (${C_HERE.toFixed(1)} m/s) exactly the same`,
-    b.id === "sun" ? "it sits in the plane of the Earth's orbit: no hill on this road" :
+    `${EXO ? "" : "today "}${fmtKm(b.distKm)} from ${HOME_NAME}  ·  here ${fmtM(b.w.length())} from the ${EXO ? "pedestal" : "globe"}`,
+    `light takes ${fmtT(lt)} to get here from ${HOME_NAME}: at the scale's light speed (${C_HERE.toFixed(1)} m/s) exactly the same`,
+    EXO ? (b.a ? `its orbit: ${b.a} AU from the star (${fmtM(b.a * AU)} here)` : "the star of the system") : b.id === "sun" ? "it sits in the plane of the Earth's orbit: no hill on this road" :
       `today it is ${Math.abs(b.lat).toFixed(2)}° ${b.lat >= 0 ? "above" : "below"} the plane of the Earth's orbit: ${fmtM(Math.abs(b.h))} ${b.h >= 0 ? "up" : "down"} here, an average grade of ${Math.abs(grade).toFixed(1)}%`,
     ...facts], sp.x, sp.z, b.w.x, b.w.z, Math.max(3, Math.min(8, b.r * 2.5)), 1.2);
   // the exit sign, on the interstate before its exit
@@ -53593,7 +53641,7 @@ for (const b of BODIES) {
   postSign([`EXIT ${b.exit}`, `${b.turn > 0 ? "←" : "→"}  ${b.name === "the Sun" ? "The Sun" : b.name}  ${fmtM(b.w.length())}`, `(real ${fmtKm(b.distKm)})`],
     ex, ez, ex + back * 100, ez, 7, 4.5, { bg: "#0b6b3a", fg: "#ffffff", sub: "#e8f5ec", gold: false, title: 2 });
 }
-postSign(["INTERSTATE SOL", "exits to the Sun and every planet, east and west", "(they are where the planets really are today, all around)"], 300, ZH + 16, 0, ZH + 16, 6, 3.5, { bg: "#1f4e9c", gold: false });
+postSign([EXO ? "INTERSTATE " + EXO.name.toUpperCase() : "INTERSTATE SOL", "exits to the Sun and every planet, east and west", "(they are where the planets really are today, all around)"], 300, ZH + 16, 0, ZH + 16, 6, 3.5, { bg: "#1f4e9c", gold: false });
 // sunlight: a wavefront leaves the Sun every minute and crawls outward at the scale's speed of light
 const WAVES = [];
 const waveGeo = new THREE.BufferGeometry().setFromPoints(Array.from({ length: 361 }, (_, k) => V3(Math.cos(k * deg), 0, Math.sin(k * deg))));
@@ -53669,7 +53717,7 @@ const O3 = new THREE.Object3D();
 // the desk and the train shuttles back and forth. Board when it's in (E / X by a door, or the guide / wrist button);
 // you can walk about inside the carriage while it runs, and the markers keep showing where everything is.
 const TRAIN_VMAX = 83.3, TRAIN_ACC = 0.7, TRAIN_DEC = 0.9;   // 300 km/h, like a high-speed train; gentle starts and stops
-const STATIONS = [{ name: "Earth (the desk)", p: V3(-26, 0, 12), body: null }];
+const STATIONS = [{ name: HOME_NAME + (EXO ? " (start)" : " (the desk)"), p: V3(-26, 0, 12), body: null }];
 for (const b of BODIES.slice().sort((a, c) => Math.hypot(a.w.x, a.w.z) - Math.hypot(c.w.x, c.w.z))) {
   const away = V3(b.w.x - b.E.x, 0, b.w.z - b.E.z).normalize(); STATIONS.push({ name: b.name === "the Sun" ? "the Sun" : b.name, p: V3(b.w.x + away.x * (b.r + 34), 0, b.w.z + away.z * (b.r + 34)), body: b }); }
 function filleted(P) { const out = [P[0]];                 // replace each corner by a long curve (cut back up to 900 m each side)
@@ -53992,12 +54040,21 @@ const TDESIGN = {
   sedna: { name: "Far Tower", H: 360, deck: 300, rEl: 20, rOut: 28, build(g) {           // dark red, ringed by a long, tilted ellipse: Sedna's 11,000-year orbit
     g.add(lathe([[0, 0], [16, 0], [12, 340], [0, 346]], towerMat("#5a2018", "#e08a70", 8, 11)));
     const ell = new THREE.Mesh(new THREE.TorusGeometry(30, 0.9, 6, 120), M(0xc0503a, { metalness: 0.6 })); ell.scale.set(2.4, 1, 1); ell.position.y = 330; ell.rotation.x = Math.PI / 2 - 0.2; g.add(ell); } } };
+function roomOf(w, self) { let d = self === null ? 1e9 : Math.hypot(w.x, w.z) - RE; for (const o of BODIES) if (o !== self) d = Math.min(d, Math.hypot(o.w.x - w.x, o.w.z - w.z) - o.r); return d; }
+const SCALE_OF = {};   // towers, towns and stations shrink where an exoplanet system is too crowded for skyscrapers (at home, always 1)
+if (EXO) { const TPL = { hot: ["venus", "gonggong", "mercury", "mars", "makemake"], temperate: ["quaoar", "haumea", "sedna", "arrokoth", "orcus"], ice: ["neptune", "uranus", "eris", "pluto", "ceres"], gas: ["jupiter", "saturn", "uranus", "neptune", "vesta"] }, used = new Set();
+  const pick = t => { const l = TPL[t]; const q = l.find(k => !used.has(k)) || l[0]; used.add(q); return q; };
+  TDESIGN.earth = { ...TDESIGN[pick(EXO.homeP.type)], name: HOME_NAME + " Tower" }; TDESIGN.sun = { ...TDESIGN.sun, name: EXO.name + " Spire" };
+  for (const b of BODIES) if (b.type) TDESIGN[b.id] = { ...TDESIGN[pick(b.type)], name: b.name + " Tower" };
+  for (const k of Object.keys(TDESIGN)) if (k !== "earth" && k !== "sun" && !k.startsWith("x_")) delete TDESIGN[k];
+  SCALE_OF.earth = THREE.MathUtils.clamp(roomOf(V3(0, 0, 0), null) / 500, 0.06, 1); for (const b of BODIES) SCALE_OF[b.id] = THREE.MathUtils.clamp(roomOf(b.w, b) / 500, 0.06, 1); }
 const towerSpots = { earth: { w: V3(0, 0, 0), r: 0.15, away: V3(-0.8, 0, -0.6) } };
 for (const b of BODIES) { const f = V3(b.w.x - b.E.x, 0, b.w.z - b.E.z).normalize(); towerSpots[b.id] = { w: b.w, r: b.r, away: V3(-f.z, 0, f.x), body: b }; }
 for (const b of SMALL) { const f = V3(b.w.x, 0, b.w.z).normalize(); towerSpots[b.id] = { w: b.w, r: b.r, away: V3(-f.z, 0, f.x), body: b }; }
 const cabMat = new THREE.MeshStandardMaterial({ color: 0xcfe8f5, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide });
-for (const [id, D] of Object.entries(TDESIGN)) { const S = towerSpots[id]; if (!S) continue; const dist = id === "earth" ? 95 : S.r + D.rOut + 90, A = V3(S.w.x, 0, S.w.z).addScaledVector(S.away, dist), g0 = terrainH(A.x, A.z);
-  const g = new THREE.Group(); g.position.set(A.x, g0, A.z); scene.add(g); D.build(g);
+for (const [id, D0] of Object.entries(TDESIGN)) { const S = towerSpots[id]; if (!S) continue; const sc = SCALE_OF[id] || 1, D = { ...D0, H: Math.round(D0.H * sc), deck: D0.deck * sc, rEl: D0.rEl * sc, rOut: D0.rOut * sc };
+  const dist = id === "earth" ? (EXO ? RE + 95 * sc : 95) : S.r + D.rOut + 90 * sc, A = V3(S.w.x, 0, S.w.z).addScaledVector(S.away, dist), g0 = terrainH(A.x, A.z);
+  const g = new THREE.Group(); g.position.set(A.x, g0, A.z); scene.add(g); const gs = new THREE.Group(); gs.scale.setScalar(sc); g.add(gs); D0.build(gs);
   const plinth = new THREE.Mesh(new THREE.CylinderGeometry(D.rOut + 6, D.rOut + 10, 40, 32), M(0x8a8478)); plinth.position.y = -19.9; g.add(plinth);   // its footing, covering any slope
   const toW = V3(S.w.x - A.x, 0, S.w.z - A.z).normalize(), elDir = toW, base = A.clone().addScaledVector(elDir, D.rEl);   // the elevator runs up the side facing the world it's named for
   const rail = new THREE.Mesh(new THREE.BoxGeometry(0.6, D.deck + 4, 0.6), M(0x5a6068, { metalness: 0.6 })); rail.position.set(base.x - A.x - elDir.x * 1.6, (D.deck + 4) / 2, base.z - A.z - elDir.z * 1.6); g.add(rail);
@@ -54007,7 +54064,7 @@ for (const [id, D] of Object.entries(TDESIGN)) { const S = towerSpots[id]; if (!
   const cab = new THREE.Group(); scene.add(cab); const cb = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.8, 2.6), cabMat); cb.position.y = 1.4; cab.add(cb);
   const cf = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.12, 2.6), M(0x3a3e44)); cab.add(cf); const ct = cf.clone(); ct.position.y = 2.8; cab.add(ct); cab.position.set(base.x, g0, base.z);
   // the Ledge: a glass box jutting 7 m out from the balcony toward the world below, with a glass floor (like the Willis Tower Skydeck's)
-  { const L = new THREE.Group(); L.position.set(elDir.x * (D.rOut + 2.5), D.deck, elDir.z * (D.rOut + 2.5)); L.rotation.y = Math.atan2(elDir.x, elDir.z); g.add(L);
+  { const L = new THREE.Group(); L.position.set(elDir.x * (D0.rOut + 2.5), D0.deck, elDir.z * (D0.rOut + 2.5)); L.rotation.y = Math.atan2(elDir.x, elDir.z); gs.add(L);
     const gl = new THREE.MeshStandardMaterial({ color: 0xd8f0ff, transparent: true, opacity: 0.14, roughness: 0.05, metalness: 0.1, depthWrite: false, side: THREE.DoubleSide }), fr = M(0x2a2e34, { metalness: 0.6 });
     const fl = new THREE.Mesh(new THREE.BoxGeometry(4, 0.06, 7), gl); fl.position.y = -0.03; L.add(fl);
     for (const sx of [-2, 2]) { const w = new THREE.Mesh(new THREE.BoxGeometry(0.04, 2.6, 7), gl); w.position.set(sx, 1.3, 0); L.add(w); }
@@ -54015,13 +54072,13 @@ for (const [id, D] of Object.entries(TDESIGN)) { const S = towerSpots[id]; if (!
     for (const [x, y] of [[-2, 0], [2, 0], [-2, 2.6], [2, 2.6]]) { const e = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 7), fr); e.position.set(x, y, 0); L.add(e); }
     for (const z of [-3.5, 3.5]) for (const y of [0, 2.6]) { const e = new THREE.Mesh(new THREE.BoxGeometry(4, 0.08, 0.08), fr); e.position.set(0, y, z); L.add(e); }
     const sg = boardMesh(["THE LEDGE", "glass floor: look straight down"], 1.6, { bg: "#1a2a3a" }); sg.position.set(0, 2.3, -3.4); L.add(sg); }
-  const T = { id, D, A, g0, base, elDir, cab, deckY: g0 + D.deck, name: D.name, world: S.body ? S.body.name : "Earth" };
+  const T = { id, D, A, g0, base, elDir, cab, s: sc, deckY: g0 + D.deck, name: D.name, world: S.body ? S.body.name : HOME_NAME };
   const door = boardMesh([`${D.name}: ${D.H} m`, "glass elevator to the observation deck (E / X here)", `the tower of ${T.world}`], 3.4, { bg: "#1a2a3a" });
   door.position.set(base.x + elDir.x * 2.2, g0 + 3.6, base.z + elDir.z * 2.2); door.lookAt(base.x + elDir.x * 10, g0 + 3.6, base.z + elDir.z * 10); scene.add(door);
   TOWERS.push(T); }
 for (const T of TOWERS) {   // on each deck, a board: how far it is to every other tower
   const others = TOWERS.filter(o => o !== T).map(o => [o, Math.hypot(o.A.x - T.A.x, o.A.z - T.A.z)]).sort((a, b) => a[1] - b[1]).slice(0, 5);
-  const b = boardMesh([`${T.name} observation deck, ${T.D.deck} m up`, ...others.map(([o, d]) => `${o.name} (${o.world}): ${fmtM(d)} away`), "these towers are 300-560 m tall: like the Sears Tower (442 m)"], 4, { bg: "#1a2a3a" });
+  const b = boardMesh([`${T.name} observation deck, ${T.D.deck} m up`, ...others.map(([o, d]) => `${o.name} (${o.world}): ${fmtM(d)} away`), EXO && T.s < 1 ? `this system is too crowded for skyscrapers: towers here are shrunk to ${Math.round(T.s * 100)}% of full size` : "these towers are 300-560 m tall: like the Sears Tower (442 m)"], 4, { bg: "#1a2a3a" });
   const p = T.A.clone().addScaledVector(T.elDir, T.D.rOut - 2.5); b.position.set(p.x + T.elDir.z * 6, T.deckY + 1.8, p.z - T.elDir.x * 6); b.lookAt(T.A.x, T.deckY + 1.8, T.A.z); scene.add(b); }
 const lift = { T: null, from: 0, to: 0, t: 0, dur: 0, riding: false }; let onDeck = null;
 function headXZ() { return camera.getWorldPosition(V3(0, 0, 0)); }   // in VR you can stand away from the rig's centre: use where your head is
@@ -54072,14 +54129,15 @@ function town(name, C, R, kind, ang) {
         if (tr() < 0.5) { const [tx, tz] = P(lu + (tr() - 0.5) * 10, side ? lv - 9 : lv + 9); if (!blocked(tx, tz, 1)) TREE.push([tx, tz, 0.7 + tr() * 0.5]); } } } }
   // a welcome sign on the side toward the world
   const [sx, sz] = P(0, -R - 25); if (!blocked(sx, sz)) postSign([`Welcome to ${name}`, kind === "downtown" ? "the downtown of the solar system, beside the Sun: low and mid-rise, so the towers stand out" : `a town beside ${kind}`, "(fictional, for scale: a block is 90 m, a house 10 m)"], sx, sz, C.x, C.z, 5, 2.0); }
-const TOWNS = [["Helios City", SUN, 1100, "downtown"], ["Globeville", null, 420, "Earth"]];
+const TOWNS = EXO ? [[EXO.city, SUN, 1100, "downtown"], [EXO.homeP.town, null, 420, HOME_NAME], ...BODIES.filter(b => b.town).map(b => [b.town, b, b.type === "gas" ? 520 : 400, b.name])] : [["Helios City", SUN, 1100, "downtown"], ["Globeville", null, 420, "Earth"]];
 const TNAMES = { mercury: "Quicksilver", venus: "Venusberg", mars: "Ares Heights", jupiter: "Jove", saturn: "Ringwood", uranus: "Tiltford", neptune: "Neptune Bay", pluto: "Plutonia Springs",
   ceres: "Ceresville", vesta: "Vesta Grove", halley: "Halley's Landing", quaoar: "Quaoar Flats", orcus: "Orcus Hollow", haumea: "Haumea Point", makemake: "Makemake", arrokoth: "Snowman Creek", gonggong: "Gonggong", eris: "Eris Falls", sedna: "Sedna's End" };
-for (const b of [...BODIES, ...SMALL]) if (TNAMES[b.id]) TOWNS.push([TNAMES[b.id], b, b.id === "jupiter" || b.id === "saturn" ? 520 : 400, b.name]);
-for (const [name, b, R, kind] of TOWNS) {
+if (!EXO) for (const b of [...BODIES, ...SMALL]) if (TNAMES[b.id]) TOWNS.push([TNAMES[b.id], b, b.id === "jupiter" || b.id === "saturn" ? 520 : 400, b.name]);
+for (const [name, b, R0, kind] of TOWNS) {
+  const sc = EXO ? (b ? SCALE_OF[b.id] : SCALE_OF.earth) || 1 : 1, R = R0 * sc; if (R < 110) continue;   // crowded systems: no room for a town
   let C, ang;
   if (!b) { C = V3(-700, 0, -550); ang = 0.3; }
-  else { const S = towerSpots[b.id], away = S ? S.away : V3(1, 0, 0); C = V3(b.w.x, 0, b.w.z).addScaledVector(away, -(b.r + R + 260)); ang = Math.atan2(away.z, away.x); }
+  else { const S = towerSpots[b.id], away = S ? S.away : V3(1, 0, 0); C = V3(b.w.x, 0, b.w.z).addScaledVector(away, -(b.r + R + 260 * sc)); ang = Math.atan2(away.z, away.x); }
   town(name, C, R, kind, ang); }
 { // build the instanced meshes
   const inst = (list, geo, mat, set) => { const im = new THREE.InstancedMesh(geo, mat, Math.max(1, list.length)), c = new THREE.Color(); list.forEach((q, i) => { set(q, O3, c); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); if (im.instanceColor || c.__set) im.setColorAt(i, c); });
@@ -54135,12 +54193,17 @@ const MTN = {   // shape (u, v in -1..1 → 0..1), height m, radius m, colours, 
     f: (u, v) => { let h = 0; for (let k = 0; k < 9; k++) { const a = k * 2.4, d = k ? 0.25 + (k % 3) * 0.2 : 0, s = 0.12 - 0.006 * k; h = Math.max(h, (1 - k * 0.07) * Math.max(0, 1 - Math.hypot(u - d * Math.cos(a), v - d * Math.sin(a)) / s)); } return h; } },
   sedna: { name: "the Long Dark Ridge", world: "Sedna", note: "a long, curved dark-red ridge, after Sedna's 11,000-year orbit", H: 1300, R: 5000, lo: "#4a1810", hi: "#8a3424",
     f: (u, v) => { const r = Math.hypot(u * 0.6, v * 1.2); return Math.exp(-(((r - 0.6) / 0.06) ** 2)) * (u > -0.2 ? 1 : 0.3) * (0.8 + 0.3 * fbm2(u * 4, v * 4)); } } };
-for (const b of [...BODIES, ...SMALL]) { const D = MTN[b.id]; if (!D) continue;
+if (EXO) { const MT = { hot: ["jupiter", "gonggong", "halley", "makemake", "vesta"], temperate: ["ceres", "quaoar", "arrokoth", "haumea", "pluto"], ice: ["eris", "neptune", "haumea", "uranus", "sedna"], gas: ["saturn", "sedna", "jupiter", "quaoar", "orcus"] },
+    SUF = ["Range", "Massif", "Spires", "Ridge", "Highlands", "Crags", "Peaks", "Mesa"], used = new Set(); let k = 0;
+  for (const b of BODIES) if (b.type) { const l = MT[b.type], q = l.find(x => !used.has(x)) || l[k % l.length]; used.add(q);
+    MTN[b.id] = { ...MTN[q], name: `the ${b.name} ${SUF[k++ % SUF.length]}`, world: b.name, note: "invented: nobody knows what its surface looks like" }; } }
+for (const b of [...BODIES, ...SMALL]) { const D = MTN[b.id]; if (!D || (EXO && !b.type)) continue;
   // place it 3-5 km beyond the world, on whichever side is clear of roads, railway, towers and towns
   let C = null; const out = V3(b.w.x - SUN.w.x, 0, b.w.z - SUN.w.z).normalize();
   for (let k = 0; k < 16 && !C; k++) { const a = Math.atan2(out.z, out.x) + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.4, dd = D.R + 1800 + 600 * (k % 3);
     const q = V3(b.w.x + Math.cos(a) * dd, 0, b.w.z + Math.sin(a) * dd); let ok = true;
     for (let j = 0; j < 12 && ok; j++) { const t = j / 12 * Math.PI * 2; if (blocked(q.x + Math.cos(t) * D.R * 0.9, q.z + Math.sin(t) * D.R * 0.9, 20)) ok = false; }
+    for (const o of Object.values(MTN_AT)) if (Math.hypot(o.x - q.x, o.z - q.z) < D.R * 2.2) ok = false;   // no two ranges overlap
     if (ok && !blocked(q.x, q.z, 40)) C = q; }
   if (!C) continue;
   const N = IS_HEADSET ? 70 : 110, geo = new THREE.PlaneGeometry(2 * D.R, 2 * D.R, N, N).rotateX(-Math.PI / 2), p = geo.attributes.position, col = new Float32Array(p.count * 3), lo = new THREE.Color(D.lo), hi = new THREE.Color(D.hi), c = new THREE.Color();
@@ -54156,16 +54219,33 @@ for (const b of [...BODIES, ...SMALL]) { const D = MTN[b.id]; if (!D) continue;
   const toB = V3(b.w.x - C.x, 0, b.w.z - C.z).normalize(), sp = C.clone().addScaledVector(toB, D.R + 60);
   if (!blocked(sp.x, sp.z)) postSign([D.name, `inspired by ${D.world}: ${D.note}`, `scenery for scale: ${(D.H / 1000).toFixed(1)} km tall here (the real one would be a speck)`], sp.x, sp.z, b.w.x, b.w.z, 4, 1.5); }
 
+
+// ---------- portals by the desk: to the exoplanet systems, and from them back home ----------
+function goSystem(key) { const u = location.pathname + (key ? "?system=" + key : ""); if (renderer.xr.isPresenting) renderer.xr.getSession().end(); setTimeout(() => location.href = u, 50); }
+const PORTALS = [];
+{ const swirl = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const x = c.getContext("2d"), gr = x.createRadialGradient(128, 128, 4, 128, 128, 128);
+    gr.addColorStop(0, "rgba(255,255,255,.95)"); gr.addColorStop(0.5, "rgba(170,140,255,.6)"); gr.addColorStop(1, "rgba(80,60,200,.25)"); x.fillStyle = gr; x.fillRect(0, 0, 256, 256);
+    x.strokeStyle = "rgba(255,255,255,.6)"; x.lineWidth = 5; for (let k = 0; k < 4; k++) { x.beginPath(); for (let a = 0; a < 9; a += 0.05) { const r = 6 + a * 13; x.lineTo(128 + r * Math.cos(a + k * 1.571), 128 + r * Math.sin(a + k * 1.571)); } x.stroke(); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+  const list = EXO ? [["", "the Solar System", "home: back to the Earth as a 12-inch globe"]] : Object.entries(EXOSYS).map(([k, X]) => [k, X.name, `${X.ly.toLocaleString()} light-years · start beside ${X.name + X.sep + X.home}`]);
+  list.forEach(([key, title, line], i) => { const pos = EXO ? V3(6, 0, 6) : V3(-14 + i * 5.6, 0, -16), g = new THREE.Group(); g.position.set(pos.x, terrainH(pos.x, pos.z), pos.z); scene.add(g);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.1, 12, 48), M(0x9a7aff, { metalness: 0.6, roughness: 0.3, emissive: 0x2a1a5a })); ring.position.y = 1.45; g.add(ring);
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(1.15, 40), new THREE.MeshBasicMaterial({ map: swirl, transparent: true, side: THREE.DoubleSide, depthWrite: false })); disc.position.y = 1.45; g.add(disc);
+    const sg = boardMesh(["🌀 " + title, line, "walk in"], 2.4, { bg: "#2a1a4a" }); sg.position.y = 3.3; g.add(sg);
+    PORTALS.push({ key, pos, disc }); });
+  if (!EXO) postSign(["PORTALS TO OTHER SYSTEMS", "each leads to a real planetary system, at the same scale: if the Earth were a 12-inch globe", "TRAPPIST-1's seven planets all fit within 220 m; HR 8799's giants spread over 240 km"], 0, -21.5, 0, 0, 3.4, 1.2); }
+
 // ---------- the wrist teleporter (VR): a panel on your left wrist; point the right controller at a place and pull the trigger ----------
-const PLACES = [["🚆 board the train", "#b8322a", "train"], ["Earth (the globe)", "#5a9ae8", () => [V3(0, 0, 1.7), GC]], ["the Moon", "#d8d8d8", () => moonSpot()], ["your car", "#ff6a5a", () => [car.position.clone().add(V3(-2.5, 0, 2.5)), car.position]],
+const PLACES = [["🚆 board the train", "#b8322a", "train"], [EXO ? HOME_NAME : "Earth (the globe)", "#5a9ae8", () => [V3(0, 0, RE + 1.7), GC]], ...(EXO ? [] : [["the Moon", "#d8d8d8", () => moonSpot()]]), ["your car", "#ff6a5a", () => [car.position.clone().add(V3(-2.5, 0, 2.5)), car.position]],
   ...BODIES.map(b => [b.name === "the Sun" ? "Sun" : b.name, b.col, () => [b.stop.clone(), b.c]]),
   ...SMALL.map(b => [b.name, b.col, () => [b.stand.clone(), b.c]]),
-  ...STAR_VISITS.map((S, k) => ["★ " + S.name, "#fff2c0", "star" + k]), ["☀ back to the Solar System", "#ffd27a", "home"],
+  ...STAR_VISITS.map((S, k) => ["★ " + S.name, "#fff2c0", "star" + k]), [EXO ? "☀ back to " + EXO.name : "☀ back to the Solar System", "#ffd27a", "home"],
+  ...(EXO ? [["🌀 portal home: the Solar System", "#9a7aff", "exo:"]] : Object.entries(EXOSYS).map(([k, X]) => ["🌀 " + X.name, "#9a7aff", "exo:" + k])),
   ...["Io", "Europa", "Ganymede", "Callisto", "Amalthea", "Titan", "Triton", "Charon"].map(n => { const q = () => MOON_LIST.find(m => m.name === n); return [n, q()?.col || "#bbbbbb", () => moonStand(q())]; }).filter(x => MOON_LIST.find(m => m.name === x[0]))];
 function moonSpot() { const d = V3(MC.x, 0, MC.z).normalize(); return [V3(MC.x - d.x * 1.6, 0, MC.z - d.z * 1.6), MC]; }
 function moonStand(m) { const pc = m.planet.c, mp = m.pos(), d = V3(mp.x - pc.x, 0, mp.z - pc.z).normalize(), back = Math.max(1.5, m.r * 30);
   return [V3(mp.x + d.x * back, 0, mp.z + d.z * back), mp]; }
-function teleport(i) { onDeck = null; lift.riding = false; const kind = PLACES[i][2]; if (typeof kind === "string" && kind.startsWith("star")) return enterStar(+kind.slice(4)); if (kind === "home") return leaveStar();
+function teleport(i) { onDeck = null; lift.riding = false; const kind = PLACES[i][2]; if (typeof kind === "string" && kind.startsWith("exo:")) return goSystem(kind.slice(4)); if (typeof kind === "string" && kind.startsWith("star")) return enterStar(+kind.slice(4)); if (kind === "home") return leaveStar();
   if (inStar >= 0) leaveStar(); if (kind === "train") return boardTrain(); if (onTrain) onTrain = false; const [at, look] = PLACES[i][2](); if (inCar) exitCar(); flying = false; at.y = terrainH(at.x, at.z); rig.position.copy(at);
   const dx = look.x - at.x, dz = look.z - at.z, ry = Math.atan2(-dx, -dz);
   if (renderer.xr.isPresenting) { vrTurn = ry; rig.rotation.set(0, ry, 0); } else { yaw = ry; pitch = Math.atan2(look.y - at.y - 1.65, Math.hypot(dx, dz)); } wristDirty = true; }
@@ -54185,13 +54265,14 @@ addEventListener("pointerup", () => dragging = false);
 addEventListener("pointermove", e => { if (!dragging) return; yaw -= e.movementX * 0.004; pitch = THREE.MathUtils.clamp(pitch - e.movementY * 0.004, -1.5, 1.5); });
 intro?.addEventListener("click", start);
 const guide = document.getElementById("guide");
-guide.innerHTML = "<b>Go to</b><button data-go='desk'><i style='background:#3d7cc9'></i>the globe</button><button data-tp='2'><i style='background:#d8d8d8'></i>the Moon</button><button data-train='1'><i style='background:#b8322a'></i>🚆 ride the Solar Line</button>" +
+guide.innerHTML = "<b>Go to</b><button data-go='desk'><i style='background:#3d7cc9'></i>" + (EXO ? HOME_NAME : "the globe") + "</button>" + (EXO ? "" : "<button data-tp='" + PLACES.findIndex(q => q[0] === "the Moon") + "'><i style='background:#d8d8d8'></i>the Moon</button>") + "<button data-train='1'><i style='background:#b8322a'></i>🚆 ride the Solar Line</button>" +
   BODIES.map((b, k) => `<div class="row"><button data-go="${k}"><i style="background:${b.col}"></i>${b.name}</button><button class="drive" data-drive="${k}" title="drive there">🚗 ${k + 1}</button></div>`).join("");
 guide.style.maxHeight = "calc(100vh - 30px)"; guide.style.overflowY = "auto";
-guide.innerHTML += "<b style='margin-top:6px'>Small bodies</b>" + SMALL.map(b => `<button data-tp="${PLACES.findIndex(q => q[0] === b.name)}"><i style="background:${b.col}"></i>${b.name}</button>`).join("") +
-  "<b style='margin-top:6px'>Other stars</b>" + STAR_VISITS.map((S, k) => `<button data-star="${k}"><i style="background:#fff2c0"></i>★ ${S.name}</button>`).join("") + `<button data-home="1"><i style="background:#ffd27a"></i>☀ back to the Solar System</button>`;
+guide.innerHTML += (SMALL.length ? "<b style='margin-top:6px'>Small bodies</b>" : "") + SMALL.map(b => `<button data-tp="${PLACES.findIndex(q => q[0] === b.name)}"><i style="background:${b.col}"></i>${b.name}</button>`).join("") +
+  "<b style='margin-top:6px'>Exoplanet systems (portals)</b>" + (EXO ? `<button data-exo=""><i style="background:#9a7aff"></i>🌀 home: the Solar System</button>` : Object.entries(EXOSYS).map(([k, X]) => `<button data-exo="${k}"><i style="background:#9a7aff"></i>🌀 ${X.name}</button>`).join("")) +
+  "<b style='margin-top:6px'>Other stars</b>" + STAR_VISITS.map((S, k) => `<button data-star="${k}"><i style="background:#fff2c0"></i>★ ${S.name}</button>`).join("") + `<button data-home="1"><i style="background:#ffd27a"></i>☀ back to ${EXO ? EXO.name : "the Solar System"}</button>`;
 guide.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); start();
-  if (b.dataset.star) return enterStar(+b.dataset.star); if (b.dataset.home) return leaveStar(); if (inStar >= 0 && !b.dataset.tp) leaveStar();
+  if (b.dataset.exo !== undefined) return goSystem(b.dataset.exo); if (b.dataset.star) return enterStar(+b.dataset.star); if (b.dataset.home) return leaveStar(); if (inStar >= 0 && !b.dataset.tp) leaveStar();
   if (b.dataset.drive) return driveTo(BODIES[+b.dataset.drive]); if (b.dataset.tp) return teleport(+b.dataset.tp); if (b.dataset.train) return boardTrain();
   if (inCar) exitCar();
   if (b.dataset.go === "desk") { rig.position.set(0, 0, 1.7); yaw = 0; pitch = -0.15; return; }
@@ -54201,7 +54282,7 @@ function readout(v) {
   if (inStar >= 0) { const S = STAR_VISITS[inStar]; hud.innerHTML = `<b>1 : ${(1 / K / 1e6).toFixed(1)} million</b> &nbsp;·&nbsp; the Earth is a 12-inch globe<br>visiting <b>${S.name}</b>: ${S.ly} light-years away, ${(S.ly * 9.4607).toLocaleString(undefined, { maximumFractionDigits: 0 })} trillion km real<br>
     at this scale: ${fmtKm(S.ly * 9.4607e15 * K / 1000)} from the globe<br><span class="dim">WASD walk the deck · drag to look · guide / wrist: other stars, or back to the Solar System</span>`; return; }
   const d = rig.position.distanceTo(GC), near = BODIES.reduce((a, b) => V3(b.w.x, 0, b.w.z).distanceTo(rig.position) < V3(a.w.x, 0, a.w.z).distanceTo(rig.position) ? b : a);
-  hud.innerHTML = `<b>1 : ${(1 / K / 1e6).toFixed(1)} million</b> &nbsp;·&nbsp; the Earth is a 12-inch globe &nbsp;·&nbsp; positions for ${NOW.toDateString()}<br>
+  hud.innerHTML = `${EXO ? `visiting <b>${EXO.name}</b>, ${EXO.ly.toLocaleString()} light-years away &nbsp;·&nbsp; ` : ""}<b>1 : ${(1 / K / 1e6).toFixed(1)} million</b> &nbsp;·&nbsp; the Earth is a 12-inch globe &nbsp;·&nbsp; ${EXO ? "orbit positions illustrative" : "positions for " + NOW.toDateString()}<br>
     ${onTrain ? "on the Solar Line · " + trainLine() + "<br>" : ""}${liftLine() ? liftLine() + "<br>" : ""}${inCar ? "driving" : onTrain ? "aboard" : flying ? "jetpack" : "walking"} ${inCar || onTrain ? "" : `<span class="k">F</span>`} &nbsp;·&nbsp; ${v.toFixed(v < 10 ? 1 : 0)} m/s here = ${(v / C_HERE).toFixed(2)} × light speed here (${C_HERE.toFixed(1)} m/s)<br>
     from the globe: ${fmtM(d)} = ${fmtKm(d / K / 1000)} real &nbsp;·&nbsp; nearest: <b>${near.name}</b><br>
     <span class="dim">${onTrain ? "WASD walk about the carriage · drag to look · E get off when the train is in a station" : inCar ? "W / S faster / slower · space stop · 1–9 pick a destination · E get out" : "WASD walk · drag to look · scroll or − = speed · F jetpack (space / C) · E at the car to get in · 1–9 drive to a planet · H markers"}</span>`;
@@ -54223,7 +54304,7 @@ let vrTurn = 0;
 // Off screen or behind you: an arrow on the screen edge pointing the way to turn, with the name.
 // A marker fades out as the object grows on screen (by its apparent size, not distance), so it never covers it.
 // VR: the same arrow and name, floating in the object's direction, drawn over everything.
-const TARGETS = [{ name: "Earth (the globe)", col: "#5a9ae8", pos: () => GC, r: RE }, { name: "the Moon", col: "#d8d8d8", pos: () => MC, r: RM },
+const TARGETS = [{ name: EXO ? HOME_NAME : "Earth (the globe)", col: "#5a9ae8", pos: () => GC, r: RE }, ...(EXO ? [] : [{ name: "the Moon", col: "#d8d8d8", pos: () => MC, r: RM }]),
   ...BODIES.map(b => ({ name: b.name === "the Sun" ? "Sun" : b.name, col: b.col, pos: () => b.c, r: b.r, big: true })),
   ...SMALL.map(b => ({ name: b.name, col: b.col, pos: () => b.c, r: b.r, big: true })),
   ...MOON_LIST.map(q => ({ ...q, small: true })), { name: "your car", col: "#ff6a5a", pos: () => car.position, r: 1.2, car: true }];
@@ -54316,10 +54397,11 @@ function frame() {
     moved = before.distanceTo(rig.position) / Math.max(dt, 1e-4);
     const gh = floorH(rig.position.x, rig.position.z); if (!flying) rig.position.y = gh; else rig.position.y = Math.max(gh, rig.position.y); } }
   stepTrain(dt); stepLift(dt);
+  { const h = camera.getWorldPosition(V3(0, 0, 0)); for (const P of PORTALS) { P.disc.rotation.z -= dt * 0.9; if (started && Math.hypot(h.x - P.pos.x, h.z - P.pos.z) < 0.9 && Math.abs(h.y - P.pos.y - 1.5) < 2) { PORTALS.length = 0; goSystem(P.key); break; } } }
   if (lift.riding && vr) rig.rotation.y = vrTurn;
   if (onDeck && !lift.riding) { const T = onDeck, h = headXZ(), dx = h.x - T.A.x, dz = h.z - T.A.z, along = dx * T.elDir.x + dz * T.elDir.z, across = -dx * T.elDir.z + dz * T.elDir.x;
-    if (along > T.D.rOut - 1.5 && Math.abs(across) < 1.6) { const a2 = Math.min(along, T.D.rOut + 5.6); rig.position.x += T.elDir.x * (a2 - along); rig.position.z += T.elDir.z * (a2 - along); }   // out on the Ledge
-    else { const r = Math.hypot(dx, dz), r2 = THREE.MathUtils.clamp(r, T.D.rEl - 5.5, T.D.rOut - 0.6);   // stay on the balcony
+    if (along > T.D.rOut - 1.5 * T.s && Math.abs(across) < 1.6 * T.s) { const a2 = Math.min(along, T.D.rOut + 5.6 * T.s); rig.position.x += T.elDir.x * (a2 - along); rig.position.z += T.elDir.z * (a2 - along); }   // out on the Ledge
+    else { const r = Math.hypot(dx, dz), r2 = THREE.MathUtils.clamp(r, T.D.rEl - 5.5 * T.s, T.D.rOut - 0.6 * T.s);   // stay on the balcony
       if (r2 !== r) { rig.position.x += dx / r * (r2 - r); rig.position.z += dz / r * (r2 - r); } } rig.position.y = T.deckY; }
   if (inStar >= 0 && !flying) { const r = Math.hypot(rig.position.x, rig.position.z); if (r > 6.4) { rig.position.x *= 6.4 / r; rig.position.z *= 6.4 / r; } }
   if (onTrain) { const g = train.cars[1], L = CAR_L[1];
