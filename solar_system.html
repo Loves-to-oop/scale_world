@@ -53640,16 +53640,40 @@ renderer.domElement.addEventListener("pointerdown", e => { start();
 // VR: a laser from each controller; pull the trigger while pointing at the dashboard to press a button
 for (const i of [0, 1]) { const c = renderer.xr.getController(i); rig.add(c);
   const laser = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(0, 0, 0), V3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xffe9a8 })); laser.scale.z = 2; laser.visible = false; c.add(laser); c.userData.laser = laser;
-  c.addEventListener("selectstart", () => { if (!inCar) return; const m = new THREE.Matrix4().extractRotation(c.matrixWorld); ray.ray.origin.setFromMatrixPosition(c.matrixWorld); ray.ray.direction.set(0, 0, -1).applyMatrix4(m);
-    const hit = ray.intersectObject(dash)[0]; if (hit) pressDash(hit.uv); }); }
+  c.addEventListener("connected", e => { c.userData.hand = e.data.handedness; });
+  c.addEventListener("selectstart", () => { const m = new THREE.Matrix4().extractRotation(c.matrixWorld); ray.ray.origin.setFromMatrixPosition(c.matrixWorld); ray.ray.direction.set(0, 0, -1).applyMatrix4(m);
+    const w = ray.intersectObject(wristPanel)[0]; if (w && wristPanel.visible) return pressWrist(w.uv);
+    if (!inCar) return; const hit = ray.intersectObject(dash)[0]; if (hit) pressDash(hit.uv); }); }
+// ---------- the wrist teleporter (VR): a panel on your left wrist; point the right controller at a place and pull the trigger ----------
+const PLACES = [["Earth (the globe)", "#5a9ae8", () => [V3(0, 0, 1.7), GC]], ["the Moon", "#d8d8d8", () => moonSpot()], ["your car", "#ff6a5a", () => [car.position.clone().add(V3(-2.5, 0, 2.5)), car.position]],
+  ...BODIES.map(b => [b.name === "the Sun" ? "Sun" : b.name, b.col, () => [b.stop.clone(), b.c]]),
+  ...["Io", "Europa", "Ganymede", "Callisto", "Amalthea", "Titan", "Triton", "Charon"].map(n => { const q = () => MOON_LIST.find(m => m.name === n); return [n, q()?.col || "#bbbbbb", () => moonStand(q())]; }).filter(x => MOON_LIST.find(m => m.name === x[0]))];
+function moonSpot() { const d = V3(MC.x, 0, MC.z).normalize(); return [V3(MC.x - d.x * 1.6, 0, MC.z - d.z * 1.6), MC]; }
+function moonStand(m) { const pc = m.planet.c, mp = m.pos(), d = V3(mp.x - pc.x, 0, mp.z - pc.z).normalize(), back = Math.max(1.5, m.r * 30);
+  return [V3(mp.x + d.x * back, 0, mp.z + d.z * back), mp]; }
+function teleport(i) { const [at, look] = PLACES[i][2](); if (inCar) exitCar(); flying = false; at.y = terrainH(at.x, at.z); rig.position.copy(at);
+  const dx = look.x - at.x, dz = look.z - at.z, ry = Math.atan2(-dx, -dz);
+  if (renderer.xr.isPresenting) { vrTurn = ry; rig.rotation.set(0, ry, 0); } else { yaw = ry; pitch = Math.atan2(look.y - at.y - 1.65, Math.hypot(dx, dz)); } wristDirty = true; }
+const wristC = document.createElement("canvas"); wristC.width = 640; wristC.height = 40 + Math.ceil(PLACES.length / 2) * 62; const wristT = new THREE.CanvasTexture(wristC); wristT.colorSpace = THREE.SRGBColorSpace;
+const wristPanel = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2 * wristC.height / 640), new THREE.MeshBasicMaterial({ map: wristT, transparent: true, toneMapped: false }));
+wristPanel.position.set(0, 0.06, 0.06); wristPanel.rotation.x = -1.0; wristPanel.visible = false;
+let wristDirty = true, wristFlash = -1;
+function drawWrist() { const g = wristC.getContext("2d"), W = 640; g.clearRect(0, 0, W, wristC.height); g.fillStyle = "rgba(10,24,36,.9)"; g.beginPath(); g.roundRect(0, 0, W, wristC.height, 18); g.fill();
+  g.fillStyle = "#ffe9a8"; g.font = "700 26px -apple-system, Helvetica, sans-serif"; g.fillText("Teleport to…", 18, 30);
+  PLACES.forEach(([n, col], i) => { const x = 12 + (i % 2) * 312, y = 42 + Math.floor(i / 2) * 62; g.fillStyle = i === wristFlash ? "#ffe9a8" : "#1e2e3a"; g.beginPath(); g.roundRect(x, y, 304, 54, 10); g.fill();
+    g.fillStyle = col; g.beginPath(); g.arc(x + 26, y + 27, 11, 0, 6.283); g.fill(); g.fillStyle = i === wristFlash ? "#111" : "#fff"; g.font = "600 25px -apple-system, Helvetica, sans-serif"; g.fillText(n, x + 46, y + 36); });
+  wristT.needsUpdate = true; wristDirty = false; }
+function pressWrist(uv) { const px = uv.x * 640, py = (1 - uv.y) * wristC.height, col = px < 320 ? 0 : 1, row = Math.floor((py - 42) / 62), i = row * 2 + col;
+  if (row >= 0 && i < PLACES.length && py > 42) { wristFlash = i; drawWrist(); setTimeout(() => { wristFlash = -1; wristDirty = true; }, 300); teleport(i); } }
+for (const i of [0, 1]) { const grip = renderer.xr.getControllerGrip(i); rig.add(grip); grip.addEventListener("connected", e => { if (e.data.handedness === "left") grip.add(wristPanel); }); }
 addEventListener("pointerup", () => dragging = false);
 addEventListener("pointermove", e => { if (!dragging) return; yaw -= e.movementX * 0.004; pitch = THREE.MathUtils.clamp(pitch - e.movementY * 0.004, -1.5, 1.5); });
 intro?.addEventListener("click", start);
 const guide = document.getElementById("guide");
-guide.innerHTML = "<b>Go to</b><button data-go='desk'><i style='background:#3d7cc9'></i>the globe</button>" +
+guide.innerHTML = "<b>Go to</b><button data-go='desk'><i style='background:#3d7cc9'></i>the globe</button><button data-tp='1'><i style='background:#d8d8d8'></i>the Moon</button>" +
   BODIES.map((b, k) => `<div class="row"><button data-go="${k}"><i style="background:${b.col}"></i>${b.name}</button><button class="drive" data-drive="${k}" title="drive there">🚗 ${k + 1}</button></div>`).join("");
 guide.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); start();
-  if (b.dataset.drive) return driveTo(BODIES[+b.dataset.drive]);
+  if (b.dataset.drive) return driveTo(BODIES[+b.dataset.drive]); if (b.dataset.tp) return teleport(+b.dataset.tp);
   if (inCar) exitCar();
   if (b.dataset.go === "desk") { rig.position.set(0, 0, 1.7); yaw = 0; pitch = -0.15; return; }
   const t = BODIES[+b.dataset.go], p = t.stop; rig.position.set(p.x, terrainH(p.x, p.z), p.z); yaw = Math.atan2(-(t.w.x - p.x), -(t.w.z - p.z)); pitch = 0; flying = false; });
@@ -53775,7 +53799,8 @@ function frame() {
     dashTimer -= dt; if (dashTimer <= 0) { drawDash(v); dashTimer = 0.2; } }
   else if (!vr) rig.rotation.set(0, 0, 0);
   if (guide.style.display !== (inCar ? "none" : "")) guide.style.display = inCar ? "none" : "";   // the dashboard replaces the guide while you drive
-  for (const i of [0, 1]) { const l = renderer.xr.getController(i).userData.laser; if (l) l.visible = vr && inCar; }
+  for (const i of [0, 1]) { const c = renderer.xr.getController(i), l = c.userData.laser; if (l) l.visible = vr && (inCar || c.userData.hand === "right"); }
+  wristPanel.visible = vr; if (vr && wristDirty) drawWrist();
   if (t - waveT > 60) { spawnWave(t); waveT = t; }
   for (let i = WAVES.length - 1; i >= 0; i--) { const w = WAVES[i], r = SUN.r + (t - w.t) * C_HERE; w.l.scale.setScalar(r);
     if (r > 6000) { scene.remove(w.l); w.l.material.dispose(); WAVES.splice(i, 1); } }
