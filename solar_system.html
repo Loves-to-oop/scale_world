@@ -53878,7 +53878,7 @@ function placeCar() {
   const y = deckH(r.p.x, r.p.z) + ROAD_LIFT + 0.08, pitch = Math.atan2(deckH(ahead.x, ahead.z) - deckH(behind.x, behind.z), 4);
   car.position.set(r.p.x, y, r.p.z); car.rotation.set(pitch, Math.atan2(-r.dir.x, -r.dir.z), 0, "YXZ"); }
 placeCar();
-function enterCar() { if (!inCar) { yaw = 0; pitch = -0.1; vrTurn = 0; } inCar = true; flying = false; }   // look out over the hood: in the car, the view is relative to the car
+function enterCar() { if (inHeli) exitHeli(true); if (!inCar) { yaw = 0; pitch = -0.1; vrTurn = 0; } inCar = true; flying = false; }   // look out over the hood: in the car, the view is relative to the car
 function exitCar() { inCar = false; yaw += car.rotation.y; const s = V3(-2.2, 0, 0.3).applyEuler(new THREE.Euler(0, car.rotation.y, 0)); rig.position.set(car.position.x + s.x, floorH(car.position.x + s.x, car.position.z + s.z), car.position.z + s.z); rig.rotation.set(0, 0, 0); camera.position.y = 1.65; }
 function drawDash(v) {
   const g = dashC.getContext("2d"); g.fillStyle = "#0d1a22"; g.fillRect(0, 0, 1024, 560); g.strokeStyle = "#c9a227"; g.lineWidth = 6; g.strokeRect(3, 3, 1018, 554);
@@ -54024,7 +54024,7 @@ function stepTrain(rdt) { const dt = rdt * train.timeK;
         else { train.at = train.dest; train.dest = -1; train.state = "idle"; } break; } } }
   placeTrain(); }
 function nearTrainDoor() { if (train.state !== "idle") return false; const h = headXZ(); for (const k of [1, 2]) if (train.cars[k].position.distanceTo(V3(h.x, train.cars[k].position.y, h.z)) < CAR_L[k] / 2 + 4) return true; return false; }
-function boardTrain() { if (inCar) exitCar(); if (onTrain) return; onTrain = true; flying = false; tLocal.set(0.4, 0, 2); yaw = 0; pitch = -0.05; vrTurn = 0; }
+function boardTrain() { if (inCar) exitCar(); if (inHeli) exitHeli(true); if (onTrain) return; onTrain = true; flying = false; tLocal.set(0.4, 0, 2); yaw = 0; pitch = -0.05; vrTurn = 0; }
 function alight() { const P = PLATFORMS[train.at]; onTrain = false; rig.position.set(P.c.x, P.top, P.c.z); rig.rotation.set(0, 0, 0);
   yaw = Math.atan2(-P.n.x, -P.n.z) + Math.PI; camera.position.y = renderer.xr.isPresenting ? 0 : 1.65; }
 STATIONS.forEach(s => postSign(["SOLAR LINE station", `choose where to go on the screen by the platform: the train comes, and takes you there in real time`, s.body ? `${s.name}: ${fmtM(s.body.w.length())} from the desk here, ${fmtKm(s.body.distKm)} for real` : "the line runs out past every planet to Pluto, 127 km away"],
@@ -54037,12 +54037,13 @@ rig.position.set(0, 0, 1.7);
 const intro = document.getElementById("intro");
 function start() { intro?.classList.add("gone"); }
 addEventListener("keydown", e => { keys[e.code] = true; start();
-  if (e.code === "KeyF" && !inCar) flying = !flying;
-  if (e.code === "KeyE") { const L = !inCar && !onTrain && !lift.riding && nearLift(); if (L) { rideLift(...L); return; } if (onTrain) { if (train.state === "idle") alight(); } else if (inCar) exitCar(); else if (nearTrainDoor()) boardTrain(); else if (nearCar()) enterCar(); }
-  if (/^Digit[1-9]$/.test(e.code)) driveTo(BODIES[+e.code.slice(5) - 1]);
+  if (e.code === "KeyF" && !inCar && !inHeli) flying = !flying;
+  if (e.code === "KeyE") { if (inHeli) { exitHeli(); return; } if (!inCar && !onTrain && nearHeli()) { enterHeli(); return; } const L = !inCar && !onTrain && !lift.riding && nearLift(); if (L) { rideLift(...L); return; } if (onTrain) { if (train.state === "idle") alight(); } else if (inCar) exitCar(); else if (nearTrainDoor()) boardTrain(); else if (nearCar()) enterCar(); }
+  if (/^Digit[1-9]$/.test(e.code) && !inHeli) driveTo(BODIES[+e.code.slice(5) - 1]);
   if (inCar && e.code === "KeyW") speedI = Math.min(SPEEDS.length - 1, speedI + 1);
   if (inCar && e.code === "KeyS") speedI = Math.max(0, speedI - 1);
   if (inCar && e.code === "Space") speedI = 0;
+  if (inHeli && e.code === "KeyW") heliMulI = Math.min(HMULS.length - 1, heliMulI + 1); if (inHeli && e.code === "KeyS") heliMulI = Math.max(0, heliMulI - 1); if (inHeli && e.code === "Space") heliGo();
   if (e.code === "Equal") speed = Math.min(5000, speed * 2); if (e.code === "Minus") speed = Math.max(0.05, speed / 2); });
 addEventListener("keyup", e => { keys[e.code] = false; });
 addEventListener("wheel", e => { if (renderer.xr.isPresenting) return; speed = THREE.MathUtils.clamp(speed * (e.deltaY < 0 ? 1.25 : 0.8), 0.05, 5000); });
@@ -54050,6 +54051,7 @@ const ray = new THREE.Raycaster();
 renderer.domElement.addEventListener("pointerdown", e => { start();
   ray.setFromCamera(new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1), camera);
   if (inCar) { const hit = ray.intersectObject(dash)[0]; if (hit && pressDash(hit.uv)) return; }
+  if (inHeli) { const hit = ray.intersectObject(hpanel)[0]; if (hit && pressHeli(hit.uv)) return; }
   const th = ray.intersectObjects(SCREENS)[0]; if (th && th.distance < 12 && pressTrainScreen(th.uv)) return;
   dragging = true; });
 // VR: a laser from each controller; pull the trigger while pointing at the dashboard to press a button
@@ -54059,6 +54061,7 @@ for (const i of [0, 1]) { const c = renderer.xr.getController(i); rig.add(c);
   c.addEventListener("selectstart", () => { const m = new THREE.Matrix4().extractRotation(c.matrixWorld); ray.ray.origin.setFromMatrixPosition(c.matrixWorld); ray.ray.direction.set(0, 0, -1).applyMatrix4(m);
     const w = ray.intersectObject(wristPanel)[0]; if (w && wristPanel.visible) return pressWrist(w.uv);
     const th = ray.intersectObjects(SCREENS)[0]; if (th && th.distance < 12 && pressTrainScreen(th.uv)) return;
+    if (inHeli) { const hh = ray.intersectObject(hpanel)[0]; if (hh) pressHeli(hh.uv); return; }
     if (!inCar) return; const hit = ray.intersectObject(dash)[0]; if (hit) pressDash(hit.uv); }); }
 // ---------- dwarf planets, asteroids and Halley's Comet; the asteroid belt and the Kuiper belt ----------
 // Each small body stands at its real distance and direction today, on a short glass stand over the spot below it: many are
@@ -54440,7 +54443,111 @@ const PORTALS = [];
   if (!EXO) postSign(["PORTALS TO OTHER SYSTEMS", "planets, stars, a pulsar and black holes, all at the same scale: if the Earth were a 12-inch globe", "TRAPPIST-1's seven planets all fit within 220 m; HR 8799's giants spread over 240 km"], 0, -28.5, 0, 0, 3.4, 1.2); }
 
 // ---------- the wrist teleporter (VR): a panel on your left wrist; point the right controller at a place and pull the trigger ----------
-const PLACES = [["🚆 board the train", "#b8322a", "train"], [EXO ? HOME_NAME : "Earth (the globe)", "#5a9ae8", () => [V3(0, 0, RE + 1.7), GC]], ...(EXO ? [] : [["the Moon", "#d8d8d8", () => moonSpot()]]), ["your car", "#ff6a5a", () => [car.position.clone().add(V3(-2.5, 0, 2.5)), car.position]],
+// ---------- the helicopter: a pad beside the desk, and a flyover of the whole model ----------
+// Board it (E / X beside it, or the guide) and it lifts off and flies a tour: low and slow past the globe, the Sun, each
+// planet and the islands in the asteroid belt, climbing high and fast between them, then home to land on the pad.
+// It is a real-size helicopter (a 10 m rotor), so it passes the small worlds at several metres; the markers show them.
+const PAD = V3(34, 0, 4); PAD.y = terrainH(PAD.x, PAD.z);
+{ const pad = new THREE.Mesh(new THREE.CircleGeometry(9, 48).rotateX(-Math.PI / 2), M(0x4a4d50, { roughness: 0.9 })); pad.position.set(PAD.x, PAD.y + 0.03, PAD.z); scene.add(pad);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(7.4, 7.9, 48).rotateX(-Math.PI / 2), M(0xf1c40f)); ring.position.set(PAD.x, PAD.y + 0.05, PAD.z); scene.add(ring);
+  for (const [w, d, x] of [[0.7, 5, -1.4], [0.7, 5, 1.4], [2.1, 0.7, 0]]) { const h = new THREE.Mesh(new THREE.BoxGeometry(w, 0.02, d), M(0xffffff)); h.position.set(PAD.x + x, PAD.y + 0.06, PAD.z); scene.add(h); }
+  postSign(["HELIPAD", "a flyover of the whole model: the globe, the Sun, every planet and the asteroid-belt islands", "walk up to the helicopter and press E (X on Quest), or pick it in the guide"], PAD.x - 7, PAD.z + 11, PAD.x, PAD.z, 3.2, 1.0); }
+const heli = new THREE.Group(); heli.position.copy(PAD); heli.rotation.y = Math.PI / 2; scene.add(heli);
+const rotor = new THREE.Group(), rotorBlades = new THREE.Group(), tailRotor = new THREE.Group();
+const rotorDisc = new THREE.Mesh(new THREE.CircleGeometry(5.2, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x30343a, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide }));
+{ const paint = M(0xf0b020, { metalness: 0.4, roughness: 0.35 }), dark = M(0x22262a, { metalness: 0.5, roughness: 0.4 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0xcfe8f5, transparent: true, opacity: 0.14, roughness: 0.05, side: THREE.DoubleSide, depthWrite: false });
+  const add = (geo, mat, x, y, z, to = heli) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); to.add(m); return m; };
+  add(new THREE.SphereGeometry(1, 32, 16, 0, 2 * Math.PI, 0, 0.8 * Math.PI), glass, 0, 1.5, 0).scale.set(1.3, 1.25, 2.2);
+  add(new THREE.SphereGeometry(1, 32, 6, 0, 2 * Math.PI, 0.8 * Math.PI, 0.2 * Math.PI), paint, 0, 1.5, 0).scale.set(1.3, 1.25, 2.2);
+  add(new THREE.BoxGeometry(1.7, 0.06, 1.3), dark, 0, 0.8, 0.35);
+  for (const x of [-0.45, 0.45]) { add(new THREE.BoxGeometry(0.55, 0.12, 0.5), M(0xe8dcc8, { roughness: 0.8 }), x, 1.0, 0.25); add(new THREE.BoxGeometry(0.55, 0.7, 0.1), M(0xe8dcc8, { roughness: 0.8 }), x, 1.4, 0.55); }
+  add(new THREE.BoxGeometry(1.2, 1.0, 1.5), paint, 0, 1.9, 1.9);
+  add(new THREE.CylinderGeometry(0.12, 0.3, 5.8, 12).rotateX(Math.PI / 2), paint, 0, 1.9, 5.3);
+  add(new THREE.BoxGeometry(0.08, 1.2, 0.8), paint, 0, 2.3, 8.0);
+  add(new THREE.CylinderGeometry(0.08, 0.1, 0.8, 8), dark, 0, 2.85, 0.3);
+  for (const x of [-1.05, 1.05]) { add(new THREE.CylinderGeometry(0.06, 0.06, 3.8, 8).rotateX(Math.PI / 2), M(0xc0c4c8, { metalness: 0.7, roughness: 0.3 }), x, 0.06, 0.2); for (const z of [0.7, 1.5]) add(new THREE.CylinderGeometry(0.04, 0.04, 0.75, 6), dark, x * 0.9, 0.42, z); }
+  rotor.position.set(0, 3.25, 0.3); heli.add(rotor); rotor.add(rotorBlades); rotor.add(rotorDisc); rotorDisc.visible = false;
+  for (const a of [0, Math.PI / 2]) add(new THREE.BoxGeometry(0.28, 0.04, 10.4), dark, 0, 0, 0, rotorBlades).rotation.y = a;
+  tailRotor.position.set(0.12, 2.3, 8.1); heli.add(tailRotor); for (const a of [0, Math.PI / 2]) add(new THREE.BoxGeometry(0.03, 1.6, 0.12), dark, 0, 0, 0, tailRotor).rotation.x = a; }
+const hpC = document.createElement("canvas"); hpC.width = 1024; hpC.height = 420; const hpT = new THREE.CanvasTexture(hpC); hpT.colorSpace = THREE.SRGBColorSpace;
+const hpanel = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.33), new THREE.MeshBasicMaterial({ map: hpT, toneMapped: false })); hpanel.position.set(-0.25, 1.15, -1.0); hpanel.rotation.x = -0.5; heli.add(hpanel);
+let inHeli = false, heliState = "parked", heliS = 0, heliMulI = 2, heliPaused = false, heliSpin = 0, heliTimer = 0, heliPanelT = 0, HP = null;
+const HMULS = [0.25, 0.5, 1, 2, 4, 8];
+const HBTNS = [["slower", () => { heliMulI = Math.max(0, heliMulI - 1); }], ["pause / go", () => heliGo()], ["faster", () => { heliMulI = Math.min(HMULS.length - 1, heliMulI + 1); }], ["skip ▶", () => heliSkip()], ["back to pad", () => heliHome()]]
+  .map(([label, act], k) => ({ x: 14 + k * 201, y: 300, w: 192, h: 100, label, act, flash: 0 }));
+function heliPlan() {   // the route: a smooth curve through low passes beside each world, with high hops between them
+  const stops = [{ name: EXO ? HOME_NAME : "the Earth (the globe) and the Moon", q: V3(GC.x + 7, GC.y + 4, GC.z + 3) }];
+  const list = [...BODIES, ...ISLES.map(I => I.b)].sort((a, b) => Math.hypot(a.w.x - SUN.w.x, a.w.z - SUN.w.z) - Math.hypot(b.w.x - SUN.w.x, b.w.z - SUN.w.z));
+  for (const b of list) { const S = towerSpots[b.id], aw = S ? S.away : V3(1, 0, 0), big = b.r > 50, dd = big ? b.r * 1.25 : Math.max(7.5, b.r * 1.5 + 10), q = b.c.clone().addScaledVector(aw, -dd);
+    q.y = big ? b.c.y : Math.max(b.c.y - 1.4, terrainH(q.x, q.z) + 4); stops.push({ name: ISLES.some(I => I.b === b) ? b.name + "'s island" : b.name, q, b, aw }); }
+  const P = [PAD.clone(), PAD.clone().add(V3(0, 18, 0))]; let prev = null;
+  const hop = (a, b) => { const L = Math.hypot(b.x - a.x, b.z - a.z); if (L < 900) return; const m = a.clone().lerp(b, 0.5); m.y = Math.max(a.y, b.y, terrainH(m.x, m.z)) + THREE.MathUtils.clamp(0.12 * L, 100, 3000); P.push(m); };
+  for (const s of stops) {
+    if (s.b) { const f = V3(-s.aw.z, 0, s.aw.x), sg = prev && (prev.x - s.q.x) * f.x + (prev.z - s.q.z) * f.z < 0 ? -1 : 1, run = Math.max(400, s.b.r * 3);   // fly past along the side away from its tower
+      s.ain = s.q.clone().addScaledVector(f, sg * run); s.ain.y = s.q.y + 30; s.aout = s.q.clone().addScaledVector(f, -sg * run); s.aout.y = s.q.y + 30; }
+    if (prev) hop(prev, s.ain || s.q); if (s.ain) P.push(s.ain); P.push(s.q.clone()); if (s.aout) P.push(s.aout); prev = s.aout || s.q; }
+  const dir = V3(prev.x - PAD.x, 0, prev.z - PAD.z).normalize(), fin = PAD.clone().addScaledVector(dir, 300).setY(PAD.y + 90); hop(prev, fin); P.push(fin, PAD.clone().add(V3(0, 22, 0)), PAD.clone());
+  const curve = new THREE.CatmullRomCurve3(P, false, "centripetal"); curve.arcLengthDivisions = Math.min(60000, P.length * 600);
+  const pts = curve.getSpacedPoints(Math.ceil(curve.getLength() / 5)), n = pts.length;
+  const obst = []; for (const T of TOWERS) obst.push([T.A.x, T.A.z, T.D.rOut + 30, T.g0 + T.D.H + 25]);
+  for (const [id, Cc] of Object.entries(MTN_AT)) { const D = MTN[id]; if (D) obst.push([Cc.x, Cc.z, D.R * 1.05, terrainH(Cc.x, Cc.z) + D.H * 1.25 + 60]); }
+  for (const b of BODIES) if (b.r > 2) obst.push([b.c.x, b.c.z, b.r + 10, b.c.y + b.r + 10]);
+  const C = new Float32Array(n), Y = new Float32Array(n), padD = new Float32Array(n);
+  pts.forEach((q, i) => { const g = terrainH(q.x, q.z); let dq = 1e9; for (const s of stops) dq = Math.min(dq, Math.hypot(q.x - s.q.x, q.z - s.q.z));
+    let c = g + 4 + 26 * THREE.MathUtils.smoothstep(dq, 120, 600); const dp = Math.hypot(q.x - PAD.x, q.z - PAD.z); padD[i] = dp; if (dp < 40) c = Math.min(c, PAD.y + (dp < 12 ? 0 : 4));
+    for (const [ox, oz, orr, top] of obst) if (Math.abs(q.x - ox) < orr && Math.abs(q.z - oz) < orr && Math.hypot(q.x - ox, q.z - oz) < orr) c = Math.max(c, top);
+    C[i] = c; Y[i] = Math.max(q.y, c); });
+  for (let pass = 0; pass < 3; pass++) { const pre = [0]; for (let i = 0; i < n; i++) pre.push(pre[i] + Y[i]);   // smooth the climbs over obstacles
+    for (let i = 0; i < n; i++) if (padD[i] > 30) { const a = Math.max(0, i - 25), b = Math.min(n - 1, i + 25); Y[i] = Math.max(C[i], (pre[b + 1] - pre[a]) / (b - a + 1)); } }
+  const X = new Float32Array(n), Z = new Float32Array(n), cum = new Float32Array(n), V = new Float32Array(n), T = new Float32Array(n);
+  pts.forEach((q, i) => { X[i] = q.x; Z[i] = q.z; if (i) cum[i] = cum[i - 1] + Math.hypot(X[i] - X[i - 1], Y[i] - Y[i - 1], Z[i] - Z[i - 1]);
+    let d = 1e9; for (const s of stops) d = Math.min(d, Math.hypot(q.x - s.q.x, Y[i] - s.q.y, q.z - s.q.z));
+    V[i] = Math.min(1500, 0.35 * d + 9, 0.3 * Math.hypot(padD[i], Y[i] - PAD.y) + 2.5); if (i) T[i] = T[i - 1] + (cum[i] - cum[i - 1]) / V[i]; });
+  let k0 = 0; for (const s of stops) { let best = k0, bd = 1e9; for (let i = k0; i < n; i++) { const d = Math.hypot(X[i] - s.q.x, Z[i] - s.q.z); if (d < bd) { bd = d; best = i; } if (d < 4) break; } s.K = best; k0 = best; }
+  return { X, Y, Z, cum, V, T, n, L: cum[n - 1], stops }; }
+function hIdx(s) { let lo = 0, hi = HP.n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (HP.cum[m] <= s) lo = m; else hi = m; } return lo; }
+function heliGo() { if (heliState === "parked" || heliState === "landed") { heliState = "spinup"; heliTimer = 0; heliS = 0; heliPaused = false; } else heliPaused = !heliPaused; }
+function heliSkip() { if (!HP || heliState !== "flying") return; const s = HP.stops.find(s => HP.cum[s.K] > heliS + 60); heliS = s ? Math.max(heliS, HP.cum[s.K] - 1500) : Math.max(heliS, HP.L - 400); }
+function heliHome() { heliState = "landed"; heliPaused = false; heliS = HP ? HP.L : 0; heli.position.copy(PAD); }
+function nearHeli() { const h = headXZ(); return heliState !== "flying" && Math.hypot(h.x - heli.position.x, h.z - heli.position.z) < 9; }
+function enterHeli() { if (inCar) exitCar(); onTrain = false; onDeck = null; lift.riding = false; if (!HP) HP = heliPlan(); if (!inHeli) { yaw = 0; pitch = -0.15; vrTurn = 0; } inHeli = true; flying = false;
+  if (heliState === "parked" || heliState === "landed") heliGo(); }
+function exitHeli(quiet) { if (!inHeli) return; inHeli = false; yaw += heli.rotation.y; if (renderer.xr.isPresenting) vrTurn += heli.rotation.y; camera.position.y = 1.65;
+  const air = heli.position.y - terrainH(heli.position.x, heli.position.z) > 2;
+  if (!quiet) { const s = V3(-2.6, 0, 0).applyAxisAngle(V3(0, 1, 0), heli.rotation.y).add(heli.position); rig.position.set(s.x, air ? heli.position.y + 1 : floorH(s.x, s.z), s.z); rig.rotation.set(0, renderer.xr.isPresenting ? vrTurn : 0, 0); if (air) flying = true; }
+  if (air || heliState !== "landed") heliHome(); }
+function pressHeli(uv) { const px = uv.x * 1024, py = (1 - uv.y) * 420, b = HBTNS.find(q => px > q.x && px < q.x + q.w && py > q.y && py < q.y + q.h); if (b) { b.act(); b.flash = 0.25; heliPanelT = 0; } return !!b; }
+function drawHeliPanel(v) { const g = hpC.getContext("2d"); g.fillStyle = "#0d1a22"; g.fillRect(0, 0, 1024, 420); g.strokeStyle = "#f0b020"; g.lineWidth = 6; g.strokeRect(3, 3, 1018, 414);
+  for (const b of HBTNS) { g.fillStyle = b.flash > 0 ? "#ffe9a8" : "#1e2e3a"; g.beginPath(); g.roundRect(b.x, b.y, b.w, b.h, 12); g.fill(); g.strokeStyle = "#f0b020"; g.lineWidth = 4; g.stroke();
+    g.fillStyle = b.flash > 0 ? "#1a1a1a" : "#ffffff"; g.font = "700 30px -apple-system, Helvetica, sans-serif"; g.textAlign = "center"; g.fillText(b.label === "pause / go" ? (heliState !== "flying" ? "go" : heliPaused ? "go" : "pause") : b.label, b.x + b.w / 2, b.y + b.h / 2 + 11); g.textAlign = "left"; }
+  const t = (s, y, sz, col = "#e6f3f9", w = 400) => { g.fillStyle = col; g.font = `${w} ${sz}px -apple-system, Helvetica, sans-serif`; g.fillText(s, 22, y); };
+  if (heliState === "spinup") t("🚁 starting the rotor…", 56, 40, "#ffe9a8", 700);
+  else if (heliState !== "flying") { t("🚁 landed on the helipad", 56, 40, "#ffe9a8", 700); t("press go to fly the tour again, or get out (E / X)", 110, 30); }
+  else { const i = hIdx(heliS), j = HP.stops.findIndex(s => HP.cum[s.K] > heliS - 30), s = HP.stops[j];
+    if (s) { const fx = HP.X[Math.min(HP.n - 1, i + 4)] - HP.X[Math.max(0, i - 4)], fz = HP.Z[Math.min(HP.n - 1, i + 4)] - HP.Z[Math.max(0, i - 4)], side = (s.q.x - HP.X[i]) * -fz + (s.q.z - HP.Z[i]) * fx;
+      const left = HP.cum[s.K] - heliS; t(`→ ${s.name}${left < 300 ? (side > 0 ? "  · on your right" : "  · on your left") : ""}`, 56, 40, "#ffe9a8", 700); t(`stop ${j + 1} of ${HP.stops.length}  ·  ${fmtM(Math.max(0, left))} to go`, 104, 28); }
+    else t("→ home to the helipad", 56, 40, "#ffe9a8", 700);
+    t(`${heliPaused ? "hovering" : `${Math.round(v * 3.6).toLocaleString()} km/h here`}  ·  speed ×${HMULS[heliMulI]}  ·  tour time left ${fmtT((HP.T[HP.n - 1] - HP.T[i]) / HMULS[heliMulI])}`, 152, 28);
+    t(`at real size: ${(v / K / 299792458).toFixed(v / K / 299792458 < 10 ? 1 : 0)} × the speed of light`, 194, 26, "#a9c6d4");
+    t(`height above the ground: ${fmtM(Math.max(0, heli.position.y - terrainH(heli.position.x, heli.position.z)))}`, 232, 24, "#a9c6d4"); }
+  t(IS_HEADSET ? "point at a button and pull the trigger" : "click a button  ·  or W / S speed, space pause, E get out (in the air: jetpack)", 276, 20, "#a9c6d4");
+  hpT.needsUpdate = true; }
+function stepHeli(dt, vr) {
+  const on = heliState === "spinup" || heliState === "flying"; heliSpin += ((on ? 28 : 0) - heliSpin) * Math.min(1, dt * (on ? 0.8 : 0.35));
+  rotor.rotation.y += heliSpin * dt; tailRotor.rotation.x += heliSpin * 4 * dt; rotorDisc.visible = heliSpin > 12; rotorBlades.visible = heliSpin <= 12;
+  let v = 0;
+  if (heliState === "spinup") { heliTimer += dt; if (heliTimer > 3.5) heliState = "flying"; }
+  else if (heliState === "flying" && HP) { const i = hIdx(heliS); v = heliPaused ? 0 : HP.V[i] * HMULS[heliMulI]; heliS += v * dt; if (heliS >= HP.L) { heliS = HP.L; heliState = "landed"; } }
+  if (HP && (heliState === "flying" || heliState === "landed" && heliS > 0)) { const i = hIdx(heliS), j = Math.min(HP.n - 1, i + 1), f = THREE.MathUtils.clamp((heliS - HP.cum[i]) / Math.max(1e-6, HP.cum[j] - HP.cum[i]), 0, 1);
+    heli.position.set(HP.X[i] + (HP.X[j] - HP.X[i]) * f, HP.Y[i] + (HP.Y[j] - HP.Y[i]) * f, HP.Z[i] + (HP.Z[j] - HP.Z[i]) * f);
+    const a = Math.max(0, i - 6), b = Math.min(HP.n - 1, i + 6), tx = HP.X[b] - HP.X[a], tz = HP.Z[b] - HP.Z[a];
+    if (Math.hypot(tx, tz) > 3) { let d = Math.atan2(-tx, -tz) - heli.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); heli.rotation.y += d * Math.min(1, dt * 1.5); } }
+  if (inHeli) { const seat = V3(-0.45, 0.85, 0.05).applyAxisAngle(V3(0, 1, 0), heli.rotation.y).add(heli.position); rig.position.copy(seat);
+    if (vr) rig.rotation.set(0, heli.rotation.y + vrTurn, 0); else { rig.rotation.set(0, heli.rotation.y, 0); camera.position.y = 0.6; camera.rotation.set(pitch, yaw, 0, "YXZ"); }
+    for (const b of HBTNS) if (b.flash > 0) b.flash -= dt; heliPanelT -= dt; if (heliPanelT <= 0) { drawHeliPanel(v); heliPanelT = 0.2; } }
+  return v; }
+const PLACES = [["🚆 board the train", "#b8322a", "train"], ["🚁 helicopter flyover", "#f0b020", "heli"], [EXO ? HOME_NAME : "Earth (the globe)", "#5a9ae8", () => [V3(0, 0, RE + 1.7), GC]], ...(EXO ? [] : [["the Moon", "#d8d8d8", () => moonSpot()]]), ["your car", "#ff6a5a", () => [car.position.clone().add(V3(-2.5, 0, 2.5)), car.position]],
   ...BODIES.map(b => [b.name === "the Sun" ? "Sun" : b.name, b.col, () => [b.stop.clone(), b.c]]),
   ...SMALL.map(b => [b.name, b.col, () => [b.stand.clone(), b.c]]),
   ...(EXO ? [["🌀 portal home: the Solar System", "#9a7aff", "exo:"]] : Object.entries(EXOSYS).map(([k, X]) => ["🌀 " + X.name, "#9a7aff", "exo:" + k])),
@@ -54449,7 +54556,7 @@ function moonSpot() { const d = V3(MC.x, 0, MC.z).normalize(); return [V3(MC.x -
 function moonStand(m) { const pc = m.planet.c, mp = m.pos(), d = V3(mp.x - pc.x, 0, mp.z - pc.z).normalize(), back = Math.max(1.5, m.r * 30);
   return [V3(mp.x + d.x * back, 0, mp.z + d.z * back), mp]; }
 function teleport(i) { onDeck = null; lift.riding = false; const kind = PLACES[i][2]; if (typeof kind === "string" && kind.startsWith("exo:")) return goSystem(kind.slice(4)); if (typeof kind === "string" && kind.startsWith("star")) return enterStar(+kind.slice(4)); if (kind === "home") return leaveStar();
-  if (inStar >= 0) leaveStar(); if (kind === "train") return boardTrain(); if (onTrain) onTrain = false; const [at, look] = PLACES[i][2](); if (inCar) exitCar(); flying = false; at.y = terrainH(at.x, at.z); rig.position.copy(at);
+  if (inStar >= 0) leaveStar(); if (kind === "train") return boardTrain(); if (kind === "heli") return enterHeli(); if (inHeli) exitHeli(true); if (onTrain) onTrain = false; const [at, look] = PLACES[i][2](); if (inCar) exitCar(); flying = false; at.y = terrainH(at.x, at.z); rig.position.copy(at);
   const dx = look.x - at.x, dz = look.z - at.z, ry = Math.atan2(-dx, -dz);
   if (renderer.xr.isPresenting) { vrTurn = ry; rig.rotation.set(0, ry, 0); } else { yaw = ry; pitch = Math.atan2(look.y - at.y - 1.65, Math.hypot(dx, dz)); } wristDirty = true; }
 const wristC = document.createElement("canvas"); wristC.width = 960; wristC.height = 40 + Math.ceil(PLACES.length / 3) * 62; const wristT = new THREE.CanvasTexture(wristC); wristT.colorSpace = THREE.SRGBColorSpace;
@@ -54468,7 +54575,7 @@ addEventListener("pointerup", () => dragging = false);
 addEventListener("pointermove", e => { if (!dragging) return; yaw -= e.movementX * 0.004; pitch = THREE.MathUtils.clamp(pitch - e.movementY * 0.004, -1.5, 1.5); });
 intro?.addEventListener("click", start);
 const guide = document.getElementById("guide");
-guide.innerHTML = "<b>Go to</b><button data-go='desk'><i style='background:#3d7cc9'></i>" + (EXO ? HOME_NAME : "the globe") + "</button>" + (EXO ? "" : "<button data-tp='" + PLACES.findIndex(q => q[0] === "the Moon") + "'><i style='background:#d8d8d8'></i>the Moon</button>") + "<button data-train='1'><i style='background:#b8322a'></i>🚆 ride the Solar Line</button>" +
+guide.innerHTML = "<b>Go to</b><button data-go='desk'><i style='background:#3d7cc9'></i>" + (EXO ? HOME_NAME : "the globe") + "</button>" + (EXO ? "" : "<button data-tp='" + PLACES.findIndex(q => q[0] === "the Moon") + "'><i style='background:#d8d8d8'></i>the Moon</button>") + "<button data-train='1'><i style='background:#b8322a'></i>🚆 ride the Solar Line</button><button data-heli='1'><i style='background:#f0b020'></i>🚁 helicopter flyover</button>" +
   BODIES.map((b, k) => `<div class="row"><button data-go="${k}"><i style="background:${b.col}"></i>${b.name}</button><button class="drive" data-drive="${k}" title="drive there">🚗 ${k + 1}</button></div>`).join("");
 guide.style.maxHeight = "calc(100vh - 30px)"; guide.style.overflowY = "auto";
 guide.innerHTML += (SMALL.length ? "<b style='margin-top:6px'>Small bodies</b>" : "") + SMALL.map(b => `<button data-tp="${PLACES.findIndex(q => q[0] === b.name)}"><i style="background:${b.col}"></i>${b.name}</button>`).join("") +
@@ -54476,8 +54583,8 @@ guide.innerHTML += (SMALL.length ? "<b style='margin-top:6px'>Small bodies</b>" 
   "";
 guide.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); start();
   if (b.dataset.exo !== undefined) return goSystem(b.dataset.exo); if (b.dataset.star) return enterStar(+b.dataset.star); if (b.dataset.home) return leaveStar(); if (inStar >= 0 && !b.dataset.tp) leaveStar();
-  if (b.dataset.drive) return driveTo(BODIES[+b.dataset.drive]); if (b.dataset.tp) return teleport(+b.dataset.tp); if (b.dataset.train) return boardTrain();
-  if (inCar) exitCar();
+  if (b.dataset.drive) return driveTo(BODIES[+b.dataset.drive]); if (b.dataset.tp) return teleport(+b.dataset.tp); if (b.dataset.train) return boardTrain(); if (b.dataset.heli) return enterHeli();
+  if (inCar) exitCar(); if (inHeli) exitHeli(true);
   if (b.dataset.go === "desk") { rig.position.set(0, 0, 1.7); yaw = 0; pitch = -0.15; return; }
   const t = BODIES[+b.dataset.go], p = t.stop; rig.position.set(p.x, terrainH(p.x, p.z), p.z); yaw = Math.atan2(-(t.w.x - p.x), -(t.w.z - p.z)); pitch = 0; flying = false; });
 const hud = document.getElementById("hud");
@@ -54486,9 +54593,9 @@ function readout(v) {
     at this scale: ${fmtKm(S.ly * 9.4607e15 * K / 1000)} from the globe<br><span class="dim">WASD walk the deck · drag to look · guide / wrist: other stars, or back to the Solar System</span>`; return; }
   const d = rig.position.distanceTo(GC), near = BODIES.reduce((a, b) => V3(b.w.x, 0, b.w.z).distanceTo(rig.position) < V3(a.w.x, 0, a.w.z).distanceTo(rig.position) ? b : a);
   hud.innerHTML = `${EXO ? `visiting <b>${EXO.name}</b>, ${EXO.ly.toLocaleString()} light-years away &nbsp;·&nbsp; ` : ""}<b>1 : ${(1 / K / 1e6).toFixed(1)} million</b> &nbsp;·&nbsp; the Earth is a 12-inch globe &nbsp;·&nbsp; ${EXO ? "orbit positions illustrative" : "positions for " + NOW.toDateString()}<br>
-    ${onTrain ? "on the Solar Line · " + trainLine() + "<br>" : ""}${liftLine() ? liftLine() + "<br>" : ""}${inCar ? "driving" : onTrain ? "aboard" : flying ? "jetpack" : "walking"} ${inCar || onTrain ? "" : `<span class="k">F</span>`} &nbsp;·&nbsp; ${v.toFixed(v < 10 ? 1 : 0)} m/s here = ${(v / C_HERE).toFixed(2)} × light speed here (${C_HERE.toFixed(1)} m/s)<br>
+    ${onTrain ? "on the Solar Line · " + trainLine() + "<br>" : ""}${liftLine() ? liftLine() + "<br>" : ""}${inHeli ? "helicopter" : inCar ? "driving" : onTrain ? "aboard" : flying ? "jetpack" : "walking"} ${inCar || onTrain || inHeli ? "" : `<span class="k">F</span>`} &nbsp;·&nbsp; ${v.toFixed(v < 10 ? 1 : 0)} m/s here = ${(v / C_HERE).toFixed(2)} × light speed here (${C_HERE.toFixed(1)} m/s)<br>
     from the globe: ${fmtM(d)} = ${fmtKm(d / K / 1000)} real &nbsp;·&nbsp; nearest: <b>${near.name}</b><br>
-    <span class="dim">${onTrain ? "WASD walk about the carriage · drag to look · E get off when the train is in a station" : inCar ? "W / S faster / slower · space stop · 1–9 pick a destination · E get out" : "WASD walk · drag to look · scroll or − = speed · F jetpack (space / C) · E at the car to get in · 1–9 drive to a planet · H markers"}</span>`;
+    <span class="dim">${onTrain ? "WASD walk about the carriage · drag to look · E get off when the train is in a station" : inHeli ? "W / S faster / slower · space pause / go · drag to look · E get out (in the air: jetpack)" : inCar ? "W / S faster / slower · space stop · 1–9 pick a destination · E get out" : "WASD walk · drag to look · scroll or − = speed · F jetpack (space / C) · E at the car to get in · 1–9 drive to a planet · H markers"}</span>`;
 }
 
 // ---------- VR ----------
@@ -54581,16 +54688,17 @@ function frame() {
   if (vr) { const s = renderer.xr.getSession(); let mx = 0, my = 0, boost = 1;
     for (const src of s?.inputSources || []) { const gp = src.gamepad; if (!gp) continue; const [ax, ay] = stick(gp.axes);
       if (src.handedness === "left") { mx += ax; my += ay;
-        if (tap("L", gp, 4)) { const L = !inCar && !onTrain && !lift.riding && nearLift(); if (L) rideLift(...L); else if (onTrain) { if (train.state === "idle") alight(); } else if (inCar) exitCar(); else if (nearTrainDoor()) boardTrain(); else if (nearCar()) enterCar(); }
-        if (tap("L", gp, 5)) { const k = dest ? (BODIES.indexOf(dest) + 1) % BODIES.length : 0; driveTo(BODIES[k]); } }
-      else { if (gp.buttons[0]?.value > 0.3 && !inCar) boost = 6; my += ay;
+        if (tap("L", gp, 4)) { if (inHeli) exitHeli(); else if (!inCar && !onTrain && nearHeli()) enterHeli(); else { const L = !inCar && !onTrain && !lift.riding && nearLift(); if (L) rideLift(...L); else if (onTrain) { if (train.state === "idle") alight(); } else if (inCar) exitCar(); else if (nearTrainDoor()) boardTrain(); else if (nearCar()) enterCar(); } }
+        if (tap("L", gp, 5) && !inHeli) { const k = dest ? (BODIES.indexOf(dest) + 1) % BODIES.length : 0; driveTo(BODIES[k]); } }
+      else { if (gp.buttons[0]?.value > 0.3 && !inCar && !inHeli) boost = 6; my += ay;
         if (Math.abs(ax) > 0.7 && snap) { vrTurn -= Math.sign(ax) * Math.PI / 6; snap = false; } else if (Math.abs(ax) < 0.3) snap = true;
-        if (inCar && tap("R", gp, 4)) speedI = Math.max(0, speedI - 1); if (inCar && tap("R", gp, 5)) speedI = Math.min(SPEEDS.length - 1, speedI + 1); } }
-    if (!inCar && !onTrain && !lift.riding) { rig.rotation.y = vrTurn;
+        if (inCar && tap("R", gp, 4)) speedI = Math.max(0, speedI - 1); if (inCar && tap("R", gp, 5)) speedI = Math.min(SPEEDS.length - 1, speedI + 1);
+        if (inHeli && tap("R", gp, 4)) heliMulI = Math.max(0, heliMulI - 1); if (inHeli && tap("R", gp, 5)) heliMulI = Math.min(HMULS.length - 1, heliMulI + 1); } }
+    if (!inCar && !onTrain && !inHeli && !lift.riding) { rig.rotation.y = vrTurn;
       if (mx || my) { fwd.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(rig.quaternion); fwd.y = 0; fwd.normalize(); sideV.crossVectors(fwd, UP).normalize();
         const sp = 1.5 * boost; rig.position.addScaledVector(fwd, -my * sp * dt).addScaledVector(sideV, mx * sp * dt); moved = sp; }
       rig.position.y = floorH(rig.position.x, rig.position.z); } }
-  else if (!inCar && !onTrain) { camera.rotation.set(pitch, yaw, 0, "YXZ"); camera.position.y = 1.65; if (lift.riding) {} else {
+  else if (!inCar && !onTrain && !inHeli) { camera.rotation.set(pitch, yaw, 0, "YXZ"); camera.position.y = 1.65; if (lift.riding) {} else {
     const sp = speed * (keys.ShiftLeft || keys.ShiftRight ? 5 : 1) * dt, before = rig.position.clone();
     camera.getWorldDirection(fwd); if (!flying) { fwd.y = 0; fwd.normalize(); } sideV.crossVectors(fwd, UP).normalize();
     if (keys.KeyW || keys.ArrowUp) rig.position.addScaledVector(fwd, sp); if (keys.KeyS || keys.ArrowDown) rig.position.addScaledVector(fwd, -sp);
@@ -54620,6 +54728,7 @@ function frame() {
     moved = Math.abs(train.v); }
   for (const b of TBTN) if (b.flash > 0) b.flash -= dt;
   trainTimer -= dt; if (trainTimer <= 0) { drawTrainScreen(); trainTimer = 0.3; }
+  { const hv = stepHeli(dt, vr); if (inHeli) moved = hv; }
   if (inCar) { const v = SPEEDS[speedI] / 3.6;
     if (carRoute) { carS = Math.min(carRoute.L, carS + v * dt); if (carS >= carRoute.L) { speedI = 0; if (longDrive) { longDrive = false; goSystem("transit:" + SYSTEM_KEY + ">" + LONG); } } }
     placeCar(); moved = carRoute && carS < carRoute.L ? v : 0;
@@ -54627,9 +54736,9 @@ function frame() {
     if (vr) rig.rotation.set(0, car.rotation.y + vrTurn, 0); else { rig.rotation.set(0, car.rotation.y, 0); camera.position.y = 0.55; camera.rotation.set(pitch, yaw, 0, "YXZ"); }
     for (const b of DASH_BTNS) if (b.flash > 0) b.flash -= dt;
     dashTimer -= dt; if (dashTimer <= 0) { drawDash(v); dashTimer = 0.2; } }
-  else if (!vr && !onTrain) rig.rotation.set(0, 0, 0);
-  if (guide.style.display !== (inCar ? "none" : "")) guide.style.display = inCar ? "none" : "";   // the dashboard replaces the guide while you drive
-  for (const i of [0, 1]) { const c = renderer.xr.getController(i), l = c.userData.laser; if (l) l.visible = vr && (inCar || c.userData.hand === "right"); }
+  else if (!vr && !onTrain && !inHeli) rig.rotation.set(0, 0, 0);
+  if (guide.style.display !== (inCar || inHeli ? "none" : "")) guide.style.display = inCar || inHeli ? "none" : "";   // the dashboard replaces the guide while you drive
+  for (const i of [0, 1]) { const c = renderer.xr.getController(i), l = c.userData.laser; if (l) l.visible = vr && (inCar || inHeli || c.userData.hand === "right"); }
   wristPanel.visible = vr; if (vr && wristDirty) drawWrist();
   if (t - waveT > 60) { spawnWave(t); waveT = t; }
   for (let i = WAVES.length - 1; i >= 0; i--) { const w = WAVES[i], r = SUN.r + (t - w.t) * C_HERE; w.l.scale.setScalar(r);
