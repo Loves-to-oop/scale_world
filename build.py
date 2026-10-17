@@ -273,3 +273,25 @@ MOON = MOON.replace("__SCENE__", 'const EARTH_JPG = "__EARTH__";\n__SCENE__')
 out6 = HERE / "moon_baseball.html"
 out6.write_text(MOON.replace("__THREE__", three).replace("__EARTH__", img("earth.jpg")).replace("__SCENE__", (HERE / "moonball.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out6.name}, {out6.stat().st_size // 1024} KB")
+
+
+# ---- the seventh page: President of the United States --------------------------------------------
+PRES = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Mr. or Madam President</title>").replace("background:#c8d4d8", "background:#9ec4e8")
+i0, i1 = PRES.index('<div id="intro">'), PRES.index('<button id="vr">')
+PRES = PRES[:i0] + """<div id="intro"><div class="card">
+  <h1>President of the United States</h1>
+  <p>Four years (eight, if re-elected) as President, one representative day each month. Walk the White House:
+  the Oval Office, the Cabinet Room, the Situation Room, the Press Briefing Room, the Rose Garden. Take Marine One,
+  the motorcade and Air Force One to the Capitol, Camp David, the United Nations, and towns across the country.</p>
+  <p>Every day starts with the President's Daily Brief. Then the decisions come, each in the room where it would really
+  happen: bills to sign or veto, budget deadlines, court vacancies, strikes, storms, hostages, calls from foreign leaders,
+  press questions. They move your approval, your standing with Congress, the economy, the world, and the nation's security.
+  The issues are fictional and nonpartisan; the facts about the job are real.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>shift</kbd> run &nbsp;&middot;&nbsp; <kbd>E</kbd> act &nbsp;&middot;&nbsp; <kbd>1</kbd>&ndash;<kbd>4</kbd> or click to choose<br>
+  In VR: left stick walk (and choose in menus), right stick turn, <b>A</b> act / select</p>
+  <p class="dim">Follow the gold marker to your next appointment. Click to begin.</p>
+</div></div>
+""" + PRES[i1:]
+out7 = HERE / "president.html"
+out7.write_text(PRES.replace("__THREE__", three).replace("__SCENE__", (HERE / "president.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out7.name}, {out7.stat().st_size // 1024} KB")
