@@ -53718,7 +53718,7 @@ STATIONS.forEach(st => { const r = railAt(st.s), t = V3(r.dir.x, 0, r.dir.z).nor
   const nm = boardMesh(["SOLAR LINE", st.name.toUpperCase(), st.body ? `real distance from Earth today: ${fmtKm(st.body.distKm)}` : "the line runs outward to Pluto"], 4, { bg: "#1f4e9c", gold: false, title: 2 });
   nm.position.set(0.2, top + 2.5, 8); nm.rotation.y = -Math.PI / 2; g.add(nm); const nm2 = nm.clone(); nm2.position.z = -8; g.add(nm2);
   PLATFORMS.push({ c, t, n, top, st, inv: new THREE.Matrix4().makeRotationY(-Math.atan2(t.x, t.z)) }); });
-function floorH(x, z) { if (inStar >= 0) return 0; let h = terrainH(x, z);   // you can walk up onto a platform
+function floorH(x, z) { if (inStar >= 0) return 0; if (onDeck) return onDeck.deckY; let h = terrainH(x, z);   // you can walk up onto a platform
   for (const P of PLATFORMS) { const dx = x - P.c.x, dz = z - P.c.z, a = dx * P.n.x + dz * P.n.z, b = dx * P.t.x + dz * P.t.z; if (Math.abs(a) < 2.1 && Math.abs(b) < 33) h = Math.max(h, P.top); } return h; }
 // the train: a locomotive and two carriages, each placed on the track on its own, so it bends round the line
 const train = { cars: [], s: 0, v: 0, dir: 1, at: 0, dest: -1, pickup: -1, state: "idle", doors: 0, timeK: 1 };
@@ -53806,7 +53806,7 @@ const intro = document.getElementById("intro");
 function start() { intro?.classList.add("gone"); }
 addEventListener("keydown", e => { keys[e.code] = true; start();
   if (e.code === "KeyF" && !inCar) flying = !flying;
-  if (e.code === "KeyE") { if (onTrain) { if (train.state === "idle") alight(); } else if (inCar) exitCar(); else if (nearTrainDoor()) boardTrain(); else if (car.position.distanceTo(rig.position) < 8) enterCar(); }
+  if (e.code === "KeyE") { const L = !inCar && !onTrain && !lift.riding && nearLift(); if (L) { rideLift(...L); return; } if (onTrain) { if (train.state === "idle") alight(); } else if (inCar) exitCar(); else if (nearTrainDoor()) boardTrain(); else if (car.position.distanceTo(rig.position) < 8) enterCar(); }
   if (/^Digit[1-9]$/.test(e.code)) driveTo(BODIES[+e.code.slice(5) - 1]);
   if (inCar && e.code === "KeyW") speedI = Math.min(SPEEDS.length - 1, speedI + 1);
   if (inCar && e.code === "KeyS") speedI = Math.max(0, speedI - 1);
@@ -53892,6 +53892,93 @@ const STAR_T = [];
 function leaveStar() { if (inStar < 0) return; for (const [o, v] of savedVis) o.visible = v; starWorld.visible = false; starWorld.clear(); scene.background = savedBG; scene.fog = savedFog; inStar = -1; STAR_T.length = 0;
   rig.position.set(0, 0, 1.7); yaw = 0; pitch = -0.15; vrTurn = 0; wristDirty = true; }
 
+// ---------- a skyscraper beside each world, each its own design, Willis (Sears) Tower scale: 300-560 m ----------
+// A glass elevator climbs the outside of each to an observation balcony: from up there you can see the next towers,
+// and so how far apart the worlds are. E at the elevator door at the foot (X in VR) to ride; E at the top to come down.
+const winTex = (base, win, cols = 8, rows = 8) => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d"); g.fillStyle = base; g.fillRect(0, 0, 256, 256);
+  g.fillStyle = win; const cw = 256 / cols, rh = 256 / rows; for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) g.fillRect(k * cw + cw * 0.12, r * rh + rh * 0.18, cw * 0.76, rh * 0.62);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; };
+const towerMat = (base, win, rx, ry, o = {}) => { const t = winTex(base, win); t.repeat.set(rx, ry); return new THREE.MeshStandardMaterial({ map: t, roughness: 0.35, metalness: 0.35, ...o }); };
+function lathe(prof, mat, segs = 48) { return new THREE.Mesh(new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), segs), mat); }
+const TOWERS = [];
+const TDESIGN = {
+  earth: { name: "Terra Tower", H: 460, deck: 412, rEl: 36, rOut: 44, build(g) {          // a homage to the Sears Tower's bundled tubes, in ocean blue and land green, crowned by a globe
+    const T = 22.5, hs = [[442, 1, 1], [442, 0, 1], [360, 1, 0], [360, 2, 1], [270, 0, 0], [270, 2, 2], [270, 1, 2], [200, 0, 2], [200, 2, 0]];
+    for (const [h, i, j] of hs) { const m = new THREE.Mesh(new THREE.BoxGeometry(T, h, T), towerMat((i + j) % 2 ? "#1d4f8a" : "#2a6a4a", "#9fd0f0", 2, h / 32)); m.position.set((i - 1) * T, h / 2, (j - 1) * T); g.add(m); }
+    const globe = new THREE.Mesh(new THREE.SphereGeometry(14, 48, 24), new THREE.MeshStandardMaterial({ map: earthTex, emissive: 0x112244, roughness: 0.5 })); globe.position.y = 460; g.add(globe);
+    for (const sx of [-5, 5]) { const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 1, 60, 8), M(0xdddddd)); ant.position.set(sx, 472, 0); g.add(ant); } } },
+  sun: { name: "Helios Spire", H: 540, deck: 430, rEl: 30, rOut: 38, build(g) {          // a golden tower opening into a sunburst crown round a glowing core
+    g.add(lathe([[0, 0], [26, 0], [24, 120], [20, 300], [16, 420], [22, 450], [0, 452]], towerMat("#a8781e", "#ffe08a", 14, 14)));
+    const core = new THREE.Mesh(new THREE.SphereGeometry(20, 32, 16), new THREE.MeshBasicMaterial({ color: 0xffd04a, toneMapped: false })); core.position.y = 480; g.add(core);
+    for (let k = 0; k < 24; k++) { const f = new THREE.Mesh(new THREE.BoxGeometry(2, 70, 10), M(0xe8b030, { metalness: 0.8, roughness: 0.3, emissive: 0x402000 })); const a = k / 24 * Math.PI * 2;
+      f.position.set(42 * Math.cos(a), 480, 42 * Math.sin(a)); f.lookAt(0, 480, 0); f.rotateX(Math.PI / 2 * 0.6); g.add(f); } } },
+  mercury: { name: "Quicksilver Needle", H: 330, deck: 290, rEl: 14, rOut: 22, build(g) {    // a slim tapering steel obelisk, its facades pocked with crater discs
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(6, 18, 320, 4, 1), towerMat("#8a8e94", "#d8e0e8", 3, 10, { metalness: 0.8, roughness: 0.25 })); m.rotation.y = Math.PI / 4; m.position.y = 160; g.add(m);
+    for (let k = 0; k < 40; k++) { const y = 20 + Math.random() * 260, w = 18 - y / 320 * 12, side = (Math.random() * 4) | 0, d = new THREE.Mesh(new THREE.CircleGeometry(1 + Math.random() * 3, 20), M(0x5a5e64));
+      const a = side * Math.PI / 2; d.position.set(Math.cos(a) * w * 0.72, y, Math.sin(a) * w * 0.72); d.lookAt(Math.cos(a) * 100, y, Math.sin(a) * 100); d.position.add(V3(Math.cos(a), 0, Math.sin(a)).multiplyScalar(0.3)); g.add(d); }
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(4.3, 30, 4), M(0xc8ccd0, { metalness: 0.9 })); tip.position.y = 335; tip.rotation.y = Math.PI / 4; g.add(tip); } },
+  venus: { name: "Cloudswirl", H: 430, deck: 384, rEl: 34, rOut: 42, build(g) {          // a twisting tower in cream and gold, like Venus's spinning clouds
+    const n = 70, im = new THREE.InstancedMesh(new THREE.BoxGeometry(40, 6, 26), towerMat("#e8d6a0", "#fff4d0", 4, 0.2), n);
+    for (let k = 0; k < n; k++) { const O = new THREE.Object3D(); O.position.y = 3 + k * 6; O.rotation.y = k * 0.045; const s = 1 - k / n * 0.35; O.scale.set(s, 1, s); O.updateMatrix(); im.setMatrixAt(k, O.matrix); }
+    g.add(im); const crown = new THREE.Mesh(new THREE.TorusKnotGeometry(10, 2.2, 96, 12), M(0xf0d070, { metalness: 0.8, roughness: 0.3 })); crown.position.y = 430; g.add(crown); } },
+  mars: { name: "Olympus Tower", H: 390, deck: 300, rEl: 30, rOut: 38, build(g) {        // a red tower rising from a broad shield-volcano base, Phobos and Deimos on arms at the top
+    g.add(lathe([[0, 0], [70, 0], [55, 20], [34, 50], [24, 70], [20, 340], [14, 380], [0, 384]], towerMat("#9a3a1e", "#ffb08a", 12, 12)));
+    for (const [r, y, s, a] of [[30, 360, 5, 0.4], [44, 330, 3.5, 2.6]]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(r, 1.2, 1.2), M(0x6a2a14)); arm.position.set(Math.cos(a) * r / 2, y, Math.sin(a) * r / 2); arm.rotation.y = -a; g.add(arm);
+      const moon = new THREE.Mesh(new THREE.SphereGeometry(s, 16, 12), M(0x8a7a6a)); moon.position.set(Math.cos(a) * r, y, Math.sin(a) * r); g.add(moon); } } },
+  jupiter: { name: "Great Red Tower", H: 520, deck: 470, rEl: 46, rOut: 54, build(g) {      // a giant banded drum with a Great Red Spot, the four Galilean moons on its crown
+    const bt = (() => { const c = document.createElement("canvas"); c.width = 256; c.height = 512; const x = c.getContext("2d"); let y = 0, k = 0; while (y < 512) { const h = 14 + (k * 37 % 30); x.fillStyle = ["#d8b48a", "#efe0c4", "#b88a62", "#e8d0a8", "#a8784e"][k % 5]; x.fillRect(0, y, 256, h); y += h; k++; }
+      x.fillStyle = "rgba(255,240,200,.55)"; for (let r = 0; r < 64; r++) for (let q = 0; q < 16; q++) x.fillRect(q * 16 + 3, r * 8 + 2, 10, 4); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.repeat.set(3, 1); return t; })();
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(38, 42, 480, 48), new THREE.MeshStandardMaterial({ map: bt, roughness: 0.6 })); drum.position.y = 240; g.add(drum);
+    const spot = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), M(0xb8442a)); spot.scale.set(16, 9, 5); spot.position.set(0, 180, 39.5); g.add(spot);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(38, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), M(0xd8b48a)); cap.position.y = 480; cap.scale.y = 0.4; g.add(cap);
+    for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2, m = new THREE.Mesh(new THREE.SphereGeometry(3 + k * 0.6, 16, 12), M([0xe8d060, 0xe8dcc8, 0x9a8e80, 0x5e564e][k])); m.position.set(Math.cos(a) * 28, 505 + k * 4, Math.sin(a) * 28); g.add(m); } } },
+  saturn: { name: "Ringworld Tower", H: 480, deck: 360, rEl: 30, rOut: 38, build(g) {      // a pale gold tower wearing three tilted rings near its top
+    g.add(lathe([[0, 0], [24, 0], [22, 300], [26, 420], [20, 470], [0, 476]], towerMat("#c8b078", "#fff0c8", 12, 15)));
+    for (const [r0, r1, op] of [[34, 52, 0.85], [54, 70, 0.6], [72, 80, 0.45]]) { const ring = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 96), new THREE.MeshStandardMaterial({ color: 0xe8d8a8, side: THREE.DoubleSide, transparent: true, opacity: op, metalness: 0.4 }));
+      ring.rotation.x = -Math.PI / 2 + 0.47; ring.position.y = 430; g.add(ring); } } },
+  uranus: { name: "Sideways Tower", H: 410, deck: 330, rEl: 28, rOut: 36, build(g) {      // cyan glass with rings standing on edge, like Uranus rolling on its side
+    g.add(lathe([[0, 0], [22, 0], [20, 350], [14, 400], [0, 404]], towerMat("#4aa8b8", "#c8f4ff", 12, 13)));
+    for (const r of [30, 34, 37]) { const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.8, 8, 96), M(0x9ae0ea, { metalness: 0.6 })); ring.position.y = 370; ring.rotation.y = 0.3; g.add(ring); }
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(12, 32, 16), M(0xa6e0e8)); ball.position.y = 370; g.add(ball); } },
+  neptune: { name: "Trident Tower", H: 450, deck: 360, rEl: 26, rOut: 34, build(g) {      // deep blue, tapering into Neptune's trident
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(10, 24, 390, 6), towerMat("#1e3a8a", "#8ab0ff", 6, 12)); m.position.y = 195; g.add(m);
+    for (const sx of [-14, 0, 14]) { const prong = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 2, sx ? 50 : 70, 8), M(0x4a6ad8, { metalness: 0.8 })); prong.position.set(sx, 390 + (sx ? 25 : 35), 0); g.add(prong);
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(3, 10, 8), M(0x8ab0ff, { metalness: 0.8 })); tip.position.set(sx, 390 + (sx ? 55 : 75), 0); g.add(tip); }
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(32, 3, 3), M(0x4a6ad8, { metalness: 0.8 })); bar.position.y = 392; g.add(bar); } },
+  pluto: { name: "Heart of Pluto", H: 300, deck: 250, rEl: 22, rOut: 30, build(g) {      // a small pale tower crowned with Pluto's heart, Tombaugh Regio
+    g.add(lathe([[0, 0], [18, 0], [15, 260], [10, 280], [0, 282]], towerMat("#c8b090", "#f8eedc", 9, 9)));
+    const sh = new THREE.Shape(); sh.moveTo(0, -12); sh.bezierCurveTo(-30, 8, -12, 30, 0, 14); sh.bezierCurveTo(12, 30, 30, 8, 0, -12);
+    const heart = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 4, bevelEnabled: true, bevelSize: 1, bevelThickness: 1 }), M(0xf4ece0, { emissive: 0x332a20 })); heart.position.set(0, 290, -2); g.add(heart); } } };
+const towerSpots = { earth: { w: V3(0, 0, 0), r: 0.15, away: V3(-0.8, 0, -0.6) } };
+for (const b of BODIES) { const f = V3(b.w.x - b.E.x, 0, b.w.z - b.E.z).normalize(); towerSpots[b.id] = { w: b.w, r: b.r, away: V3(-f.z, 0, f.x), body: b }; }
+const cabMat = new THREE.MeshStandardMaterial({ color: 0xcfe8f5, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide });
+for (const [id, D] of Object.entries(TDESIGN)) { const S = towerSpots[id], dist = id === "earth" ? 95 : S.r + D.rOut + 90, A = V3(S.w.x, 0, S.w.z).addScaledVector(S.away, dist), g0 = terrainH(A.x, A.z);
+  const g = new THREE.Group(); g.position.set(A.x, g0, A.z); scene.add(g); D.build(g);
+  const plinth = new THREE.Mesh(new THREE.CylinderGeometry(D.rOut + 6, D.rOut + 10, 40, 32), M(0x8a8478)); plinth.position.y = -19.9; g.add(plinth);   // its footing, covering any slope
+  const toW = V3(S.w.x - A.x, 0, S.w.z - A.z).normalize(), elDir = toW, base = A.clone().addScaledVector(elDir, D.rEl);   // the elevator runs up the side facing the world it's named for
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(0.6, D.deck + 4, 0.6), M(0x5a6068, { metalness: 0.6 })); rail.position.set(base.x - A.x - elDir.x * 1.6, (D.deck + 4) / 2, base.z - A.z - elDir.z * 1.6); g.add(rail);
+  const deck = new THREE.Mesh(new THREE.RingGeometry(D.rEl - 6, D.rOut, 96).rotateX(-Math.PI / 2), M(0xb8b4ac, { side: THREE.DoubleSide })); deck.position.y = D.deck; g.add(deck);
+  const glass = new THREE.Mesh(new THREE.CylinderGeometry(D.rOut, D.rOut, 2.4, 96, 1, true), cabMat); glass.position.y = D.deck + 1.2; g.add(glass);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(D.rOut, 0.12, 6, 96).rotateX(Math.PI / 2), M(0xc9a227, { metalness: 0.7 })); rim.position.y = D.deck + 1.1; g.add(rim);
+  const cab = new THREE.Group(); scene.add(cab); const cb = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.8, 2.6), cabMat); cb.position.y = 1.4; cab.add(cb);
+  const cf = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.12, 2.6), M(0x3a3e44)); cab.add(cf); const ct = cf.clone(); ct.position.y = 2.8; cab.add(ct); cab.position.set(base.x, g0, base.z);
+  const T = { id, D, A, g0, base, elDir, cab, deckY: g0 + D.deck, name: D.name, world: S.body ? S.body.name : "Earth" };
+  const door = boardMesh([`${D.name}: ${D.H} m`, "glass elevator to the observation deck (E / X here)", `the tower of ${T.world}`], 3.4, { bg: "#1a2a3a" });
+  door.position.set(base.x + elDir.x * 2.2, g0 + 3.6, base.z + elDir.z * 2.2); door.lookAt(base.x + elDir.x * 10, g0 + 3.6, base.z + elDir.z * 10); scene.add(door);
+  TOWERS.push(T); }
+for (const T of TOWERS) {   // on each deck, a board: how far it is to every other tower
+  const others = TOWERS.filter(o => o !== T).map(o => [o, Math.hypot(o.A.x - T.A.x, o.A.z - T.A.z)]).sort((a, b) => a[1] - b[1]).slice(0, 5);
+  const b = boardMesh([`${T.name} observation deck, ${T.D.deck} m up`, ...others.map(([o, d]) => `${o.name} (${o.world}): ${fmtM(d)} away`), "these towers are 300-560 m tall: like the Sears Tower (442 m)"], 4, { bg: "#1a2a3a" });
+  const p = T.A.clone().addScaledVector(T.elDir, T.D.rOut - 2.5); b.position.set(p.x + T.elDir.z * 6, T.deckY + 1.8, p.z - T.elDir.x * 6); b.lookAt(T.A.x, T.deckY + 1.8, T.A.z); scene.add(b); }
+const lift = { T: null, from: 0, to: 0, t: 0, dur: 0, riding: false }; let onDeck = null;
+function nearLift() { for (const T of TOWERS) { const atBase = Math.hypot(rig.position.x - T.base.x, rig.position.z - T.base.z) < 4; if (atBase && Math.abs(rig.position.y - T.g0) < 3) return [T, "up"];
+    if (onDeck === T && atBase) return [T, "down"]; } return null; }
+function rideLift(T, dir) { lift.T = T; lift.from = dir === "up" ? T.g0 : T.deckY; lift.to = dir === "up" ? T.deckY : T.g0; lift.t = 0; lift.dur = Math.abs(lift.to - lift.from) / 9 + 4; lift.riding = true; onDeck = null; if (inCar) exitCar(); flying = false; }
+function stepLift(dt) { if (!lift.riding) return; lift.t += dt; const f = THREE.MathUtils.clamp(lift.t / lift.dur, 0, 1), e = f < 0.5 ? 2 * f * f : 1 - 2 * (1 - f) * (1 - f), y = lift.from + (lift.to - lift.from) * e;
+  lift.T.cab.position.y = y; rig.position.set(lift.T.base.x, y + 0.12, lift.T.base.z);
+  if (f >= 1) { lift.riding = false; if (lift.to > lift.from) { onDeck = lift.T; const p = lift.T.base.clone().addScaledVector(lift.T.elDir, 2.6); rig.position.set(p.x, lift.T.deckY, p.z); } } }   // step out of the cab, toward the view
+function liftLine() { if (lift.riding) { const h = rig.position.y - lift.T.g0; return `glass elevator, ${lift.T.name}: ${Math.round(h)} m up${lift.to > lift.from ? "" : ", going down"} (9 m/s)`; } return onDeck ? `on the observation deck of ${onDeck.name}, ${onDeck.D.deck} m up · E by the elevator to go down` : ""; }
+
 // ---------- the wrist teleporter (VR): a panel on your left wrist; point the right controller at a place and pull the trigger ----------
 const PLACES = [["🚆 board the train", "#b8322a", "train"], ["Earth (the globe)", "#5a9ae8", () => [V3(0, 0, 1.7), GC]], ["the Moon", "#d8d8d8", () => moonSpot()], ["your car", "#ff6a5a", () => [car.position.clone().add(V3(-2.5, 0, 2.5)), car.position]],
   ...BODIES.map(b => [b.name === "the Sun" ? "Sun" : b.name, b.col, () => [b.stop.clone(), b.c]]),
@@ -53901,7 +53988,7 @@ const PLACES = [["🚆 board the train", "#b8322a", "train"], ["Earth (the globe
 function moonSpot() { const d = V3(MC.x, 0, MC.z).normalize(); return [V3(MC.x - d.x * 1.6, 0, MC.z - d.z * 1.6), MC]; }
 function moonStand(m) { const pc = m.planet.c, mp = m.pos(), d = V3(mp.x - pc.x, 0, mp.z - pc.z).normalize(), back = Math.max(1.5, m.r * 30);
   return [V3(mp.x + d.x * back, 0, mp.z + d.z * back), mp]; }
-function teleport(i) { const kind = PLACES[i][2]; if (typeof kind === "string" && kind.startsWith("star")) return enterStar(+kind.slice(4)); if (kind === "home") return leaveStar();
+function teleport(i) { onDeck = null; lift.riding = false; const kind = PLACES[i][2]; if (typeof kind === "string" && kind.startsWith("star")) return enterStar(+kind.slice(4)); if (kind === "home") return leaveStar();
   if (inStar >= 0) leaveStar(); if (kind === "train") return boardTrain(); if (onTrain) onTrain = false; const [at, look] = PLACES[i][2](); if (inCar) exitCar(); flying = false; at.y = terrainH(at.x, at.z); rig.position.copy(at);
   const dx = look.x - at.x, dz = look.z - at.z, ry = Math.atan2(-dx, -dz);
   if (renderer.xr.isPresenting) { vrTurn = ry; rig.rotation.set(0, ry, 0); } else { yaw = ry; pitch = Math.atan2(look.y - at.y - 1.65, Math.hypot(dx, dz)); } wristDirty = true; }
@@ -53938,7 +54025,7 @@ function readout(v) {
     at this scale: ${fmtKm(S.ly * 9.4607e15 * K / 1000)} from the globe<br><span class="dim">WASD walk the deck · drag to look · guide / wrist: other stars, or back to the Solar System</span>`; return; }
   const d = rig.position.distanceTo(GC), near = BODIES.reduce((a, b) => V3(b.w.x, 0, b.w.z).distanceTo(rig.position) < V3(a.w.x, 0, a.w.z).distanceTo(rig.position) ? b : a);
   hud.innerHTML = `<b>1 : ${(1 / K / 1e6).toFixed(1)} million</b> &nbsp;·&nbsp; the Earth is a 12-inch globe &nbsp;·&nbsp; positions for ${NOW.toDateString()}<br>
-    ${onTrain ? "on the Solar Line · " + trainLine() + "<br>" : ""}${inCar ? "driving" : onTrain ? "aboard" : flying ? "jetpack" : "walking"} ${inCar || onTrain ? "" : `<span class="k">F</span>`} &nbsp;·&nbsp; ${v.toFixed(v < 10 ? 1 : 0)} m/s here = ${(v / C_HERE).toFixed(2)} × light speed here (${C_HERE.toFixed(1)} m/s)<br>
+    ${onTrain ? "on the Solar Line · " + trainLine() + "<br>" : ""}${liftLine() ? liftLine() + "<br>" : ""}${inCar ? "driving" : onTrain ? "aboard" : flying ? "jetpack" : "walking"} ${inCar || onTrain ? "" : `<span class="k">F</span>`} &nbsp;·&nbsp; ${v.toFixed(v < 10 ? 1 : 0)} m/s here = ${(v / C_HERE).toFixed(2)} × light speed here (${C_HERE.toFixed(1)} m/s)<br>
     from the globe: ${fmtM(d)} = ${fmtKm(d / K / 1000)} real &nbsp;·&nbsp; nearest: <b>${near.name}</b><br>
     <span class="dim">${onTrain ? "WASD walk about the carriage · drag to look · E get off when the train is in a station" : inCar ? "W / S faster / slower · space stop · 1–9 pick a destination · E get out" : "WASD walk · drag to look · scroll or − = speed · F jetpack (space / C) · E at the car to get in · 1–9 drive to a planet · H markers"}</span>`;
 }
@@ -54033,16 +54120,16 @@ function frame() {
   if (vr) { const s = renderer.xr.getSession(); let mx = 0, my = 0, boost = 1;
     for (const src of s?.inputSources || []) { const gp = src.gamepad; if (!gp) continue; const [ax, ay] = stick(gp.axes);
       if (src.handedness === "left") { mx += ax; my += ay;
-        if (tap("L", gp, 4)) { if (onTrain) { if (train.state === "idle") alight(); } else if (inCar) exitCar(); else if (nearTrainDoor()) boardTrain(); else enterCar(); }
+        if (tap("L", gp, 4)) { const L = !inCar && !onTrain && !lift.riding && nearLift(); if (L) rideLift(...L); else if (onTrain) { if (train.state === "idle") alight(); } else if (inCar) exitCar(); else if (nearTrainDoor()) boardTrain(); else enterCar(); }
         if (tap("L", gp, 5)) { const k = dest ? (BODIES.indexOf(dest) + 1) % BODIES.length : 0; driveTo(BODIES[k]); } }
       else { if (gp.buttons[0]?.value > 0.3 && !inCar) boost = 6; my += ay;
         if (Math.abs(ax) > 0.7 && snap) { vrTurn -= Math.sign(ax) * Math.PI / 6; snap = false; } else if (Math.abs(ax) < 0.3) snap = true;
         if (inCar && tap("R", gp, 4)) speedI = Math.max(0, speedI - 1); if (inCar && tap("R", gp, 5)) speedI = Math.min(SPEEDS.length - 1, speedI + 1); } }
-    if (!inCar && !onTrain) { rig.rotation.y = vrTurn;
+    if (!inCar && !onTrain && !lift.riding) { rig.rotation.y = vrTurn;
       if (mx || my) { fwd.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(rig.quaternion); fwd.y = 0; fwd.normalize(); sideV.crossVectors(fwd, UP).normalize();
         const sp = 1.5 * boost; rig.position.addScaledVector(fwd, -my * sp * dt).addScaledVector(sideV, mx * sp * dt); moved = sp; }
       rig.position.y = floorH(rig.position.x, rig.position.z); } }
-  else if (!inCar && !onTrain) { camera.rotation.set(pitch, yaw, 0, "YXZ"); camera.position.y = 1.65;
+  else if (!inCar && !onTrain) { camera.rotation.set(pitch, yaw, 0, "YXZ"); camera.position.y = 1.65; if (lift.riding) {} else {
     const sp = speed * (keys.ShiftLeft || keys.ShiftRight ? 5 : 1) * dt, before = rig.position.clone();
     camera.getWorldDirection(fwd); if (!flying) { fwd.y = 0; fwd.normalize(); } sideV.crossVectors(fwd, UP).normalize();
     if (keys.KeyW || keys.ArrowUp) rig.position.addScaledVector(fwd, sp); if (keys.KeyS || keys.ArrowDown) rig.position.addScaledVector(fwd, -sp);
@@ -54050,8 +54137,11 @@ function frame() {
     if (flying && keys.Space) rig.position.y += sp; if (flying && (keys.KeyC || keys.ControlLeft)) rig.position.y -= sp;
     if (keys.ArrowLeft) yaw += 1.5 * dt; if (keys.ArrowRight) yaw -= 1.5 * dt;
     moved = before.distanceTo(rig.position) / Math.max(dt, 1e-4);
-    const gh = floorH(rig.position.x, rig.position.z); if (!flying) rig.position.y = gh; else rig.position.y = Math.max(gh, rig.position.y); }
-  stepTrain(dt);
+    const gh = floorH(rig.position.x, rig.position.z); if (!flying) rig.position.y = gh; else rig.position.y = Math.max(gh, rig.position.y); } }
+  stepTrain(dt); stepLift(dt);
+  if (lift.riding && vr) rig.rotation.y = vrTurn;
+  if (onDeck && !lift.riding) { const T = onDeck, dx = rig.position.x - T.A.x, dz = rig.position.z - T.A.z, r = Math.hypot(dx, dz), r2 = THREE.MathUtils.clamp(r, T.D.rEl - 5.5, T.D.rOut - 0.6);   // stay on the balcony
+    if (r2 !== r) { rig.position.x = T.A.x + dx / r * r2; rig.position.z = T.A.z + dz / r * r2; } rig.position.y = T.deckY; }
   if (inStar >= 0 && !flying) { const r = Math.hypot(rig.position.x, rig.position.z); if (r > 6.4) { rig.position.x *= 6.4 / r; rig.position.z *= 6.4 / r; } }
   if (onTrain) { const g = train.cars[1], L = CAR_L[1];
     if (vr) { const s = renderer.xr.getSession(); let mx = 0, my = 0; for (const src of s?.inputSources || []) if (src.handedness === "left") { const [ax, ay] = stick(src.gamepad?.axes); mx = ax; my = ay; }
