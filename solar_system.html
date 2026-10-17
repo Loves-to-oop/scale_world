@@ -53115,6 +53115,94 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWid
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
+
+// ---------- worlds: the Solar System, or another system, built inside this one page ----------
+// Going through a portal tears the current world down and builds the next on the same renderer, so the
+// browser (and a VR session) carry straight on. Listeners and page elements a world adds are tracked and removed.
+let TRACK = null;
+{ const addET = EventTarget.prototype.addEventListener, addED = THREE.EventDispatcher.prototype.addEventListener;
+  EventTarget.prototype.addEventListener = function (t, f, o) { if (TRACK && (this === window || this === document || this instanceof HTMLElement)) TRACK.l.push([this, t, f, o, 0]); return addET.call(this, t, f, o); };
+  THREE.EventDispatcher.prototype.addEventListener = function (t, f) { if (TRACK && this.isObject3D) TRACK.l.push([this, t, f, null, 1]); return addED.call(this, t, f); }; }
+let WORLD = null;
+function teardownWorld() {
+  if (!WORLD) return; renderer.setAnimationLoop(null);
+  for (const [o, t, f, opt, ed] of WORLD.track.l) ed ? o.removeEventListener(t, f) : o.removeEventListener(t, f, opt);
+  for (const el of [...document.body.children]) if (!WORLD.bodyKeep.has(el)) el.remove();
+  for (const el of [...document.head.children]) if (!WORLD.headKeep.has(el)) el.remove();
+  for (const i of [0, 1]) for (const c of [renderer.xr.getController(i), renderer.xr.getControllerGrip(i)]) { c.parent?.remove(c); c.clear(); }
+  WORLD.scene.traverse(o => { o.geometry?.dispose(); for (const m of [].concat(o.material || [])) { for (const k in m) if (m[k] && m[k].isTexture) m[k].dispose(); m.dispose(); } });
+  WORLD = null; }
+function switchWorld(key) { const after = WORLD && WORLD.after; teardownWorld(); after && after(); if (key && key.startsWith("transit:")) { const [a, b] = key.slice(8).split(">"); return buildTransit(a, b); } buildWorld(key || null); }
+// ---------- the deep-space highway: a long drive between two systems (Proxima ↔ Alpha Centauri, 46,000 km at this scale) ----------
+// The road scrolls under the car, so the world never strays far from the origin (no loss of precision); the distance is real.
+function buildTransit(fromKey, toKey) {
+TRACK = { l: [] }; const bodyKeep = new Set(document.body.children), headKeep = new Set(document.head.children);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0e1a2e); scene.fog = new THREE.FogExp2(0x1a2a44, 0.0009);
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 1e6), rig = new THREE.Group(); rig.add(camera); scene.add(rig);
+scene.add(new THREE.HemisphereLight(0x8aa0c8, 0x2a3a2a, 1.2)); const moonish = new THREE.DirectionalLight(0xffffff, 0.8); moonish.position.set(1, 2, 1); scene.add(moonish);
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z), M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, ...o });
+const TOTAL = 4.64e7, NAMES = { proxima: "Proxima Centauri", alphacen: "Alpha Centauri" };   // 13,000 AU in metres here
+const tex = (w, h, draw, rx, ry) => { const c = document.createElement("canvas"); c.width = w; c.height = h; draw(c.getContext("2d"), w, h); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = 8; t.colorSpace = THREE.SRGBColorSpace; return t; };
+const roadT = tex(256, 256, (g, w, h) => { g.fillStyle = "#33363a"; g.fillRect(0, 0, w, h); g.fillStyle = "#f2f2f2"; g.fillRect(10, 0, 6, h); g.fillRect(w - 16, 0, 6, h); g.fillStyle = "#f1c40f"; g.fillRect(w / 2 - 4, 0, 8, h * 0.5); }, 1, 40);
+const road = new THREE.Mesh(new THREE.PlaneGeometry(12, 4000).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: roadT, roughness: 0.9 })); road.position.y = 0.02; scene.add(road);
+const grassT = tex(256, 256, (g, w) => { g.fillStyle = "#2a3a24"; g.fillRect(0, 0, w, w); for (let k = 0; k < 4000; k++) { g.fillStyle = Math.random() < 0.5 ? "#34482c" : "#22301c"; g.fillRect(Math.random() * w, Math.random() * w, 2, 3); } }, 400, 400);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: grassT, roughness: 1 })); scene.add(ground);
+const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.15, 1.2, 0.15).translate(0, 0.6, 0), M(0xd8d8d0), 80), O = new THREE.Object3D();
+for (let k = 0; k < 80; k++) { O.position.set(k % 2 ? 7 : -7, 0, -k * 25); O.updateMatrix(); posts.setMatrixAt(k, O.matrix); } scene.add(posts);
+{ const n = 3000, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const y = Math.random(), f = Math.random() * 6.283, r = Math.sqrt(1 - y * y); a.set([r * Math.cos(f) * 5e5, y * 5e5, r * Math.sin(f) * 5e5], i * 3); }
+  scene.add(new THREE.Points(new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(a, 3)), new THREE.PointsMaterial({ color: 0xffffff, size: 1.5, sizeAttenuation: false, fog: false }))); }
+// the stars: behind you the one you left, ahead the one you're driving to; each glows brighter as you get close
+const glowT = (() => { const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d"), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.25, "rgba(255,255,255,.5)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c); })();
+const star = (col) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowT, color: col, fog: false, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); scene.add(s); return s; };
+const ahead = toKey === "alphacen" ? [star(0xfff2dc), star(0xffd8a8)] : [star(0xff7a50)], behind = toKey === "alphacen" ? [star(0xff7a50)] : [star(0xfff2dc), star(0xffd8a8)];
+// the car
+const car = new THREE.Group(); scene.add(car);
+{ const paint = M(0xc0392b, { metalness: 0.4, roughness: 0.35 }), part = (w, h, d, x, y, z, m = paint) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); car.add(b); };
+  part(1.8, 0.25, 4.4, 0, 0.45, 0); part(1.8, 0.45, 1.5, 0, 0.8, -1.45); part(1.8, 0.4, 1.1, 0, 0.78, 1.65); for (const x of [-0.85, 0.85]) part(0.1, 0.4, 1.8, x, 0.77, 0); part(1.6, 0.2, 0.1, 0, 0.84, -0.7, M(0x1a1a1a));
+  const seat = M(0xe8dcc8); part(0.55, 0.12, 0.55, -0.42, 0.75, 0.25, seat); part(0.55, 0.65, 0.1, -0.42, 1.05, 0.55, seat); part(0.55, 0.12, 0.55, 0.42, 0.75, 0.25, seat); part(0.55, 0.65, 0.1, 0.42, 1.05, 0.55, seat); }
+const dashC = document.createElement("canvas"); dashC.width = 1024; dashC.height = 420; const dashT = new THREE.CanvasTexture(dashC); dashT.colorSpace = THREE.SRGBColorSpace;
+const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 0.34), new THREE.MeshBasicMaterial({ map: dashT, toneMapped: false })); dash.position.set(0.05, 1.0, -0.66); dash.rotation.x = -0.6; car.add(dash);
+const SP = [10000, 30000, 100000, 300000, 1000000, 3000000]; let si = 2, ff = 1, s = 0, back = false;   // km/h here; ff: fast-forward
+const BTN = [{ x: 20, y: 300, w: 230, h: 100, l: "slower", f: () => si = Math.max(0, si - 1) }, { x: 270, y: 300, w: 230, h: 100, l: "faster", f: () => si = Math.min(SP.length - 1, si + 1) },
+  { x: 520, y: 300, w: 230, h: 100, l: () => ff === 1 ? "real time" : `×${ff} time`, f: () => ff = ff === 1 ? 10 : ff === 10 ? 60 : 1 }, { x: 770, y: 300, w: 230, h: 100, l: "turn back", f: () => back = !back }];
+function press(uv) { const px = uv.x * 1024, py = (1 - uv.y) * 420, b = BTN.find(q => px > q.x && px < q.x + q.w && py > q.y && py < q.y + q.h); if (b) b.f(); }
+const fmtKm = m => `${Math.round(m / 1000).toLocaleString()} km`, fmtT = x => x >= 3600 ? `${Math.floor(x / 3600)} h ${Math.round(x % 3600 / 60)} min` : `${Math.floor(x / 60)} min ${Math.round(x % 60)} s`;
+function drawDash() { const g = dashC.getContext("2d"); g.fillStyle = "#0d1a22"; g.fillRect(0, 0, 1024, 420); g.strokeStyle = "#c9a227"; g.lineWidth = 6; g.strokeRect(3, 3, 1018, 414);
+  const goal = back ? NAMES[fromKey] : NAMES[toKey], left = back ? s : TOTAL - s, v = SP[si] / 3.6 * ff;
+  g.fillStyle = "#ffe9a8"; g.font = "700 40px -apple-system, Helvetica, sans-serif"; g.fillText(`→ ${goal}: ${fmtKm(left)} to go`, 24, 56);
+  g.fillStyle = "#e6f3f9"; g.font = "30px -apple-system, Helvetica, sans-serif"; g.fillText(`${SP[si].toLocaleString()} km/h here${ff > 1 ? ` (time ×${ff})` : ""}  ·  arriving in ${fmtT(left / v)}`, 24, 110);
+  g.fillStyle = "#a9c6d4"; g.font = "24px -apple-system, Helvetica, sans-serif"; g.fillText(`real distance between the stars: 13,000 AU = 1.9 trillion km; light takes 75 days`, 24, 160);
+  g.fillText(`at this scale light (7.2 m/s) would take ${fmtT(TOTAL / 7.17)}: your car is ${Math.round(SP[si] / 3.6 / 7.17).toLocaleString()} times faster than light here`, 24, 196);
+  g.fillText(`${(s / TOTAL * 100).toFixed(1)}% of the way from ${NAMES[fromKey]} to ${NAMES[toKey]}`, 24, 232);
+  for (const b of BTN) { g.fillStyle = "#1e2e3a"; g.beginPath(); g.roundRect(b.x, b.y, b.w, b.h, 12); g.fill(); g.strokeStyle = "#4a6a8a"; g.lineWidth = 3; g.stroke(); g.fillStyle = "#fff"; g.font = "700 32px -apple-system, Helvetica, sans-serif"; g.textAlign = "center";
+    g.fillText(typeof b.l === "function" ? b.l() : b.l, b.x + b.w / 2, b.y + 62); g.textAlign = "left"; } dashT.needsUpdate = true; }
+const HUD = document.createElement("div"); HUD.style.cssText = "position:fixed;left:14px;top:12px;z-index:2;background:rgba(10,30,45,.72);color:#e6f3f9;padding:10px 14px;border-radius:10px;font:13.5px/1.5 -apple-system,Helvetica,sans-serif"; document.body.appendChild(HUD);
+document.getElementById("guide").style.display = "none";
+let yaw = 0, pitch = -0.08, drag = false;
+renderer.domElement.addEventListener("pointerdown", e => { const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1), camera); const h = ray.intersectObject(dash)[0]; if (h) press(h.uv); else drag = true; });
+addEventListener("pointerup", () => drag = false); addEventListener("pointermove", e => { if (drag) { yaw -= e.movementX * 0.004; pitch = Math.max(-1.4, Math.min(1.4, pitch - e.movementY * 0.004)); } });
+addEventListener("keydown", e => { if (e.code === "KeyW") BTN[1].f(); if (e.code === "KeyS") BTN[0].f(); if (e.code === "KeyT") BTN[2].f(); if (e.code === "KeyB") BTN[3].f(); });
+const ray = new THREE.Raycaster();
+for (const i of [0, 1]) { const c = renderer.xr.getController(i); rig.add(c); const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(0, 0, 0), V3(0, 0, -2)]), new THREE.LineBasicMaterial({ color: 0xffe9a8 })); c.add(l);
+  c.addEventListener("selectstart", () => { const m = new THREE.Matrix4().extractRotation(c.matrixWorld); ray.ray.origin.setFromMatrixPosition(c.matrixWorld); ray.ray.direction.set(0, 0, -1).applyMatrix4(m); const h = ray.intersectObject(dash)[0]; if (h) press(h.uv); }); }
+const clock = new THREE.Clock(); let dt0 = 0, done = false;
+renderer.setAnimationLoop(() => { try {
+  const dt = Math.min(clock.getDelta(), 0.1), vr = renderer.xr.isPresenting, v = SP[si] / 3.6 * ff;
+  s = Math.max(0, Math.min(TOTAL, s + (back ? -v : v) * dt));
+  car.rotation.y = back ? Math.PI : 0; roadT.offset.y = (roadT.offset.y + (back ? -1 : 1) * Math.min(v, 300) * dt / 100) % 1; grassT.offset.y = (grassT.offset.y + (back ? -1 : 1) * Math.min(v, 300) * dt / 20) % 1;
+  posts.position.z = ((posts.position.z + Math.min(v, 300) * dt) % 50);
+  const place = (sprites, d, dir) => sprites.forEach((sp, k) => { const D = 3e5, sz = Math.max(800, 2.5e9 / Math.max(d, 1e4)); sp.position.set((k - (sprites.length - 1) / 2) * sz * 0.9, 2500 + 0.04 * D, dir * D); sp.scale.setScalar(sz); });
+  place(ahead, TOTAL - s, back ? 1 : -1); place(behind, s, back ? -1 : 1);
+  rig.position.set(-0.42, 0.7, 0.3); if (vr) { camera.position.set(0, 0, 0); rig.rotation.y = car.rotation.y; } else { rig.rotation.y = car.rotation.y; camera.position.set(0, 0.55, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
+  if ((dt0 -= dt) <= 0) { dt0 = 0.25; drawDash(); HUD.innerHTML = `<b>the deep-space highway</b>: ${NAMES[fromKey]} → ${NAMES[toKey]} · same 12-inch-Earth scale<br>click the dashboard (or W / S speed, T fast-forward, B turn back) · in VR, point and pull the trigger`; }
+  if (!done && (s >= TOTAL && !back || s <= 0 && back)) { done = true; setTimeout(() => switchWorld(back ? fromKey : toKey), 0); }
+  renderer.render(scene, camera); } catch (e) { console.error(e); } });
+WORLD = { scene, track: TRACK, bodyKeep, headKeep, after: () => { document.getElementById("guide").style.display = ""; } }; TRACK = null;
+}
+
+function buildWorld(SYSTEM_KEY) {
+TRACK = { l: [] }; const bodyKeep = new Set(document.body.children), headKeep = new Set(document.head.children);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9ec9ec);
 scene.fog = new THREE.FogExp2(0xb4d3ec, IS_HEADSET ? 1.2e-5 : 3.5e-6);
@@ -53200,9 +53288,9 @@ const EXOSYS = {
   sgra: { name: "Sagittarius A*", sep: " ", ly: 26700, city: "Galactic Centre", home: null, viewAU: 2.5, kind: "bh", star: [18.2, "#000000", ["the black hole at the centre of the Milky Way: 4.3 million Suns", "its event horizon is 25 million km across: here, a black sphere 600 m wide",
     "imaged by the Event Horizon Telescope in 2022"]], stars2: [["S2", 6, "#c8d8ff", 120, ["a hot star orbiting it every 16 years, shown at its closest: 120 AU, at 7,700 km/s", "its orbit proved the black hole is there (Nobel Prize 2020)"]]], planets: [] } };
 
-const EXO = EXOSYS[new URLSearchParams(location.search).get("system")] || null;
+const EXO = EXOSYS[SYSTEM_KEY] || null;
 const TYPECOL = { hot: "#c8683a", temperate: "#5a8ac0", ice: "#a8d0e4", gas: "#d8b890", rocky: "#9a948c" };
-let HOME_NAME = "Earth";
+let HOME_NAME = "Earth"; const LONG_SIGN = () => ({ proxima: "ALPHA CENTAURI A & B ➜", alphacen: "PROXIMA CENTAURI ➜" })[SYSTEM_KEY];
 if (EXO) { const pn = l => EXO.name + EXO.sep + l, H = EXO.home ? EXO.planets.find(q => q[0] === EXO.home) : null, aH = H ? H[2] : EXO.viewAU, star = V3(0, 0, -aH * AU);
   if (H) { HOME_NAME = pn(H[0]); EXO.homeP = { name: HOME_NAME, r: H[1] * 6371e3 * K, type: H[3], town: H[4], facts: H[5] }; }
   else { HOME_NAME = "the Earth (for comparison)"; EXO.homeP = { name: HOME_NAME, r: 0.1524, type: "earth", town: "Viewpoint", facts: [`no planet to start beside here: the 12-inch Earth globe stands ${EXO.viewAU} AU from ${EXO.name}, for comparison`] }; }
@@ -53678,6 +53766,7 @@ for (const b of BODIES) {
   postSign([`EXIT ${b.exit}`, `${b.turn > 0 ? "←" : "→"}  ${b.name === "the Sun" ? "The Sun" : b.name}  ${fmtM(b.w.length())}`, `(real ${fmtKm(b.distKm)})`],
     ex, ez, ex + back * 100, ez, 7, 4.5, { bg: "#0b6b3a", fg: "#ffffff", sub: "#e8f5ec", gold: false, title: 2 });
 }
+if (LONG_SIGN()) postSign([LONG_SIGN(), "46,000 km east along the interstate: the deep-space highway", "in the car, press the gold button on the dashboard"], 260, ZH + 30, 0, ZH + 30, 6, 3.5, { bg: "#6a4a1a", gold: false });
 postSign([EXO ? "INTERSTATE " + EXO.name.toUpperCase() : "INTERSTATE SOL", "exits to the Sun and every planet, east and west", "(they are where the planets really are today, all around)"], 300, ZH + 16, 0, ZH + 16, 6, 3.5, { bg: "#1f4e9c", gold: false });
 // sunlight: a wavefront leaves the Sun every minute and crawls outward at the scale's speed of light
 const WAVES = [];
@@ -53705,6 +53794,10 @@ const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 0.45), new THREE.MeshB
 const DASH_BTNS = [];
 BODIES.forEach((b, k) => DASH_BTNS.push({ x: 20 + (k % 5) * 198, y: 236 + Math.floor(k / 5) * 96, w: 188, h: 84, label: b.name === "the Sun" ? "Sun" : b.name, col: b.col, act: () => driveTo(b), body: b }));
 DASH_BTNS.push({ x: 812, y: 332, w: 188, h: 84, label: "Desk", col: "#3d7cc9", act: () => driveHome() });
+const LONG = { proxima: "alphacen", alphacen: "proxima" }[SYSTEM_KEY]; let longDrive = false;
+if (LONG) DASH_BTNS.push({ x: 812, y: 236, w: 188, h: 84, label: LONG === "alphacen" ? "α Cen ➜" : "Proxima ➜", col: "#ffd27a", act: () => driveLong() });
+function driveLong() { const pts = [...new THREE.CatmullRomCurve3(ONRAMP).getPoints(30)]; for (let x = 300; x < XMAX - 200; x += 50) pts.push(V3(x, 0, ZE));
+  carRoute = mkRoute(pts); carS = 0; dest = { name: LONG === "alphacen" ? "Alpha Centauri, 46,000 km" : "Proxima Centauri, 46,000 km" }; longDrive = true; if (!speedI) speedI = 6; enterCar(); }
 [["slower", () => { speedI = Math.max(1, speedI - 1); }], ["stop / go", () => { speedI = speedI ? 0 : 4; }], ["faster", () => { speedI = Math.min(SPEEDS.length - 1, speedI + 1); }], ["get out", () => exitCar()]]
   .forEach(([label, act], k) => DASH_BTNS.push({ x: 20 + k * 250, y: 440, w: 236, h: 100, label, col: k === 3 ? "#b84a3a" : "#4a6a8a", act }));
 function pressDash(uv) { const px = uv.x * 1024, py = (1 - uv.y) * 560, b = DASH_BTNS.find(q => px > q.x && px < q.x + q.w && py > q.y && py < q.y + q.h); if (b) { b.act(); b.flash = 0.25; dashTimer = 0; } return !!b; }
@@ -54259,7 +54352,7 @@ for (const b of [...BODIES, ...SMALL]) { const D = MTN[b.id]; if (!D || (EXO && 
 
 
 // ---------- portals by the desk: to the exoplanet systems, and from them back home ----------
-function goSystem(key) { const u = location.pathname + (key ? "?system=" + key : ""); if (renderer.xr.isPresenting) renderer.xr.getSession().end(); setTimeout(() => location.href = u, 50); }
+function goSystem(key) { setTimeout(() => switchWorld(key), 0); }   // same page, same VR session: the world is rebuilt around you
 const PORTALS = [];
 { const swirl = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const x = c.getContext("2d"), gr = x.createRadialGradient(128, 128, 4, 128, 128, 128);
     gr.addColorStop(0, "rgba(255,255,255,.95)"); gr.addColorStop(0.5, "rgba(170,140,255,.6)"); gr.addColorStop(1, "rgba(80,60,200,.25)"); x.fillStyle = gr; x.fillRect(0, 0, 256, 256);
@@ -54297,7 +54390,7 @@ function drawWrist() { const g = wristC.getContext("2d"), W = 960; g.clearRect(0
   wristT.needsUpdate = true; wristDirty = false; }
 function pressWrist(uv) { const px = uv.x * 960, py = (1 - uv.y) * wristC.height, col = Math.min(2, Math.floor((px - 12) / 314)), row = Math.floor((py - 42) / 62), i = row * 3 + col;
   if (row >= 0 && i < PLACES.length && py > 42) { wristFlash = i; drawWrist(); setTimeout(() => { wristFlash = -1; wristDirty = true; }, 300); teleport(i); } }
-for (const i of [0, 1]) { const grip = renderer.xr.getControllerGrip(i); rig.add(grip); grip.addEventListener("connected", e => { if (e.data.handedness === "left") grip.add(wristPanel); }); }
+for (const i of [0, 1]) { const grip = renderer.xr.getControllerGrip(i); rig.add(grip); if (grip.userData.hand === "left") grip.add(wristPanel); grip.addEventListener("connected", e => { grip.userData.hand = e.data.handedness; if (e.data.handedness === "left") grip.add(wristPanel); }); }
 addEventListener("pointerup", () => dragging = false);
 addEventListener("pointermove", e => { if (!dragging) return; yaw -= e.movementX * 0.004; pitch = THREE.MathUtils.clamp(pitch - e.movementY * 0.004, -1.5, 1.5); });
 intro?.addEventListener("click", start);
@@ -54455,7 +54548,7 @@ function frame() {
   for (const b of TBTN) if (b.flash > 0) b.flash -= dt;
   trainTimer -= dt; if (trainTimer <= 0) { drawTrainScreen(); trainTimer = 0.3; }
   if (inCar) { const v = SPEEDS[speedI] / 3.6;
-    if (carRoute) { carS = Math.min(carRoute.L, carS + v * dt); if (carS >= carRoute.L) speedI = 0; }
+    if (carRoute) { carS = Math.min(carRoute.L, carS + v * dt); if (carS >= carRoute.L) { speedI = 0; if (longDrive) { longDrive = false; goSystem("transit:" + SYSTEM_KEY + ">" + LONG); } } }
     placeCar(); moved = carRoute && carS < carRoute.L ? v : 0;
     const seat = V3(-0.42, 0.7, 0.3).applyEuler(car.rotation).add(car.position); rig.position.copy(seat);
     if (vr) rig.rotation.set(0, car.rotation.y + vrTurn, 0); else { rig.rotation.set(0, car.rotation.y, 0); camera.position.y = 0.55; camera.rotation.set(pitch, yaw, 0, "YXZ"); }
@@ -54473,5 +54566,10 @@ function frame() {
   updateMarkers(vr);
   renderer.render(scene, camera);
 }
+// a world built while in VR carries on in VR: the headset supplies the eye height
+if (renderer.xr.isPresenting) { camera.position.set(0, 0, 0); start(); vrTurn = 0; renderer.xr.getSession().addEventListener("end", () => { camera.position.set(0, 1.65, 0); rig.rotation.set(0, 0, 0); }); }
+WORLD = { scene, track: TRACK, bodyKeep, headKeep }; TRACK = null;
+}
+buildWorld(new URLSearchParams(location.search).get("system"));
 
 </script></body></html>
