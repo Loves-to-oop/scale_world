@@ -53184,14 +53184,32 @@ const EXOSYS = {
       ["c", 8, 0.2373, "gas", "Copperfield", ["radius estimated"]], ["f", 7, 0.7708, "gas", "Fernhill", ["in the habitable zone, but a gas giant; radius estimated"]], ["d", 12.5, 5.957, "gas", "Driftwood", ["a Jupiter-like giant 6 AU out; radius estimated"]]] },
   kepler186: { name: "Kepler-186", sep: "", ly: 580, city: "Amberton", home: "f", star: [0.523, "#ffb37a", ["a red dwarf 580 light-years away", "five small planets"]],
     planets: [["b", 1.07, 0.0378, "hot", "Brookline", ["a 4-day year"]], ["c", 1.25, 0.0574, "hot", "Cedarton", ["a 7-day year"]], ["d", 1.4, 0.0861, "hot", "Dunmore", ["a 13-day year"]],
-      ["e", 1.27, 0.1216, "temperate", "Elmwood", ["a 22-day year"]], ["f", 1.17, 0.432, "temperate", "Fernvale", ["the first Earth-size planet found in a habitable zone (2014)", "a 130-day year under a dim orange star"]]] } };
+      ["e", 1.27, 0.1216, "temperate", "Elmwood", ["a 22-day year"]], ["f", 1.17, 0.432, "temperate", "Fernvale", ["the first Earth-size planet found in a habitable zone (2014)", "a 130-day year under a dim orange star"]]] },
+  alphacen: { name: "Alpha Centauri", sep: " ", ly: 4.37, city: "Rigil City", home: null, viewAU: 1.25, star: [1.22, "#fff2dc", ["Alpha Centauri A: the nearest Sun-like star, a little bigger than the Sun", "the third star, the red dwarf Proxima, is 13,000 AU away: 46,000 km at this scale, far beyond this ground"]],
+    stars2: [["Alpha Centauri B", 0.86, "#ffd8a8", 23, ["a little smaller and cooler than the Sun", "A and B circle each other every 80 years, 11-35 AU apart (shown at 23 AU)"]]],
+    planets: [["Ab (candidate)", 9, 2, "gas", "Candidate Creek", ["a possible Saturn-mass giant seen by JWST in 2025: not yet confirmed", "radius and position guessed"]]] },
+  sirius: { name: "Sirius", sep: " ", ly: 8.6, city: "Dog Star City", home: null, viewAU: 5, star: [1.71, "#e4ecff", ["the brightest star in our night sky, 25 times as bright as the Sun", "twice the Sun's mass"]],
+    stars2: [["Sirius B", 0.0084, "#ffffff", 20, ["a white dwarf: the Sun's mass squeezed to the size of the Earth", "a teaspoon of it would weigh tonnes"]]], planets: [] },
+  betelgeuse: { name: "Betelgeuse", sep: " ", ly: 548, city: "Orion Heights", home: null, viewAU: 7, star: [764, "#ff9a5a", ["a red supergiant in Orion, ~550 light-years away", "put in the Sun's place it would reach past Mars: here it is a ball 25 km across",
+    "it will explode as a supernova, perhaps within 100,000 years"]], planets: [] },
+  pulsar: { name: "PSR B1257+12", sep: " ", ly: 2300, city: "Lich City", home: "c", kind: "ns", star: [10 / 696000, "#bfe0ff", ["a pulsar: a neutron star 20 km across with 1.5 times the Sun's mass, spinning 161 times a second", "here it is 0.5 mm across: the beams sweep round (shown slowed)"]],
+    planets: [["b", 1.5, 0.36, "rocky", "Poltergeist", ["4.3 Earth masses, bathed in the pulsar's radiation", "radius estimated"]], ["c", 1.5, 0.46, "rocky", "Phobetor", ["3.9 Earth masses: with b, the first exoplanets ever found (1992)", "radius estimated"]],
+      ["a", 0.27, 0.19, "rocky", "Draugr", ["about twice the Moon's mass: one of the lightest planets known", "radius estimated"]]] },
+  cygx1: { name: "Cygnus X-1", sep: " ", ly: 7200, city: "Event City", home: null, viewAU: 1.4, kind: "bh", star: [62 / 696000, "#000000", ["a black hole of 21 Suns: its event horizon is 124 km across, 3 mm here",
+    "it pulls gas off its companion star into a glowing disc; the first black hole widely accepted (1970s)"]], stars2: [["HDE 226868", 22, "#b8c8ff", 0.2, ["a blue supergiant, 40 times the Sun's mass, 22 times its width", "it orbits the black hole every 5.6 days"]]], planets: [] },
+  sgra: { name: "Sagittarius A*", sep: " ", ly: 26700, city: "Galactic Centre", home: null, viewAU: 2.5, kind: "bh", star: [18.2, "#000000", ["the black hole at the centre of the Milky Way: 4.3 million Suns", "its event horizon is 25 million km across: here, a black sphere 600 m wide",
+    "imaged by the Event Horizon Telescope in 2022"]], stars2: [["S2", 6, "#c8d8ff", 120, ["a hot star orbiting it every 16 years, shown at its closest: 120 AU, at 7,700 km/s", "its orbit proved the black hole is there (Nobel Prize 2020)"]]], planets: [] } };
+
 const EXO = EXOSYS[new URLSearchParams(location.search).get("system")] || null;
-const TYPECOL = { hot: "#c8683a", temperate: "#5a8ac0", ice: "#a8d0e4", gas: "#d8b890" };
+const TYPECOL = { hot: "#c8683a", temperate: "#5a8ac0", ice: "#a8d0e4", gas: "#d8b890", rocky: "#9a948c" };
 let HOME_NAME = "Earth";
-if (EXO) { const pn = l => EXO.name + EXO.sep + l, H = EXO.planets.find(q => q[0] === EXO.home), aH = H[2], star = V3(0, 0, -aH * AU);
-  HOME_NAME = pn(H[0]); EXO.homeP = { name: HOME_NAME, r: H[1] * 6371e3 * K, type: H[3], town: H[4], facts: H[5] };
+if (EXO) { const pn = l => EXO.name + EXO.sep + l, H = EXO.home ? EXO.planets.find(q => q[0] === EXO.home) : null, aH = H ? H[2] : EXO.viewAU, star = V3(0, 0, -aH * AU);
+  if (H) { HOME_NAME = pn(H[0]); EXO.homeP = { name: HOME_NAME, r: H[1] * 6371e3 * K, type: H[3], town: H[4], facts: H[5] }; }
+  else { HOME_NAME = "the Earth (for comparison)"; EXO.homeP = { name: HOME_NAME, r: 0.1524, type: "earth", town: "Viewpoint", facts: [`no planet to start beside here: the 12-inch Earth globe stands ${EXO.viewAU} AU from ${EXO.name}, for comparison`] }; }
   const others = EXO.planets.filter(q => q !== H).sort((a, b) => a[2] - b[2]);
-  EXO.bodies = [{ id: "sun", name: EXO.name + " (the star)", dkm: EXO.star[0] * 1392700, pole: [0, 90], col: EXO.star[1], facts: EXO.star[2] }];
+  EXO.bodies = [{ id: "sun", name: EXO.kind === "bh" ? EXO.name + " (the black hole)" : EXO.kind === "ns" ? EXO.name + " (the pulsar)" : EXO.name + (EXO.stars2 ? " A" : " (the star)"), dkm: EXO.star[0] * 1392700, pole: [0, 90], col: EXO.star[1], facts: EXO.star[2] }];
+  (EXO.stars2 || []).forEach(([nm, R, col, au, facts], i) => EXO.bodies.push({ id: "s_" + i, name: nm, dkm: R * 1392700, pole: [0, 90], col, type: "star", town: nm.split(" ")[0] + "ville", facts, a: au,
+    wSys: star.clone().add(V3(Math.sin(0.9 - i), 0, -Math.cos(0.9 - i)).multiplyScalar(au * AU)) }));
   others.forEach((q, i) => { const phi = others.length > 1 ? -1.15 + 2.3 * i / (others.length - 1) : 0.6;
     EXO.bodies.push({ id: "x_" + q[0], name: pn(q[0]), dkm: q[1] * 12742, pole: [0, 90], col: TYPECOL[q[3]], type: q[3], town: q[4], facts: q[5], a: q[2],
       wSys: star.clone().add(V3(Math.sin(phi), 0, -Math.cos(phi)).multiplyScalar(q[2] * AU)) }); });
@@ -53547,9 +53565,24 @@ function jovian(b, P, u, v) {
   postSign(["spacecraft at Jupiter", "Pioneer 10 (1973) and 11 (1974) · Voyager 1 and 2 (1979) · Cassini (2000) · New Horizons (2007): flybys, solid lines",
     "Galileo (pink): arrived 7 Dec 1995, braked into orbit; its first 7-month orbit and a few of its 34 (dashed); its probe (white) dived into the clouds",
     "Juno (teal, dashed): a polar orbit since 2016", "closest distances and the shapes of the paths are real; their directions in space are approximate"], sp.x, sp.z, b.w.x, b.w.z, 6, 1.2); }                                    // for the markers
-function typeTexture(t) { return t === "hot" ? mottled("#6a3018", ["#ff7a2a", "#2a1208", "#c85a28"]) : t === "temperate" ? mottled("#2a5a8a", ["#3a7a3a", "#e8e8e8", "#8a7a5a"])
+function typeTexture(t) { if (t === "earth") return earthTex; if (t === "rocky") return mottled("#6a6660", ["#8a847c", "#4a4642", "#a8a098"]); return t === "hot" ? mottled("#6a3018", ["#ff7a2a", "#2a1208", "#c85a28"]) : t === "temperate" ? mottled("#2a5a8a", ["#3a7a3a", "#e8e8e8", "#8a7a5a"])
   : t === "ice" ? bands(["#c8e0ec", "#b0d0e0", "#e0f0f8", "#98c0d8"]) : bands(["#d8b890", "#c89a68", "#e8d4b0", "#a8805a"]); }
 if (EXO) { for (const b of BODIES) if (!TEX[b.id] && b.type) TEX[b.id] = () => typeTexture(b.type); globe.material.map = typeTexture(EXO.homeP.type); globe.material.needsUpdate = true; }
+const GLOWT = () => canvasTex(128, 128, (g, w) => { const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.3, "rgba(255,255,255,.45)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(0, 0, w, w); });
+let PULSAR = null;
+function decorateCompact(b, body) {   // a black hole: black sphere, a thin photon ring and a glowing disc; a pulsar: a bright speck and two sweeping beams
+  if (EXO.kind === "bh") { body.material = new THREE.MeshBasicMaterial({ color: 0x000000 }); const R = Math.max(b.r, 0.02);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(R * 1.5, R * 0.04 + 0.002, 8, 96), new THREE.MeshBasicMaterial({ color: 0xffd8a0, toneMapped: false })); ring.position.copy(b.c); ring.lookAt(V3(0, b.c.y, 0)); scene.add(ring);
+    const dt = canvasTex(512, 8, (g, w) => { const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, "rgba(255,250,230,1)"); gr.addColorStop(0.3, "rgba(255,170,80,.85)"); gr.addColorStop(1, "rgba(160,40,10,0)"); g.fillStyle = gr; g.fillRect(0, 0, w, 8); });
+    const close = EXO.stars2 && EXO.stars2[0][3] < 1, r0 = R * 3, r1 = close ? 0.03 * AU : R * 12, dg = new THREE.RingGeometry(r0, r1, 128, 1), pp = dg.attributes.position, uv = dg.attributes.uv;
+    for (let i = 0; i < pp.count; i++) uv.setXY(i, (Math.hypot(pp.getX(i), pp.getY(i)) - r0) / (r1 - r0), 0.5);
+    const disc = new THREE.Mesh(dg.rotateX(-Math.PI / 2 + 0.15), new THREE.MeshBasicMaterial({ map: dt, transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false })); disc.position.copy(b.c); scene.add(disc);
+    if (close) { const st = new THREE.Mesh(new THREE.CylinderGeometry(R * 2 + 0.5, 6, 1, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0xffa860, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide }));
+      scene.add(st); PULSAR = { stream: st, bh: b }; } }   // the stream of gas from the companion, placed once the companion is built
+  else { body.material = new THREE.MeshBasicMaterial({ color: 0xffffff }); const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: GLOWT(), color: 0xbfe0ff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); gl.scale.setScalar(2.5); gl.position.copy(b.c); scene.add(gl);
+    const beams = new THREE.Group(); beams.position.copy(b.c); beams.rotation.z = 0.5; scene.add(beams);
+    for (const sd of [1, -1]) { const c = new THREE.Mesh(new THREE.ConeGeometry(25, 600, 24, 1, true).translate(0, -300, 0), new THREE.MeshBasicMaterial({ color: 0x9ad0ff, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+      c.rotation.x = sd > 0 ? Math.PI : 0; c.rotation.z = 0.6; beams.add(c); } PULSAR = { beams }; } }
 const sunLight = new THREE.PointLight(0xfff4e0, 3.2, 0, 0);
 for (const b of BODIES) {
   const B = V3(b.w.x, 0, b.w.z), gh = terrainH(B.x, B.z);
@@ -53568,10 +53601,14 @@ for (const b of BODIES) {
     ? new THREE.MeshBasicMaterial({ map: canvasTex(1024, 512, (g, w, h) => { g.fillStyle = "#fff2c0"; g.fillRect(0, 0, w, h); for (let k = 0; k < 6000; k++) { g.fillStyle = `rgba(255,${180 + rnd() * 60 | 0},80,${rnd() * 0.25})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, 1 + rnd() * 4, 0, 6.283); g.fill(); } }), toneMapped: false })
     : new THREE.MeshStandardMaterial({ map: TEX[b.id](), roughness: 0.8 });
   const body = new THREE.Mesh(new THREE.SphereGeometry(b.r, 96, 48), mat); body.position.copy(b.c); body.quaternion.setFromUnitVectors(V3(0, 1, 0), radec(...b.pole)); scene.add(body);
-  if (b.id === "sun") { sunLight.position.copy(b.c); scene.add(sunLight); if (EXO) { body.material.color.set(b.col); sunLight.color.set(b.col); }
+  if (b.type === "star") { body.material = new THREE.MeshBasicMaterial({ color: b.col, toneMapped: false }); const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: GLOWT(), color: b.col, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
+    gl.scale.setScalar(b.r * 4 + 2); gl.position.copy(b.c); scene.add(gl); const L = new THREE.PointLight(b.col, 1.5, 0, 0); L.position.copy(b.c); scene.add(L); }
+  if (b.id === "sun" && EXO && EXO.kind) decorateCompact(b, body);
+  if (b.id === "s_0" && PULSAR && PULSAR.stream) { const st = PULSAR.stream, a = b.c, c2 = PULSAR.bh.c, d = c2.clone().sub(a); st.position.copy(a).addScaledVector(d, 0.5); st.scale.y = d.length(); st.quaternion.setFromUnitVectors(V3(0, 1, 0), d.normalize()); }
+  if (b.id === "sun") { sunLight.position.copy(b.c); scene.add(sunLight); if (EXO) { if (!EXO.kind) body.material.color.set(b.col); sunLight.color.set(EXO.kind === "bh" ? "#ffb070" : b.col); if (EXO.kind) sunLight.intensity = EXO.kind === "bh" ? 0.8 : 1.5; }
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTex(256, 256, (g, w) => { const gr = g.createRadialGradient(w / 2, w / 2, w * 0.2, w / 2, w / 2, w / 2);
       gr.addColorStop(0, "rgba(255,230,160,.7)"); gr.addColorStop(1, "rgba(255,200,120,0)"); g.fillStyle = gr; g.fillRect(0, 0, w, w); }), transparent: true, depthWrite: false, toneMapped: false }));
-    glow.scale.setScalar(b.r * 4.5); glow.position.copy(b.c); scene.add(glow);
+    glow.scale.setScalar(b.r * 4.5); glow.position.copy(b.c); glow.visible = !(EXO && EXO.kind === "bh"); scene.add(glow);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(b.r * 0.75, 0.6, 12, 64).rotateX(Math.PI / 2), M(0x5a5a5a, { metalness: 0.6 })); ring.position.set(B.x, gh + 0.6, B.z); scene.add(ring); }
   else if (b.r < Y0 - 0.15) { const col = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, Math.max(0.05, cy - b.r - gh), 12), M(0x2c3e50, { metalness: 0.4 })); col.position.set(B.x, (gh + cy - b.r) / 2, B.z); scene.add(col); }
   else { const stand = new THREE.Mesh(new THREE.CylinderGeometry(b.r * 0.3, b.r * 0.45, Math.max(0.1, cy - b.r * 0.85 - gh), 24), M(0x2c3e50, { metalness: 0.4 })); stand.position.set(B.x, (gh + cy - b.r * 0.85) / 2, B.z); scene.add(stand); }
@@ -53903,7 +53940,7 @@ for (const b of SMALL) {
 
 // ---------- other stars, at the same 12-inch-globe scale ----------
 // They are so far away that each is a separate place: you are taken to a viewing deck near it (the Sun's system is hidden).
-const STAR_VISITS = [
+const STAR_VISITS_OLD = [
   { name: "Alpha Centauri", ly: 4.37, stars: [["Alpha Centauri A", 1.22, 0xfff2dc], ["Alpha Centauri B", 0.86, 0xffd8a8, 23]], lines: ["the nearest star system: 4.37 light-years, 41 trillion km",
     "here: 988,000 km away from the globe, 2½ times the real distance from the Earth to the Moon", "A is a little bigger than the Sun (40 m here), B a little smaller (29 m); they orbit each other every 80 years, 11-35 AU apart (82 km here, the bright star over there)",
     "the third star, Proxima Centauri, a red dwarf with an Earth-size planet, is 13,000 AU from them: 46,000 km away here", "the Sun, seen from here, would be a bright star in Cassiopeia"] },
@@ -53912,6 +53949,7 @@ const STAR_VISITS = [
   { name: "Betelgeuse", ly: 548, stars: [["Betelgeuse", 764, 0xff9a5a]], lines: ["a red supergiant in Orion, about 550 light-years away",
     "here: 124 million km from the globe: almost as far as the REAL Earth is from the real Sun", "it is so big that, put in the Sun's place, it would reach past Mars toward Jupiter: here it is 25 km across",
     "it will explode as a supernova, perhaps within 100,000 years; it dimmed dramatically in 2019-2020 when it puffed out a cloud of dust"] }];
+const STAR_VISITS = [];   // the stars are now full systems, through the portals
 const GLOW_T = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d"), gr = g.createRadialGradient(128, 128, 0, 128, 128, 128);
   gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.35, "rgba(255,255,255,.45)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(0, 0, 256, 256); return new THREE.CanvasTexture(c); })();
 const starWorld = new THREE.Group(); starWorld.visible = false; scene.add(starWorld);
@@ -54042,9 +54080,9 @@ const TDESIGN = {
     const ell = new THREE.Mesh(new THREE.TorusGeometry(30, 0.9, 6, 120), M(0xc0503a, { metalness: 0.6 })); ell.scale.set(2.4, 1, 1); ell.position.y = 330; ell.rotation.x = Math.PI / 2 - 0.2; g.add(ell); } } };
 function roomOf(w, self) { let d = self === null ? 1e9 : Math.hypot(w.x, w.z) - RE; for (const o of BODIES) if (o !== self) d = Math.min(d, Math.hypot(o.w.x - w.x, o.w.z - w.z) - o.r); return d; }
 const SCALE_OF = {};   // towers, towns and stations shrink where an exoplanet system is too crowded for skyscrapers (at home, always 1)
-if (EXO) { const TPL = { hot: ["venus", "gonggong", "mercury", "mars", "makemake"], temperate: ["quaoar", "haumea", "sedna", "arrokoth", "orcus"], ice: ["neptune", "uranus", "eris", "pluto", "ceres"], gas: ["jupiter", "saturn", "uranus", "neptune", "vesta"] }, used = new Set();
+if (EXO) { const TPL = { star: ["vesta", "saturn", "neptune"], rocky: ["mars", "ceres", "mercury", "makemake"], hot: ["venus", "gonggong", "mercury", "mars", "makemake"], temperate: ["quaoar", "haumea", "sedna", "arrokoth", "orcus"], ice: ["neptune", "uranus", "eris", "pluto", "ceres"], gas: ["jupiter", "saturn", "uranus", "neptune", "vesta"] }, used = new Set();
   const pick = t => { const l = TPL[t]; const q = l.find(k => !used.has(k)) || l[0]; used.add(q); return q; };
-  TDESIGN.earth = { ...TDESIGN[pick(EXO.homeP.type)], name: HOME_NAME + " Tower" }; TDESIGN.sun = { ...TDESIGN.sun, name: EXO.name + " Spire" };
+  if (EXO.homeP.type !== "earth") TDESIGN.earth = { ...TDESIGN[pick(EXO.homeP.type)], name: HOME_NAME + " Tower" };   // with no planet to start beside, the Terra Tower stands by the comparison globe TDESIGN.sun = { ...TDESIGN.sun, name: EXO.name + " Spire" };
   for (const b of BODIES) if (b.type) TDESIGN[b.id] = { ...TDESIGN[pick(b.type)], name: b.name + " Tower" };
   for (const k of Object.keys(TDESIGN)) if (k !== "earth" && k !== "sun" && !k.startsWith("x_")) delete TDESIGN[k];
   SCALE_OF.earth = THREE.MathUtils.clamp(roomOf(V3(0, 0, 0), null) / 500, 0.06, 1); for (const b of BODIES) SCALE_OF[b.id] = THREE.MathUtils.clamp(roomOf(b.w, b) / 500, 0.06, 1); }
@@ -54193,7 +54231,7 @@ const MTN = {   // shape (u, v in -1..1 → 0..1), height m, radius m, colours, 
     f: (u, v) => { let h = 0; for (let k = 0; k < 9; k++) { const a = k * 2.4, d = k ? 0.25 + (k % 3) * 0.2 : 0, s = 0.12 - 0.006 * k; h = Math.max(h, (1 - k * 0.07) * Math.max(0, 1 - Math.hypot(u - d * Math.cos(a), v - d * Math.sin(a)) / s)); } return h; } },
   sedna: { name: "the Long Dark Ridge", world: "Sedna", note: "a long, curved dark-red ridge, after Sedna's 11,000-year orbit", H: 1300, R: 5000, lo: "#4a1810", hi: "#8a3424",
     f: (u, v) => { const r = Math.hypot(u * 0.6, v * 1.2); return Math.exp(-(((r - 0.6) / 0.06) ** 2)) * (u > -0.2 ? 1 : 0.3) * (0.8 + 0.3 * fbm2(u * 4, v * 4)); } } };
-if (EXO) { const MT = { hot: ["jupiter", "gonggong", "halley", "makemake", "vesta"], temperate: ["ceres", "quaoar", "arrokoth", "haumea", "pluto"], ice: ["eris", "neptune", "haumea", "uranus", "sedna"], gas: ["saturn", "sedna", "jupiter", "quaoar", "orcus"] },
+if (EXO) { const MT = { star: ["vesta", "eris", "jupiter"], rocky: ["pluto", "vesta", "orcus", "ceres"], hot: ["jupiter", "gonggong", "halley", "makemake", "vesta"], temperate: ["ceres", "quaoar", "arrokoth", "haumea", "pluto"], ice: ["eris", "neptune", "haumea", "uranus", "sedna"], gas: ["saturn", "sedna", "jupiter", "quaoar", "orcus"] },
     SUF = ["Range", "Massif", "Spires", "Ridge", "Highlands", "Crags", "Peaks", "Mesa"], used = new Set(); let k = 0;
   for (const b of BODIES) if (b.type) { const l = MT[b.type], q = l.find(x => !used.has(x)) || l[k % l.length]; used.add(q);
     MTN[b.id] = { ...MTN[q], name: `the ${b.name} ${SUF[k++ % SUF.length]}`, world: b.name, note: "invented: nobody knows what its surface looks like" }; } }
@@ -54227,19 +54265,18 @@ const PORTALS = [];
     gr.addColorStop(0, "rgba(255,255,255,.95)"); gr.addColorStop(0.5, "rgba(170,140,255,.6)"); gr.addColorStop(1, "rgba(80,60,200,.25)"); x.fillStyle = gr; x.fillRect(0, 0, 256, 256);
     x.strokeStyle = "rgba(255,255,255,.6)"; x.lineWidth = 5; for (let k = 0; k < 4; k++) { x.beginPath(); for (let a = 0; a < 9; a += 0.05) { const r = 6 + a * 13; x.lineTo(128 + r * Math.cos(a + k * 1.571), 128 + r * Math.sin(a + k * 1.571)); } x.stroke(); }
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
-  const list = EXO ? [["", "the Solar System", "home: back to the Earth as a 12-inch globe"]] : Object.entries(EXOSYS).map(([k, X]) => [k, X.name, `${X.ly.toLocaleString()} light-years · start beside ${X.name + X.sep + X.home}`]);
-  list.forEach(([key, title, line], i) => { const pos = EXO ? V3(6, 0, 6) : V3(-14 + i * 5.6, 0, -16), g = new THREE.Group(); g.position.set(pos.x, terrainH(pos.x, pos.z), pos.z); scene.add(g);
+  const list = EXO ? [["", "the Solar System", "home: back to the Earth as a 12-inch globe"]] : Object.entries(EXOSYS).map(([k, X]) => [k, X.name, `${X.ly.toLocaleString()} light-years · ${X.home ? "start beside " + X.name + X.sep + X.home : X.kind === "bh" ? "a black hole" : "a star system"}`]);
+  list.forEach(([key, title, line], i) => { const pos = EXO ? V3(6, 0, 6) : V3(-17 + (i % 7) * 5.6, 0, -16 - Math.floor(i / 7) * 7), g = new THREE.Group(); g.position.set(pos.x, terrainH(pos.x, pos.z), pos.z); scene.add(g);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.1, 12, 48), M(0x9a7aff, { metalness: 0.6, roughness: 0.3, emissive: 0x2a1a5a })); ring.position.y = 1.45; g.add(ring);
     const disc = new THREE.Mesh(new THREE.CircleGeometry(1.15, 40), new THREE.MeshBasicMaterial({ map: swirl, transparent: true, side: THREE.DoubleSide, depthWrite: false })); disc.position.y = 1.45; g.add(disc);
     const sg = boardMesh(["🌀 " + title, line, "walk in"], 2.4, { bg: "#2a1a4a" }); sg.position.y = 3.3; g.add(sg);
     PORTALS.push({ key, pos, disc }); });
-  if (!EXO) postSign(["PORTALS TO OTHER SYSTEMS", "each leads to a real planetary system, at the same scale: if the Earth were a 12-inch globe", "TRAPPIST-1's seven planets all fit within 220 m; HR 8799's giants spread over 240 km"], 0, -21.5, 0, 0, 3.4, 1.2); }
+  if (!EXO) postSign(["PORTALS TO OTHER SYSTEMS", "planets, stars, a pulsar and black holes, all at the same scale: if the Earth were a 12-inch globe", "TRAPPIST-1's seven planets all fit within 220 m; HR 8799's giants spread over 240 km"], 0, -28.5, 0, 0, 3.4, 1.2); }
 
 // ---------- the wrist teleporter (VR): a panel on your left wrist; point the right controller at a place and pull the trigger ----------
 const PLACES = [["🚆 board the train", "#b8322a", "train"], [EXO ? HOME_NAME : "Earth (the globe)", "#5a9ae8", () => [V3(0, 0, RE + 1.7), GC]], ...(EXO ? [] : [["the Moon", "#d8d8d8", () => moonSpot()]]), ["your car", "#ff6a5a", () => [car.position.clone().add(V3(-2.5, 0, 2.5)), car.position]],
   ...BODIES.map(b => [b.name === "the Sun" ? "Sun" : b.name, b.col, () => [b.stop.clone(), b.c]]),
   ...SMALL.map(b => [b.name, b.col, () => [b.stand.clone(), b.c]]),
-  ...STAR_VISITS.map((S, k) => ["★ " + S.name, "#fff2c0", "star" + k]), [EXO ? "☀ back to " + EXO.name : "☀ back to the Solar System", "#ffd27a", "home"],
   ...(EXO ? [["🌀 portal home: the Solar System", "#9a7aff", "exo:"]] : Object.entries(EXOSYS).map(([k, X]) => ["🌀 " + X.name, "#9a7aff", "exo:" + k])),
   ...["Io", "Europa", "Ganymede", "Callisto", "Amalthea", "Titan", "Triton", "Charon"].map(n => { const q = () => MOON_LIST.find(m => m.name === n); return [n, q()?.col || "#bbbbbb", () => moonStand(q())]; }).filter(x => MOON_LIST.find(m => m.name === x[0]))];
 function moonSpot() { const d = V3(MC.x, 0, MC.z).normalize(); return [V3(MC.x - d.x * 1.6, 0, MC.z - d.z * 1.6), MC]; }
@@ -54270,7 +54307,7 @@ guide.innerHTML = "<b>Go to</b><button data-go='desk'><i style='background:#3d7c
 guide.style.maxHeight = "calc(100vh - 30px)"; guide.style.overflowY = "auto";
 guide.innerHTML += (SMALL.length ? "<b style='margin-top:6px'>Small bodies</b>" : "") + SMALL.map(b => `<button data-tp="${PLACES.findIndex(q => q[0] === b.name)}"><i style="background:${b.col}"></i>${b.name}</button>`).join("") +
   "<b style='margin-top:6px'>Exoplanet systems (portals)</b>" + (EXO ? `<button data-exo=""><i style="background:#9a7aff"></i>🌀 home: the Solar System</button>` : Object.entries(EXOSYS).map(([k, X]) => `<button data-exo="${k}"><i style="background:#9a7aff"></i>🌀 ${X.name}</button>`).join("")) +
-  "<b style='margin-top:6px'>Other stars</b>" + STAR_VISITS.map((S, k) => `<button data-star="${k}"><i style="background:#fff2c0"></i>★ ${S.name}</button>`).join("") + `<button data-home="1"><i style="background:#ffd27a"></i>☀ back to ${EXO ? EXO.name : "the Solar System"}</button>`;
+  "";
 guide.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); start();
   if (b.dataset.exo !== undefined) return goSystem(b.dataset.exo); if (b.dataset.star) return enterStar(+b.dataset.star); if (b.dataset.home) return leaveStar(); if (inStar >= 0 && !b.dataset.tp) leaveStar();
   if (b.dataset.drive) return driveTo(BODIES[+b.dataset.drive]); if (b.dataset.tp) return teleport(+b.dataset.tp); if (b.dataset.train) return boardTrain();
@@ -54396,7 +54433,7 @@ function frame() {
     if (keys.ArrowLeft) yaw += 1.5 * dt; if (keys.ArrowRight) yaw -= 1.5 * dt;
     moved = before.distanceTo(rig.position) / Math.max(dt, 1e-4);
     const gh = floorH(rig.position.x, rig.position.z); if (!flying) rig.position.y = gh; else rig.position.y = Math.max(gh, rig.position.y); } }
-  stepTrain(dt); stepLift(dt);
+  stepTrain(dt); stepLift(dt); if (PULSAR && PULSAR.beams) PULSAR.beams.rotation.y += dt * 2.5;
   { const h = camera.getWorldPosition(V3(0, 0, 0)); for (const P of PORTALS) { P.disc.rotation.z -= dt * 0.9; if (intro?.classList.contains("gone") && Math.hypot(h.x - P.pos.x, h.z - P.pos.z) < 1.2 && Math.abs(h.y - P.pos.y - 1.5) < 2) { PORTALS.length = 0; goSystem(P.key); break; } } }
   if (lift.riding && vr) rig.rotation.y = vrTurn;
   if (onDeck && !lift.riding) { const T = onDeck, h = headXZ(), dx = h.x - T.A.x, dz = h.z - T.A.z, along = dx * T.elDir.x + dz * T.elDir.z, across = -dx * T.elDir.z + dz * T.elDir.x;
