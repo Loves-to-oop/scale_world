@@ -906,6 +906,15 @@ for (const [id, D] of Object.entries(TDESIGN)) { const S = towerSpots[id]; if (!
   const rim = new THREE.Mesh(new THREE.TorusGeometry(D.rOut, 0.12, 6, 96).rotateX(Math.PI / 2), M(0xc9a227, { metalness: 0.7 })); rim.position.y = D.deck + 1.1; g.add(rim);
   const cab = new THREE.Group(); scene.add(cab); const cb = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.8, 2.6), cabMat); cb.position.y = 1.4; cab.add(cb);
   const cf = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.12, 2.6), M(0x3a3e44)); cab.add(cf); const ct = cf.clone(); ct.position.y = 2.8; cab.add(ct); cab.position.set(base.x, g0, base.z);
+  // the Ledge: a glass box jutting 7 m out from the balcony toward the world below, with a glass floor (like the Willis Tower Skydeck's)
+  { const L = new THREE.Group(); L.position.set(elDir.x * (D.rOut + 2.5), D.deck, elDir.z * (D.rOut + 2.5)); L.rotation.y = Math.atan2(elDir.x, elDir.z); g.add(L);
+    const gl = new THREE.MeshStandardMaterial({ color: 0xd8f0ff, transparent: true, opacity: 0.14, roughness: 0.05, metalness: 0.1, depthWrite: false, side: THREE.DoubleSide }), fr = M(0x2a2e34, { metalness: 0.6 });
+    const fl = new THREE.Mesh(new THREE.BoxGeometry(4, 0.06, 7), gl); fl.position.y = -0.03; L.add(fl);
+    for (const sx of [-2, 2]) { const w = new THREE.Mesh(new THREE.BoxGeometry(0.04, 2.6, 7), gl); w.position.set(sx, 1.3, 0); L.add(w); }
+    const end = new THREE.Mesh(new THREE.BoxGeometry(4, 2.6, 0.04), gl); end.position.set(0, 1.3, 3.5); L.add(end); const roof = new THREE.Mesh(new THREE.BoxGeometry(4, 0.04, 7), gl); roof.position.y = 2.6; L.add(roof);
+    for (const [x, y] of [[-2, 0], [2, 0], [-2, 2.6], [2, 2.6]]) { const e = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 7), fr); e.position.set(x, y, 0); L.add(e); }
+    for (const z of [-3.5, 3.5]) for (const y of [0, 2.6]) { const e = new THREE.Mesh(new THREE.BoxGeometry(4, 0.08, 0.08), fr); e.position.set(0, y, z); L.add(e); }
+    const sg = boardMesh(["THE LEDGE", "glass floor: look straight down"], 1.6, { bg: "#1a2a3a" }); sg.position.set(0, 2.3, -3.4); L.add(sg); }
   const T = { id, D, A, g0, base, elDir, cab, deckY: g0 + D.deck, name: D.name, world: S.body ? S.body.name : "Earth" };
   const door = boardMesh([`${D.name}: ${D.H} m`, "glass elevator to the observation deck (E / X here)", `the tower of ${T.world}`], 3.4, { bg: "#1a2a3a" });
   door.position.set(base.x + elDir.x * 2.2, g0 + 3.6, base.z + elDir.z * 2.2); door.lookAt(base.x + elDir.x * 10, g0 + 3.6, base.z + elDir.z * 10); scene.add(door);
@@ -1087,8 +1096,10 @@ function frame() {
     const gh = floorH(rig.position.x, rig.position.z); if (!flying) rig.position.y = gh; else rig.position.y = Math.max(gh, rig.position.y); } }
   stepTrain(dt); stepLift(dt);
   if (lift.riding && vr) rig.rotation.y = vrTurn;
-  if (onDeck && !lift.riding) { const T = onDeck, h = headXZ(), dx = h.x - T.A.x, dz = h.z - T.A.z, r = Math.hypot(dx, dz), r2 = THREE.MathUtils.clamp(r, T.D.rEl - 5.5, T.D.rOut - 0.6);   // stay on the balcony
-    if (r2 !== r) { rig.position.x += dx / r * (r2 - r); rig.position.z += dz / r * (r2 - r); } rig.position.y = T.deckY; }
+  if (onDeck && !lift.riding) { const T = onDeck, h = headXZ(), dx = h.x - T.A.x, dz = h.z - T.A.z, along = dx * T.elDir.x + dz * T.elDir.z, across = -dx * T.elDir.z + dz * T.elDir.x;
+    if (along > T.D.rOut - 1.5 && Math.abs(across) < 1.6) { const a2 = Math.min(along, T.D.rOut + 5.6); rig.position.x += T.elDir.x * (a2 - along); rig.position.z += T.elDir.z * (a2 - along); }   // out on the Ledge
+    else { const r = Math.hypot(dx, dz), r2 = THREE.MathUtils.clamp(r, T.D.rEl - 5.5, T.D.rOut - 0.6);   // stay on the balcony
+      if (r2 !== r) { rig.position.x += dx / r * (r2 - r); rig.position.z += dz / r * (r2 - r); } } rig.position.y = T.deckY; }
   if (inStar >= 0 && !flying) { const r = Math.hypot(rig.position.x, rig.position.z); if (r > 6.4) { rig.position.x *= 6.4 / r; rig.position.z *= 6.4 / r; } }
   if (onTrain) { const g = train.cars[1], L = CAR_L[1];
     if (vr) { const s = renderer.xr.getSession(); let mx = 0, my = 0; for (const src of s?.inputSources || []) if (src.handedness === "left") { const [ax, ay] = stick(src.gamepad?.axes); mx = ax; my = ay; }
