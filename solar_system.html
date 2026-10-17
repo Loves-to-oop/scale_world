@@ -53425,10 +53425,40 @@ if (BODIES.find(b => b.id === "jupiter")) { const J = BODIES.find(b => b.id === 
 { const n = INNER.N + 1, band = 2.2 * OUTER.cell;            // the fine grid's edge blends into the coarse surface, so the two meet exactly at the seam
   for (let iz = 0; iz <= INNER.N; iz++) for (let ix = 0; ix <= INNER.N; ix++) { const x = ix * INNER.cell - INNER.half, z = iz * INNER.cell - INNER.half, e = INNER.half - Math.max(Math.abs(x), Math.abs(z));
     if (e < band) { const w = THREE.MathUtils.smoothstep(band - e, 0, band); INNER.H[iz * n + ix] += (gridH(OUTER, x, z) + 0.6 - INNER.H[iz * n + ix]) * w; } } }   // 0.6 m proud: no coarse cell can poke through
+// ---------- the asteroid belt as a river: 2.1-3.3 AU from the Sun, here 7.5-11.8 km out, 4.3 km wide ----------
+// The water is level across the river and follows the lie of the land slowly round it; the bed is dug out of both grids,
+// with a low flood plain each side blending back into the ground. Ceres and Vesta, with their towers and towns, stand on
+// islands, drawn finely on their own (the coarse grid is too coarse for them).
+const RIVER = !EXO, BELT0 = 2.1 * AU, BELT1 = 3.3 * AU, LEVEE = 500, BANK = 800, SHORE = 260, RDEPTH = 22, NLW = 360, LW = new Float32Array(NLW);
+let RIVER_TEX = null, BRIDGE_SEGS = []; const BRIDGES = [], ISLES = [];
+function beltPolar(x, z) { const dx = x - SUN.w.x, dz = z - SUN.w.z; return [Math.hypot(dx, dz), Math.atan2(dz, dx)]; }
+function waterAt(th) { const f = ((((th / (2 * Math.PI)) % 1) + 1) % 1) * NLW, i = Math.floor(f) % NLW, u = f - Math.floor(f); return LW[i] * (1 - u) + LW[(i + 1) % NLW] * u; }
+function waterSurf(x, z) { if (!RIVER) return -1e9; const [r, th] = beltPolar(x, z); return r > BELT0 && r < BELT1 ? waterAt(th) : -1e9; }
+function riverDeck(x, z, clear = 9) { if (!RIVER) return -1e9; const [r, th] = beltPolar(x, z), out = Math.max(BELT0 - r, r - BELT1, 0); return out > 3000 ? -1e9 : waterAt(th) + clear - 0.08 * out; }
+function deckH(x, z) { return Math.max(terrainH(x, z), riverDeck(x, z)); }
+function isleH(x, z) { let h = -1e9;
+  for (const I of ISLES) { if (Math.abs(x - I.c.x) > I.half || Math.abs(z - I.c.z) > I.half) continue; const L = waterAt(beltPolar(x, z)[1]);
+    for (const [q, rad] of I.discs) { const d = Math.hypot(x - q.x, z - q.z); if (d < rad + 200) h = Math.max(h, L + 2.5 + 1.5 * Math.max(0, 1 - (d / rad) ** 2) - (RDEPTH + 16) * THREE.MathUtils.smoothstep(d, rad, rad + 200)); } }
+  return h; }
+if (RIVER) {
+  const raw = (x, z) => inInner(x, z) ? gridH(INNER, x, z) : gridH(OUTER, x, z);
+  for (let k = 0; k < NLW; k++) { const th = k / NLW * 2 * Math.PI; let sm = 0;
+    for (let j = 0; j < 12; j++) { const r = BELT0 + (BELT1 - BELT0) * (j + 0.5) / 12; sm += raw(SUN.w.x + r * Math.cos(th), SUN.w.z + r * Math.sin(th)); } LW[k] = sm / 12; }
+  for (let pass = 0; pass < 3; pass++) { const c = LW.slice(); for (let k = 0; k < NLW; k++) { let sm = 0; for (let j = -15; j <= 15; j++) sm += c[(k + j + NLW) % NLW]; LW[k] = sm / 31; } }
+  for (const G of [INNER, OUTER]) { const n = G.N + 1;
+    for (let iz = 0; iz <= G.N; iz++) for (let ix = 0; ix <= G.N; ix++) { const x = ix * G.cell - G.half, z = iz * G.cell - G.half, [r, th] = beltPolar(x, z);
+      if (r < BELT0 - LEVEE - BANK || r > BELT1 + LEVEE + BANK) continue;
+      const L = waterAt(th), sd = Math.min(r - BELT0, BELT1 - r), i = iz * n + ix;
+      if (sd >= 0) G.H[i] = L + 3 - (RDEPTH + 3) * THREE.MathUtils.smoothstep(sd, 0, SHORE);
+      else G.H[i] += (L + 3 - G.H[i]) * (1 - THREE.MathUtils.smoothstep(-sd, LEVEE, LEVEE + BANK)); } }
+  for (const b of SMALL) { const [r, th] = beltPolar(b.w.x, b.w.z); if (r < BELT0 - 600 || r > BELT1 + 600) continue;
+    const f = V3(b.w.x, 0, b.w.z).normalize(), away = V3(-f.z, 0, f.x), P = V3(b.w.x, 0, b.w.z), T = P.clone().addScaledVector(away, -(b.r + 660));
+    ISLES.push({ b, L: waterAt(th), c: P.clone().lerp(T, 0.5), half: 1300, discs: [[P, 330], [T, 550]] }); } }
 let OUTER_DRAWN = OUTER;                                // the coarse grid as actually drawn (set once its mesh is built)
 const RF = Math.max(RX, ...SMALL.map(b => Math.max(Math.abs(b.w.x), Math.abs(b.w.z)))) + 40000;   // a far plain out to the farthest Kuiper belt objects
 function farH(x, z) { const ax = Math.max(Math.abs(x), Math.abs(z)); return gridH(OUTER_DRAWN, THREE.MathUtils.clamp(x, -RX, RX), THREE.MathUtils.clamp(z, -RX, RX)) * (1 - THREE.MathUtils.smoothstep(ax - RX, 0, 30000)); }
-function terrainH(x, z) { if (inInner(x, z)) return gridH(INNER, x, z); if (Math.max(Math.abs(x), Math.abs(z)) <= RX) return gridH(OUTER_DRAWN, x, z); return farH(x, z); }
+function groundH(x, z) { if (inInner(x, z)) return gridH(INNER, x, z); if (Math.max(Math.abs(x), Math.abs(z)) <= RX) return gridH(OUTER_DRAWN, x, z); return farH(x, z); }
+function terrainH(x, z) { const g = groundH(x, z); return ISLES.length ? Math.max(g, isleH(x, z)) : g; }
 { const gc = document.createElement("canvas"); gc.width = gc.height = 256; const g = gc.getContext("2d"); g.fillStyle = "#c8c8c8"; g.fillRect(0, 0, 256, 256);
   for (let k = 0; k < 5000; k++) { const v = 150 + rnd() * 105 | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(rnd() * 256, rnd() * 256, 1.5, 3); }
   OUTER.Hr = new Float32Array(OUTER.H.length);
@@ -53443,6 +53473,7 @@ function terrainH(x, z) { if (inInner(x, z)) return gridH(INNER, x, z); if (Math
       c.setHSL(0.25 + 0.04 * n, 0.42, 0.33 + 0.08 * n);
       if (h > 900) c.lerp(new THREE.Color(0x8a8478), Math.min(1, (h - 900) / 900)); if (h > 2600) c.lerp(new THREE.Color(0xf4f6f8), Math.min(1, (h - 2600) / 600));
       if (h < -300) c.lerp(new THREE.Color(0x5a7a48), Math.min(1, -h / 2000));
+      if (RIVER) { const [r] = beltPolar(x, z); if (Math.min(r - BELT0, BELT1 - r) > -140) c.lerp(new THREE.Color(0xcdbb8c), 0.75); }
       col.set([c.r, c.g, c.b], i * 3); }
     geo.setAttribute("color", new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals();
     const gt = new THREE.CanvasTexture(gc); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(2 * G.half / 6, 2 * G.half / 6); gt.anisotropy = 8;
@@ -53456,16 +53487,34 @@ function terrainH(x, z) { if (inInner(x, z)) return gridH(INNER, x, z); if (Math
     const gt = new THREE.CanvasTexture(gc); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(2 * RF / 6, 2 * RF / 6);
     scene.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, map: gt, roughness: 0.95 }))); } }
 
+if (RIVER) {   // the water: a ring, level across, a little wider than the river so its edges tuck under the banks
+  const wc = document.createElement("canvas"); wc.width = wc.height = 256; const g = wc.getContext("2d"); g.fillStyle = "#2c6a8c"; g.fillRect(0, 0, 256, 256);
+  for (let k = 0; k < 900; k++) { g.fillStyle = `rgba(${rnd() < 0.5 ? "190,225,240" : "20,60,90"},${0.08 + rnd() * 0.12})`; g.fillRect(rnd() * 256, rnd() * 256, 1.5, 3 + rnd() * 10); }
+  RIVER_TEX = new THREE.CanvasTexture(wc); RIVER_TEX.wrapS = RIVER_TEX.wrapT = THREE.RepeatWrapping; RIVER_TEX.colorSpace = THREE.SRGBColorSpace; RIVER_TEX.anisotropy = 8;
+  const NA = IS_HEADSET ? 480 : 900, R0 = BELT0 - 400, R1 = BELT1 + 400, pos = [], uv = [], idx = [];
+  for (let a = 0; a <= NA; a++) { const th = a / NA * 2 * Math.PI, L = waterAt(th);
+    for (let j = 0; j <= 2; j++) { const r = R0 + (R1 - R0) * j / 2; pos.push(SUN.w.x + r * Math.cos(th), L, SUN.w.z + r * Math.sin(th)); uv.push(j / 2 * (R1 - R0) / 40, a / NA * 2 * Math.PI * (BELT0 + BELT1) / 2 / 40); } }
+  for (let a = 0; a < NA; a++) for (let j = 0; j < 2; j++) { const k = a * 3 + j; idx.push(k, k + 3, k + 1, k + 1, k + 3, k + 4); }
+  const wg = new THREE.BufferGeometry(); wg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); wg.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); wg.setIndex(idx); wg.computeVertexNormals();
+  const water = new THREE.Mesh(wg, new THREE.MeshStandardMaterial({ map: RIVER_TEX, roughness: 0.22, metalness: 0.25, side: THREE.DoubleSide })); water.frustumCulled = false; scene.add(water);
+  for (const I of ISLES) { const N = IS_HEADSET ? 90 : 160, geo = new THREE.PlaneGeometry(2 * I.half, 2 * I.half, N, N).rotateX(-Math.PI / 2), p = geo.attributes.position, col = new Float32Array(p.count * 3), c = new THREE.Color(), sand = new THREE.Color(0xd8c89a);
+    for (let i = 0; i < p.count; i++) { const x = I.c.x + p.getX(i), z = I.c.z + p.getZ(i), L = waterAt(beltPolar(x, z)[1]), h = Math.max(isleH(x, z), L - RDEPTH - 14); p.setY(i, h);
+      const n = 0.5 + 0.25 * Math.sin(x * 0.00031 + Math.sin(z * 0.00017) * 3) + 0.25 * Math.sin(z * 0.00043 + x * 0.0001); c.setHSL(0.25 + 0.04 * n, 0.42, 0.33 + 0.08 * n);
+      c.lerp(sand, 1 - THREE.MathUtils.smoothstep(h, L + 1.2, L + 2.4)); col.set([c.r, c.g, c.b], i * 3); }
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 })); m.position.set(I.c.x, 0, I.c.z); scene.add(m); } }
+
 // a paved ribbon along xz points, laid on the ground
 function densify(pts, step = 8) { const out = [pts[0]];
   for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / step));
     for (let k = 1; k <= n; k++) out.push(V3(a.x + (b.x - a.x) * k / n, 0, a.z + (b.z - a.z) * k / n)); } return out; }
 const ROAD_LIFT = 0.3;
 function ribbon(pts, width, mat, lift = ROAD_LIFT, uvLen = 12) { pts = densify(pts);
+  if (RIVER) { let br = null; for (const q of pts) { const d = riverDeck(q.x, q.z); if (d > terrainH(q.x, q.z) + 1.2) (br || (br = [])).push(V3(q.x, d, q.z)); else if (br) { BRIDGES.push({ pts: br, width }); br = null; } } if (br) BRIDGES.push({ pts: br, width }); }
   const pos = [], uv = [], idx = []; let run = 0;
   pts.forEach((q, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], t = V3(b.x - a.x, 0, b.z - a.z).normalize(), n = V3(-t.z, 0, t.x);
     if (i) run += Math.hypot(q.x - pts[i - 1].x, q.z - pts[i - 1].z);
-    for (const s of [1, -1]) { const x = q.x + n.x * width / 2 * s, z = q.z + n.z * width / 2 * s; pos.push(x, terrainH(x, z) + lift, z); }
+    for (const s of [1, -1]) { const x = q.x + n.x * width / 2 * s, z = q.z + n.z * width / 2 * s; pos.push(x, deckH(x, z) + lift, z); }
     uv.push(0, run / uvLen, 1, run / uvLen); if (i) { const k = 2 * i; idx.push(k - 2, k, k - 1, k - 1, k, k + 1); } });   // wound to face up
   const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx); g.computeVertexNormals(); const m = new THREE.Mesh(g, mat); scene.add(m); return m;
@@ -53826,11 +53875,11 @@ function driveHome() {                                // back along the road to 
 function placeCar() {
   const r = carRoute ? routeAt(carRoute, carS) : { p: V3(4, 0, 36), dir: V3(1, 0, 0) };
   const ahead = r.p.clone().addScaledVector(r.dir, 2), behind = r.p.clone().addScaledVector(r.dir, -2);
-  const y = terrainH(r.p.x, r.p.z) + ROAD_LIFT + 0.08, pitch = Math.atan2(terrainH(ahead.x, ahead.z) - terrainH(behind.x, behind.z), 4);
+  const y = deckH(r.p.x, r.p.z) + ROAD_LIFT + 0.08, pitch = Math.atan2(deckH(ahead.x, ahead.z) - deckH(behind.x, behind.z), 4);
   car.position.set(r.p.x, y, r.p.z); car.rotation.set(pitch, Math.atan2(-r.dir.x, -r.dir.z), 0, "YXZ"); }
 placeCar();
 function enterCar() { if (!inCar) { yaw = 0; pitch = -0.1; vrTurn = 0; } inCar = true; flying = false; }   // look out over the hood: in the car, the view is relative to the car
-function exitCar() { inCar = false; yaw += car.rotation.y; const s = V3(-2.2, 0, 0.3).applyEuler(new THREE.Euler(0, car.rotation.y, 0)); rig.position.set(car.position.x + s.x, terrainH(car.position.x + s.x, car.position.z + s.z), car.position.z + s.z); rig.rotation.set(0, 0, 0); camera.position.y = 1.65; }
+function exitCar() { inCar = false; yaw += car.rotation.y; const s = V3(-2.2, 0, 0.3).applyEuler(new THREE.Euler(0, car.rotation.y, 0)); rig.position.set(car.position.x + s.x, floorH(car.position.x + s.x, car.position.z + s.z), car.position.z + s.z); rig.rotation.set(0, 0, 0); camera.position.y = 1.65; }
 function drawDash(v) {
   const g = dashC.getContext("2d"); g.fillStyle = "#0d1a22"; g.fillRect(0, 0, 1024, 560); g.strokeStyle = "#c9a227"; g.lineWidth = 6; g.strokeRect(3, 3, 1018, 554);
   for (const b of DASH_BTNS) { g.fillStyle = b.flash > 0 ? "#ffe9a8" : b.body && b.body === dest ? "#2a4a3a" : "#1e2e3a"; g.beginPath(); g.roundRect(b.x, b.y, b.w, b.h, 12); g.fill();
@@ -53857,7 +53906,7 @@ function filleted(P) { const out = [P[0]];                 // replace each corne
     const A = b.clone().addScaledVector(d1.normalize(), -cut), B = b.clone().addScaledVector(d2.normalize(), cut);
     for (let k = 0; k <= 24; k++) { const t = k / 24; out.push(A.clone().multiplyScalar((1 - t) ** 2).addScaledVector(b, 2 * t * (1 - t)).addScaledVector(B, t * t)); } }
   out.push(P[P.length - 1]); return out; }
-const RAIL = (() => { const pts = densify(filleted(STATIONS.map(s => s.p)), 4), n = pts.length, g = pts.map(q => terrainH(q.x, q.z));
+const RAIL = (() => { const pts = densify(filleted(STATIONS.map(s => s.p)), 4), n = pts.length, g = pts.map(q => Math.max(terrainH(q.x, q.z), riverDeck(q.x, q.z, 14)));
   const cum = [0]; for (let i = 1; i < n; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
   const stS = STATIONS.map(s => { let best = 0, bd = 1e9; pts.forEach((q, i) => { const d = Math.hypot(q.x - s.p.x, q.z - s.p.z); if (d < bd) { bd = d; best = i; } }); return best; });
   // the track's height: a smoothed version of the ground (embankments and viaducts over hollows), never below it, level with it at stations
@@ -53883,9 +53932,9 @@ function railAt(s) { s = THREE.MathUtils.clamp(s, 0, RAIL.L); let lo = 0, hi = R
     const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; scene.add(m); };
   strip(0, 3.2, 0, new THREE.MeshStandardMaterial({ map: bedT, roughness: 0.95, side: THREE.DoubleSide }), 0.7);
   for (const o of [-0.72, 0.72]) strip(o, 0.09, 0.17, M(0xb8bcc0, { metalness: 0.8, roughness: 0.3, side: THREE.DoubleSide }), 10);
-  const piers = []; for (let i = 0; i < RAIL.pts.length; i += 10) if (RAIL.y[i] - RAIL.g[i] > 2.5) piers.push(i);
+  const piers = []; for (let i = 0; i < RAIL.pts.length; i += 10) if (RAIL.y[i] - terrainH(RAIL.pts[i].x, RAIL.pts[i].z) > 2.5) piers.push(i);
   const pm = new THREE.InstancedMesh(new THREE.BoxGeometry(2.2, 1, 1.2).translate(0, 0.5, 0), M(0xb8b0a4), piers.length);
-  piers.forEach((i, k) => { const q = RAIL.pts[i]; O3.position.set(q.x, RAIL.g[i] - 0.5, q.z); O3.rotation.set(0, 0, 0); O3.scale.set(1, RAIL.y[i] - RAIL.g[i] + 0.4, 1); O3.updateMatrix(); pm.setMatrixAt(k, O3.matrix); });
+  piers.forEach((i, k) => { const q = RAIL.pts[i], gb = terrainH(q.x, q.z); O3.position.set(q.x, gb - 0.5, q.z); O3.rotation.set(0, 0, 0); O3.scale.set(1, RAIL.y[i] - gb + 0.4, 1); O3.updateMatrix(); pm.setMatrixAt(k, O3.matrix); });
   pm.frustumCulled = false; scene.add(pm); }
 const PLATFORMS = [];
 STATIONS.forEach(st => { const r = railAt(st.s), t = V3(r.dir.x, 0, r.dir.z).normalize(), n = V3(-t.z, 0, t.x), c = r.p.clone().addScaledVector(n, 3.6), top = r.p.y + 0.55;
@@ -53899,6 +53948,9 @@ STATIONS.forEach(st => { const r = railAt(st.s), t = V3(r.dir.x, 0, r.dir.z).nor
   nm.position.set(0.2, top + 2.5, 8); nm.rotation.y = -Math.PI / 2; g.add(nm); const nm2 = nm.clone(); nm2.position.z = -8; g.add(nm2);
   PLATFORMS.push({ c, t, n, top, st, inv: new THREE.Matrix4().makeRotationY(-Math.atan2(t.x, t.z)) }); });
 function floorH(x, z) { if (inStar >= 0) return 0; if (onDeck) return onDeck.deckY; let h = terrainH(x, z);   // you can walk up onto a platform
+  if (RIVER) { const d = riverDeck(x, z); if (d > h) { let on = false;   // on a bridge you walk its deck; elsewhere over the river, its surface
+    for (const [a, b, w] of BRIDGE_SEGS) if (Math.abs(a.x - x) < 40 && Math.abs(a.z - z) < 40 && segD(x, z, a, b) < w / 2 + 0.4) { on = true; break; }
+    h = on ? d + ROAD_LIFT : Math.max(h, waterSurf(x, z)); } }
   for (const P of PLATFORMS) { const dx = x - P.c.x, dz = z - P.c.z, a = dx * P.n.x + dz * P.n.z, b = dx * P.t.x + dz * P.t.z; if (Math.abs(a) < 2.1 && Math.abs(b) < 33) h = Math.max(h, P.top); } return h; }
 // the train: a locomotive and two carriages, each placed on the track on its own, so it bends round the line
 const train = { cars: [], s: 0, v: 0, dir: 1, at: 0, dest: -1, pickup: -1, state: "idle", doors: 0, timeK: 1 };
@@ -54024,12 +54076,13 @@ for (const b of SMALL) {
     for (let k = 0; k <= 720; k++) { const E = k / 720 * 2 * Math.PI, H = helioEl(a, e, i, Om, w, (E - e * Math.sin(E)) / deg, JD), q = eclToWorld(H.sub(EARTH)).multiplyScalar(AU); q.y = terrainH(q.x, q.z) + 1.5; pts.push(q); }
     scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineDashedMaterial({ color: 0xbfe8ff, dashSize: 40, gapSize: 30 })).computeLineDistances()); } }
 { const ring = (n, a0, a1, col, size) => { const pts = []; for (let k = 0; k < n; k++) { const a = (a0 + Math.random() * (a1 - a0)) * AU, th = Math.random() * 6.283, x = SUN.w.x + a * Math.cos(th), z = SUN.w.z + a * Math.sin(th);
-      pts.push(V3(x, terrainH(x, z) + 0.6, z)); } scene.add(new THREE.Points(new THREE.BufferGeometry().setFromPoints(pts), new THREE.PointsMaterial({ color: col, size, sizeAttenuation: false, transparent: true, opacity: 0.8 }))); };
+      pts.push(V3(x, Math.max(terrainH(x, z), waterSurf(x, z)) + 0.6, z)); } scene.add(new THREE.Points(new THREE.BufferGeometry().setFromPoints(pts), new THREE.PointsMaterial({ color: col, size, sizeAttenuation: false, transparent: true, opacity: 0.8 }))); };
   ring(IS_HEADSET ? 2000 : 5000, 2.1, 3.3, 0xb8a890, 2);    // the asteroid belt: 7.5-12 km from the Sun here
   ring(IS_HEADSET ? 3000 : 8000, 30, 50, 0xa8c0d8, 2);      // the Kuiper belt: 107-180 km from the Sun here
-  const toD = SUN.w.clone().negate().setY(0).normalize(), kb = SUN.w.clone().addScaledVector(toD, 30 * AU), ab = SUN.w.clone().addScaledVector(toD, 2.1 * AU);
+  const toD = SUN.w.clone().negate().setY(0).normalize(), kb = SUN.w.clone().addScaledVector(toD, 30 * AU), ab = SUN.w.clone().addScaledVector(toD, 2.1 * AU - 80);
   postSign(["the asteroid belt", "between Mars and Jupiter: 2.1-3.3 AU from the Sun, here 7.5-12 km from it", "each speck is only a marker: real asteroids, even the largest, would be grains of sand here",
-    "all of them together have less mass than the Moon: they are spread out, not crowded"], ab.x, ab.z, SUN.w.x, SUN.w.z, 3.2, 1.0);
+    "all of them together have less mass than the Moon: they are spread out, not crowded",
+    "here the belt is a river 4.3 km wide; the specks float on it, and Ceres and Vesta stand on islands joined to the roads by bridges"], ab.x, ab.z, SUN.w.x, SUN.w.z, 3.2, 1.0);
   postSign(["the Kuiper belt", "icy bodies beyond Neptune: 30-50 AU from the Sun, here 107-180 km from it", "Pluto, Eris, Makemake, Haumea, Quaoar, Orcus, Gonggong and Arrokoth are out here; Sedna swings far beyond",
     "the specks are markers flattened onto the ground; real Kuiper belt orbits are often steeply tilted"], kb.x, kb.z, SUN.w.x, SUN.w.z, 3.2, 1.0); }
 
@@ -54229,6 +54282,24 @@ function liftLine() { if (lift.riding) { const h = rig.position.y - lift.T.g0; r
 // Generated, kept clear of the roads, the railway, the towers and stations. Instanced, so thousands of buildings stay cheap.
 const RAILHASH = new Map(); RAIL.pts.forEach((q, i) => { if (i % 3) return; const k = Math.floor(q.x / 60) + "," + Math.floor(q.z / 60); if (!RAILHASH.has(k)) RAILHASH.set(k, []); RAILHASH.get(k).push(q); });
 const ROADSEGS = []; for (const b of BODIES) { const L = [b.S, ...b.arc, ...b.line]; for (let i = 1; i < L.length; i++) ROADSEGS.push([L[i - 1], L[i]]); }
+if (RIVER) for (const I of ISLES) { const b = I.b, P = V3(b.w.x, 0, b.w.z); let best = null, bd = 6000;
+  for (const [a, c] of ROADSEGS) { const dx = c.x - a.x, dz = c.z - a.z, l2 = dx * dx + dz * dz, t = l2 ? Math.max(0, Math.min(1, ((P.x - a.x) * dx + (P.z - a.z) * dz) / l2)) : 0, q = V3(a.x + t * dx, 0, a.z + t * dz), d = q.distanceTo(P); if (d < bd) { bd = d; best = q; } }
+  if (!best) { const [r, th] = beltPolar(P.x, P.z), R = r - BELT0 < BELT1 - r ? BELT0 - 300 : BELT1 + 300; best = V3(SUN.w.x + R * Math.cos(th), 0, SUN.w.z + R * Math.sin(th)); }
+  const dir = best.clone().sub(P).normalize(), A = P.clone().addScaledVector(dir, b.r + 30), B = best.clone().addScaledVector(dir, -4);
+  ribbon([A, B], 7, laneMat, ROAD_LIFT + 0.06, 8); ROADSEGS.push([A, B]); I.link = B; }
+if (BRIDGES.length) {   // a concrete deck with parapets under every stretch of road over the water, on piers every 80 m down to the bed
+  const SL = [], WL = [], PL = [];
+  for (const Bd of BRIDGES) { const P = Bd.pts, w = Bd.width;
+    for (let i = 1; i < P.length; i++) { const a = P[i - 1], b = P[i], len = Math.hypot(b.x - a.x, b.z - a.z), yaw = Math.atan2(b.x - a.x, b.z - a.z), m = a.clone().lerp(b, 0.5), top = m.y + ROAD_LIFT;
+      SL.push([m.x, top - 1.0, m.z, w + 1.4, 1.6, len + 0.3, yaw]);
+      for (const sd of [1, -1]) WL.push([m.x + Math.cos(yaw) * sd * (w / 2 + 0.5), top + 0.55, m.z - Math.sin(yaw) * sd * (w / 2 + 0.5), 0.35, 1.1, len + 0.3, yaw]);
+      BRIDGE_SEGS.push([a, b, w]);
+      if (i % 10 === 5) { const gb = terrainH(b.x, b.z) - 3, pt = top - 1.8; if (pt > gb) PL.push([b.x, (gb + pt) / 2, b.z, w * 0.7, pt - gb, 3, yaw]); } } }
+  const box = new THREE.BoxGeometry(1, 1, 1);
+  for (const [list, mat] of [[SL, M(0x9c9a94, { roughness: 0.85 })], [WL, M(0xb8b6b0, { roughness: 0.8 })], [PL, M(0x8a8780, { roughness: 0.9 })]]) {
+    const im = new THREE.InstancedMesh(box, mat, Math.max(1, list.length));
+    list.forEach(([x, y, z, sx, sy, sz, yaw], k) => { O3.position.set(x, y, z); O3.rotation.set(0, yaw, 0); O3.scale.set(sx, sy, sz); O3.updateMatrix(); im.setMatrixAt(k, O3.matrix); });
+    if (!list.length) im.count = 0; im.frustumCulled = false; scene.add(im); } }
 function segD(px, pz, a, b) { const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz, t = l2 ? Math.max(0, Math.min(1, ((px - a.x) * dx + (pz - a.z) * dz) / l2)) : 0; return Math.hypot(a.x + t * dx - px, a.z + t * dz - pz); }
 function blocked(x, z, pad = 0) {
   if (Math.abs(z - ZH) < 30 + pad && x > XMIN && x < XMAX) return true;                                   // the interstate
@@ -54528,7 +54599,7 @@ function frame() {
     if (keys.ArrowLeft) yaw += 1.5 * dt; if (keys.ArrowRight) yaw -= 1.5 * dt;
     moved = before.distanceTo(rig.position) / Math.max(dt, 1e-4);
     const gh = floorH(rig.position.x, rig.position.z); if (!flying) rig.position.y = gh; else rig.position.y = Math.max(gh, rig.position.y); } }
-  stepTrain(dt); stepLift(dt); if (PULSAR && PULSAR.beams) PULSAR.beams.rotation.y += dt * 2.5;
+  stepTrain(dt); stepLift(dt); if (PULSAR && PULSAR.beams) PULSAR.beams.rotation.y += dt * 2.5; if (RIVER_TEX) RIVER_TEX.offset.y -= dt * 0.03;
   { const h = camera.getWorldPosition(V3(0, 0, 0)); for (const P of PORTALS) { P.disc.rotation.z -= dt * 0.9; if (intro?.classList.contains("gone") && Math.hypot(h.x - P.pos.x, h.z - P.pos.z) < 1.2 && Math.abs(h.y - P.pos.y - 1.5) < 2) { PORTALS.length = 0; goSystem(P.key); break; } } }
   if (lift.riding && vr) rig.rotation.y = vrTurn;
   if (onDeck && !lift.riding) { const T = onDeck, h = headXZ(), dx = h.x - T.A.x, dz = h.z - T.A.z, along = dx * T.elDir.x + dz * T.elDir.z, across = -dx * T.elDir.z + dz * T.elDir.x;
