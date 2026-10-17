@@ -995,6 +995,67 @@ for (const [name, b, R, kind] of TOWNS) {
   inst(STREET, new THREE.BoxGeometry(1, 0.06, 1), M(0x45484c, { roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2 }), ([x, z, w, d, a], O) => { O.position.set(x, terrainH(x, z) + 0.2, z); O.rotation.set(0, -a, 0); O.scale.set(w, 1, d); });
   inst(TREE, new THREE.IcosahedronGeometry(4, 0).translate(0, 7, 0), M(0x3f6a2a, { flatShading: true }), ([x, z, s], O, c) => { O.position.set(x, terrainH(x, z), z); O.rotation.set(0, tr() * 6, 0); O.scale.setScalar(s); c.setHSL(0.27 + tr() * 0.06, 0.4, 0.25 + tr() * 0.1); c.__set = 1; }); }
 
+// ---------- mountains: one range near each distant world and small body, each shaped after its most famous real feature ----------
+// Scenery for a sense of distance: 0.8-2.6 km tall, so they stand out across tens of km. Not to scale (the real features would be specks).
+const hfRand = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+function vn(x, z) { const i = Math.floor(x), j = Math.floor(z), u = x - i, v = z - j, s = t => t * t * (3 - 2 * t), a = hfRand(i, j), b = hfRand(i + 1, j), c = hfRand(i, j + 1), d = hfRand(i + 1, j + 1);
+  return a + (b - a) * s(u) + (c - a) * s(v) + (a - b - c + d) * s(u) * s(v); }
+const fbm2 = (x, z) => 0.5 * vn(x, z) + 0.25 * vn(2 * x, 2 * z) + 0.125 * vn(4 * x, 4 * z) + 0.0625 * vn(8 * x, 8 * z);
+const MTN_AT = {};
+const MTN = {   // shape (u, v in -1..1 → 0..1), height m, radius m, colours, title
+  jupiter: { name: "Boösaule Montes", world: "Io, Jupiter's volcanic moon", note: "Io's tallest mountain, 17.5 km: a tilted block of crust", H: 2200, R: 3200, lo: "#c8a040", hi: "#f0d878",
+    f: (u, v) => { const r = Math.hypot(u * 0.8, v * 1.3); return Math.min(1, Math.pow(Math.max(0, 1 - r), 0.8) * 1.5) * (0.55 + 0.45 * Math.max(0, u + 0.5)) * (0.7 + 0.6 * fbm2(u * 4 + 5, v * 4)); } },   // a rugged tilted massif
+  saturn: { name: "the Iapetus Ridge", world: "Iapetus, Saturn's two-toned moon", note: "a ridge 20 km high and 1,300 km long, running exactly round its equator", H: 1600, R: 6000, lo: "#3a3028", hi: "#e8e0d0",
+    f: (u, v) => Math.max(0, 1 - Math.abs(v) * 5 - Math.pow(Math.abs(u), 6)) * (0.8 + 0.4 * fbm2(u * 6, v * 2)), snowSide: true },
+  uranus: { name: "Verona Rupes", world: "Miranda, a moon of Uranus", note: "the tallest known cliff in the solar system: about 20 km straight down", H: 2400, R: 3000, lo: "#7a7874", hi: "#c8c4bc",
+    f: (u, v) => { const r = Math.hypot(u, v); return Math.max(0, Math.min(1, (1 - r) * 5)) * Math.max(0, Math.min(1, (0.2 - u) * 40)) * (0.35 + 0.65 * Math.max(0, u + 1) / 1.2) * (0.9 + 0.15 * fbm2(u * 4, v * 4)); } },   // a tilted block, highest at its sheer face
+  neptune: { name: "the Cantaloupe Highlands", world: "Triton, Neptune's captured moon", note: "dimpled 'cantaloupe' terrain, streaked by nitrogen geysers", H: 900, R: 4000, lo: "#b8a8a0", hi: "#e8dcd8",
+    f: (u, v) => { const r = Math.hypot(u, v); return r > 1 ? 0 : Math.min(1, (1 - r) * 4) * (0.8 + 0.2 * Math.abs(Math.sin(u * 22) * Math.sin(v * 22))); }, plumes: true },
+  pluto: { name: "Tenzing Montes", world: "Pluto", note: "jagged mountains of water ice up to 6 km high, on the edge of the 'heart'", H: 2000, R: 3000, lo: "#8a6a58", hi: "#f4ece4",
+    f: (u, v) => { const r = Math.hypot(u, v); return r > 1 ? 0 : Math.pow(1 - r, 0.7) * Math.pow(fbm2(u * 5 + 9, v * 5), 1.6) * 2.4; } },
+  ceres: { name: "Ahuna Mons", world: "Ceres", note: "a lonely ice volcano, 4 km high, its steep sides streaked with bright salts", H: 1200, R: 2400, lo: "#5a5854", hi: "#f0f0ee",
+    f: (u, v) => { const r = Math.hypot(u, v); return r > 1 ? 0 : Math.min(1, (1 - r) * 3.5) * (1 - 0.15 * r); }, streaks: true },
+  vesta: { name: "the Rheasilvia peak", world: "Vesta", note: "the central peak of a 505 km crater: 22 km high, among the tallest mountains known", H: 2600, R: 5000, lo: "#8a8070", hi: "#d8d0c0",
+    f: (u, v) => { const r = Math.hypot(u, v); return r > 1 ? 0 : Math.exp(-((r / 0.22) ** 2)) + 0.35 * Math.exp(-(((r - 0.85) / 0.07) ** 2)); } },
+  halley: { name: "Comet Rock", world: "Halley's Comet", note: "a dark peanut of ice and dust, like Halley's 15 km nucleus seen by Giotto in 1986", H: 1100, R: 2600, lo: "#1e1c1a", hi: "#4a4642",
+    f: (u, v) => { const a = Math.hypot((u + 0.35) * 1.1, v * 1.6), b = Math.hypot((u - 0.4) * 1.3, v * 1.9); return Math.max(0, 1 - a) ** 0.6 * 0.9 + Math.max(0, 1 - b) ** 0.6 * 0.7; } },
+  quaoar: { name: "the Ring Hills", world: "Quaoar", note: "a ring of hills, after Quaoar's ring lying far outside where rings should survive", H: 800, R: 3500, lo: "#7a5a44", hi: "#c8a890",
+    f: (u, v) => Math.exp(-(((Math.hypot(u, v) - 0.7) / 0.08) ** 2)) * (0.8 + 0.3 * fbm2(u * 5, v * 5)) },
+  orcus: { name: "the Twin Peaks", world: "Orcus and its moon Vanth", note: "a big peak and a small one, like Orcus and its large moon", H: 1500, R: 3000, lo: "#6a6a70", hi: "#e0e4ec",
+    f: (u, v) => Math.max(0, 1 - Math.hypot(u + 0.3, v) * 1.8) ** 1.2 + 0.55 * Math.max(0, 1 - Math.hypot(u - 0.5, v + 0.2) * 3) ** 1.2 },
+  haumea: { name: "the Egg Ridge", world: "Haumea", note: "a long white ridge, after Haumea stretched into an egg by its 4-hour spin", H: 1100, R: 4500, lo: "#c8ccd4", hi: "#ffffff",
+    f: (u, v) => { const r = Math.hypot(u, v * 3.2); return r > 1 ? 0 : Math.sqrt(1 - r * r); } },
+  makemake: { name: "the Methane Crags", world: "Makemake", note: "reddish crags frosted with methane ice", H: 1600, R: 2800, lo: "#8a4a34", hi: "#f8f0ec",
+    f: (u, v) => { const r = Math.hypot(u, v); return r > 1 ? 0 : (1 - r) * (0.4 + 1.2 * Math.abs(fbm2(u * 7, v * 7) - 0.5) * 2); } },
+  arrokoth: { name: "the Snowman Hills", world: "Arrokoth", note: "two flattened lobes touching, like Arrokoth seen by New Horizons", H: 900, R: 3000, lo: "#8a4430", hi: "#c87a5a",
+    f: (u, v) => Math.max(0, 1 - Math.hypot((u + 0.35) * 1.2, v * 1.6)) ** 0.5 * 0.9 + Math.max(0, 1 - Math.hypot((u - 0.45) * 1.6, v * 2)) ** 0.5 * 0.7 },
+  gonggong: { name: "the Red Mesa", world: "Gonggong", note: "flat-topped and deep red, like one of the reddest objects known", H: 1200, R: 3200, lo: "#6a1e16", hi: "#a83a2a",
+    f: (u, v) => { const r = Math.hypot(u, v) + 0.12 * fbm2(u * 4, v * 4); return Math.max(0, Math.min(1, (0.75 - r) * 6)); } },
+  eris: { name: "the Discord Spires", world: "Eris", note: "a cluster of white needles, bright as Eris, one of the most reflective worlds known", H: 2400, R: 2400, lo: "#c8ccd8", hi: "#ffffff",
+    f: (u, v) => { let h = 0; for (let k = 0; k < 9; k++) { const a = k * 2.4, d = k ? 0.25 + (k % 3) * 0.2 : 0, s = 0.12 - 0.006 * k; h = Math.max(h, (1 - k * 0.07) * Math.max(0, 1 - Math.hypot(u - d * Math.cos(a), v - d * Math.sin(a)) / s)); } return h; } },
+  sedna: { name: "the Long Dark Ridge", world: "Sedna", note: "a long, curved dark-red ridge, after Sedna's 11,000-year orbit", H: 1300, R: 5000, lo: "#4a1810", hi: "#8a3424",
+    f: (u, v) => { const r = Math.hypot(u * 0.6, v * 1.2); return Math.exp(-(((r - 0.6) / 0.06) ** 2)) * (u > -0.2 ? 1 : 0.3) * (0.8 + 0.3 * fbm2(u * 4, v * 4)); } } };
+for (const b of [...BODIES, ...SMALL]) { const D = MTN[b.id]; if (!D) continue;
+  // place it 3-5 km beyond the world, on whichever side is clear of roads, railway, towers and towns
+  let C = null; const out = V3(b.w.x - SUN.w.x, 0, b.w.z - SUN.w.z).normalize();
+  for (let k = 0; k < 16 && !C; k++) { const a = Math.atan2(out.z, out.x) + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.4, dd = D.R + 1800 + 600 * (k % 3);
+    const q = V3(b.w.x + Math.cos(a) * dd, 0, b.w.z + Math.sin(a) * dd); let ok = true;
+    for (let j = 0; j < 12 && ok; j++) { const t = j / 12 * Math.PI * 2; if (blocked(q.x + Math.cos(t) * D.R * 0.9, q.z + Math.sin(t) * D.R * 0.9, 20)) ok = false; }
+    if (ok && !blocked(q.x, q.z, 40)) C = q; }
+  if (!C) continue;
+  const N = IS_HEADSET ? 70 : 110, geo = new THREE.PlaneGeometry(2 * D.R, 2 * D.R, N, N).rotateX(-Math.PI / 2), p = geo.attributes.position, col = new Float32Array(p.count * 3), lo = new THREE.Color(D.lo), hi = new THREE.Color(D.hi), c = new THREE.Color();
+  const rot = hfRand(C.x, C.z) * 6.28, cr = Math.cos(rot), sr = Math.sin(rot);   // turn the shape, not the mesh, so the base follows the ground
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i), u = (x * cr - z * sr) / D.R, v = (x * sr + z * cr) / D.R, f = Math.max(0, Math.min(1.2, D.f(u, v))), y = terrainH(C.x + x, C.z + z) + f * D.H - 25 * (1 - Math.min(1, f * 20));
+    p.setY(i, y); const k = D.snowSide ? (u > 0 ? Math.min(1, f * 2) : 0) : Math.pow(Math.min(1, f), 1.5); c.copy(lo).lerp(hi, k);
+    if (D.streaks && f > 0.3 && Math.sin(Math.atan2(v, u) * 24) > 0.6) c.lerp(new THREE.Color(0xffffff), 0.7);
+    c.offsetHSL(0, 0, (fbm2(u * 12, v * 12) - 0.5) * 0.12); col.set([c.r, c.g, c.b], i * 3); }
+  geo.setAttribute("color", new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals();
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true })); m.position.set(C.x, 0, C.z); MTN_AT[b.id] = C; scene.add(m);
+  if (D.plumes) for (let k = 0; k < 3; k++) { const a = k * 2.1, x = C.x + Math.cos(a) * D.R * 0.35, z = C.z + Math.sin(a) * D.R * 0.35, h = terrainH(x, z) + D.H * 0.8;
+    const pl = new THREE.Mesh(new THREE.CylinderGeometry(40, 8, 1600, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0x3a3430, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false })); pl.position.set(x, h + 800, z); scene.add(pl); }
+  const toB = V3(b.w.x - C.x, 0, b.w.z - C.z).normalize(), sp = C.clone().addScaledVector(toB, D.R + 60);
+  if (!blocked(sp.x, sp.z)) postSign([D.name, `inspired by ${D.world}: ${D.note}`, `scenery for scale: ${(D.H / 1000).toFixed(1)} km tall here (the real one would be a speck)`], sp.x, sp.z, b.w.x, b.w.z, 4, 1.5); }
+
 // ---------- the wrist teleporter (VR): a panel on your left wrist; point the right controller at a place and pull the trigger ----------
 const PLACES = [["🚆 board the train", "#b8322a", "train"], ["Earth (the globe)", "#5a9ae8", () => [V3(0, 0, 1.7), GC]], ["the Moon", "#d8d8d8", () => moonSpot()], ["your car", "#ff6a5a", () => [car.position.clone().add(V3(-2.5, 0, 2.5)), car.position]],
   ...BODIES.map(b => [b.name === "the Sun" ? "Sun" : b.name, b.col, () => [b.stop.clone(), b.c]]),
