@@ -155,6 +155,9 @@ const INNER = mkGrid(8000, IS_HEADSET ? 200 : 400), OUTER = mkGrid(RX, IS_HEADSE
 const inInner = (x, z) => Math.abs(x) < INNER.half && Math.abs(z) < INNER.half;
 pullTo(INNER, BODIES.filter(b => Math.abs(b.w.x) < INNER.half - 1500 && Math.abs(b.w.z) < INNER.half - 1500), b => b.id === "sun" ? 120 : 260);
 pullTo(OUTER, BODIES.filter(b => !inInner(b.w.x, b.w.z)), () => Math.max(1600, 2.5 * OUTER.cell));
+{ const J = BODIES.find(b => b.id === "jupiter"), n = OUTER.N + 1;   // a level plain 1.2 km round Jupiter: its whole system lies nearly flat, in its equator
+  for (let iz = 0; iz <= OUTER.N; iz++) for (let ix = 0; ix <= OUTER.N; ix++) { const x = ix * OUTER.cell - OUTER.half, z = iz * OUTER.cell - OUTER.half, d = Math.hypot(x - J.w.x, z - J.w.z);
+    if (d < 2200) { const w = 1 - THREE.MathUtils.smoothstep(d, 1200, 2200); OUTER.H[iz * n + ix] += (J.h - OUTER.H[iz * n + ix]) * w; } } }
 { const n = INNER.N + 1, band = 2.2 * OUTER.cell;            // the fine grid's edge blends into the coarse surface, so the two meet exactly at the seam
   for (let iz = 0; iz <= INNER.N; iz++) for (let ix = 0; ix <= INNER.N; ix++) { const x = ix * INNER.cell - INNER.half, z = iz * INNER.cell - INNER.half, e = INNER.half - Math.max(Math.abs(x), Math.abs(z));
     if (e < band) { const w = THREE.MathUtils.smoothstep(band - e, 0, band); INNER.H[iz * n + ix] += (gridH(OUTER, x, z) + 0.6 - INNER.H[iz * n + ix]) * w; } } }   // 0.6 m proud: no coarse cell can poke through
@@ -297,14 +300,71 @@ const TEX = {
 // the larger moons: name, diameter km, orbit radius km, inclination to the planet's equator (°), colour
 const MOONS = {
   mars: [["Phobos", 22, 9376, 1.1, "#8a7a6a"], ["Deimos", 12, 23463, 1.8, "#9a8a7a"]],
-  jupiter: [["Io", 3643, 421700, 0.04, "#e8d060"], ["Europa", 3122, 671034, 0.47, "#e8dcc8"], ["Ganymede", 5268, 1070412, 0.2, "#9a8e80"], ["Callisto", 4821, 1882709, 0.2, "#5e564e"]],
+  jupiter: [["Metis", 43, 128000, 0.06, "#9a8478"], ["Adrastea", 16, 129000, 0.03, "#8a7468"], ["Amalthea", 167, 181400, 0.37, "#b84a2a"], ["Thebe", 98, 221900, 1.08, "#8a6a5a"],
+    ["Io", 3643, 421700, 0.04, "#e8d060"], ["Europa", 3122, 671034, 0.47, "#e8dcc8"], ["Ganymede", 5268, 1070412, 0.2, "#9a8e80"], ["Callisto", 4821, 1882709, 0.2, "#5e564e"],
+    ["Themisto", 9, 7507000, 43.1, "#9a948e"], ["Leda", 21, 11165000, 27.5, "#9a948e"], ["Himalia", 140, 11461000, 27.5, "#a8a098"], ["Lysithea", 42, 11717000, 28.3, "#9a948e"],
+    ["Elara", 80, 11741000, 26.6, "#9a948e"], ["Dia", 4, 12118000, 28.2, "#8a847e"], ["Carpo", 3, 16989000, 51.4, "#8a847e"], ["Euporie", 2, 19302000, 145.8, "#7a746e"],
+    ["Praxidike", 7, 20907000, 149, "#7a746e"], ["Ananke", 29, 21276000, 148.9, "#8a847e"], ["Taygete", 5, 23360000, 165.2, "#7a746e"], ["Carme", 46, 23404000, 164.9, "#8a7a6e"],
+    ["Megaclite", 5, 23493000, 152.8, "#7a746e"], ["Kalyke", 5, 23583000, 165.2, "#7a746e"], ["Pasiphae", 60, 23624000, 151.4, "#8a847e"], ["Sinope", 35, 23939000, 158.1, "#8a7a6e"],
+    ["Autonoe", 4, 24046000, 152.4, "#7a746e"], ["Callirrhoe", 7, 24103000, 147, "#7a746e"]],
   saturn: [["Mimas", 396, 185539, 1.6, "#c8c8c4"], ["Enceladus", 504, 237948, 0.0, "#f4f6f8"], ["Tethys", 1062, 294619, 1.1, "#dcdcd8"], ["Dione", 1123, 377396, 0.0, "#d0ccc4"],
     ["Rhea", 1527, 527108, 0.3, "#c8c4bc"], ["Titan", 5150, 1221870, 0.3, "#d89a4a"], ["Iapetus", 1469, 3560820, 15.5, "#8a7a62"]],
   uranus: [["Miranda", 472, 129390, 4.3, "#b8b8b4"], ["Ariel", 1158, 191020, 0.3, "#c4c0b8"], ["Umbriel", 1169, 266000, 0.1, "#7a766e"], ["Titania", 1578, 435910, 0.1, "#b0a89c"], ["Oberon", 1523, 583520, 0.1, "#a09486"]],
   neptune: [["Proteus", 420, 117647, 0.5, "#7a7470"], ["Triton", 2707, 354759, 157, "#d8c8c0"]],
   pluto: [["Charon", 1212, 19591, 0.0, "#9a948e"]],
 };
-const MOON_LIST = [];                                    // for the markers
+const MOON_LIST = [];
+// the Jovian system beyond the moons on rods: the rings, the swarm of small outer moons, and the paths of the spacecraft
+function jovian(b, P, u, v) {
+  const KM = 1000 * K, c = b.c;
+  // rings, in the equator: halo 92,000-122,500 km, main 122,500-129,000, gossamer out to 226,000 (Thebe)
+  for (const [r0, r1, op, col] of [[92000, 122500, 0.08, 0xd8c8b8], [122500, 129000, 0.3, 0xe8d8c4], [129000, 181400, 0.05, 0xc8b8a8], [181400, 226000, 0.035, 0xc8b8a8]]) {
+    const g = new THREE.RingGeometry(r0 * KM, r1 * KM, 96, 1), m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false }));
+    m.position.copy(c); m.quaternion.setFromUnitVectors(V3(0, 0, 1), P); scene.add(m); }
+  // ~70 more small irregular moons: specks at their real distances and tilts (positions illustrative)
+  { const pts = []; let tries = 0; while (pts.length < 70 && tries++ < 4000) { const retro = Math.random() < 0.85, a = (retro ? 19e6 + Math.random() * 10e6 : 11e6 + Math.random() * 7e6) * KM;
+      const inc = (retro ? 140 + Math.random() * 26 : 26 + Math.random() * 30) * deg, node = Math.random() * 6.283, th = Math.random() * 6.283;
+      const nu = u.clone().applyAxisAngle(P, node), nv = v.clone().applyAxisAngle(P, node), ax = nv.clone().multiplyScalar(Math.cos(inc)).addScaledVector(P, Math.sin(inc));
+      const q = c.clone().addScaledVector(nu, a * Math.cos(th)).addScaledVector(ax, a * Math.sin(th)); if (q.y > terrainH(q.x, q.z) + 0.5) pts.push(q); }
+    scene.add(new THREE.Points(new THREE.BufferGeometry().setFromPoints(pts), new THREE.PointsMaterial({ color: 0xd8d0c8, size: 3, sizeAttenuation: false }))); }
+  // spacecraft paths. Closest distance and shape (from Jupiter's gravity, μ = 1.267e8 km³/s², and the arrival speed) are real;
+  // the orientation in space is approximate: each arrives roughly from the Sun's side of Jupiter
+  const MU = 1.267e8, toSun = SUN.w.clone().sub(b.w).normalize(), sunA = Math.atan2(toSun.dot(v), toSun.dot(u));
+  const plane = (inc, node) => { const nu = u.clone().applyAxisAngle(P, node), nv = v.clone().applyAxisAngle(P, node); return [nu, nv.multiplyScalar(Math.cos(inc)).addScaledVector(P, Math.sin(inc))]; };
+  function conic(rp, e, inc, omega, th0, th1, col, name, desc, dash) {
+    const p = rp * (1 + e), [A, Bv] = plane(inc, 0), pts = [];
+    for (let k = 0; k <= 400; k++) { const th = th0 + (th1 - th0) * k / 400, r = p / (1 + e * Math.cos(th)); if (r <= 0 || r > 60e6) continue;
+      const a = th + omega; pts.push(c.clone().addScaledVector(A, r * KM * Math.cos(a)).addScaledVector(Bv, r * KM * Math.sin(a))); }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts), line = new THREE.Line(geo, dash ? new THREE.LineDashedMaterial({ color: col, dashSize: 0.6, gapSize: 0.4, transparent: true, opacity: 0.9 }) : new THREE.LineBasicMaterial({ color: col }));
+    if (dash) line.computeLineDistances(); scene.add(line);
+    if (name) { const pe = c.clone().addScaledVector(A, rp * KM * Math.cos(omega)).addScaledVector(Bv, rp * KM * Math.sin(omega));
+      MOON_LIST.push({ name, col: "#" + new THREE.Color(col).getHexString(), pos: () => pe, r: 0.0005, planet: b, orbit: rp * KM * 2.5, desc, probe: true }); }
+    return pts; }
+  const flyby = (rp, vinf, inc, offset, col, name, desc) => { const e = 1 + rp * vinf * vinf / MU, thm = Math.acos(-1 / e) * 0.995, omega = sunA + Math.PI - thm + offset; conic(rp, e, inc, omega, -thm, thm, col, name, desc); };
+  flyby(203000, 9.8, 14 * deg, 0.2, 0x7fd0ff, "Pioneer 10, 1973", "the first spacecraft to fly past Jupiter: 132,000 km above the clouds");
+  flyby(114500, 13, 155 * deg, -0.3, 0x5ab0e8, "Pioneer 11, 1974", "43,000 km above the clouds, then flung on to Saturn");
+  flyby(348890, 10.7, 3 * deg, 0, 0xffd04a, "Voyager 1, 1979", "closest 349,000 km from Jupiter's centre; found Io's volcanoes and the faint ring");
+  flyby(721670, 10.2, 7 * deg, 0.5, 0xff8a3a, "Voyager 2, 1979", "closest 722,000 km; went on to Saturn, Uranus and Neptune");
+  flyby(9.72e6, 11.6, 4 * deg, 0.8, 0xc8a0ff, "Cassini, 2000", "on its way to Saturn: 9.7 million km, but it took 26,000 pictures");
+  flyby(2.3e6, 21, 2 * deg, -0.6, 0x9aff9a, "New Horizons, 2007", "a gravity assist on its way to Pluto: 2.3 million km");
+  // Galileo: arrival on 7 December 1995, braking into orbit at 4 Jupiter radii; its first, 7-month orbit; a few of its 34 orbits
+  const gal = 0xff5a7a, rpG = 286500, eArr = 1 + rpG * 5.6 * 5.6 / MU, omG = sunA + 2.2;
+  conic(rpG, eArr, 2 * deg, omG, -Math.acos(-1 / eArr) * 0.99, 0, gal, "Galileo arrives, 7 Dec 1995", "fired its engine for 49 minutes at 286,500 km and was captured into orbit");
+  const raG = 19.5e6, eG = (raG - rpG) / (raG + rpG); conic(rpG, eG, 2 * deg, omG, 0, Math.PI * 2, gal, null, null, true);
+  for (let k = 1; k <= 6; k++) { const ra = 8e6 + k * 0.9e6, rp = 650000 + k * 40000, e = (ra - rp) / (ra + rp); conic(rp, e, 1 * deg, omG + k * 0.45, 0, Math.PI * 2, 0xc84a62, null, null, true); }
+  { const entry = c.clone().addScaledVector(u, b.r * Math.cos(omG + 0.35)).addScaledVector(v, b.r * Math.sin(omG + 0.35)), far = entry.clone().addScaledVector(toSun.clone().add(V3(0, -0.05, 0)).normalize(), 220);
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([far, entry]), new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.3, gapSize: 0.3 })).computeLineDistances());
+    MOON_LIST.push({ name: "Galileo's probe", col: "#ffffff", pos: () => entry, r: 0.0005, planet: b, orbit: 20, desc: "released 5 months earlier; entered the clouds at 47 km/s", probe: true }); }
+  // Juno: since 2016, a polar orbit, 53 days, skimming 4,200 km over the clouds
+  { const rp = 75700, ra = 8.1e6, e = (ra - rp) / (ra + rp), A = u.clone().applyAxisAngle(P, sunA + 1.2), pts = [], pp = rp * (1 + e);
+    for (let k = 0; k <= 400; k++) { const th = k / 400 * Math.PI * 2, r = pp / (1 + e * Math.cos(th)), a = th - 0.3; pts.push(c.clone().addScaledVector(A, r * KM * Math.cos(a)).addScaledVector(P, r * KM * Math.sin(a))); }
+    const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineDashedMaterial({ color: 0x4af0d0, dashSize: 0.5, gapSize: 0.3 })); l.computeLineDistances(); scene.add(l);
+    const pe = c.clone().addScaledVector(A, rp * KM * Math.cos(-0.3)).addScaledVector(P, rp * KM * Math.sin(-0.3));
+    MOON_LIST.push({ name: "Juno, 2016-", col: "#4af0d0", pos: () => pe, r: 0.0005, planet: b, orbit: 40, desc: "a polar orbit every 53 days, 4,200 km above the clouds", probe: true }); }
+  const fwd3 = V3(b.w.x - b.E.x, 0, b.w.z - b.E.z).normalize(), side3 = V3(-fwd3.z, 0, fwd3.x), sp = b.stop.clone().addScaledVector(side3, 24).addScaledVector(fwd3, -10);
+  postSign(["spacecraft at Jupiter", "Pioneer 10 (1973) and 11 (1974) · Voyager 1 and 2 (1979) · Cassini (2000) · New Horizons (2007): flybys, solid lines",
+    "Galileo (pink): arrived 7 Dec 1995, braked into orbit; its first 7-month orbit and a few of its 34 (dashed); its probe (white) dived into the clouds",
+    "Juno (teal, dashed): a polar orbit since 2016", "closest distances and the shapes of the paths are real; their directions in space are approximate"], sp.x, sp.z, b.w.x, b.w.z, 6, 1.2); }                                    // for the markers
 const sunLight = new THREE.PointLight(0xfff4e0, 3.2, 0, 0);
 for (const b of BODIES) {
   const B = V3(b.w.x, 0, b.w.z), gh = terrainH(B.x, B.z);
@@ -355,7 +415,13 @@ for (const b of BODIES) {
       scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(orbit), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 })));
       names.push(`${mn}: ${md.toLocaleString()} km → ${fmtM(2 * mr)}, orbit ${fmtKm(ma)} → ${fmtM(a)}`); }
     const fwd2 = V3(b.w.x - b.E.x, 0, b.w.z - b.E.z).normalize(), side2 = V3(-fwd2.z, 0, fwd2.x), mp = b.stop.clone().addScaledVector(side2, -12).addScaledVector(fwd2, -6);
-    postSign([`the moons of ${b.name}`, ...names, "faint white lines: their orbits, tilted with the planet's equator", "each moon is shown at one point on its orbit, not today's exact spot"],
+    if (b.id === "jupiter") { postSign(["the moons of Jupiter: 95 known (2023)", "inner moons, inside Io: Metis and Adrastea (1 mm, at the ring's edge), Amalthea (167 km → 4 mm, 4.3 m out), Thebe",
+        "the four Galilean moons, found by Galileo in 1610: Io 10 m out, Europa 16 m, Ganymede 26 m, Callisto 45 m", "outer prograde moons: Themisto (180 m out), the Himalia group (Himalia 140 km → 3.3 mm, 274 m out), Carpo",
+        "~60 retrograde moons, orbiting backwards on tilted paths 500-700 m out (Ananke, Carme, Pasiphae, Sinope...): captured asteroids",
+        "most are 1-5 km across (a few hundredths of a mm here): the haze of specks 350-700 m out", "Jupiter's faint rings: the main ring (3 m out), the halo, and the gossamer rings out to Thebe",
+        "each moon is shown at one point on its real orbit, not today's exact spot; orbital elements approximate"], mp.x, mp.z, b.w.x, b.w.z, 7, 1.2);
+      jovian(b, P, u, v); }
+    else postSign([`the moons of ${b.name}`, ...names, "faint white lines: their orbits, tilted with the planet's equator", "each moon is shown at one point on its orbit, not today's exact spot"],
       mp.x, mp.z, b.w.x, b.w.z, Math.max(3, Math.min(6, names.length * 0.9)), 1.2); }
   // (no sky beacons: the markers show where every body is)
   const lt = b.distKm / 299792.458, grade = b.h / Math.hypot(b.w.x - b.E.x, b.w.z - b.E.z) * 100;
@@ -537,7 +603,7 @@ function updateMarkers(vr) {
   for (const t of TARGETS) {
     const wp = t.pos(), d = Math.max(0.01, camP.distanceTo(wp)), ang = Math.atan(t.r / d);   // apparent radius, radians
     const rPx = Math.tan(ang) * fovK * innerHeight / 2, fade = THREE.MathUtils.clamp((0.05 - ang) / 0.025, 0, 1);   // gone once the object is ~5° across
-    const nearPlanet = !t.planet || camP.distanceTo(t.planet.c) < Math.max(60, 3 * t.orbit);
+    const nearPlanet = !t.planet || d < Math.max(30, 0.7 * t.orbit) || (t.probe && camP.distanceTo(t.planet.c) < 25);
     const show = markersOn && fade > 0.01 && nearPlanet && !(t.car && inCar);
     const txt = `${t.name}|${fmtM(d)}`;
     if (vr) { t.el.style.display = "none"; t.spr.visible = show;
