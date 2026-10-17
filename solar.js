@@ -559,15 +559,15 @@ if (EXO) { for (const b of BODIES) if (!TEX[b.id] && b.type) TEX[b.id] = () => t
 const GLOWT = () => canvasTex(128, 128, (g, w) => { const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.3, "rgba(255,255,255,.45)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(0, 0, w, w); });
 let PULSAR = null;
 function decorateCompact(b, body) {   // a black hole: black sphere, a thin photon ring and a glowing disc; a pulsar: a bright speck and two sweeping beams
-  if (EXO.kind === "bh") { body.material = new THREE.MeshBasicMaterial({ color: 0x000000 }); const R = Math.max(b.r, 0.02);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(R * 1.5, R * 0.04 + 0.002, 8, 96), new THREE.MeshBasicMaterial({ color: 0xffd8a0, toneMapped: false })); ring.position.copy(b.c); ring.lookAt(V3(0, b.c.y, 0)); scene.add(ring);
+  if (EXO.kind === "bh") { body.material = new THREE.MeshBasicMaterial({ color: 0x000000 }); const R = b.r, tiny = b.r < 0.005, close = EXO.stars2 && EXO.stars2[0][3] < 1;   // true size: Cygnus X-1's horizon is 3 mm here, so it gets no ring or disc, only a dot
+    if (!tiny) { const ring = new THREE.Mesh(new THREE.TorusGeometry(b.r * 1.5, b.r * 0.06, 8, 96), new THREE.MeshBasicMaterial({ color: 0xffd8a0, toneMapped: false })); ring.position.copy(b.c); ring.lookAt(V3(0, b.c.y, 0)); scene.add(ring);
     const dt = canvasTex(512, 8, (g, w) => { const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, "rgba(255,250,230,1)"); gr.addColorStop(0.3, "rgba(255,170,80,.85)"); gr.addColorStop(1, "rgba(160,40,10,0)"); g.fillStyle = gr; g.fillRect(0, 0, w, 8); });
-    const close = EXO.stars2 && EXO.stars2[0][3] < 1, r0 = R * 3, r1 = close ? 0.03 * AU : R * 12, dg = new THREE.RingGeometry(r0, r1, 128, 1), pp = dg.attributes.position, uv = dg.attributes.uv;
+    const r0 = R * 3, r1 = close ? 0.03 * AU : R * 12, dg = new THREE.RingGeometry(r0, r1, 128, 1), pp = dg.attributes.position, uv = dg.attributes.uv;
     for (let i = 0; i < pp.count; i++) uv.setXY(i, (Math.hypot(pp.getX(i), pp.getY(i)) - r0) / (r1 - r0), 0.5);
-    const disc = new THREE.Mesh(dg.rotateX(-Math.PI / 2 + 0.15), new THREE.MeshBasicMaterial({ map: dt, transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false })); disc.position.copy(b.c); scene.add(disc);
-    if (close) { const st = new THREE.Mesh(new THREE.CylinderGeometry(R * 2 + 0.5, 6, 1, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0xffa860, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide }));
+    const disc = new THREE.Mesh(dg.rotateX(-Math.PI / 2 + 0.15), new THREE.MeshBasicMaterial({ map: dt, transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false })); disc.position.copy(b.c); scene.add(disc); }
+    if (close) { const st = new THREE.Mesh(new THREE.CylinderGeometry(R * 3, 6, 1, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0xffa860, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide }));
       scene.add(st); PULSAR = { stream: st, bh: b }; } }   // the stream of gas from the companion, placed once the companion is built
-  else { body.material = new THREE.MeshBasicMaterial({ color: 0xffffff }); const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: GLOWT(), color: 0xbfe0ff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); gl.scale.setScalar(2.5); gl.position.copy(b.c); scene.add(gl);
+  else { body.material = new THREE.MeshBasicMaterial({ color: 0xffffff }); if (b.r < 0.005) return;
     const beams = new THREE.Group(); beams.position.copy(b.c); beams.rotation.z = 0.5; scene.add(beams);
     for (const sd of [1, -1]) { const c = new THREE.Mesh(new THREE.ConeGeometry(25, 600, 24, 1, true).translate(0, -300, 0), new THREE.MeshBasicMaterial({ color: 0x9ad0ff, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
       c.rotation.x = sd > 0 ? Math.PI : 0; c.rotation.z = 0.6; beams.add(c); } PULSAR = { beams }; } }
@@ -578,7 +578,7 @@ for (const b of BODIES) {
   for (let i = 0; i < pp.count; i++) pp.setY(i, terrainH(B.x + pp.getX(i), B.z + pp.getZ(i)) + 0.08);
   padG.computeVertexNormals(); const pad = new THREE.Mesh(padG, M(0xb8b0a0, { roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
   pad.position.set(B.x, 0, B.z); scene.add(pad);
-  if (b.r < 0.5) { const ring = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.06, 8, 48).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: b.beacon, toneMapped: false }));
+  if (b.r < 0.5 && !(b.id === "sun" && EXO && EXO.kind)) { const ring = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.06, 8, 48).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: b.beacon, toneMapped: false }));
     ring.position.set(B.x, gh + 0.15, B.z); scene.add(ring); }   // small planets are marbles: a bright ring round the foot of the column
   let cy;
   if (b.id === "sun") cy = gh + b.r + 0.6;                       // raised out of the ground (its centre is really at globe height)
@@ -592,12 +592,14 @@ for (const b of BODIES) {
   if (b.type === "star") { body.material = new THREE.MeshBasicMaterial({ color: b.col, toneMapped: false }); const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: GLOWT(), color: b.col, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
     gl.scale.setScalar(b.r * 4 + 2); gl.position.copy(b.c); scene.add(gl); const L = new THREE.PointLight(b.col, 1.5, 0, 0); L.position.copy(b.c); scene.add(L); }
   if (b.id === "sun" && EXO && EXO.kind) decorateCompact(b, body);
+  if (b.r < 0.005) { const dot = new THREE.Points(new THREE.BufferGeometry().setFromPoints([V3(0, 0, 0)]), new THREE.PointsMaterial({ color: EXO && EXO.kind === "bh" ? 0x000000 : 0xffffff, size: 5, sizeAttenuation: false, depthWrite: false }));
+    dot.position.copy(b.c); scene.add(dot); }   // a marker dot, the same few pixels at any distance: the object itself is far smaller
   if (b.id === "s_0" && PULSAR && PULSAR.stream) { const st = PULSAR.stream, a = b.c, c2 = PULSAR.bh.c, d = c2.clone().sub(a); st.position.copy(a).addScaledVector(d, 0.5); st.scale.y = d.length(); st.quaternion.setFromUnitVectors(V3(0, 1, 0), d.normalize()); }
   if (b.id === "sun") { sunLight.position.copy(b.c); scene.add(sunLight); if (EXO) { if (!EXO.kind) body.material.color.set(b.col); sunLight.color.set(EXO.kind === "bh" ? "#ffb070" : b.col); if (EXO.kind) sunLight.intensity = EXO.kind === "bh" ? 0.8 : 1.5; }
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTex(256, 256, (g, w) => { const gr = g.createRadialGradient(w / 2, w / 2, w * 0.2, w / 2, w / 2, w / 2);
       gr.addColorStop(0, "rgba(255,230,160,.7)"); gr.addColorStop(1, "rgba(255,200,120,0)"); g.fillStyle = gr; g.fillRect(0, 0, w, w); }), transparent: true, depthWrite: false, toneMapped: false }));
     glow.scale.setScalar(b.r * 4.5); glow.position.copy(b.c); glow.visible = !(EXO && EXO.kind === "bh"); scene.add(glow);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(b.r * 0.75, 0.6, 12, 64).rotateX(Math.PI / 2), M(0x5a5a5a, { metalness: 0.6 })); ring.position.set(B.x, gh + 0.6, B.z); scene.add(ring); }
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(b.r * 0.75, Math.min(0.6, b.r * 0.04), 12, 64).rotateX(Math.PI / 2), M(0x5a5a5a, { metalness: 0.6 })); ring.position.set(B.x, gh + 0.6, B.z); scene.add(ring); }
   else if (b.r < Y0 - 0.15) { const col = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, Math.max(0.05, cy - b.r - gh), 12), M(0x2c3e50, { metalness: 0.4 })); col.position.set(B.x, (gh + cy - b.r) / 2, B.z); scene.add(col); }
   else { const stand = new THREE.Mesh(new THREE.CylinderGeometry(b.r * 0.3, b.r * 0.45, Math.max(0.1, cy - b.r * 0.85 - gh), 24), M(0x2c3e50, { metalness: 0.4 })); stand.position.set(B.x, (gh + cy - b.r * 0.85) / 2, B.z); scene.add(stand); }
   if (b.id === "saturn" || b.id === "uranus") {                  // rings, in the planet's equator
