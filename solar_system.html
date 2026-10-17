@@ -54525,8 +54525,9 @@ function drawHeliPanel(v) { const g = hpC.getContext("2d"); g.fillStyle = "#0d1a
   if (heliState === "spinup") t("🚁 starting the rotor…", 56, 40, "#ffe9a8", 700);
   else if (heliState !== "flying") { t("🚁 landed on the helipad", 56, 40, "#ffe9a8", 700); t("press go to fly the tour again, or get out (E / X)", 110, 30); }
   else { const i = hIdx(heliS), j = HP.stops.findIndex(s => HP.cum[s.K] > heliS - 30), s = HP.stops[j];
-    if (s) { const fx = HP.X[Math.min(HP.n - 1, i + 4)] - HP.X[Math.max(0, i - 4)], fz = HP.Z[Math.min(HP.n - 1, i + 4)] - HP.Z[Math.max(0, i - 4)], side = (s.q.x - HP.X[i]) * -fz + (s.q.z - HP.Z[i]) * fx;
-      const left = HP.cum[s.K] - heliS; t(`→ ${s.name}${left < 300 ? (side > 0 ? "  · on your right" : "  · on your left") : ""}`, 56, 40, "#ffe9a8", 700); t(`stop ${j + 1} of ${HP.stops.length}  ·  ${fmtM(Math.max(0, left))} to go`, 104, 28); }
+    if (s) { const hy = heli.rotation.y, dx = s.q.x - heli.position.x, dz = s.q.z - heli.position.z, ahead = -dx * Math.sin(hy) - dz * Math.cos(hy), right = dx * Math.cos(hy) - dz * Math.sin(hy);
+      const ang = Math.atan2(right, ahead), where = Math.abs(ang) < 0.6 ? "ahead" : Math.abs(ang) > 2.5 ? "behind you" : ang > 0 ? "on your right" : "on your left";
+      const left = HP.cum[s.K] - heliS; t(`→ ${s.name}  · ${where}`, 56, 40, "#ffe9a8", 700); t(`stop ${j + 1} of ${HP.stops.length}  ·  ${fmtM(Math.max(0, left))} to go`, 104, 28); }
     else t("→ home to the helipad", 56, 40, "#ffe9a8", 700);
     t(`${heliPaused ? "hovering" : `${Math.round(v * 3.6).toLocaleString()} km/h here`}  ·  speed ×${HMULS[heliMulI]}  ·  tour time left ${fmtT((HP.T[HP.n - 1] - HP.T[i]) / HMULS[heliMulI])}`, 152, 28);
     t(`at real size: ${(v / K / 299792458).toFixed(v / K / 299792458 < 10 ? 1 : 0)} × the speed of light`, 194, 26, "#a9c6d4");
@@ -54540,9 +54541,7 @@ function stepHeli(dt, vr) {
   if (heliState === "spinup") { heliTimer += dt; if (heliTimer > 3.5) heliState = "flying"; }
   else if (heliState === "flying" && HP) { const i = hIdx(heliS); v = heliPaused ? 0 : HP.V[i] * HMULS[heliMulI]; heliS += v * dt; if (heliS >= HP.L) { heliS = HP.L; heliState = "landed"; } }
   if (HP && (heliState === "flying" || heliState === "landed" && heliS > 0)) { const i = hIdx(heliS), j = Math.min(HP.n - 1, i + 1), f = THREE.MathUtils.clamp((heliS - HP.cum[i]) / Math.max(1e-6, HP.cum[j] - HP.cum[i]), 0, 1);
-    heli.position.set(HP.X[i] + (HP.X[j] - HP.X[i]) * f, HP.Y[i] + (HP.Y[j] - HP.Y[i]) * f, HP.Z[i] + (HP.Z[j] - HP.Z[i]) * f);
-    const a = Math.max(0, i - 6), b = Math.min(HP.n - 1, i + 6), tx = HP.X[b] - HP.X[a], tz = HP.Z[b] - HP.Z[a];
-    if (Math.hypot(tx, tz) > 3) { let d = Math.atan2(-tx, -tz) - heli.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); heli.rotation.y += d * Math.min(1, dt * 1.5); } }
+    heli.position.set(HP.X[i] + (HP.X[j] - HP.X[i]) * f, HP.Y[i] + (HP.Y[j] - HP.Y[i]) * f, HP.Z[i] + (HP.Z[j] - HP.Z[i]) * f); }   // the cabin never turns in flight (turning you is what makes VR queasy): look or snap-turn to see where it's going
   if (inHeli) { const seat = V3(-0.45, 0.85, 0.05).applyAxisAngle(V3(0, 1, 0), heli.rotation.y).add(heli.position); rig.position.copy(seat);
     if (vr) rig.rotation.set(0, heli.rotation.y + vrTurn, 0); else { rig.rotation.set(0, heli.rotation.y, 0); camera.position.y = 0.6; camera.rotation.set(pitch, yaw, 0, "YXZ"); }
     for (const b of HBTNS) if (b.flash > 0) b.flash -= dt; heliPanelT -= dt; if (heliPanelT <= 0) { drawHeliPanel(v); heliPanelT = 0.2; } }
