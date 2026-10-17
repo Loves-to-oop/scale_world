@@ -53178,6 +53178,25 @@ for (const b of BODIES) {
   b.h = b.w.y; b.r = b.dkm * 1000 * K / 2; b.lat = Math.asin(rel.z / rel.length()) / deg;
 }
 const SUN = BODIES[0];
+// dwarf planets, asteroids, a comet: a, e, i, node, arg. of perihelion (°), mean anomaly M0 at epoch JD (approximate elements)
+function helioEl(a, e, i, Om, w, M0, ep) { const n = 0.9856076686 / Math.pow(a, 1.5); let Mn = (((M0 + n * (JD - ep)) % 360) + 360) % 360; if (Mn > 180) Mn -= 360; Mn *= deg;
+  let E = e < 0.8 ? Mn : Math.PI * Math.sign(Mn || 1); for (let k = 0; k < 50; k++) E -= (E - e * Math.sin(E) - Mn) / (1 - e * Math.cos(E));
+  const xp = a * (Math.cos(E) - e), yp = a * Math.sqrt(1 - e * e) * Math.sin(E), W = w * deg, O = Om * deg, I = i * deg, cw = Math.cos(W), sw = Math.sin(W), cO = Math.cos(O), sO = Math.sin(O), cI = Math.cos(I), sI = Math.sin(I);
+  return V3((cw * cO - sw * sO * cI) * xp + (-sw * cO - cw * sO * cI) * yp, (cw * sO + sw * cO * cI) * xp + (-sw * sO + cw * cO * cI) * yp, sw * sI * xp + cw * sI * yp); }
+const SMALL = [
+  { id: "ceres", name: "Ceres", dkm: 940, col: "#9a948c", el: [2.7675, 0.0758, 10.59, 80.3, 73.6, 60.08, 2460200.5], kind: "the largest asteroid, a dwarf planet: a third of the asteroid belt's mass", more: "it has bright salt deposits in Occator crater; NASA's Dawn orbited it 2015-2018" },
+  { id: "vesta", name: "Vesta", dkm: 525, col: "#b0a898", el: [2.3615, 0.0886, 7.14, 103.8, 151.2, 169.4, 2460200.5], kind: "the brightest asteroid, sometimes visible to the naked eye", more: "a giant impact crater at its south pole, Rheasilvia, is 505 km across; Dawn orbited it in 2011-12" },
+  { id: "halley", name: "Halley's Comet", dkm: 11, col: "#d8e8f0", el: [17.83, 0.967, 162.26, 59.4, 112.0, 0, 2446470.5], kind: "a 15 × 8 km nucleus of ice and dust; back every 75-76 years (last 1986, next 2061)", more: "its orbit goes backwards round the Sun; at this scale it's a speck 0.3 mm across", comet: true },
+  { id: "quaoar", name: "Quaoar", dkm: 1110, col: "#a07858", el: [43.69, 0.039, 7.99, 188.9, 155.3, 299, 2460200.5], kind: "a Kuiper belt dwarf planet with a ring far outside where rings should be able to exist", more: "" },
+  { id: "orcus", name: "Orcus", dkm: 910, col: "#a8a4a0", el: [39.3, 0.226, 20.6, 268.4, 73.0, 181, 2460200.5], kind: "a Kuiper belt object locked in a 2:3 dance with Neptune, like Pluto: the 'anti-Pluto'", more: "it has a moon, Vanth" },
+  { id: "haumea", name: "Haumea", dkm: 1600, col: "#e8e4e0", el: [43.12, 0.196, 28.21, 121.8, 240.9, 218.2, 2460200.5], kind: "a dwarf planet spinning every 4 hours, stretched into an egg 2,100 km long", more: "it has a ring and two moons" },
+  { id: "makemake", name: "Makemake", dkm: 1430, col: "#c88a6a", el: [45.43, 0.161, 28.98, 79.62, 294.84, 165.5, 2460200.5], kind: "a reddish dwarf planet coated in frozen methane", more: "" },
+  { id: "arrokoth", name: "Arrokoth", dkm: 36, col: "#b86a4a", el: [44.4, 0.04, 2.45, 159, 174, 316, 2460200.5], kind: "two lumps stuck gently together: visited by New Horizons on 1 January 2019", more: "the most distant object ever explored up close" },
+  { id: "gonggong", name: "Gonggong", dkm: 1230, col: "#b0584a", el: [67.4, 0.50, 30.9, 336.8, 207.6, 107, 2460200.5], kind: "one of the reddest objects in the solar system", more: "" },
+  { id: "eris", name: "Eris", dkm: 2326, col: "#e8e8ec", el: [67.86, 0.437, 44.04, 35.95, 151.64, 205.99, 2460200.5], kind: "almost Pluto's size and more massive: its discovery in 2005 led to Pluto's reclassification", more: "" },
+  { id: "sedna", name: "Sedna", dkm: 995, col: "#c0503a", el: [506, 0.85, 11.93, 144.4, 311.3, 358.2, 2460200.5], kind: "it takes ~11,000 years to orbit, swinging out to ~900 AU (3,200 km here)", more: "it is near its closest to the Sun now" }];
+for (const b of SMALL) { const H = helioEl(...b.el), rel = H.clone().sub(EARTH); b.helio = H; b.au = H.length(); b.distKm = rel.length() * 149597870.7; b.w = eclToWorld(rel).multiplyScalar(AU);
+  b.lat = Math.asin(H.z / H.length()) / deg; b.r = Math.max(b.dkm * 1000 * K / 2, 0.00015); }
 // the Moon, low-precision geocentric position
 { const L = 218.316 + 13.176396 * D, Mm = (134.963 + 13.064993 * D) * deg, F = (93.272 + 13.229350 * D) * deg;
   var MOON = { lon: (L + 6.289 * Math.sin(Mm)) * deg, lat: 5.128 * Math.sin(F) * deg, km: 385001 - 20905 * Math.cos(Mm) };
@@ -53262,7 +53281,9 @@ pullTo(OUTER, BODIES.filter(b => !inInner(b.w.x, b.w.z)), () => Math.max(1600, 2
   for (let iz = 0; iz <= INNER.N; iz++) for (let ix = 0; ix <= INNER.N; ix++) { const x = ix * INNER.cell - INNER.half, z = iz * INNER.cell - INNER.half, e = INNER.half - Math.max(Math.abs(x), Math.abs(z));
     if (e < band) { const w = THREE.MathUtils.smoothstep(band - e, 0, band); INNER.H[iz * n + ix] += (gridH(OUTER, x, z) + 0.6 - INNER.H[iz * n + ix]) * w; } } }   // 0.6 m proud: no coarse cell can poke through
 let OUTER_DRAWN = OUTER;                                // the coarse grid as actually drawn (set once its mesh is built)
-function terrainH(x, z) { return gridH(inInner(x, z) ? INNER : OUTER_DRAWN, x, z); }
+const RF = Math.max(RX, ...SMALL.map(b => Math.max(Math.abs(b.w.x), Math.abs(b.w.z)))) + 40000;   // a far plain out to the farthest Kuiper belt objects
+function farH(x, z) { const ax = Math.max(Math.abs(x), Math.abs(z)); return gridH(OUTER_DRAWN, THREE.MathUtils.clamp(x, -RX, RX), THREE.MathUtils.clamp(z, -RX, RX)) * (1 - THREE.MathUtils.smoothstep(ax - RX, 0, 30000)); }
+function terrainH(x, z) { if (inInner(x, z)) return gridH(INNER, x, z); if (Math.max(Math.abs(x), Math.abs(z)) <= RX) return gridH(OUTER_DRAWN, x, z); return farH(x, z); }
 { const gc = document.createElement("canvas"); gc.width = gc.height = 256; const g = gc.getContext("2d"); g.fillStyle = "#c8c8c8"; g.fillRect(0, 0, 256, 256);
   for (let k = 0; k < 5000; k++) { const v = 150 + rnd() * 105 | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(rnd() * 256, rnd() * 256, 1.5, 3); }
   OUTER.Hr = new Float32Array(OUTER.H.length);
@@ -53281,7 +53302,14 @@ function terrainH(x, z) { return gridH(inInner(x, z) ? INNER : OUTER_DRAWN, x, z
     geo.setAttribute("color", new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals();
     const gt = new THREE.CanvasTexture(gc); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(2 * G.half / 6, 2 * G.half / 6); gt.anisotropy = 8;
     scene.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, map: gt, roughness: 0.95 }))); };
-  mesh(OUTER, true); mesh(INNER, false); OUTER_DRAWN = { ...OUTER, H: OUTER.Hr }; }
+  mesh(OUTER, true); mesh(INNER, false); OUTER_DRAWN = { ...OUTER, H: OUTER.Hr };
+  { const N = IS_HEADSET ? 120 : 220, cell = 2 * RF / N, geo = new THREE.PlaneGeometry(2 * RF, 2 * RF, N, N).rotateX(-Math.PI / 2), p = geo.attributes.position, col = new Float32Array(p.count * 3), c = new THREE.Color();
+    for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i), ax = Math.max(Math.abs(x), Math.abs(z));
+      p.setY(i, ax >= RX ? farH(x, z) : ax < RX - cell * 1.01 ? -3000 : Math.min(farH(x, z), gridH(OUTER_DRAWN, x, z)) - 5);   // under the grid, out of sight
+      const n = 0.5 + 0.25 * Math.sin(x * 0.00031 + Math.sin(z * 0.00017) * 3) + 0.25 * Math.sin(z * 0.00043 + x * 0.0001); c.setHSL(0.25 + 0.04 * n, 0.42, 0.33 + 0.08 * n); col.set([c.r, c.g, c.b], i * 3); }
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals();
+    const gt = new THREE.CanvasTexture(gc); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(2 * RF / 6, 2 * RF / 6);
+    scene.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, map: gt, roughness: 0.95 }))); } }
 
 // a paved ribbon along xz points, laid on the ground
 function densify(pts, step = 8) { const out = [pts[0]];
@@ -53407,11 +53435,20 @@ const MOONS = {
     ["Praxidike", 7, 20907000, 149, "#7a746e"], ["Ananke", 29, 21276000, 148.9, "#8a847e"], ["Taygete", 5, 23360000, 165.2, "#7a746e"], ["Carme", 46, 23404000, 164.9, "#8a7a6e"],
     ["Megaclite", 5, 23493000, 152.8, "#7a746e"], ["Kalyke", 5, 23583000, 165.2, "#7a746e"], ["Pasiphae", 60, 23624000, 151.4, "#8a847e"], ["Sinope", 35, 23939000, 158.1, "#8a7a6e"],
     ["Autonoe", 4, 24046000, 152.4, "#7a746e"], ["Callirrhoe", 7, 24103000, 147, "#7a746e"]],
-  saturn: [["Mimas", 396, 185539, 1.6, "#c8c8c4"], ["Enceladus", 504, 237948, 0.0, "#f4f6f8"], ["Tethys", 1062, 294619, 1.1, "#dcdcd8"], ["Dione", 1123, 377396, 0.0, "#d0ccc4"],
-    ["Rhea", 1527, 527108, 0.3, "#c8c4bc"], ["Titan", 5150, 1221870, 0.3, "#d89a4a"], ["Iapetus", 1469, 3560820, 15.5, "#8a7a62"]],
-  uranus: [["Miranda", 472, 129390, 4.3, "#b8b8b4"], ["Ariel", 1158, 191020, 0.3, "#c4c0b8"], ["Umbriel", 1169, 266000, 0.1, "#7a766e"], ["Titania", 1578, 435910, 0.1, "#b0a89c"], ["Oberon", 1523, 583520, 0.1, "#a09486"]],
-  neptune: [["Proteus", 420, 117647, 0.5, "#7a7470"], ["Triton", 2707, 354759, 157, "#d8c8c0"]],
-  pluto: [["Charon", 1212, 19591, 0.0, "#9a948e"]],
+  saturn: [["Pan", 28, 133584, 0, "#c8c0b0"], ["Daphnis", 8, 136505, 0, "#c8c0b0"], ["Atlas", 30, 137670, 0, "#c8c0b0"], ["Prometheus", 86, 139380, 0, "#c8c0b0"], ["Pandora", 81, 141720, 0.05, "#c8c0b0"],
+    ["Epimetheus", 116, 151422, 0.35, "#b8b0a8"], ["Janus", 179, 151472, 0.16, "#b8b0a8"],
+    ["Mimas", 396, 185539, 1.6, "#c8c8c4"], ["Enceladus", 504, 237948, 0.0, "#f4f6f8"], ["Tethys", 1062, 294619, 1.1, "#dcdcd8"], ["Dione", 1123, 377396, 0.0, "#d0ccc4"],
+    ["Rhea", 1527, 527108, 0.3, "#c8c4bc"], ["Titan", 5150, 1221870, 0.3, "#d89a4a"], ["Hyperion", 270, 1481009, 0.43, "#b89a7a"], ["Iapetus", 1469, 3560820, 15.5, "#8a7a62"], ["Phoebe", 213, 12947913, 175.3, "#5a5450"]],
+  uranus: [["Cordelia", 40, 49770, 0.08, "#8a8682"], ["Ophelia", 43, 53790, 0.1, "#8a8682"], ["Bianca", 51, 59170, 0.19, "#8a8682"], ["Cressida", 80, 61780, 0.01, "#8a8682"], ["Desdemona", 64, 62680, 0.11, "#8a8682"],
+    ["Juliet", 94, 64350, 0.07, "#8a8682"], ["Portia", 135, 66090, 0.06, "#8a8682"], ["Rosalind", 72, 69940, 0.28, "#8a8682"], ["Cupid", 18, 74800, 0.1, "#8a8682"], ["Belinda", 90, 75260, 0.03, "#8a8682"],
+    ["Perdita", 30, 76420, 0, "#8a8682"], ["Puck", 162, 86010, 0.32, "#8a8682"], ["Mab", 25, 97736, 0.13, "#8a8682"],
+    ["Miranda", 472, 129390, 4.3, "#b8b8b4"], ["Ariel", 1158, 191020, 0.3, "#c4c0b8"], ["Umbriel", 1169, 266000, 0.1, "#7a766e"], ["Titania", 1578, 435910, 0.1, "#b0a89c"], ["Oberon", 1523, 583520, 0.1, "#a09486"],
+    ["Francisco", 22, 4276000, 147, "#7a746e"], ["Caliban", 72, 7231000, 141, "#9a6a5a"], ["Stephano", 32, 8004000, 144, "#7a746e"], ["Trinculo", 18, 8504000, 167, "#7a746e"], ["Sycorax", 165, 12179000, 159, "#a06a5a"],
+    ["Margaret", 20, 14345000, 57, "#7a746e"], ["Prospero", 50, 16256000, 152, "#7a746e"], ["Setebos", 48, 17418000, 158, "#7a746e"], ["Ferdinand", 20, 20901000, 169, "#7a746e"]],
+  neptune: [["Naiad", 66, 48227, 4.7, "#7a7470"], ["Thalassa", 82, 50074, 0.2, "#7a7470"], ["Despina", 156, 52526, 0.1, "#7a7470"], ["Galatea", 174, 61953, 0.06, "#7a7470"], ["Larissa", 194, 73548, 0.2, "#7a7470"],
+    ["Hippocamp", 34, 105283, 0, "#7a7470"], ["Proteus", 420, 117647, 0.5, "#7a7470"], ["Triton", 2707, 354759, 157, "#d8c8c0"], ["Nereid", 357, 5513818, 7.2, "#8a8682"],
+    ["Halimede", 62, 16611000, 134, "#7a746e"], ["Sao", 44, 22228000, 48, "#7a746e"], ["Laomedeia", 42, 23567000, 35, "#7a746e"], ["Psamathe", 40, 46695000, 137, "#7a746e"], ["Neso", 60, 48387000, 132, "#7a746e"]],
+  pluto: [["Charon", 1212, 19591, 0.0, "#9a948e"], ["Styx", 16, 42656, 0, "#8a8682"], ["Nix", 50, 48694, 0, "#c8c4c0"], ["Kerberos", 19, 57783, 0, "#7a746e"], ["Hydra", 51, 64738, 0, "#c8c4c0"]],
 };
 const MOON_LIST = [];
 // the Jovian system beyond the moons on rods: the rings, the swarm of small outer moons, and the paths of the spacecraft
@@ -53521,8 +53558,16 @@ for (const b of BODIES) {
         "most are 1-5 km across (a few hundredths of a mm here): the haze of specks 350-700 m out", "Jupiter's faint rings: the main ring (3 m out), the halo, and the gossamer rings out to Thebe",
         "each moon is shown at one point on its real orbit, not today's exact spot; orbital elements approximate"], mp.x, mp.z, b.w.x, b.w.z, 7, 1.2);
       jovian(b, P, u, v); }
-    else postSign([`the moons of ${b.name}`, ...names, "faint white lines: their orbits, tilted with the planet's equator", "each moon is shown at one point on its orbit, not today's exact spot"],
-      mp.x, mp.z, b.w.x, b.w.z, Math.max(3, Math.min(6, names.length * 0.9)), 1.2); }
+    else { const KNOWN = { mars: 2, saturn: 146, uranus: 28, neptune: 16, pluto: 5 }[b.id];
+      if (b.id === "saturn") { const KM = 1000 * K, pts = []; let tries = 0;   // ~120 small irregular moons 11-26 million km out (Norse, Inuit and Gallic groups)
+        while (pts.length < 120 && tries++ < 6000) { const g = Math.random(), a = (g < 0.75 ? 12e6 + Math.random() * 14e6 : 11e6 + Math.random() * 7e6) * KM, inc = (g < 0.75 ? 145 + Math.random() * 35 : g < 0.9 ? 44 + Math.random() * 8 : 34 + Math.random() * 6) * deg;
+          const node = Math.random() * 6.283, th = Math.random() * 6.283, nu = u.clone().applyAxisAngle(P, node), nv = v.clone().applyAxisAngle(P, node), ax = nv.clone().multiplyScalar(Math.cos(inc)).addScaledVector(P, Math.sin(inc));
+          const q = b.c.clone().addScaledVector(nu, a * Math.cos(th)).addScaledVector(ax, a * Math.sin(th)); if (q.y > terrainH(q.x, q.z) + 0.5) pts.push(q); }
+        scene.add(new THREE.Points(new THREE.BufferGeometry().setFromPoints(pts), new THREE.PointsMaterial({ color: 0xd8d0c8, size: 3, sizeAttenuation: false }))); }
+      const shown = names.slice(0, 10);
+      postSign([`the moons of ${b.name}: ${KNOWN} known`, ...shown, ...(names.length > 10 ? [`... and ${names.length - 10} more on rods round it${b.id === "saturn" ? ", plus ~120 small irregular moons as specks 270-620 m out" : ""}`] : []),
+        "faint white lines: their orbits, tilted with the planet's equator", "each moon is shown at one point on its real orbit, not today's exact spot"],
+        mp.x, mp.z, b.w.x, b.w.z, Math.max(3, Math.min(7, shown.length * 0.9)), 1.2); } }
   // (no sky beacons: the markers show where every body is)
   const lt = b.distKm / 299792.458, grade = b.h / Math.hypot(b.w.x - b.E.x, b.w.z - b.E.z) * 100;
   const facts = {
@@ -53673,7 +53718,7 @@ STATIONS.forEach(st => { const r = railAt(st.s), t = V3(r.dir.x, 0, r.dir.z).nor
   const nm = boardMesh(["SOLAR LINE", st.name.toUpperCase(), st.body ? `real distance from Earth today: ${fmtKm(st.body.distKm)}` : "the line runs outward to Pluto"], 4, { bg: "#1f4e9c", gold: false, title: 2 });
   nm.position.set(0.2, top + 2.5, 8); nm.rotation.y = -Math.PI / 2; g.add(nm); const nm2 = nm.clone(); nm2.position.z = -8; g.add(nm2);
   PLATFORMS.push({ c, t, n, top, st, inv: new THREE.Matrix4().makeRotationY(-Math.atan2(t.x, t.z)) }); });
-function floorH(x, z) { let h = terrainH(x, z);   // you can walk up onto a platform
+function floorH(x, z) { if (inStar >= 0) return 0; let h = terrainH(x, z);   // you can walk up onto a platform
   for (const P of PLATFORMS) { const dx = x - P.c.x, dz = z - P.c.z, a = dx * P.n.x + dz * P.n.z, b = dx * P.t.x + dz * P.t.z; if (Math.abs(a) < 2.1 && Math.abs(b) < 33) h = Math.max(h, P.top); } return h; }
 // the train: a locomotive and two carriages, each placed on the track on its own, so it bends round the line
 const train = { cars: [], s: 0, v: 0, dir: 1, at: 0, dest: -1, pickup: -1, state: "idle", doors: 0, timeK: 1 };
@@ -53783,26 +53828,93 @@ for (const i of [0, 1]) { const c = renderer.xr.getController(i); rig.add(c);
     const w = ray.intersectObject(wristPanel)[0]; if (w && wristPanel.visible) return pressWrist(w.uv);
     const th = ray.intersectObjects(SCREENS)[0]; if (th && th.distance < 12 && pressTrainScreen(th.uv)) return;
     if (!inCar) return; const hit = ray.intersectObject(dash)[0]; if (hit) pressDash(hit.uv); }); }
+// ---------- dwarf planets, asteroids and Halley's Comet; the asteroid belt and the Kuiper belt ----------
+// Each small body stands at its real distance and direction today, on a short glass stand over the spot below it: many are
+// tens of kilometres (here) above or below the plane of the Earth's orbit, far off the ground, and the sign says how far.
+for (const b of SMALL) {
+  const g = terrainH(b.w.x, b.w.z); b.c = V3(b.w.x, g + 1.1, b.w.z); b.stand = V3(b.w.x + 2.2, 0, b.w.z + 2.2);
+  const body = new THREE.Mesh(new THREE.SphereGeometry(b.r, 24, 12), M(new THREE.Color(b.col).getHex(), { roughness: 0.9 })); if (b.id === "haumea") body.scale.set(1.3, 0.67, 1.05); body.position.copy(b.c); scene.add(body);
+  const st = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.03, 1.1, 8), new THREE.MeshStandardMaterial({ color: 0xdff4ff, transparent: true, opacity: 0.45 })); st.position.set(b.w.x, g + 0.55, b.w.z); scene.add(st);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.05, 8, 48).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(b.col), toneMapped: false })); ring.position.set(b.w.x, g + 0.1, b.w.z); scene.add(ring);
+  const hTrue = b.w.y, where = Math.abs(hTrue) < 1 ? "it lies in the plane of the Earth's orbit" : `its true position is ${fmtM(Math.abs(hTrue))} ${hTrue > 0 ? "above" : "below"} this stand (${Math.abs(b.lat).toFixed(1)}° ${hTrue > 0 ? "north" : "south"} of the plane)`;
+  postSign([b.name, `real ${b.dkm.toLocaleString()} km across  ·  here ${fmtM(2 * b.r)}`, `${b.au.toFixed(1)} AU from the Sun today  ·  ${fmtKm(b.distKm)} from the Earth  ·  ${fmtM(b.w.length())} from the globe`,
+    b.kind, ...(b.more ? [b.more] : []), where, "position today from approximate orbital elements"], b.w.x + 3, b.w.z - 2, b.w.x, b.w.z, 3.2, 1.0);
+  if (b.comet) {   // Halley's orbit, flattened onto the ground (it is tilted 18° from the plane, and goes round backwards)
+    const pts = []; const [a, e, i, Om, w] = b.el;
+    for (let k = 0; k <= 720; k++) { const E = k / 720 * 2 * Math.PI, H = helioEl(a, e, i, Om, w, (E - e * Math.sin(E)) / deg, JD), q = eclToWorld(H.sub(EARTH)).multiplyScalar(AU); q.y = terrainH(q.x, q.z) + 1.5; pts.push(q); }
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineDashedMaterial({ color: 0xbfe8ff, dashSize: 40, gapSize: 30 })).computeLineDistances()); } }
+{ const ring = (n, a0, a1, col, size) => { const pts = []; for (let k = 0; k < n; k++) { const a = (a0 + Math.random() * (a1 - a0)) * AU, th = Math.random() * 6.283, x = SUN.w.x + a * Math.cos(th), z = SUN.w.z + a * Math.sin(th);
+      pts.push(V3(x, terrainH(x, z) + 0.6, z)); } scene.add(new THREE.Points(new THREE.BufferGeometry().setFromPoints(pts), new THREE.PointsMaterial({ color: col, size, sizeAttenuation: false, transparent: true, opacity: 0.8 }))); };
+  ring(IS_HEADSET ? 2000 : 5000, 2.1, 3.3, 0xb8a890, 2);    // the asteroid belt: 7.5-12 km from the Sun here
+  ring(IS_HEADSET ? 3000 : 8000, 30, 50, 0xa8c0d8, 2);      // the Kuiper belt: 107-180 km from the Sun here
+  const toD = SUN.w.clone().negate().setY(0).normalize(), kb = SUN.w.clone().addScaledVector(toD, 30 * AU), ab = SUN.w.clone().addScaledVector(toD, 2.1 * AU);
+  postSign(["the asteroid belt", "between Mars and Jupiter: 2.1-3.3 AU from the Sun, here 7.5-12 km from it", "each speck is only a marker: real asteroids, even the largest, would be grains of sand here",
+    "all of them together have less mass than the Moon: they are spread out, not crowded"], ab.x, ab.z, SUN.w.x, SUN.w.z, 3.2, 1.0);
+  postSign(["the Kuiper belt", "icy bodies beyond Neptune: 30-50 AU from the Sun, here 107-180 km from it", "Pluto, Eris, Makemake, Haumea, Quaoar, Orcus, Gonggong and Arrokoth are out here; Sedna swings far beyond",
+    "the specks are markers flattened onto the ground; real Kuiper belt orbits are often steeply tilted"], kb.x, kb.z, SUN.w.x, SUN.w.z, 3.2, 1.0); }
+
+// ---------- other stars, at the same 12-inch-globe scale ----------
+// They are so far away that each is a separate place: you are taken to a viewing deck near it (the Sun's system is hidden).
+const STAR_VISITS = [
+  { name: "Alpha Centauri", ly: 4.37, stars: [["Alpha Centauri A", 1.22, 0xfff2dc], ["Alpha Centauri B", 0.86, 0xffd8a8, 23]], lines: ["the nearest star system: 4.37 light-years, 41 trillion km",
+    "here: 988,000 km away from the globe, 2½ times the real distance from the Earth to the Moon", "A is a little bigger than the Sun (40 m here), B a little smaller (29 m); they orbit each other every 80 years, 11-35 AU apart (82 km here, the bright star over there)",
+    "the third star, Proxima Centauri, a red dwarf with an Earth-size planet, is 13,000 AU from them: 46,000 km away here", "the Sun, seen from here, would be a bright star in Cassiopeia"] },
+  { name: "Sirius", ly: 8.6, stars: [["Sirius A", 1.71, 0xe4ecff], ["Sirius B", 0.0084, 0xffffff, 20]], lines: ["the brightest star in our night sky: 8.6 light-years, 81 trillion km",
+    "here: 1.95 million km from the globe", "Sirius A is twice the Sun's mass and 25 times as bright: 57 m across here", "its companion Sirius B is a white dwarf: the Sun's mass squeezed to the size of the Earth: 28 cm here, 72 km away"] },
+  { name: "Betelgeuse", ly: 548, stars: [["Betelgeuse", 764, 0xff9a5a]], lines: ["a red supergiant in Orion, about 550 light-years away",
+    "here: 124 million km from the globe: almost as far as the REAL Earth is from the real Sun", "it is so big that, put in the Sun's place, it would reach past Mars toward Jupiter: here it is 25 km across",
+    "it will explode as a supernova, perhaps within 100,000 years; it dimmed dramatically in 2019-2020 when it puffed out a cloud of dust"] }];
+const GLOW_T = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d"), gr = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+  gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.35, "rgba(255,255,255,.45)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(0, 0, 256, 256); return new THREE.CanvasTexture(c); })();
+const starWorld = new THREE.Group(); starWorld.visible = false; scene.add(starWorld);
+let inStar = -1, savedVis = null, savedBG = null, savedFog = null;
+const DECK = V3(0, 0, 0);
+function enterStar(k) {
+  if (inCar) exitCar(); onTrain = false;
+  if (inStar < 0) { savedVis = scene.children.filter(o => o !== rig && o !== starWorld).map(o => [o, o.visible]); savedBG = scene.background; savedFog = scene.fog; }
+  for (const [o] of savedVis) o.visible = false;
+  starWorld.clear(); starWorld.visible = true; scene.background = new THREE.Color(0x000000); scene.fog = null; inStar = k;
+  const S = STAR_VISITS[k], R0 = S.stars[0][1] * 696000e3 * K, D = R0 * 3.2 + 30, star = V3(0, 0, -D);
+  starWorld.add(new THREE.AmbientLight(0x404858, 1.2));
+  const n = 4000, sp = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const y = Math.random() * 2 - 1, f = Math.random() * 6.283, r = Math.sqrt(1 - y * y); sp.set([r * Math.cos(f) * 300000, y * 300000, r * Math.sin(f) * 300000], i * 3); }
+  starWorld.add(new THREE.Points(new THREE.BufferGeometry().setFromPoints(Array.from({ length: n }, (_, i) => V3(sp[3 * i], sp[3 * i + 1], sp[3 * i + 2]))), new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false })));
+  S.stars.forEach(([nm, rs, col, sepAU], j) => { const r = Math.max(rs * 696000e3 * K, 0.05), pos = j === 0 ? star : star.clone().add(V3(sepAU * AU * 0.8, sepAU * AU * 0.1, -sepAU * AU * 0.6));
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 64, 32), new THREE.MeshBasicMaterial({ color: col, toneMapped: false })); m.position.copy(pos); starWorld.add(m);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: GLOW_T, color: col, transparent: true, opacity: 0.6, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending })); glow.scale.setScalar(r * 4 + 3); glow.position.copy(pos); starWorld.add(glow);
+    const L = new THREE.PointLight(col, 4, 0, 0); L.position.copy(pos); starWorld.add(L);
+    STAR_T.push({ name: nm, col: "#" + new THREE.Color(col).getHexString(), pos: () => pos, r, star: k, big: true }); });
+  const deckM = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 0.3, 48), M(0x9aa4ae, { metalness: 0.3, roughness: 0.5 })); deckM.position.set(0, -0.15, 0); starWorld.add(deckM);
+  const rail = new THREE.Mesh(new THREE.TorusGeometry(6.8, 0.04, 8, 64).rotateX(Math.PI / 2), M(0xc9a227, { metalness: 0.7 })); rail.position.y = 1.0; starWorld.add(rail);
+  const sign = boardMesh([`${S.name}`, ...S.lines, "use the guide or the wrist panel to go back to the Solar System"], 6); sign.position.set(0, 2.4, 6.6); sign.rotation.y = Math.PI; starWorld.add(sign);
+  const sunDir = V3(0.3, 0.25, 1).normalize(); STAR_T.push({ name: "the Sun", col: "#ffd27a", pos: () => sunDir.clone().multiplyScalar(250000), r: 0, star: k, big: true });
+  rig.position.set(0, 0, 3); rig.rotation.set(0, 0, 0); flying = false; vrTurn = 0; yaw = 0; pitch = 0.05; wristDirty = true; }
+const STAR_T = [];
+function leaveStar() { if (inStar < 0) return; for (const [o, v] of savedVis) o.visible = v; starWorld.visible = false; starWorld.clear(); scene.background = savedBG; scene.fog = savedFog; inStar = -1; STAR_T.length = 0;
+  rig.position.set(0, 0, 1.7); yaw = 0; pitch = -0.15; vrTurn = 0; wristDirty = true; }
+
 // ---------- the wrist teleporter (VR): a panel on your left wrist; point the right controller at a place and pull the trigger ----------
 const PLACES = [["🚆 board the train", "#b8322a", "train"], ["Earth (the globe)", "#5a9ae8", () => [V3(0, 0, 1.7), GC]], ["the Moon", "#d8d8d8", () => moonSpot()], ["your car", "#ff6a5a", () => [car.position.clone().add(V3(-2.5, 0, 2.5)), car.position]],
   ...BODIES.map(b => [b.name === "the Sun" ? "Sun" : b.name, b.col, () => [b.stop.clone(), b.c]]),
+  ...SMALL.map(b => [b.name, b.col, () => [b.stand.clone(), b.c]]),
+  ...STAR_VISITS.map((S, k) => ["★ " + S.name, "#fff2c0", "star" + k]), ["☀ back to the Solar System", "#ffd27a", "home"],
   ...["Io", "Europa", "Ganymede", "Callisto", "Amalthea", "Titan", "Triton", "Charon"].map(n => { const q = () => MOON_LIST.find(m => m.name === n); return [n, q()?.col || "#bbbbbb", () => moonStand(q())]; }).filter(x => MOON_LIST.find(m => m.name === x[0]))];
 function moonSpot() { const d = V3(MC.x, 0, MC.z).normalize(); return [V3(MC.x - d.x * 1.6, 0, MC.z - d.z * 1.6), MC]; }
 function moonStand(m) { const pc = m.planet.c, mp = m.pos(), d = V3(mp.x - pc.x, 0, mp.z - pc.z).normalize(), back = Math.max(1.5, m.r * 30);
   return [V3(mp.x + d.x * back, 0, mp.z + d.z * back), mp]; }
-function teleport(i) { if (PLACES[i][2] === "train") return boardTrain(); if (onTrain) onTrain = false; const [at, look] = PLACES[i][2](); if (inCar) exitCar(); flying = false; at.y = terrainH(at.x, at.z); rig.position.copy(at);
+function teleport(i) { const kind = PLACES[i][2]; if (typeof kind === "string" && kind.startsWith("star")) return enterStar(+kind.slice(4)); if (kind === "home") return leaveStar();
+  if (inStar >= 0) leaveStar(); if (kind === "train") return boardTrain(); if (onTrain) onTrain = false; const [at, look] = PLACES[i][2](); if (inCar) exitCar(); flying = false; at.y = terrainH(at.x, at.z); rig.position.copy(at);
   const dx = look.x - at.x, dz = look.z - at.z, ry = Math.atan2(-dx, -dz);
   if (renderer.xr.isPresenting) { vrTurn = ry; rig.rotation.set(0, ry, 0); } else { yaw = ry; pitch = Math.atan2(look.y - at.y - 1.65, Math.hypot(dx, dz)); } wristDirty = true; }
-const wristC = document.createElement("canvas"); wristC.width = 640; wristC.height = 40 + Math.ceil(PLACES.length / 2) * 62; const wristT = new THREE.CanvasTexture(wristC); wristT.colorSpace = THREE.SRGBColorSpace;
-const wristPanel = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2 * wristC.height / 640), new THREE.MeshBasicMaterial({ map: wristT, transparent: true, toneMapped: false }));
+const wristC = document.createElement("canvas"); wristC.width = 960; wristC.height = 40 + Math.ceil(PLACES.length / 3) * 62; const wristT = new THREE.CanvasTexture(wristC); wristT.colorSpace = THREE.SRGBColorSpace;
+const wristPanel = new THREE.Mesh(new THREE.PlaneGeometry(0.27, 0.27 * wristC.height / 960), new THREE.MeshBasicMaterial({ map: wristT, transparent: true, toneMapped: false }));
 wristPanel.position.set(0, 0.06, 0.06); wristPanel.rotation.x = -1.0; wristPanel.visible = false;
 let wristDirty = true, wristFlash = -1;
-function drawWrist() { const g = wristC.getContext("2d"), W = 640; g.clearRect(0, 0, W, wristC.height); g.fillStyle = "rgba(10,24,36,.9)"; g.beginPath(); g.roundRect(0, 0, W, wristC.height, 18); g.fill();
+function drawWrist() { const g = wristC.getContext("2d"), W = 960; g.clearRect(0, 0, W, wristC.height); g.fillStyle = "rgba(10,24,36,.9)"; g.beginPath(); g.roundRect(0, 0, W, wristC.height, 18); g.fill();
   g.fillStyle = "#ffe9a8"; g.font = "700 26px -apple-system, Helvetica, sans-serif"; g.fillText("Teleport to…", 18, 30);
-  PLACES.forEach(([n, col], i) => { const x = 12 + (i % 2) * 312, y = 42 + Math.floor(i / 2) * 62; g.fillStyle = i === wristFlash ? "#ffe9a8" : "#1e2e3a"; g.beginPath(); g.roundRect(x, y, 304, 54, 10); g.fill();
-    g.fillStyle = col; g.beginPath(); g.arc(x + 26, y + 27, 11, 0, 6.283); g.fill(); g.fillStyle = i === wristFlash ? "#111" : "#fff"; g.font = "600 25px -apple-system, Helvetica, sans-serif"; g.fillText(n, x + 46, y + 36); });
+  PLACES.forEach(([n, col], i) => { const x = 12 + (i % 3) * 314, y = 42 + Math.floor(i / 3) * 62; g.fillStyle = i === wristFlash ? "#ffe9a8" : "#1e2e3a"; g.beginPath(); g.roundRect(x, y, 304, 54, 10); g.fill();
+    g.fillStyle = col; g.beginPath(); g.arc(x + 26, y + 27, 11, 0, 6.283); g.fill(); g.fillStyle = i === wristFlash ? "#111" : "#fff"; let fs = 25; do { g.font = `600 ${fs}px -apple-system, Helvetica, sans-serif`; } while (g.measureText(n).width > 250 && --fs > 14); g.fillText(n, x + 46, y + 36); });
   wristT.needsUpdate = true; wristDirty = false; }
-function pressWrist(uv) { const px = uv.x * 640, py = (1 - uv.y) * wristC.height, col = px < 320 ? 0 : 1, row = Math.floor((py - 42) / 62), i = row * 2 + col;
+function pressWrist(uv) { const px = uv.x * 960, py = (1 - uv.y) * wristC.height, col = Math.min(2, Math.floor((px - 12) / 314)), row = Math.floor((py - 42) / 62), i = row * 3 + col;
   if (row >= 0 && i < PLACES.length && py > 42) { wristFlash = i; drawWrist(); setTimeout(() => { wristFlash = -1; wristDirty = true; }, 300); teleport(i); } }
 for (const i of [0, 1]) { const grip = renderer.xr.getControllerGrip(i); rig.add(grip); grip.addEventListener("connected", e => { if (e.data.handedness === "left") grip.add(wristPanel); }); }
 addEventListener("pointerup", () => dragging = false);
@@ -53811,13 +53923,19 @@ intro?.addEventListener("click", start);
 const guide = document.getElementById("guide");
 guide.innerHTML = "<b>Go to</b><button data-go='desk'><i style='background:#3d7cc9'></i>the globe</button><button data-tp='2'><i style='background:#d8d8d8'></i>the Moon</button><button data-train='1'><i style='background:#b8322a'></i>🚆 ride the Solar Line</button>" +
   BODIES.map((b, k) => `<div class="row"><button data-go="${k}"><i style="background:${b.col}"></i>${b.name}</button><button class="drive" data-drive="${k}" title="drive there">🚗 ${k + 1}</button></div>`).join("");
+guide.style.maxHeight = "calc(100vh - 30px)"; guide.style.overflowY = "auto";
+guide.innerHTML += "<b style='margin-top:6px'>Small bodies</b>" + SMALL.map(b => `<button data-tp="${PLACES.findIndex(q => q[0] === b.name)}"><i style="background:${b.col}"></i>${b.name}</button>`).join("") +
+  "<b style='margin-top:6px'>Other stars</b>" + STAR_VISITS.map((S, k) => `<button data-star="${k}"><i style="background:#fff2c0"></i>★ ${S.name}</button>`).join("") + `<button data-home="1"><i style="background:#ffd27a"></i>☀ back to the Solar System</button>`;
 guide.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); start();
+  if (b.dataset.star) return enterStar(+b.dataset.star); if (b.dataset.home) return leaveStar(); if (inStar >= 0 && !b.dataset.tp) leaveStar();
   if (b.dataset.drive) return driveTo(BODIES[+b.dataset.drive]); if (b.dataset.tp) return teleport(+b.dataset.tp); if (b.dataset.train) return boardTrain();
   if (inCar) exitCar();
   if (b.dataset.go === "desk") { rig.position.set(0, 0, 1.7); yaw = 0; pitch = -0.15; return; }
   const t = BODIES[+b.dataset.go], p = t.stop; rig.position.set(p.x, terrainH(p.x, p.z), p.z); yaw = Math.atan2(-(t.w.x - p.x), -(t.w.z - p.z)); pitch = 0; flying = false; });
 const hud = document.getElementById("hud");
 function readout(v) {
+  if (inStar >= 0) { const S = STAR_VISITS[inStar]; hud.innerHTML = `<b>1 : ${(1 / K / 1e6).toFixed(1)} million</b> &nbsp;·&nbsp; the Earth is a 12-inch globe<br>visiting <b>${S.name}</b>: ${S.ly} light-years away, ${(S.ly * 9.4607).toLocaleString(undefined, { maximumFractionDigits: 0 })} trillion km real<br>
+    at this scale: ${fmtKm(S.ly * 9.4607e15 * K / 1000)} from the globe<br><span class="dim">WASD walk the deck · drag to look · guide / wrist: other stars, or back to the Solar System</span>`; return; }
   const d = rig.position.distanceTo(GC), near = BODIES.reduce((a, b) => V3(b.w.x, 0, b.w.z).distanceTo(rig.position) < V3(a.w.x, 0, a.w.z).distanceTo(rig.position) ? b : a);
   hud.innerHTML = `<b>1 : ${(1 / K / 1e6).toFixed(1)} million</b> &nbsp;·&nbsp; the Earth is a 12-inch globe &nbsp;·&nbsp; positions for ${NOW.toDateString()}<br>
     ${onTrain ? "on the Solar Line · " + trainLine() + "<br>" : ""}${inCar ? "driving" : onTrain ? "aboard" : flying ? "jetpack" : "walking"} ${inCar || onTrain ? "" : `<span class="k">F</span>`} &nbsp;·&nbsp; ${v.toFixed(v < 10 ? 1 : 0)} m/s here = ${(v / C_HERE).toFixed(2)} × light speed here (${C_HERE.toFixed(1)} m/s)<br>
@@ -53843,7 +53961,9 @@ let vrTurn = 0;
 // VR: the same arrow and name, floating in the object's direction, drawn over everything.
 const TARGETS = [{ name: "Earth (the globe)", col: "#5a9ae8", pos: () => GC, r: RE }, { name: "the Moon", col: "#d8d8d8", pos: () => MC, r: RM },
   ...BODIES.map(b => ({ name: b.name === "the Sun" ? "Sun" : b.name, col: b.col, pos: () => b.c, r: b.r, big: true })),
+  ...SMALL.map(b => ({ name: b.name, col: b.col, pos: () => b.c, r: b.r, big: true })),
   ...MOON_LIST.map(q => ({ ...q, small: true })), { name: "your car", col: "#ff6a5a", pos: () => car.position, r: 1.2, car: true }];
+for (let i = 0; i < 6; i++) TARGETS.push({ name: "", col: "#ffffff", pos: () => V3(0, -1e6, 0), r: 0, slot: i });   // reused for whatever star you visit
 let markersOn = true;
 addEventListener("keydown", e => { if (e.code === "KeyH") { markersOn = !markersOn; markLayer.style.display = markersOn ? "block" : "none"; } });
 const markLayer = document.createElement("div"); markLayer.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:1;font:600 13px -apple-system,Helvetica,sans-serif";
@@ -53864,6 +53984,8 @@ function setMode(t, mode, txt) { if (t.mode === mode && t.txt === txt) return; t
 function updateMarkers(vr) {
   camera.getWorldPosition(camP); const placed = [], fovK = 1 / Math.tan(camera.fov * Math.PI / 360);
   for (const t of TARGETS) {
+    if (t.slot !== undefined) { const st = STAR_T[t.slot]; if (st) { t.name = st.name; t.col = st.col; t.pos = st.pos; t.r = st.r; t.big = true; t.mode = ""; } else t.name = ""; }
+    if ((inStar >= 0) !== (t.slot !== undefined) || (t.slot !== undefined && !t.name)) { t.el.style.display = "none"; t.spr.visible = false; continue; }
     const wp = t.pos(), d = Math.max(0.01, camP.distanceTo(wp)), ang = Math.atan(t.r / d);   // apparent radius, radians
     const rPx = Math.tan(ang) * fovK * innerHeight / 2, fade = THREE.MathUtils.clamp((0.05 - ang) / 0.025, 0, 1);   // gone once the object is ~5° across
     const nearPlanet = !t.planet || d < Math.max(30, 0.7 * t.orbit) || (t.probe && camP.distanceTo(t.planet.c) < 25);
@@ -53930,6 +54052,7 @@ function frame() {
     moved = before.distanceTo(rig.position) / Math.max(dt, 1e-4);
     const gh = floorH(rig.position.x, rig.position.z); if (!flying) rig.position.y = gh; else rig.position.y = Math.max(gh, rig.position.y); }
   stepTrain(dt);
+  if (inStar >= 0 && !flying) { const r = Math.hypot(rig.position.x, rig.position.z); if (r > 6.4) { rig.position.x *= 6.4 / r; rig.position.z *= 6.4 / r; } }
   if (onTrain) { const g = train.cars[1], L = CAR_L[1];
     if (vr) { const s = renderer.xr.getSession(); let mx = 0, my = 0; for (const src of s?.inputSources || []) if (src.handedness === "left") { const [ax, ay] = stick(src.gamepad?.axes); mx = ax; my = ay; }
       const f = V3(0, 0, -1).applyQuaternion(camera.quaternion).applyAxisAngle(UP, vrTurn); f.y = 0; f.normalize(); const sv = V3(-f.z, 0, f.x);   // in the carriage's own frame
