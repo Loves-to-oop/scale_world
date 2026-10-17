@@ -251,3 +251,25 @@ __SCENE__
 out5 = HERE / "catalhoyuk.html"
 out5.write_text(CAT.replace("__THREE__", three).replace("__SCENE__", (HERE / "catal.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out5.name}, {out5.stat().st_size // 1024} KB")
+
+
+# ---- the sixth page: baseball on the Moon --------------------------------------------------------
+MOON = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Baseball on the Moon</title>").replace("background:#c8d4d8", "background:#05070c")
+i0, i1 = MOON.index('<div id="intro">'), MOON.index('<button id="vr">')
+MOON = MOON[:i0] + """<div id="intro"><div class="card">
+  <h1>Baseball on the Moon</h1>
+  <p>Tranquility Dome: a pressurised stadium under a glass dome 440 m across, with the grey Moon outside and the
+  Earth in the black sky. Tonight the Shackleton Shadows visit the Tranquility Tides. You are in the stands.</p>
+  <p>The Lunar League's answer to low gravity: a ball six times heavier (870 g), so it weighs on the Moon exactly what
+  a baseball weighs on Earth. Its extra inertia means slower pitches (~70 mph), and it would barely leave a normal
+  bat, so the league swings bats with twice the hitting mass. Every pitch and hit is computed: lunar gravity, the
+  dome's air, the bat-ball collision. Fly balls hang for ten seconds or more, fielders leap three metres, runners lope.</p>
+  <p><kbd>1</kbd>&ndash;<kbd>4</kbd> change seat &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>[</kbd> <kbd>]</kbd> game speed &nbsp;&middot;&nbsp; <kbd>space</kbd> pause<br>
+  In VR: look around from your seat &nbsp;&middot;&nbsp; <b>X</b>/<b>Y</b> change seat &nbsp;&middot;&nbsp; <b>A</b>/<b>B</b> game speed &nbsp;&middot;&nbsp; right stick turn</p>
+  <p class="dim">click anywhere, or press any key, to begin</p>
+</div></div>
+""" + MOON[i1:]
+MOON = MOON.replace("__SCENE__", 'const EARTH_JPG = "__EARTH__";\n__SCENE__')
+out6 = HERE / "moon_baseball.html"
+out6.write_text(MOON.replace("__THREE__", three).replace("__EARTH__", img("earth.jpg")).replace("__SCENE__", (HERE / "moonball.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out6.name}, {out6.stat().st_size // 1024} KB")
