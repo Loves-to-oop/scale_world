@@ -691,7 +691,7 @@ function stepTrain(rdt) { const dt = rdt * train.timeK;
         if (train.state === "arriving") { train.at = train.pickup; train.pickup = -1; train.state = "doors"; train.doors = 8; boardTrain(); }
         else { train.at = train.dest; train.dest = -1; train.state = "idle"; } break; } } }
   placeTrain(); }
-function nearTrainDoor() { if (train.state !== "idle") return false; for (const k of [1, 2]) if (train.cars[k].position.distanceTo(rig.position) < CAR_L[k] / 2 + 4) return true; return false; }
+function nearTrainDoor() { if (train.state !== "idle") return false; const h = headXZ(); for (const k of [1, 2]) if (train.cars[k].position.distanceTo(V3(h.x, train.cars[k].position.y, h.z)) < CAR_L[k] / 2 + 4) return true; return false; }
 function boardTrain() { if (inCar) exitCar(); if (onTrain) return; onTrain = true; flying = false; tLocal.set(0.4, 0, 2); yaw = 0; pitch = -0.05; vrTurn = 0; }
 function alight() { const P = PLATFORMS[train.at]; onTrain = false; rig.position.set(P.c.x, P.top, P.c.z); rig.rotation.set(0, 0, 0);
   yaw = Math.atan2(-P.n.x, -P.n.z) + Math.PI; camera.position.y = renderer.xr.isPresenting ? 0 : 1.65; }
@@ -706,7 +706,7 @@ const intro = document.getElementById("intro");
 function start() { intro?.classList.add("gone"); }
 addEventListener("keydown", e => { keys[e.code] = true; start();
   if (e.code === "KeyF" && !inCar) flying = !flying;
-  if (e.code === "KeyE") { const L = !inCar && !onTrain && !lift.riding && nearLift(); if (L) { rideLift(...L); return; } if (onTrain) { if (train.state === "idle") alight(); } else if (inCar) exitCar(); else if (nearTrainDoor()) boardTrain(); else if (car.position.distanceTo(rig.position) < 8) enterCar(); }
+  if (e.code === "KeyE") { const L = !inCar && !onTrain && !lift.riding && nearLift(); if (L) { rideLift(...L); return; } if (onTrain) { if (train.state === "idle") alight(); } else if (inCar) exitCar(); else if (nearTrainDoor()) boardTrain(); else if (nearCar()) enterCar(); }
   if (/^Digit[1-9]$/.test(e.code)) driveTo(BODIES[+e.code.slice(5) - 1]);
   if (inCar && e.code === "KeyW") speedI = Math.min(SPEEDS.length - 1, speedI + 1);
   if (inCar && e.code === "KeyS") speedI = Math.max(0, speedI - 1);
@@ -915,12 +915,15 @@ for (const T of TOWERS) {   // on each deck, a board: how far it is to every oth
   const b = boardMesh([`${T.name} observation deck, ${T.D.deck} m up`, ...others.map(([o, d]) => `${o.name} (${o.world}): ${fmtM(d)} away`), "these towers are 300-560 m tall: like the Sears Tower (442 m)"], 4, { bg: "#1a2a3a" });
   const p = T.A.clone().addScaledVector(T.elDir, T.D.rOut - 2.5); b.position.set(p.x + T.elDir.z * 6, T.deckY + 1.8, p.z - T.elDir.x * 6); b.lookAt(T.A.x, T.deckY + 1.8, T.A.z); scene.add(b); }
 const lift = { T: null, from: 0, to: 0, t: 0, dur: 0, riding: false }; let onDeck = null;
-function nearLift() { for (const T of TOWERS) { const atBase = Math.hypot(rig.position.x - T.base.x, rig.position.z - T.base.z) < 4; if (atBase && Math.abs(rig.position.y - T.g0) < 3) return [T, "up"];
+function headXZ() { return camera.getWorldPosition(V3(0, 0, 0)); }   // in VR you can stand away from the rig's centre: use where your head is
+function headOffset() { const h = headXZ(); return V3(h.x - rig.position.x, 0, h.z - rig.position.z); }
+function nearLift() { const h = headXZ(); for (const T of TOWERS) { const atBase = Math.hypot(h.x - T.base.x, h.z - T.base.z) < 5; if (atBase && !onDeck && Math.abs(rig.position.y - T.g0) < 10) return [T, "up"];
     if (onDeck === T && atBase) return [T, "down"]; } return null; }
+function nearCar() { const h = headXZ(); return Math.hypot(h.x - car.position.x, h.z - car.position.z) < 8; }
 function rideLift(T, dir) { lift.T = T; lift.from = dir === "up" ? T.g0 : T.deckY; lift.to = dir === "up" ? T.deckY : T.g0; lift.t = 0; lift.dur = Math.abs(lift.to - lift.from) / 9 + 4; lift.riding = true; onDeck = null; if (inCar) exitCar(); flying = false; }
 function stepLift(dt) { if (!lift.riding) return; lift.t += dt; const f = THREE.MathUtils.clamp(lift.t / lift.dur, 0, 1), e = f < 0.5 ? 2 * f * f : 1 - 2 * (1 - f) * (1 - f), y = lift.from + (lift.to - lift.from) * e;
-  lift.T.cab.position.y = y; rig.position.set(lift.T.base.x, y + 0.12, lift.T.base.z);
-  if (f >= 1) { lift.riding = false; if (lift.to > lift.from) { onDeck = lift.T; const p = lift.T.base.clone().addScaledVector(lift.T.elDir, 2.6); rig.position.set(p.x, lift.T.deckY, p.z); } } }   // step out of the cab, toward the view
+  lift.T.cab.position.y = y; const o = renderer.xr.isPresenting ? headOffset() : V3(0, 0, 0); rig.position.set(lift.T.base.x - o.x, y + 0.12, lift.T.base.z - o.z);
+  if (f >= 1) { lift.riding = false; if (lift.to > lift.from) { onDeck = lift.T; const p = lift.T.base.clone().addScaledVector(lift.T.elDir, 2.6); const o = renderer.xr.isPresenting ? headOffset() : V3(0, 0, 0); rig.position.set(p.x - o.x, lift.T.deckY, p.z - o.z); } } }   // step out of the cab, toward the view
 function liftLine() { if (lift.riding) { const h = rig.position.y - lift.T.g0; return `glass elevator, ${lift.T.name}: ${Math.round(h)} m up${lift.to > lift.from ? "" : ", going down"} (9 m/s)`; } return onDeck ? `on the observation deck of ${onDeck.name}, ${onDeck.D.deck} m up · E by the elevator to go down` : ""; }
 
 // ---------- the wrist teleporter (VR): a panel on your left wrist; point the right controller at a place and pull the trigger ----------
@@ -1064,7 +1067,7 @@ function frame() {
   if (vr) { const s = renderer.xr.getSession(); let mx = 0, my = 0, boost = 1;
     for (const src of s?.inputSources || []) { const gp = src.gamepad; if (!gp) continue; const [ax, ay] = stick(gp.axes);
       if (src.handedness === "left") { mx += ax; my += ay;
-        if (tap("L", gp, 4)) { const L = !inCar && !onTrain && !lift.riding && nearLift(); if (L) rideLift(...L); else if (onTrain) { if (train.state === "idle") alight(); } else if (inCar) exitCar(); else if (nearTrainDoor()) boardTrain(); else enterCar(); }
+        if (tap("L", gp, 4)) { const L = !inCar && !onTrain && !lift.riding && nearLift(); if (L) rideLift(...L); else if (onTrain) { if (train.state === "idle") alight(); } else if (inCar) exitCar(); else if (nearTrainDoor()) boardTrain(); else if (nearCar()) enterCar(); }
         if (tap("L", gp, 5)) { const k = dest ? (BODIES.indexOf(dest) + 1) % BODIES.length : 0; driveTo(BODIES[k]); } }
       else { if (gp.buttons[0]?.value > 0.3 && !inCar) boost = 6; my += ay;
         if (Math.abs(ax) > 0.7 && snap) { vrTurn -= Math.sign(ax) * Math.PI / 6; snap = false; } else if (Math.abs(ax) < 0.3) snap = true;
@@ -1084,8 +1087,8 @@ function frame() {
     const gh = floorH(rig.position.x, rig.position.z); if (!flying) rig.position.y = gh; else rig.position.y = Math.max(gh, rig.position.y); } }
   stepTrain(dt); stepLift(dt);
   if (lift.riding && vr) rig.rotation.y = vrTurn;
-  if (onDeck && !lift.riding) { const T = onDeck, dx = rig.position.x - T.A.x, dz = rig.position.z - T.A.z, r = Math.hypot(dx, dz), r2 = THREE.MathUtils.clamp(r, T.D.rEl - 5.5, T.D.rOut - 0.6);   // stay on the balcony
-    if (r2 !== r) { rig.position.x = T.A.x + dx / r * r2; rig.position.z = T.A.z + dz / r * r2; } rig.position.y = T.deckY; }
+  if (onDeck && !lift.riding) { const T = onDeck, h = headXZ(), dx = h.x - T.A.x, dz = h.z - T.A.z, r = Math.hypot(dx, dz), r2 = THREE.MathUtils.clamp(r, T.D.rEl - 5.5, T.D.rOut - 0.6);   // stay on the balcony
+    if (r2 !== r) { rig.position.x += dx / r * (r2 - r); rig.position.z += dz / r * (r2 - r); } rig.position.y = T.deckY; }
   if (inStar >= 0 && !flying) { const r = Math.hypot(rig.position.x, rig.position.z); if (r > 6.4) { rig.position.x *= 6.4 / r; rig.position.z *= 6.4 / r; } }
   if (onTrain) { const g = train.cars[1], L = CAR_L[1];
     if (vr) { const s = renderer.xr.getSession(); let mx = 0, my = 0; for (const src of s?.inputSources || []) if (src.handedness === "left") { const [ax, ay] = stick(src.gamepad?.axes); mx = ax; my = ay; }
