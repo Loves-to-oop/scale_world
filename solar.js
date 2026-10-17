@@ -1297,7 +1297,7 @@ function frame() {
     moved = before.distanceTo(rig.position) / Math.max(dt, 1e-4);
     const gh = floorH(rig.position.x, rig.position.z); if (!flying) rig.position.y = gh; else rig.position.y = Math.max(gh, rig.position.y); } }
   stepTrain(dt); stepLift(dt);
-  { const h = camera.getWorldPosition(V3(0, 0, 0)); for (const P of PORTALS) { P.disc.rotation.z -= dt * 0.9; if (started && Math.hypot(h.x - P.pos.x, h.z - P.pos.z) < 0.9 && Math.abs(h.y - P.pos.y - 1.5) < 2) { PORTALS.length = 0; goSystem(P.key); break; } } }
+  { const h = camera.getWorldPosition(V3(0, 0, 0)); for (const P of PORTALS) { P.disc.rotation.z -= dt * 0.9; if (intro?.classList.contains("gone") && Math.hypot(h.x - P.pos.x, h.z - P.pos.z) < 1.2 && Math.abs(h.y - P.pos.y - 1.5) < 2) { PORTALS.length = 0; goSystem(P.key); break; } } }
   if (lift.riding && vr) rig.rotation.y = vrTurn;
   if (onDeck && !lift.riding) { const T = onDeck, h = headXZ(), dx = h.x - T.A.x, dz = h.z - T.A.z, along = dx * T.elDir.x + dz * T.elDir.z, across = -dx * T.elDir.z + dz * T.elDir.x;
     if (along > T.D.rOut - 1.5 * T.s && Math.abs(across) < 1.6 * T.s) { const a2 = Math.min(along, T.D.rOut + 5.6 * T.s); rig.position.x += T.elDir.x * (a2 - along); rig.position.z += T.elDir.z * (a2 - along); }   // out on the Ledge
