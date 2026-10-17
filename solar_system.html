@@ -53618,6 +53618,100 @@ function drawDash(v) {
   t(IS_HEADSET ? "point at a button and pull the trigger" : "click a button  ·  or W / S speed, 1–9 destination, E get out", 222, 20, "#a9c6d4");
   dashT.needsUpdate = true; }
 
+const O3 = new THREE.Object3D();
+// ---------- the Solar Line: a railway from the desk out past every body, a train shuttling along it ----------
+// Stations stand beside each body, on the far side from its road; the line runs station to station outward from
+// the desk and the train shuttles back and forth. Board when it's in (E / X by a door, or the guide / wrist button);
+// you can walk about inside the carriage while it runs, and the markers keep showing where everything is.
+const STATIONS = [{ name: "Earth (the desk)", p: V3(-26, 0, 12), body: null }];
+for (const b of BODIES.slice().sort((a, c) => Math.hypot(a.w.x, a.w.z) - Math.hypot(c.w.x, c.w.z))) {
+  const away = V3(b.w.x - b.E.x, 0, b.w.z - b.E.z).normalize(); STATIONS.push({ name: b.name === "the Sun" ? "the Sun" : b.name, p: V3(b.w.x + away.x * (b.r + 34), 0, b.w.z + away.z * (b.r + 34)), body: b }); }
+const RAIL = (() => { const pts = densify(STATIONS.map(s => s.p), 4), n = pts.length, g = pts.map(q => terrainH(q.x, q.z));
+  const cum = [0]; for (let i = 1; i < n; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
+  const stS = STATIONS.map(s => { let best = 0, bd = 1e9; pts.forEach((q, i) => { const d = Math.hypot(q.x - s.p.x, q.z - s.p.z); if (d < bd) { bd = d; best = i; } }); return best; });
+  // the track's height: a smoothed version of the ground (embankments and viaducts over hollows), never below it, level with it at stations
+  const W = 150, pre = [0]; for (let i = 0; i < n; i++) pre.push(pre[i] + g[i]);
+  const y = pts.map((q, i) => { const a = Math.max(0, i - W), b = Math.min(n - 1, i + W), sm = (pre[b + 1] - pre[a]) / (b - a + 1);
+    const ds = Math.min(...stS.map(k => Math.abs(cum[i] - cum[k]))), w = THREE.MathUtils.smoothstep(ds, 60, 400); return Math.max(g[i], g[i] + (sm - g[i]) * w) + 0.5; });
+  return { pts, y, g, cum, L: cum[n - 1], stS: stS.map(k => cum[k]) }; })();
+STATIONS.forEach((s, i) => s.s = RAIL.stS[i]);
+function railAt(s) { s = THREE.MathUtils.clamp(s, 0, RAIL.L); let lo = 0, hi = RAIL.cum.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (RAIL.cum[m] <= s) lo = m; else hi = m; }
+  const f = (s - RAIL.cum[lo]) / Math.max(1e-6, RAIL.cum[hi] - RAIL.cum[lo]), a = RAIL.pts[lo], b = RAIL.pts[hi];
+  return { p: V3(a.x + (b.x - a.x) * f, RAIL.y[lo] + (RAIL.y[hi] - RAIL.y[lo]) * f, a.z + (b.z - a.z) * f), dir: V3(b.x - a.x, RAIL.y[hi] - RAIL.y[lo], b.z - a.z).normalize() }; }
+{ // the track: a ballast bed with sleepers (one textured ribbon), two steel rails, and piers where it rides above the ground
+  const bedT = (() => { const c = document.createElement("canvas"); c.width = 64; c.height = 64; const g = c.getContext("2d"); g.fillStyle = "#7a7268"; g.fillRect(0, 0, 64, 64);
+    g.fillStyle = "#4a3a2a"; g.fillRect(4, 22, 56, 20); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; })();
+  const strip = (off, w, dy, mat, uvL) => { const P = RAIL.pts, pos = [], uv = [], idx = [];
+    P.forEach((q, i) => { const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)], t = V3(b.x - a.x, 0, b.z - a.z).normalize(), n = V3(-t.z, 0, t.x);
+      for (const sd of [1, -1]) { const o = off + sd * w / 2; pos.push(q.x + n.x * o, RAIL.y[i] + dy, q.z + n.z * o); } uv.push(0, RAIL.cum[i] / uvL, 1, RAIL.cum[i] / uvL);
+      if (i) { const k = 2 * i; idx.push(k - 2, k, k - 1, k - 1, k, k + 1); } });
+    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; scene.add(m); };
+  strip(0, 3.2, 0, new THREE.MeshStandardMaterial({ map: bedT, roughness: 0.95, side: THREE.DoubleSide }), 0.7);
+  for (const o of [-0.72, 0.72]) strip(o, 0.09, 0.17, M(0xb8bcc0, { metalness: 0.8, roughness: 0.3, side: THREE.DoubleSide }), 10);
+  const piers = []; for (let i = 0; i < RAIL.pts.length; i += 10) if (RAIL.y[i] - RAIL.g[i] > 2.5) piers.push(i);
+  const pm = new THREE.InstancedMesh(new THREE.BoxGeometry(2.2, 1, 1.2).translate(0, 0.5, 0), M(0xb8b0a4), piers.length);
+  piers.forEach((i, k) => { const q = RAIL.pts[i]; O3.position.set(q.x, RAIL.g[i] - 0.5, q.z); O3.rotation.set(0, 0, 0); O3.scale.set(1, RAIL.y[i] - RAIL.g[i] + 0.4, 1); O3.updateMatrix(); pm.setMatrixAt(k, O3.matrix); });
+  pm.frustumCulled = false; scene.add(pm); }
+const PLATFORMS = [];
+STATIONS.forEach(st => { const r = railAt(st.s), t = V3(r.dir.x, 0, r.dir.z).normalize(), n = V3(-t.z, 0, t.x), c = r.p.clone().addScaledVector(n, 3.6), top = r.p.y + 0.55;
+  const g = new THREE.Group(); g.position.set(c.x, 0, c.z); g.rotation.y = Math.atan2(t.x, t.z); scene.add(g);
+  const gh = terrainH(c.x, c.z), plat = new THREE.Mesh(new THREE.BoxGeometry(4, top - gh + 0.5, 64), M(0xc8c0b0, { roughness: 0.9 })); plat.position.y = (top + gh - 0.5) / 2; g.add(plat);
+  const edge = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 64), M(0xf0d040)); edge.position.set(-1.85, top + 0.01, 0); g.add(edge);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.15, 24), M(0x2a4a6a)); roof.position.set(0.2, top + 3.2, 0); g.add(roof);
+  for (const z of [-11, 0, 11]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3.2, 8), M(0x2a3a4a)); post.position.set(1.5, top + 1.6, z); g.add(post); }
+  const bench = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.45, 3), M(0x6a4a2a)); bench.position.set(1.4, top + 0.22, -5); g.add(bench);
+  const nm = boardMesh(["SOLAR LINE", st.name.toUpperCase(), st.body ? `real distance from Earth today: ${fmtKm(st.body.distKm)}` : "the line runs outward to Pluto"], 4, { bg: "#1f4e9c", gold: false, title: 2 });
+  nm.position.set(0.2, top + 2.5, 8); nm.rotation.y = -Math.PI / 2; g.add(nm); const nm2 = nm.clone(); nm2.position.z = -8; g.add(nm2);
+  PLATFORMS.push({ c, t, n, top, st, inv: new THREE.Matrix4().makeRotationY(-Math.atan2(t.x, t.z)) }); });
+function floorH(x, z) { let h = terrainH(x, z);   // you can walk up onto a platform
+  for (const P of PLATFORMS) { const dx = x - P.c.x, dz = z - P.c.z, a = dx * P.n.x + dz * P.n.z, b = dx * P.t.x + dz * P.t.z; if (Math.abs(a) < 2.1 && Math.abs(b) < 33) h = Math.max(h, P.top); } return h; }
+// the train: a locomotive and two carriages, each placed on the track on its own, so it bends round the line
+const train = { cars: [], s: 0, v: 0, dir: 1, at: 0, next: 1, dwell: 12, state: "dwell", vmax: 4000, acc: 250 };
+const CAR_L = [16, 22, 22], CAR_GAP = 1.2;
+{ const red = M(0xb8322a, { metalness: 0.4, roughness: 0.4 }), cream = M(0xf0e8d8, { roughness: 0.6 }), dark = M(0x1a1e24), glass = new THREE.MeshStandardMaterial({ color: 0xbfe0f0, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
+  CAR_L.forEach((L, k) => { const g = new THREE.Group(); scene.add(g); train.cars.push(g);
+    const box = (w, h, d, x, y, z, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b; };
+    box(3, 0.4, L, 0, 0.9, 0, dark);                                                // underframe
+    if (k === 0) { box(3, 3.2, L - 3, 0, 2.7, 1.5, red); const nose = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 3, 24, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2), red);
+      nose.scale.set(1, 1.07, 1); nose.position.set(0, 2.7, -L / 2 + 1.5); g.add(nose); box(2.6, 0.9, 0.05, 0, 3.4, -L / 2 + 0.05, glass);
+      const lbl = boardMesh(["SOLAR LINE"], 2.6, { bg: "#b8322a", gold: false }); lbl.position.set(1.52, 2.6, 0); lbl.rotation.y = Math.PI / 2; g.add(lbl); }
+    else { box(3, 0.1, L, 0, 1.15, 0, M(0x6a5a4a));                                 // floor: you walk on this
+      for (const x of [-1.5, 1.5]) { box(0.08, 1.0, L, x, 1.65, 0, cream); box(0.08, 0.5, L, x, 3.55, 0, red); box(0.02, 1.4, L, x, 2.85, 0, glass);
+        for (let z = -L / 2 + 1; z < L / 2; z += 2.4) box(0.1, 1.4, 0.15, x, 2.85, z, cream); }
+      for (const z of [-L / 2, L / 2]) { box(1.0, 2.6, 0.08, -1.0, 2.5, z, cream); box(1.0, 2.6, 0.08, 1.0, 2.5, z, cream); box(3, 0.6, 0.08, 0, 3.5, z, cream); }
+      box(3.1, 0.15, L, 0, 3.85, 0, M(0xd8d0c4));
+      for (let z = -L / 2 + 2.5; z < L / 2 - 1.5; z += 2.0) for (const x of [-0.95, 0.95]) { box(0.9, 0.45, 0.5, x, 1.42, z, M(0x2a4a8a)); box(0.9, 0.7, 0.12, x, 1.95, z + 0.28, M(0x2a4a8a)); }
+      const lamp = new THREE.PointLight(0xfff0d8, 3, 14, 1.5); lamp.position.set(0, 3.5, 0); g.add(lamp); }
+    for (const z of [-L / 2 + 2.5, L / 2 - 2.5]) for (const x of [-1.2, 1.2]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.2, 16).rotateZ(Math.PI / 2), dark); w.position.set(x, 0.45, z); g.add(w); } }); }
+// a screen inside each carriage: where you are and the next stop
+const trainC = document.createElement("canvas"); trainC.width = 1024; trainC.height = 256; const trainT = new THREE.CanvasTexture(trainC); trainT.colorSpace = THREE.SRGBColorSpace;
+for (const k of [1, 2]) for (const z of [-1, 1]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.55), new THREE.MeshBasicMaterial({ map: trainT, toneMapped: false })); m.position.set(0, 3.15, z * (CAR_L[k] / 2 - 0.1)); if (z > 0) m.rotation.y = Math.PI; train.cars[k].add(m); }
+function trainLine() { const st = STATIONS[train.next], kmh = Math.abs(train.v) * 3.6;
+  return train.state === "dwell" ? `Now at ${STATIONS[train.at].name}  ·  doors open  ·  departing for ${STATIONS[train.next].name} in ${Math.ceil(train.dwell)} s`
+    : `Next stop: ${st.name}  ·  ${Math.round(kmh).toLocaleString()} km/h = ${(Math.abs(train.v) / C_HERE).toFixed(0)}× light speed here  ·  ${fmtM(Math.abs(st.s - train.s))} to go`; }
+function drawTrainScreen() { const g = trainC.getContext("2d"); g.fillStyle = "#0b1420"; g.fillRect(0, 0, 1024, 256); g.fillStyle = "#ffd04a"; g.font = "700 46px -apple-system, Helvetica, sans-serif"; g.fillText("SOLAR LINE", 30, 62);
+  g.fillStyle = "#e6f3f9"; g.font = "34px -apple-system, Helvetica, sans-serif"; const words = trainLine().split("  ·  "); words.forEach((w, i) => g.fillText(w, 30, 118 + i * 44)); trainT.needsUpdate = true; }
+let onTrain = false, tLocal = V3(0, 0, 0), trainTimer = 0;
+function carFrame(k) { const g = train.cars[k]; return g; }
+function placeTrain() { let off = 0; train.cars.forEach((g, k) => { const L = CAR_L[k], s = train.s - train.dir * (off + L / 2); off += L + CAR_GAP;
+    const r = railAt(s), d = r.dir.clone().multiplyScalar(train.dir); g.position.copy(r.p); g.rotation.set(0, Math.atan2(-d.x, -d.z), 0, "YXZ"); g.rotateX(Math.asin(THREE.MathUtils.clamp(d.y, -1, 1))); }); }
+function stepTrain(dt) {
+  if (train.state === "dwell") { train.dwell -= dt; train.v = 0; if (train.dwell <= 0) train.state = "run"; }
+  else { const target = STATIONS[train.next].s, left = (target - train.s) * train.dir, stopDist = train.v * train.v / (2 * train.acc);
+    train.v = left <= stopDist + 1 ? Math.max(Math.sqrt(Math.max(0, 2 * train.acc * Math.max(left, 0))), 2) : Math.min(train.vmax, train.v + train.acc * dt);
+    train.s += train.dir * Math.min(train.v * dt, Math.max(left, 0));
+    if (left <= 0.05 || (target - train.s) * train.dir <= 0.05) { train.s = target; train.at = train.next; train.state = "dwell"; train.dwell = 12; train.v = 0;
+      if (train.at === STATIONS.length - 1) train.dir = -1; else if (train.at === 0) train.dir = 1; train.next = train.at + train.dir; } }
+  placeTrain(); }
+function nearTrainDoor() { if (train.state !== "dwell") return false; for (const k of [1, 2]) if (train.cars[k].position.distanceTo(rig.position) < CAR_L[k] / 2 + 4) return true; return false; }
+function boardTrain() { if (inCar) exitCar(); onTrain = true; flying = false; tLocal.set(0.4, 0, 2); yaw = 0; pitch = -0.05; vrTurn = 0; }
+function alight() { const P = PLATFORMS[train.at]; onTrain = false; rig.position.set(P.c.x, P.top, P.c.z); rig.rotation.set(0, 0, 0);
+  yaw = Math.atan2(-P.n.x, -P.n.z) + Math.PI; camera.position.y = renderer.xr.isPresenting ? 0 : 1.65; }
+STATIONS.forEach(s => postSign(["SOLAR LINE station", `trains every few minutes: board at the platform (E / X by a carriage door)`, s.body ? `${s.name}: ${fmtM(s.body.w.length())} from the desk here, ${fmtKm(s.body.distKm)} for real` : "the line runs out past every planet to Pluto, 127 km away"],
+  s.p.x + 8, s.p.z + 8, s.p.x, s.p.z, 2.6, 1.0));
+placeTrain();
+
 // ---------- getting about ----------
 const keys = {}; let yaw = 0, pitch = -0.15, flying = false, speed = 3, vy = 0, dragging = false;
 rig.position.set(0, 0, 1.7);
@@ -53625,7 +53719,7 @@ const intro = document.getElementById("intro");
 function start() { intro?.classList.add("gone"); }
 addEventListener("keydown", e => { keys[e.code] = true; start();
   if (e.code === "KeyF" && !inCar) flying = !flying;
-  if (e.code === "KeyE") { if (inCar) exitCar(); else if (car.position.distanceTo(rig.position) < 8) enterCar(); }
+  if (e.code === "KeyE") { if (onTrain) { if (train.state === "dwell") alight(); } else if (inCar) exitCar(); else if (nearTrainDoor()) boardTrain(); else if (car.position.distanceTo(rig.position) < 8) enterCar(); }
   if (/^Digit[1-9]$/.test(e.code)) driveTo(BODIES[+e.code.slice(5) - 1]);
   if (inCar && e.code === "KeyW") speedI = Math.min(SPEEDS.length - 1, speedI + 1);
   if (inCar && e.code === "KeyS") speedI = Math.max(0, speedI - 1);
@@ -53645,13 +53739,13 @@ for (const i of [0, 1]) { const c = renderer.xr.getController(i); rig.add(c);
     const w = ray.intersectObject(wristPanel)[0]; if (w && wristPanel.visible) return pressWrist(w.uv);
     if (!inCar) return; const hit = ray.intersectObject(dash)[0]; if (hit) pressDash(hit.uv); }); }
 // ---------- the wrist teleporter (VR): a panel on your left wrist; point the right controller at a place and pull the trigger ----------
-const PLACES = [["Earth (the globe)", "#5a9ae8", () => [V3(0, 0, 1.7), GC]], ["the Moon", "#d8d8d8", () => moonSpot()], ["your car", "#ff6a5a", () => [car.position.clone().add(V3(-2.5, 0, 2.5)), car.position]],
+const PLACES = [["🚆 board the train", "#b8322a", "train"], ["Earth (the globe)", "#5a9ae8", () => [V3(0, 0, 1.7), GC]], ["the Moon", "#d8d8d8", () => moonSpot()], ["your car", "#ff6a5a", () => [car.position.clone().add(V3(-2.5, 0, 2.5)), car.position]],
   ...BODIES.map(b => [b.name === "the Sun" ? "Sun" : b.name, b.col, () => [b.stop.clone(), b.c]]),
   ...["Io", "Europa", "Ganymede", "Callisto", "Amalthea", "Titan", "Triton", "Charon"].map(n => { const q = () => MOON_LIST.find(m => m.name === n); return [n, q()?.col || "#bbbbbb", () => moonStand(q())]; }).filter(x => MOON_LIST.find(m => m.name === x[0]))];
 function moonSpot() { const d = V3(MC.x, 0, MC.z).normalize(); return [V3(MC.x - d.x * 1.6, 0, MC.z - d.z * 1.6), MC]; }
 function moonStand(m) { const pc = m.planet.c, mp = m.pos(), d = V3(mp.x - pc.x, 0, mp.z - pc.z).normalize(), back = Math.max(1.5, m.r * 30);
   return [V3(mp.x + d.x * back, 0, mp.z + d.z * back), mp]; }
-function teleport(i) { const [at, look] = PLACES[i][2](); if (inCar) exitCar(); flying = false; at.y = terrainH(at.x, at.z); rig.position.copy(at);
+function teleport(i) { if (PLACES[i][2] === "train") return boardTrain(); if (onTrain) onTrain = false; const [at, look] = PLACES[i][2](); if (inCar) exitCar(); flying = false; at.y = terrainH(at.x, at.z); rig.position.copy(at);
   const dx = look.x - at.x, dz = look.z - at.z, ry = Math.atan2(-dx, -dz);
   if (renderer.xr.isPresenting) { vrTurn = ry; rig.rotation.set(0, ry, 0); } else { yaw = ry; pitch = Math.atan2(look.y - at.y - 1.65, Math.hypot(dx, dz)); } wristDirty = true; }
 const wristC = document.createElement("canvas"); wristC.width = 640; wristC.height = 40 + Math.ceil(PLACES.length / 2) * 62; const wristT = new THREE.CanvasTexture(wristC); wristT.colorSpace = THREE.SRGBColorSpace;
@@ -53670,10 +53764,10 @@ addEventListener("pointerup", () => dragging = false);
 addEventListener("pointermove", e => { if (!dragging) return; yaw -= e.movementX * 0.004; pitch = THREE.MathUtils.clamp(pitch - e.movementY * 0.004, -1.5, 1.5); });
 intro?.addEventListener("click", start);
 const guide = document.getElementById("guide");
-guide.innerHTML = "<b>Go to</b><button data-go='desk'><i style='background:#3d7cc9'></i>the globe</button><button data-tp='1'><i style='background:#d8d8d8'></i>the Moon</button>" +
+guide.innerHTML = "<b>Go to</b><button data-go='desk'><i style='background:#3d7cc9'></i>the globe</button><button data-tp='2'><i style='background:#d8d8d8'></i>the Moon</button><button data-train='1'><i style='background:#b8322a'></i>🚆 ride the Solar Line</button>" +
   BODIES.map((b, k) => `<div class="row"><button data-go="${k}"><i style="background:${b.col}"></i>${b.name}</button><button class="drive" data-drive="${k}" title="drive there">🚗 ${k + 1}</button></div>`).join("");
 guide.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); start();
-  if (b.dataset.drive) return driveTo(BODIES[+b.dataset.drive]); if (b.dataset.tp) return teleport(+b.dataset.tp);
+  if (b.dataset.drive) return driveTo(BODIES[+b.dataset.drive]); if (b.dataset.tp) return teleport(+b.dataset.tp); if (b.dataset.train) return boardTrain();
   if (inCar) exitCar();
   if (b.dataset.go === "desk") { rig.position.set(0, 0, 1.7); yaw = 0; pitch = -0.15; return; }
   const t = BODIES[+b.dataset.go], p = t.stop; rig.position.set(p.x, terrainH(p.x, p.z), p.z); yaw = Math.atan2(-(t.w.x - p.x), -(t.w.z - p.z)); pitch = 0; flying = false; });
@@ -53681,9 +53775,9 @@ const hud = document.getElementById("hud");
 function readout(v) {
   const d = rig.position.distanceTo(GC), near = BODIES.reduce((a, b) => V3(b.w.x, 0, b.w.z).distanceTo(rig.position) < V3(a.w.x, 0, a.w.z).distanceTo(rig.position) ? b : a);
   hud.innerHTML = `<b>1 : ${(1 / K / 1e6).toFixed(1)} million</b> &nbsp;·&nbsp; the Earth is a 12-inch globe &nbsp;·&nbsp; positions for ${NOW.toDateString()}<br>
-    ${inCar ? "driving" : flying ? "jetpack" : "walking"} ${inCar ? "" : `<span class="k">F</span>`} &nbsp;·&nbsp; ${v.toFixed(v < 10 ? 1 : 0)} m/s here = ${(v / C_HERE).toFixed(2)} × light speed here (${C_HERE.toFixed(1)} m/s)<br>
+    ${onTrain ? "on the Solar Line · " + trainLine() + "<br>" : ""}${inCar ? "driving" : onTrain ? "aboard" : flying ? "jetpack" : "walking"} ${inCar || onTrain ? "" : `<span class="k">F</span>`} &nbsp;·&nbsp; ${v.toFixed(v < 10 ? 1 : 0)} m/s here = ${(v / C_HERE).toFixed(2)} × light speed here (${C_HERE.toFixed(1)} m/s)<br>
     from the globe: ${fmtM(d)} = ${fmtKm(d / K / 1000)} real &nbsp;·&nbsp; nearest: <b>${near.name}</b><br>
-    <span class="dim">${inCar ? "W / S faster / slower · space stop · 1–9 pick a destination · E get out" : "WASD walk · drag to look · scroll or − = speed · F jetpack (space / C) · E at the car to get in · 1–9 drive to a planet · H markers"}</span>`;
+    <span class="dim">${onTrain ? "WASD walk about the carriage · drag to look · E get off when the train is in a station" : inCar ? "W / S faster / slower · space stop · 1–9 pick a destination · E get out" : "WASD walk · drag to look · scroll or − = speed · F jetpack (space / C) · E at the car to get in · 1–9 drive to a planet · H markers"}</span>`;
 }
 
 // ---------- VR ----------
@@ -53772,16 +53866,16 @@ function frame() {
   if (vr) { const s = renderer.xr.getSession(); let mx = 0, my = 0, boost = 1;
     for (const src of s?.inputSources || []) { const gp = src.gamepad; if (!gp) continue; const [ax, ay] = stick(gp.axes);
       if (src.handedness === "left") { mx += ax; my += ay;
-        if (tap("L", gp, 4)) { if (inCar) exitCar(); else { carRoute = carRoute; enterCar(); } }
+        if (tap("L", gp, 4)) { if (onTrain) { if (train.state === "dwell") alight(); } else if (inCar) exitCar(); else if (nearTrainDoor()) boardTrain(); else enterCar(); }
         if (tap("L", gp, 5)) { const k = dest ? (BODIES.indexOf(dest) + 1) % BODIES.length : 0; driveTo(BODIES[k]); } }
       else { if (gp.buttons[0]?.value > 0.3 && !inCar) boost = 6; my += ay;
         if (Math.abs(ax) > 0.7 && snap) { vrTurn -= Math.sign(ax) * Math.PI / 6; snap = false; } else if (Math.abs(ax) < 0.3) snap = true;
         if (inCar && tap("R", gp, 4)) speedI = Math.max(0, speedI - 1); if (inCar && tap("R", gp, 5)) speedI = Math.min(SPEEDS.length - 1, speedI + 1); } }
-    if (!inCar) { rig.rotation.y = vrTurn;
+    if (!inCar && !onTrain) { rig.rotation.y = vrTurn;
       if (mx || my) { fwd.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(rig.quaternion); fwd.y = 0; fwd.normalize(); sideV.crossVectors(fwd, UP).normalize();
         const sp = 1.5 * boost; rig.position.addScaledVector(fwd, -my * sp * dt).addScaledVector(sideV, mx * sp * dt); moved = sp; }
-      rig.position.y = terrainH(rig.position.x, rig.position.z); } }
-  else if (!inCar) { camera.rotation.set(pitch, yaw, 0, "YXZ"); camera.position.y = 1.65;
+      rig.position.y = floorH(rig.position.x, rig.position.z); } }
+  else if (!inCar && !onTrain) { camera.rotation.set(pitch, yaw, 0, "YXZ"); camera.position.y = 1.65;
     const sp = speed * (keys.ShiftLeft || keys.ShiftRight ? 5 : 1) * dt, before = rig.position.clone();
     camera.getWorldDirection(fwd); if (!flying) { fwd.y = 0; fwd.normalize(); } sideV.crossVectors(fwd, UP).normalize();
     if (keys.KeyW || keys.ArrowUp) rig.position.addScaledVector(fwd, sp); if (keys.KeyS || keys.ArrowDown) rig.position.addScaledVector(fwd, -sp);
@@ -53789,7 +53883,20 @@ function frame() {
     if (flying && keys.Space) rig.position.y += sp; if (flying && (keys.KeyC || keys.ControlLeft)) rig.position.y -= sp;
     if (keys.ArrowLeft) yaw += 1.5 * dt; if (keys.ArrowRight) yaw -= 1.5 * dt;
     moved = before.distanceTo(rig.position) / Math.max(dt, 1e-4);
-    const gh = terrainH(rig.position.x, rig.position.z); if (!flying) rig.position.y = gh; else rig.position.y = Math.max(gh, rig.position.y); }
+    const gh = floorH(rig.position.x, rig.position.z); if (!flying) rig.position.y = gh; else rig.position.y = Math.max(gh, rig.position.y); }
+  stepTrain(dt);
+  if (onTrain) { const g = train.cars[1], L = CAR_L[1];
+    if (vr) { const s = renderer.xr.getSession(); let mx = 0, my = 0; for (const src of s?.inputSources || []) if (src.handedness === "left") { const [ax, ay] = stick(src.gamepad?.axes); mx = ax; my = ay; }
+      const f = V3(0, 0, -1).applyQuaternion(camera.quaternion).applyAxisAngle(UP, vrTurn); f.y = 0; f.normalize(); const sv = V3(-f.z, 0, f.x);   // in the carriage's own frame
+      tLocal.addScaledVector(f, -my * 1.4 * dt).addScaledVector(sv, mx * 1.4 * dt); }
+    else { const f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0), sd = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0); if (keys.ArrowLeft) yaw += 1.5 * dt; if (keys.ArrowRight) yaw -= 1.5 * dt;
+      tLocal.x += (-Math.sin(yaw) * f + Math.cos(yaw) * sd) * 1.6 * dt; tLocal.z += (-Math.cos(yaw) * f - Math.sin(yaw) * sd) * 1.6 * dt; }
+    tLocal.x = THREE.MathUtils.clamp(tLocal.x, -1.25, 1.25); tLocal.z = THREE.MathUtils.clamp(tLocal.z, -L / 2 + 0.6, L / 2 - 0.6); 
+    g.updateMatrixWorld(); rig.position.copy(V3(tLocal.x, 1.2, tLocal.z).applyMatrix4(g.matrixWorld));
+    const hy = Math.atan2(-(new THREE.Vector3(0, 0, -1).applyQuaternion(g.quaternion).x), -(new THREE.Vector3(0, 0, -1).applyQuaternion(g.quaternion).z));
+    if (vr) rig.rotation.set(0, hy + vrTurn, 0); else { rig.rotation.set(0, hy, 0); camera.position.y = 1.65; camera.rotation.set(pitch, yaw, 0, "YXZ"); }
+    moved = Math.abs(train.v); }
+  trainTimer -= dt; if (trainTimer <= 0) { drawTrainScreen(); trainTimer = 0.3; }
   if (inCar) { const v = SPEEDS[speedI] / 3.6;
     if (carRoute) { carS = Math.min(carRoute.L, carS + v * dt); if (carS >= carRoute.L) speedI = 0; }
     placeCar(); moved = carRoute && carS < carRoute.L ? v : 0;
@@ -53797,7 +53904,7 @@ function frame() {
     if (vr) rig.rotation.set(0, car.rotation.y + vrTurn, 0); else { rig.rotation.set(0, car.rotation.y, 0); camera.position.y = 0.55; camera.rotation.set(pitch, yaw, 0, "YXZ"); }
     for (const b of DASH_BTNS) if (b.flash > 0) b.flash -= dt;
     dashTimer -= dt; if (dashTimer <= 0) { drawDash(v); dashTimer = 0.2; } }
-  else if (!vr) rig.rotation.set(0, 0, 0);
+  else if (!vr && !onTrain) rig.rotation.set(0, 0, 0);
   if (guide.style.display !== (inCar ? "none" : "")) guide.style.display = inCar ? "none" : "";   // the dashboard replaces the guide while you drive
   for (const i of [0, 1]) { const c = renderer.xr.getController(i), l = c.userData.laser; if (l) l.visible = vr && (inCar || c.userData.hand === "right"); }
   wristPanel.visible = vr; if (vr && wristDirty) drawWrist();
