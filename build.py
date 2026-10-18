@@ -295,3 +295,26 @@ PRES = PRES[:i0] + """<div id="intro"><div class="card">
 out7 = HERE / "president.html"
 out7.write_text(PRES.replace("__THREE__", three).replace("__SCENE__", (HERE / "president.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out7.name}, {out7.stat().st_size // 1024} KB")
+
+
+# ---- the eighth page: Cahokia, about 1100 CE --------------------------------------------------------
+CAH = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Cahokia, about 1100 CE</title>").replace("background:#c8d4d8", "background:#c8d6dc")
+i0, i1 = CAH.index('<div id="intro">'), CAH.index('<button id="vr">')
+CAH = CAH[:i0] + """<div id="intro"><div class="card">
+  <h1>Cahokia, about 1100 CE</h1>
+  <p>The largest city north of Mexico, at its height: perhaps 10,000&ndash;20,000 people in the American Bottom, the wide
+  floodplain of the Mississippi across from today's St. Louis. Monks Mound rises 30 m over the Grand Plaza; a hundred more
+  earthen mounds, thatched houses by the thousand, posts, plazas and fields spread across the plain.</p>
+  <p>Everything is at its real size. Walk the Grand Plaza and climb Monks Mound; go west to the mound groups at East St. Louis
+  and across the Mississippi at St. Louis, north to Horseshoe Lake, or east up the bluffs to the Emerald Acropolis, 20 km away.
+  The land goes on past the map, generated as you travel.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>shift</kbd> run &nbsp;&middot;&nbsp;
+  <kbd>&minus;</kbd> <kbd>=</kbd> or scroll: pace (up to very fast, for long trips) &nbsp;&middot;&nbsp; <kbd>F</kbd> fly &nbsp;&middot;&nbsp; <kbd>E</kbd> read about where you are &nbsp;&middot;&nbsp; <kbd>M</kbd> map<br>
+  In VR: left stick walk, right stick turn, trigger run, <b>A</b> read, <b>B</b> pace, <b>X</b> travel to a place you have found, <b>Y</b> fly; the map is on your left wrist</p>
+  <p class="dim">Mound positions and sizes, the plazas, Woodhenge, the waterways and the outlying centres follow archaeological maps and
+  reports; houses and fields follow the excavated densities and house types, placed by a generator. Click to begin.</p>
+</div></div>
+""" + CAH[i1:]
+out8 = HERE / "cahokia.html"
+out8.write_text(CAH.replace("__THREE__", three).replace("__SCENE__", (HERE / "cahokia.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out8.name}, {out8.stat().st_size // 1024} KB")
