@@ -54483,10 +54483,12 @@ function heliPlan() {   // the route: a smooth curve through low passes beside e
     q.y = big ? b.c.y : Math.max(b.c.y - 1.4, terrainH(q.x, q.z) + 4); stops.push({ name: ISLES.some(I => I.b === b) ? b.name + "'s island" : b.name, q, b, aw }); }
   const P = [PAD.clone(), PAD.clone().add(V3(0, 18, 0))]; let prev = null;
   const hop = (a, b) => { const L = Math.hypot(b.x - a.x, b.z - a.z); if (L < 900) return; const m = a.clone().lerp(b, 0.5); m.y = Math.max(a.y, b.y, terrainH(m.x, m.z)) + THREE.MathUtils.clamp(0.12 * L, 100, 3000); P.push(m); };
-  for (const s of stops) {
+  stops.forEach((s, j) => { const nxt = j + 1 < stops.length ? stops[j + 1].q : PAD;
     if (s.b) { const f = V3(-s.aw.z, 0, s.aw.x), sg = prev && (prev.x - s.q.x) * f.x + (prev.z - s.q.z) * f.z < 0 ? -1 : 1, run = Math.max(800, s.b.r * 3);   // fly past along the side away from its tower
-      s.ain = s.q.clone().addScaledVector(f, sg * run); s.ain.y = s.q.y + 40; s.aout = s.q.clone().addScaledVector(f, -sg * run); s.aout.y = s.q.y + 40; }
-    if (prev) hop(prev, s.ain || s.q); if (s.ain) P.push(s.ain); P.push(s.q.clone()); if (s.aout) P.push(s.aout); prev = s.aout || s.q; }
+      s.ain = s.q.clone().addScaledVector(f, sg * run); s.ain.y = s.q.y + 40; s.aout = s.q.clone().addScaledVector(f, -sg * run); s.aout.y = s.q.y + 40;
+      if ((nxt.x - s.q.x) * f.x * -sg + (nxt.z - s.q.z) * f.z * -sg < 0) { const nr = V3(-f.z, 0, f.x), sd = Math.sign((nxt.x - s.q.x) * nr.x + (nxt.z - s.q.z) * nr.z) || 1;   // the next leg goes back the way it came:
+        s.turn = s.aout.clone().addScaledVector(f, -sg * 1200).addScaledVector(nr, sd * 1400); s.turn.y = s.q.y + 300; } }                                   // swing round in a wide, high loop, not a hairpin
+    if (prev) hop(prev, s.ain || s.q); if (s.ain) P.push(s.ain); P.push(s.q.clone()); if (s.aout) P.push(s.aout); if (s.turn) P.push(s.turn); prev = s.turn || s.aout || s.q; });
   const dir = V3(prev.x - PAD.x, 0, prev.z - PAD.z).normalize(), fin = PAD.clone().addScaledVector(dir, 300).setY(PAD.y + 90); hop(prev, fin); P.push(fin, PAD.clone().add(V3(0, 22, 0)), PAD.clone());
   const curve = new THREE.CatmullRomCurve3(P, false, "centripetal"); curve.arcLengthDivisions = Math.min(60000, P.length * 600);
   const pts = curve.getSpacedPoints(Math.ceil(curve.getLength() / 5)), n = pts.length;
@@ -54509,9 +54511,27 @@ function heliPlan() {   // the route: a smooth curve through low passes beside e
   const X = new Float32Array(n), Z = new Float32Array(n), cum = new Float32Array(n), V = new Float32Array(n), T = new Float32Array(n);
   pts.forEach((q, i) => { X[i] = q.x; Z[i] = q.z; if (i) cum[i] = cum[i - 1] + Math.hypot(X[i] - X[i - 1], Y[i] - Y[i - 1], Z[i] - Z[i - 1]);
     let d = 1e9; for (const s of stops) d = Math.min(d, Math.hypot(q.x - s.q.x, Y[i] - s.q.y, q.z - s.q.z));
-    V[i] = Math.min(800, 8 + 0.2 * (Math.hypot(d, 40) - 40), 2.5 + 0.2 * (Math.hypot(padD[i], Y[i] - PAD.y, 15) - 15)); if (i) T[i] = T[i - 1] + (cum[i] - cum[i - 1]) / V[i]; });
+    V[i] = Math.min(800, 8 + 0.2 * (Math.hypot(d, 40) - 40), 2.5 + 0.2 * (Math.hypot(padD[i], Y[i] - PAD.y, 15) - 15)); });
+  const WMAX = 0.14;   // it always faces where it is going, and never turns faster than ~8°/s: it slows for bends (speed <= turn rate x radius)
+  for (let i = 0; i < n; i++) { const a = Math.max(0, i - 20), b = Math.min(n - 1, i + 20), l1 = Math.hypot(X[i] - X[a], Z[i] - Z[a]), l2 = Math.hypot(X[b] - X[i], Z[b] - Z[i]); if (l1 < 20 || l2 < 20) continue;
+    let dh = Math.atan2(X[b] - X[i], Z[b] - Z[i]) - Math.atan2(X[i] - X[a], Z[i] - Z[a]); dh = Math.atan2(Math.sin(dh), Math.cos(dh)); const kap = Math.abs(dh) / (0.5 * (l1 + l2)); if (kap > 1e-7) V[i] = Math.min(V[i], Math.max(3, WMAX / kap)); }
+  for (let i = 1; i < n; i++) V[i] = Math.min(V[i], V[i - 1] + 0.2 * (cum[i] - cum[i - 1]));               // and changes speed gradually into and out of them
+  for (let i = n - 2; i >= 0; i--) V[i] = Math.min(V[i], V[i + 1] + 0.2 * (cum[i + 1] - cum[i]));
+  for (let i = 1; i < n; i++) T[i] = T[i - 1] + (cum[i] - cum[i - 1]) / V[i];
+  const HY = new Float32Array(n); let prevY = NaN;   // its heading: the direction of travel over about 3 s around each point
+  for (let i = 0; i < n; i++) { const w = THREE.MathUtils.clamp(Math.round(V[i] * 1.5 / 5), 4, 300), a = Math.max(0, i - w), b = Math.min(n - 1, i + w), hx = X[b] - X[a], hz = Z[b] - Z[a];
+    let y = Math.hypot(hx, hz) > 3 ? Math.atan2(-hx, -hz) : prevY; if (isNaN(y)) { HY[i] = NaN; continue; } if (!isNaN(prevY)) y = prevY + Math.atan2(Math.sin(y - prevY), Math.cos(y - prevY)); HY[i] = prevY = y; }
+  { const f = HY.findIndex(v => !isNaN(v)); for (let i = 0; i < f; i++) HY[i] = HY[f]; }
+  { const Fw = HY.slice(), Bw = HY.slice();   // where the route doubles back, spread the turn out: never more than 8°/s, centred on the bend
+    for (let i = 1; i < n; i++) { const m = WMAX * (T[i] - T[i - 1]); Fw[i] = THREE.MathUtils.clamp(Fw[i], Fw[i - 1] - m, Fw[i - 1] + m); }
+    for (let i = n - 2; i >= 0; i--) { const m = WMAX * (T[i + 1] - T[i]); Bw[i] = THREE.MathUtils.clamp(Bw[i], Bw[i + 1] - m, Bw[i + 1] + m); }
+    for (let i = 0; i < n; i++) HY[i] = (Fw[i] + Bw[i]) / 2;
+    let slow = false; for (let i = 1; i < n - 1; i++) { const hx = X[i + 1] - X[i - 1], hz = Z[i + 1] - Z[i - 1]; if (Math.hypot(hx, hz) < 1) continue;   // and nearly hover while it turns there
+      let d = Math.atan2(-hx, -hz) - HY[i]; d = Math.abs(Math.atan2(Math.sin(d), Math.cos(d))); if (d > 0.35) { V[i] = Math.min(V[i], 1.5); slow = true; } }
+    if (slow) { for (let i = 1; i < n; i++) V[i] = Math.min(V[i], V[i - 1] + 0.2 * (cum[i] - cum[i - 1])); for (let i = n - 2; i >= 0; i--) V[i] = Math.min(V[i], V[i + 1] + 0.2 * (cum[i + 1] - cum[i]));
+      for (let i = 1; i < n; i++) T[i] = T[i - 1] + (cum[i] - cum[i - 1]) / V[i]; } }
   let k0 = 0; for (const s of stops) { let best = k0, bd = 1e9; for (let i = k0; i < n; i++) { const d = Math.hypot(X[i] - s.q.x, Z[i] - s.q.z); if (d < bd) { bd = d; best = i; } if (d < 4) break; } s.K = best; k0 = best; }
-  return { X, Y, Z, cum, V, T, n, L: cum[n - 1], stops }; }
+  return { X, Y, Z, cum, V, T, HY, n, L: cum[n - 1], stops }; }
 function hIdx(s) { let lo = 0, hi = HP.n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (HP.cum[m] <= s) lo = m; else hi = m; } return lo; }
 function heliGo() { if (heliState === "parked" || heliState === "landed") { heliState = "spinup"; heliTimer = 0; heliS = 0; heliPaused = false; } else heliPaused = !heliPaused; }
 function heliSkip() { if (!HP || heliState !== "flying") return; const s = HP.stops.find(s => HP.cum[s.K] > heliS + 60); heliS = s ? Math.max(heliS, HP.cum[s.K] - 1500) : Math.max(heliS, HP.L - 400); }
@@ -54544,14 +54564,12 @@ function stepHeli(dt, vr) {
   const on = heliState === "spinup" || heliState === "flying"; heliSpin += ((on ? 28 : 0) - heliSpin) * Math.min(1, dt * (on ? 0.8 : 0.35));
   rotor.rotation.y += heliSpin * dt; tailRotor.rotation.x += heliSpin * 4 * dt; rotorDisc.visible = heliSpin > 12; rotorBlades.visible = heliSpin <= 12;
   let v = 0;
-  if (heliState === "spinup") { heliTimer += dt; heliMul = 0; heliYawV = 0; if (heliTimer > 3.5) heliState = "flying"; }
+  if (heliState === "spinup") { heliTimer += dt; heliMul = 0; let d = HP ? HP.HY[0] - heli.rotation.y : 0; d = Math.atan2(Math.sin(d), Math.cos(d));   // turns gently on the pad to face its way out
+    heli.rotation.y += THREE.MathUtils.clamp(d, -0.12 * dt, 0.12 * dt); if (heliTimer > 3.5 && Math.abs(d) < 0.01) { heli.rotation.y = HP.HY[0]; heliState = "flying"; } }
   else if (heliState === "flying" && HP) { const i = hIdx(heliS); heliMul += ((heliPaused ? 0 : HMULS[heliMulI]) - heliMul) * Math.min(1, dt * 0.6); v = HP.V[i] * heliMul; heliS += v * dt; if (heliS >= HP.L) { heliS = HP.L; heliState = "landed"; } }
   if (HP && (heliState === "flying" || heliState === "landed" && heliS > 0)) { const i = hIdx(heliS), j = Math.min(HP.n - 1, i + 1), f = THREE.MathUtils.clamp((heliS - HP.cum[i]) / Math.max(1e-6, HP.cum[j] - HP.cum[i]), 0, 1);
     heli.position.set(HP.X[i] + (HP.X[j] - HP.X[i]) * f, HP.Y[i] + (HP.Y[j] - HP.Y[i]) * f, HP.Z[i] + (HP.Z[j] - HP.Z[i]) * f);
-    const ahead = Math.max(150, v * 8), k = hIdx(Math.min(HP.L, heliS + ahead)), tx = HP.X[k] - heli.position.x, tz = HP.Z[k] - heli.position.z;   // turn gently toward where it will be in ~8 s
-    if (Math.hypot(tx, tz) > 20 && heliState === "flying") { let d = Math.atan2(-tx, -tz) - heli.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d));
-      const want = THREE.MathUtils.clamp(d * 0.3, -0.12, 0.12); heliYawV += THREE.MathUtils.clamp(want - heliYawV, -0.05 * dt, 0.05 * dt); } else heliYawV *= Math.max(0, 1 - dt);
-    heli.rotation.y += heliYawV * dt; }
+    heli.rotation.y = HP.HY[i] + (HP.HY[j] - HP.HY[i]) * f; }
   if (inHeli) { const seat = V3(-0.45, 0.85, 0.05).applyAxisAngle(V3(0, 1, 0), heli.rotation.y).add(heli.position); rig.position.copy(seat);
     if (vr) rig.rotation.set(0, heli.rotation.y + vrTurn, 0); else { rig.rotation.set(0, heli.rotation.y, 0); camera.position.y = 0.6; camera.rotation.set(pitch, yaw, 0, "YXZ"); }
     for (const b of HBTNS) if (b.flash > 0) b.flash -= dt; heliPanelT -= dt; if (heliPanelT <= 0) { drawHeliPanel(v); heliPanelT = 0.2; } }
