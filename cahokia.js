@@ -234,13 +234,23 @@ function instances(geo, mat, list, colorFn) { const im = new THREE.InstancedMesh
   list.forEach(([x, y, z, sx, sy, sz, ry], i) => { O3.position.set(x, y, z); O3.rotation.set(0, ry || 0, 0); O3.scale.set(sx, sy, sz); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); if (colorFn) { colorFn(i, c); im.setColorAt(i, c); } });
   if (!list.length) im.count = 0; im.frustumCulled = false; return im; }
 // a house: walls and a hipped thatched roof. L = { walls, roofs } lists; w across the ridge, d along it
-function addHouse(L, x, z, w, d, wallH, roofH, ry, gy) { const y = gy ?? groundH(x, z);
-  L.walls.push([x, y - 0.3, z, d, wallH + 0.3, w, ry]); L.roofs.push([x, y + wallH, z, d + 1.0, roofH, w + 1.0, ry]); }
+function addHouse(L, x, z, w, d, wallH, roofH, ry, gy, door = 1, kind = "house") { const y = gy ?? groundH(x, z);
+  const H = { x, z, w, d, ry, gy: y, wallH, roofH, door, kind, L, wi: L.walls.length, ri: L.roofs.length, di: (L.doors || (L.doors = [])).length };
+  L.walls.push([x, y - 0.3, z, d, wallH + 0.3, w, ry]); L.roofs.push([x, y + wallH, z, d + 1.0, roofH, w + 1.0, ry]);
+  const ox = Math.sin(ry) * (w / 2 + 0.03) * door, oz = Math.cos(ry) * (w / 2 + 0.03) * door; L.doors.push([x + ox, y, z + oz, Math.min(1.0, d * 0.22), Math.min(1.6, wallH * 0.8), 0.06, ry]);   // the doorway, on a long side
+  (L.houses || (L.houses = [])).push(H); return H; }
 function addFence(L, pts, h, gyFn) { for (let i = 1; i < pts.length; i++) { const [ax, az] = pts[i - 1], [bx, bz] = pts[i], len = Math.hypot(bx - ax, bz - az), mx = (ax + bx) / 2, mz = (az + bz) / 2;
   const y = gyFn ? gyFn(mx, mz) : groundH(mx, mz); L.fences.push([mx, y - 0.4, mz, len + 0.2, h + 0.4, 0.35, Math.atan2(-(bz - az), bx - ax)]); } }
-function buildSet(L, group) { if (L.walls?.length) group.add(instances(WALL_G, daubM, L.walls, (i, c) => c.setHSL(0.09, 0.2 + 0.1 * hash(i, 3), 0.7 + 0.12 * hash(i, 5))));
+const doorM = M(0x1a120a, { roughness: 1, side: THREE.DoubleSide }), DOOR_G = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);   // a doorway is one dark panel
+const hearthM = M(0x5a554e), jarM = M(0x4a3e34, { roughness: 0.8 }), mortarM = M(0x6a4a2c);
+function buildSet(L, group) { if (L.doors?.length) group.add(L._doors = instances(DOOR_G, doorM, L.doors));
+  const props = L._props = new THREE.Group(); group.add(props);                                       // the yards' hearths, jars and mortars: drawn only near you
+  if (L.hearths?.length) { props.add(instances(HEARTH_G, hearthM, L.hearths)); props.add(instances(FLAME_G, flameM, L.hearths.map(([x, y, z]) => [x, y + 0.05, z, 1, 1, 1, 0]))); }
+  if (L.jars?.length) props.add(instances(JAR_G, jarM, L.jars));
+  if (L.metates?.length) props.add(instances(MORTAR_G, mortarM, L.metates));
+  if (L.walls?.length) group.add(L._walls = instances(WALL_G, daubM, L.walls, (i, c) => c.setHSL(0.09, 0.2 + 0.1 * hash(i, 3), 0.7 + 0.12 * hash(i, 5))));
   if (L.plaster?.length) group.add(instances(WALL_G, plasterM, L.plaster));
-  if (L.roofs?.length) group.add(instances(ROOF_G, thatchM, L.roofs, (i, c) => c.setHSL(0.09, 0.25 + 0.15 * hash(i, 7), 0.62 + 0.18 * hash(i, 9))));
+  if (L.roofs?.length) group.add(L._roofs = instances(ROOF_G, thatchM, L.roofs, (i, c) => c.setHSL(0.09, 0.25 + 0.15 * hash(i, 7), 0.62 + 0.18 * hash(i, 9))));
   if (L.fences?.length) group.add(instances(WALL_G, logM, L.fences));
   if (L.cones?.length) group.add(instances(CONE_G, thatchM, L.cones));
   if (L.posts?.length) group.add(instances(POST_G, postM, L.posts));
@@ -248,6 +258,10 @@ function buildSet(L, group) { if (L.walls?.length) group.add(instances(WALL_G, d
   if (L.trunks?.length) group.add(instances(TRUNK_G, postM, L.trunks));
   if (L.crowns?.length) group.add(instances(CROWN_G, crownM, L.crowns, (i, c) => c.setHSL(0.2 + 0.07 * hash(i, 1), 0.38, 0.22 + 0.1 * hash(i, 2))));
   if (L.fields?.length) for (const f of L.fields) group.add(fieldMesh(...f)); }
+const HEARTH_G = new THREE.TorusGeometry(0.42, 0.09, 4, 8).rotateX(Math.PI / 2).translate(0, 0.05, 0), FLAME_G = new THREE.ConeGeometry(0.18, 0.55, 6).translate(0, 0.27, 0);
+const flameM = new THREE.MeshBasicMaterial({ color: 0xff9a3a, transparent: true, opacity: 0.85, toneMapped: false });
+const MORTAR_G = new THREE.CylinderGeometry(0.24, 0.27, 0.62, 8).translate(0, 0.31, 0);   // a wooden log mortar: maize was pounded with a long pestle
+const JAR_G = new THREE.LatheGeometry([[0, 0], [0.12, 0.02], [0.2, 0.1], [0.22, 0.2], [0.18, 0.3], [0.13, 0.34], [0.15, 0.38], [0.14, 0.39]].map(([r, y]) => new THREE.Vector2(r, y)), 8);   // a globular jar with a flared rim
 const TRUNK_G = new THREE.CylinderGeometry(0.18, 0.3, 1, 6).translate(0, 0.5, 0), CROWN_G = new THREE.IcosahedronGeometry(1, 0), crownM = new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true });
 function addTree(L, x, z, s, wet, gy) { const y = gy ?? groundH(x, z), th = (wet ? 7 : 5) * s; L.trunks.push([x, y, z, s, th, s, 0]); L.crowns.push([x, y + th + 2.4 * s, z, 3.4 * s, (wet ? 4.6 : 3.4) * s, 3.4 * s, hash(x | 0, z | 0) * 6]); }
 // a maize field: rows of green hills laid on the ground
@@ -261,7 +275,7 @@ function fieldMesh(x, z, w, d, ry) { const nx = Math.max(2, Math.ceil(w / 8)), n
 const TILE = 1000, TR = IS_HEADSET ? 2 : 3, TILES = new Map();
 function okToBuild(x, z, pad = 6) { if (baseH(x, z) < WATER + 0.8 || onMound(x, z)) return false; for (const [px, pz, hx, hz] of PLAZAS) if (Math.abs(x - px) < hx + pad && Math.abs(z - pz) < hz + pad) return false;
   for (const k of KEEP_CLEAR) if (Math.hypot(x - k[0], z - k[1]) < k[2] + pad) return false; return true; }
-function genTile(ti, tj) { const r = seeded(ti * 7919 + tj * 104729 + 11), x0 = ti * TILE, z0 = tj * TILE, L = { walls: [], roofs: [], cones: [], posts: [], trunks: [], crowns: [], fields: [], fences: [] }, group = new THREE.Group();
+function genTile(ti, tj) { const r = seeded(ti * 7919 + tj * 104729 + 11), x0 = ti * TILE, z0 = tj * TILE, L = { walls: [], roofs: [], cones: [], posts: [], trunks: [], crowns: [], fields: [], fences: [], houses: [], doors: [], hearths: [], jars: [], metates: [], yards: [] }, group = new THREE.Group();
   // trees, by the woodland density
   const nT = IS_HEADSET ? 500 : 1100;
   for (let k = 0; k < nT; k++) { const x = x0 + r() * TILE, z = z0 + r() * TILE, h = baseH(x, z), f = forestAt(x, z, h); if (r() > f || !okToBuild(x, z, 2)) continue; addTree(L, x, z, 0.8 + r() * 0.8, h < 1.5, h); }
@@ -279,7 +293,11 @@ function genTile(ti, tj) { const r = seeded(ti * 7919 + tj * 104729 + 11), x0 = 
       const [lu, lv] = side === 0 ? [along, -out] : side === 1 ? [out, along] : side === 2 ? [along, out] : [-out, along];
       const [dx, dz] = gw(lu, lv), x = cx + dx, z = cz + dz; if (!okToBuild(x, z, 4)) continue;
       const big = br() < 0.06, w = big ? 6 + br() * 2 : 3.6 + br() * 1.3, d = big ? 9 + br() * 3 : 5 + br() * 2;
-      addHouse(L, x, z, w, d, 1.9 + br() * 0.4, (big ? 4.6 : 3.3) + br() * 1.1, -GRID + (side % 2 ? Math.PI / 2 : 0), groundH(x, z)); }
+      const hry = -GRID + (side % 2 ? Math.PI / 2 : 0), door = Math.sign((cx - x) * Math.sin(hry) + (cz - z) * Math.cos(hry)) || 1;   // the door faces the yard
+      addHouse(L, x, z, w, d, 1.9 + br() * 0.4, (big ? 4.6 : 3.3) + br() * 1.1, hry, groundH(x, z), door); }
+    if (okToBuild(cx, cz, 1)) { const gy = groundH(cx, cz), ROLES = [["grind", "cook", "play"], ["pots", "talk", "play"], ["weave", "cook", "sit"], ["grind", "sit", "play"], ["cook", "talk", "pots"]];
+      L.hearths.push([cx, gy, cz, 1, 1, 1, 0]); L.jars.push([cx + 0.8, gy, cz + 0.5, 1, 1, 1, 0]); const [mx, mz] = gw(-1.6, 0.9); L.metates.push([cx + mx, gy, cz + mz, 1, 1, 1, 0]);
+      L.yards.push({ x: cx, z: cz, mx: cx + mx, mz: cz + mz, ry: br() * 6, n: 1 + Math.floor(br() * 3), roles: ROLES[(br() * ROLES.length) | 0] }); }
     if (br() < 0.6) { const [dx, dz] = gw((br() - 0.5) * yard * 0.5, (br() - 0.5) * yard * 0.5), sx = cx + dx, sz = cz + dz; if (okToBuild(sx, sz, 2)) { const sh = groundH(sx, sz);   // a raised granary in the yard
         for (const [px, pz] of [[-0.9, -0.9], [0.9, -0.9], [-0.9, 0.9], [0.9, 0.9]]) L.posts.push([sx + px, sh, sz + pz, 0.18, 1.3, 0.18, 0]);
         L.walls.push([sx, sh + 1.3, sz, 2.2, 1.4, 2.2, -GRID]); L.cones.push([sx, sh + 2.7, sz, 3.2, 2.0, 3.2, 0]); } }
@@ -292,8 +310,9 @@ function genTile(ti, tj) { const r = seeded(ti * 7919 + tj * 104729 + 11), x0 = 
     const sx = x - 7 * Math.sin(ry), sz = z + 7 * Math.cos(ry), sh = groundH(sx, sz); for (const [px, pz] of [[-0.9, -0.9], [0.9, -0.9], [-0.9, 0.9], [0.9, 0.9]]) L.posts.push([sx + px, sh, sz + pz, 0.18, 1.3, 0.18, 0]);
     L.walls.push([sx, sh + 1.3, sz, 2.2, 1.4, 2.2, ry]); L.cones.push([sx, sh + 2.7, sz, 3.2, 2, 3.2, 0]);
     const fx = x + 50 * Math.cos(ry + 1), fz = z + 50 * Math.sin(ry + 1); if (okToBuild(fx, fz, 20)) L.fields.push([fx, fz, 40 + r() * 40, 50 + r() * 50, ry]); }
-  buildSet(L, group); scene.add(group); return group; }
+  buildSet(L, group); group.userData = L; scene.add(group); return group; }
 function streamTiles(x, z) { const ci = Math.floor(x / TILE), cj = Math.floor(z / TILE); let made = 0;
+  for (const [k, g] of TILES) { const [i, j] = k.split(",").map(Number); if (g.userData._props) g.userData._props.visible = Math.abs(i - ci) <= 1 && Math.abs(j - cj) <= 1; }
   for (let d = 0; d <= TR; d++) for (let i = ci - d; i <= ci + d; i++) for (let j = cj - d; j <= cj + d; j++) { if (Math.max(Math.abs(i - ci), Math.abs(j - cj)) !== d) continue;
     const k = i + "," + j; if (!TILES.has(k) && made < 1) { TILES.set(k, genTile(i, j)); made++; } }
   for (const [k, g] of TILES) { const [i, j] = k.split(",").map(Number); if (Math.max(Math.abs(i - ci), Math.abs(j - cj)) > TR + 1) { scene.remove(g); g.traverse(o => { if (o.isMesh) { o.geometry !== WALL_G && o.geometry !== ROOF_G && o.geometry !== CONE_G && o.geometry !== POST_G && o.geometry !== TRUNK_G && o.geometry !== CROWN_G && o.geometry.dispose(); o.dispose?.(); } }); TILES.delete(k); } } }
@@ -399,7 +418,7 @@ function compound(m, lx, lz, hx, hz, gateSide = 1) { const g = m.base + m.h, P =
 // Monks Mound's summit building: ~31.7 x 14.6 m (104 x 48 ft), its roof perhaps 12 m high, a fenced courtyard and a great post in
 // front (Reed's excavations, 1971). Its orientation was not reported: here its long side faces south, along the mound's axis.
 { const m = MONKS, top = m.base + 29.5, [bx, bz] = toW(m, 0, -22);
-  CORE.walls.push([bx, top - 0.3, bz, 31.7, 3.6, 14.6, m.r]); CORE.roofs.push([bx, top + 3.3, bz, 33.5, 8.7, 16.4, m.r]);
+  addHouse(CORE, bx, bz, 14.6, 31.7, 3.3, 8.7, m.r, top, 1, "summit");
   const [px, pz] = toW(m, 0, 22); CORE.cedar.push([px, top - 1, pz, 0.9, 16, 0.9, 0]);
   compound(m, 0, -5, 30, 33, 1);
   stairs(m, 19, 189, 152, 6);           // the ramp's log steps (impressions found in 1971)
@@ -408,7 +427,7 @@ function compound(m, lx, lz, hx, hz, gateSide = 1) { const g = m.base + m.h, P =
 for (const m of MOUNDS) { if (m.kind !== "platform" || m.h < 2.5 || m.name.includes("upper") || m.name.includes("terrace")) continue;
   const run = m.h * (m.run ?? RUN), tw_ = m.w - 2 * run, td = m.d - 2 * run; if (tw_ < 8 || td < 8) continue;
   const bw = clampN(tw_ * 0.45, 5, 20), bd = clampN(td * 0.32, 4, 11), g = m.base + m.h, [bx, bz] = toW(m, 0, -td * 0.12);
-  CORE.walls.push([bx, g - 0.3, bz, bw, 2.6, bd, m.r]); CORE.roofs.push([bx, g + 2.3, bz, bw + 1.2, clampN(bw * 0.42, 3, 8), bd + 1.2, m.r]);
+  addHouse(CORE, bx, bz, bd, bw, 2.3, clampN(bw * 0.42, 3, 8), m.r, g, 1, "temple").mound = m;
   if (m.h >= 4 && tw_ > 20 && td > 16) compound(m, 0, 0, tw_ / 2 - 2, td / 2 - 2, 1); }
 { const m = MOUNDS.find(q => q.name.startsWith("Mound 60")); stairs(m, 0, -28, -12, 3); }   // Fox Mound's stair, from the plaza side
 // Woodhenge (III): 48 red cedar posts in a circle 125 m across, 7.5° apart, ~6 m tall, and a centre post 1.7 m east of centre.
@@ -421,10 +440,10 @@ CORE.cedar.push([-60, 0.1, 430, 0.6, 14, 0.6, 0]);
 // East St. Louis: the walled compound of small storage or ritual huts (as many as 100), which burned together about 1160
 { const cx = ESX + 260, cz = ESZ - 230, hx = 70, hz = 45, g = baseH(cx, cz);
   addFence(CORE, [[cx - hx, cz - hz], [cx + hx, cz - hz], [cx + hx, cz + hz], [cx + 5, cz + hz]], 3, () => g); addFence(CORE, [[cx - 5, cz + hz], [cx - hx, cz + hz], [cx - hx, cz - hz]], 3, () => g);
-  for (let i = 0; i < 10; i++) for (let j = 0; j < 10; j++) { const x = cx - hx + 9 + i * 13.6, z = cz - hz + 7 + j * 8.4; addHouse(CORE, x, z, 2.4, 3, 1.4, 1.8, -0.09, g); } }
+  for (let i = 0; i < 10; i++) for (let j = 0; j < 10; j++) { const x = cx - hx + 9 + i * 13.6, z = cz - hz + 7 + j * 8.4; addHouse(CORE, x, z, 2.4, 3, 1.4, 1.8, -0.09, g, j % 2 ? -1 : 1, "hut"); } }
 // the Emerald Acropolis: shrine houses on the ridge, set to the lunar axis (up to ~100 at a time; ~140 found in all)
 { const r = seeded(53); for (let k = 0; k < 90; k++) { const a = -260 + r() * 520, b = (r() - 0.5) * 120, [x, z] = emW(a, b); if (onMound(x, z)) continue;
-    addHouse(CORE, x, z, 3 + r() * 1.5, 4 + r() * 2, 1.7, 2.8 + r(), -EMA + Math.PI / 2, groundH(x, z)); } }
+    addHouse(CORE, x, z, 3 + r() * 1.5, 4 + r() * 2, 1.7, 2.8 + r(), -EMA + Math.PI / 2, groundH(x, z), 1, "shrine"); } }
 const coreGroup = new THREE.Group(); buildSet(CORE, coreGroup); scene.add(coreGroup);
 if (CORE.steps.length) coreGroup.add(instances(WALL_G, logM, CORE.steps));
 
@@ -491,57 +510,235 @@ const START = { x: -88, z: 672, yaw: 0 };
 const FIRES = [];
 
 // ---------- people ----------
-// Simple figures walking about the plazas and neighbourhoods; a chunkey game in a yard on the Grand Plaza, as the mural shows
-// (the game is well attested across the Mississippian world; its being played on this plaza is inferred); canoes on the water.
-const SKIN = [0x8d5a3b, 0x9a6646, 0x7a4a2e, 0xa36e4a, 0x84553a], CLOTH = [0xcdb48a, 0xb89a6a, 0x8a6a48, 0xd8c8a0, 0x9a4a2a, 0x6a5040, 0xe0d2b0, 0x7a6a50];
-const CHUNKEY = [-70, 372, 12, 44];                                    // the yard: x, z, half-width, half-length
-const NP = IS_HEADSET ? 140 : 280, PEOPLE = [];
+// Low-poly but human: head and hair, torso, arms and legs that move. Dress follows Mississippian evidence (figurines, the
+// Spiro and Cahokia engravings, early accounts): men in breechcloths, often with a scalp lock; women in knee-length wrap skirts
+// with long hair; some in woven or hide mantles. Out in the yards people grind maize, cook, make pots, weave and talk;
+// children play; others walk the plazas. A chunkey game runs in a yard on the Grand Plaza, as the mural shows (the game is well
+// attested; its being played on this plaza is inferred). Canoes drift on the creek and the river.
+const SKIN = [0x8d5a3b, 0x9a6646, 0x7a4a2e, 0xa36e4a, 0x84553a], GARB = [0xb8986a, 0x8a6a48, 0xcdb48a, 0x6a5040, 0x9a4a2a, 0x3a2e24, 0xd8c8a0, 0x7a6a50, 0xa05a3a];
+function mergeG(parts) { let n = 0; const gs = parts.map(([g, m]) => { const q = (g.index ? g.toNonIndexed() : g.clone()).applyMatrix4(m); q.deleteAttribute("uv"); n += q.attributes.position.count; return q; });
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let o = 0; for (const q of gs) { pos.set(q.attributes.position.array, o * 3); nor.set(q.attributes.normal.array, o * 3); o += q.attributes.position.count; }
+  const out = new THREE.BufferGeometry(); out.setAttribute("position", new THREE.BufferAttribute(pos, 3)); out.setAttribute("normal", new THREE.BufferAttribute(nor, 3)); return out; }
+const MT = (x, y, z, sx = 1, sy = 1, sz = 1, rx = 0) => new THREE.Matrix4().compose(V3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, 0, 0)), V3(sx, sy, sz));
+// the parts, each built round its joint (legs at the hip, arms at the shoulder, the rest at the hip); the figure faces +z
+const HIPY = 0.92;
+const PG = {
+  leg: mergeG([[new THREE.SphereGeometry(0.068, 6, 4), MT(0, -0.02, 0)], [new THREE.CylinderGeometry(0.066, 0.044, 0.84, 7), MT(0, -0.42, 0)], [new THREE.SphereGeometry(0.05, 6, 4), MT(0, -0.84, 0.02, 1, 0.6, 1.9)]]),
+  arm: mergeG([[new THREE.SphereGeometry(0.05, 6, 4), MT(0, -0.01, 0)], [new THREE.CylinderGeometry(0.047, 0.033, 0.56, 7), MT(0, -0.28, 0)], [new THREE.SphereGeometry(0.04, 5, 4), MT(0, -0.585, 0.01, 0.8, 1.2, 0.9)]]),
+  torso: mergeG([[new THREE.LatheGeometry([[0.13, 0], [0.118, 0.12], [0.14, 0.27], [0.162, 0.38], [0.152, 0.45], [0.06, 0.505]].map(([r, y]) => new THREE.Vector2(r, y)), 10), MT(0, 0, 0, 1, 1, 0.68)],
+    [new THREE.CylinderGeometry(0.046, 0.052, 0.09, 9), MT(0, 0.53, 0)]]),
+  head: mergeG([[new THREE.SphereGeometry(0.102, 10, 7), MT(0, 0.67, 0, 0.88, 1.12, 1)], [new THREE.BoxGeometry(0.024, 0.042, 0.03), MT(0, 0.66, 0.098)], [new THREE.SphereGeometry(0.05, 6, 4), MT(0, 0.61, 0.035, 1.25, 0.8, 1.2)]]),
+  hairLong: mergeG([[new THREE.SphereGeometry(0.108, 10, 4, 0, Math.PI * 2, 0, Math.PI * 0.55), MT(0, 0.675, -0.008, 0.92, 1.14, 1.04)], [new THREE.BoxGeometry(0.17, 0.32, 0.04), MT(0, 0.53, -0.08)]]),
+  hairLock: mergeG([[new THREE.SphereGeometry(0.104, 10, 3, 0, Math.PI * 2, 0, Math.PI * 0.28), MT(0, 0.675, -0.01, 0.9, 1.13, 1.02)], [new THREE.BoxGeometry(0.022, 0.03, 0.14), MT(0, 0.78, -0.02)], [new THREE.SphereGeometry(0.026, 5, 3), MT(0, 0.76, -0.095)]]),
+  skirt: new THREE.CylinderGeometry(0.15, 0.225, 0.52, 10, 1, true).scale(1, 1, 0.8).translate(0, -0.2, 0),
+  breech: mergeG([[new THREE.CylinderGeometry(0.136, 0.136, 0.07, 12, 1, true), MT(0, 0.02, 0, 1, 1, 0.7)], [new THREE.BoxGeometry(0.17, 0.4, 0.012), MT(0, -0.17, 0.092, 1, 1, 1, -0.06)], [new THREE.BoxGeometry(0.17, 0.36, 0.012), MT(0, -0.15, -0.088, 1, 1, 1, 0.06)]]),
+  mantle: new THREE.CylinderGeometry(0.175, 0.24, 0.5, 10, 1, true, Math.PI * 0.6, Math.PI * 1.8).scale(1, 1, 0.75).translate(0, 0.22, 0) };
+const PARTS = ["legL", "legR", "armL", "armR", "torso", "head", "hairLong", "hairLock", "skirt", "breech", "mantle"], PGEO = { legL: PG.leg, legR: PG.leg, armL: PG.arm, armR: PG.arm };
+const personMat = new THREE.MeshStandardMaterial({ roughness: 0.9, side: THREE.DoubleSide });
+// what each person looks like, from a seed
+function looks(i) { const h = k => hash(i * 13 + k, 77), woman = h(1) < 0.5, child = h(2) < 0.18, skin = SKIN[(h(3) * SKIN.length) | 0];
+  return { woman, child, s: child ? 0.6 + h(4) * 0.12 : 0.9 + h(4) * 0.13, skin, garb: GARB[(h(5) * GARB.length) | 0], mantle: !child && h(6) < (woman ? 0.45 : 0.25), mantleCol: GARB[(h(7) * GARB.length) | 0] }; }
+// a pose: hip drop, lean, leg and arm swings (radians, + backward)
+function poseOf(kind, t, ph, walkAmt) { const w = Math.sin(t * 7 + ph);
+  switch (kind) {
+    case "walk": return { drop: 0, lean: 0.04, lL: 0.42 * w * walkAmt, lR: -0.42 * w * walkAmt, aL: -0.32 * w * walkAmt, aR: 0.32 * w * walkAmt };
+    case "run": { const r = Math.sin(t * 11 + ph); return { drop: 0, lean: 0.18, lL: 0.8 * r, lR: -0.8 * r, aL: -0.7 * r, aR: 0.7 * r, bend: 0.5 }; }
+    case "sit": return { drop: HIPY - 0.13, lean: -0.05, lL: -1.45, lR: -1.35, aL: -0.4, aR: -0.35 + 0.05 * Math.sin(t * 0.7 + ph) };
+    case "kneel": return { drop: HIPY - 0.45, lean: 0.25, lL: 1.0, lR: 1.0, aL: -0.5, aR: -0.5 };
+    case "grind": { const g = Math.sin(t * 3.2 + ph); return { drop: 0, lean: 0.12 + 0.08 * g, lL: -0.08, lR: 0.08, aL: -1.9 - 0.55 * g, aR: -1.9 - 0.55 * g }; }   // pounding maize in a log mortar
+    case "cook": return { drop: HIPY - 0.45, lean: 0.35, lL: 1.0, lR: 1.0, aL: -0.6, aR: -1.0 - 0.35 * Math.sin(t * 1.8 + ph) };
+    case "pots": return { drop: HIPY - 0.13, lean: 0.35, lL: -1.4, lR: -1.4, aL: -0.95 + 0.08 * Math.sin(t * 3 + ph), aR: -0.95 - 0.08 * Math.sin(t * 3 + ph) };
+    case "weave": return { drop: HIPY - 0.13, lean: 0.25, lL: -1.4, lR: -1.3, aL: -0.9 - 0.2 * Math.sin(t * 2.6 + ph), aR: -0.9 + 0.2 * Math.sin(t * 2.6 + ph) };
+    case "talk": return { drop: 0, lean: 0, lL: 0.05, lR: -0.05, aL: 0.05, aR: -0.3 - 0.25 * Math.max(0, Math.sin(t * 1.3 + ph)) };
+    case "carry": return { drop: 0, lean: 0.03, lL: 0.4 * w * walkAmt, lR: -0.4 * w * walkAmt, aL: -2.7, aR: 0.25 * w * walkAmt };
+    default: return { drop: 0, lean: 0, lL: 0, lR: 0, aL: 0.03 * Math.sin(t * 0.8 + ph), aR: -0.03 * Math.sin(t * 0.8 + ph) }; } }
+// the part matrices for a person at x, y, z facing h with look L and pose P
+const _b = new THREE.Matrix4(), _hm = new THREE.Matrix4(), _j = new THREE.Matrix4(), _tmp = new THREE.Matrix4(), _q2 = new THREE.Quaternion(), _e2 = new THREE.Euler(), ZEROM = new THREE.Matrix4().makeScale(0, 0, 0), _p = V3(0, 0, 0), _s = V3(1, 1, 1);
+function partMatrices(x, y, z, h, L, P, out) { _e2.set(0, h, 0); _q2.setFromEuler(_e2); _b.compose(_p.set(x, y, z), _q2, _s.set(L.s, L.s, L.s));
+  _hm.copy(_b).multiply(_tmp.makeTranslation(0, HIPY - P.drop, 0)).multiply(_j.makeRotationX(P.lean));
+  const legAt = (sx, a) => out.push(_b.clone().multiply(_tmp.makeTranslation(sx, HIPY - P.drop, 0)).multiply(_j.makeRotationX(a)));
+  legAt(0.085, P.lL); legAt(-0.085, P.lR);
+  const armAt = (sx, a, sp) => out.push(_hm.clone().multiply(_tmp.makeTranslation(sx, 0.45, 0)).multiply(_j.makeRotationX(a)).multiply(_tmp.makeRotationZ(sp)));
+  armAt(0.172, P.aL, -0.04); armAt(-0.172, P.aR, 0.04);
+  out.push(_hm.clone(), _hm.clone(), L.woman ? _hm.clone() : ZEROM, L.woman ? ZEROM : _hm.clone(), L.woman && !L.child ? _hm.clone() : ZEROM, L.woman && !L.child ? ZEROM : _hm.clone(), L.mantle ? _hm.clone() : ZEROM); }
+// a person as ordinary meshes (for inside houses)
+function personMesh(i, kind, x, y, z, h, t = 0) { const L = looks(i), g = new THREE.Group(), mats = partMats(L), ms = []; partMatrices(0, 0, 0, 0, L, poseOf(kind, t, i), ms);
+  PARTS.forEach((p, k) => { if (ms[k] === ZEROM) return; const m = new THREE.Mesh(PGEO[p] || PG[p], mats[k]); m.matrixAutoUpdate = false; m.matrix.copy(ms[k]); g.add(m); });
+  g.position.set(x, y, z); g.rotation.y = h; g.userData = { i, kind }; return g; }
+function partMats(L) { const sk = M(L.skin, { roughness: 0.8 }), hair = M(0x1a120c), gb = M(L.garb, { roughness: 0.95, side: THREE.DoubleSide }), mn = M(L.mantleCol, { roughness: 0.95, side: THREE.DoubleSide });
+  return [sk, sk, sk, sk, L.mantle ? sk : sk, sk, hair, hair, gb, gb, mn]; }
+
+// the crowd: instanced parts, one set for everyone
+const NWALK = IS_HEADSET ? 110 : 240, NACT = IS_HEADSET ? 60 : 130, NCH = 2 + (IS_HEADSET ? 14 : 26), NALL = NWALK + NACT + NCH;
+const CROWD = {}; PARTS.forEach(p => { const im = new THREE.InstancedMesh(PGEO[p] || PG[p], personMat, NALL); im.frustumCulled = false; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); CROWD[p] = im; scene.add(im); });
+const LOOK = []; { const c = new THREE.Color(); for (let i = 0; i < NALL; i++) { const L = looks(i); LOOK.push(L);
+  PARTS.forEach(p => { c.setHex(p.startsWith("hair") ? 0x1a120c : p === "skirt" || p === "breech" ? L.garb : p === "mantle" ? L.mantleCol : L.skin); CROWD[p].setColorAt(i, c); }); } }
+const basketIM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.2, 0.15, 0.22, 10), M(0x9a7a4a), NALL); basketIM.frustumCulled = false; scene.add(basketIM);
+const _ms = [];
+function setPerson(i, x, y, z, h, kind, t, walkAmt = 1, show = true) { if (!show) { PARTS.forEach(p => CROWD[p].setMatrixAt(i, ZEROM)); basketIM.setMatrixAt(i, ZEROM); return; }
+  const L = LOOK[i]; _ms.length = 0; partMatrices(x, y, z, h, L, poseOf(kind, t, i * 1.7, walkAmt), _ms); PARTS.forEach((p, k) => CROWD[p].setMatrixAt(i, _ms[k]));
+  if (kind === "carry") { O3.position.set(x, y + (1.82 - 0) * L.s, z); O3.rotation.set(0, h, 0); O3.scale.setScalar(L.s); O3.updateMatrix(); basketIM.setMatrixAt(i, O3.matrix); } else basketIM.setMatrixAt(i, ZEROM); }
+// walkers about the plazas and lanes
+const CHUNKEY = [-70, 372, 12, 44];
 const ZONES = [[-38, 420, 180, 220, 0.34], [0, 0, 50, 40, 0.05], [-200, 150, 900, 700, 0.35], [ESX, ESZ, 400, 300, 0.12], [EMX, EMZ, 250, 150, 0.06], [-395, 0, 80, 140, 0.08]];
-{ const r = seeded(99), tot = ZONES.reduce((s, z) => s + z[4], 0), pick = () => { let a = r() * tot; for (const Z of ZONES) { a -= Z[4]; if (a <= 0) return Z; } return ZONES[0]; };
-  for (let k = 0; k < NP; k++) { const Z = pick(), p = { Z, x: Z[0] + (r() - 0.5) * 2 * Z[2], z: Z[1] + (r() - 0.5) * 2 * Z[3], tx: 0, tz: 0, v: 0.9 + r() * 0.6, wait: r() * 8, h: r() * 6, s: 0.92 + r() * 0.14, ph: r() * 6, r };
-    p.tx = p.x; p.tz = p.z; PEOPLE.push(p); } }
-// spectators along the chunkey yard, standing and sitting
-const WATCH = []; { const r = seeded(31); for (let k = 0; k < (IS_HEADSET ? 14 : 26); k++) { const sd = r() < 0.5 ? -1 : 1, z = CHUNKEY[1] + (r() - 0.5) * 2 * CHUNKEY[3], x = CHUNKEY[0] + sd * (CHUNKEY[2] + 2 + r() * 3);
-  WATCH.push({ x, z, h: sd > 0 ? -Math.PI / 2 : Math.PI / 2, sit: r() < 0.4, s: 0.92 + r() * 0.14 }); } }
-const NALL = NP + WATCH.length + 2;
-const torsoG = new THREE.CylinderGeometry(0.16, 0.22, 0.95, 8).translate(0, 1.07, 0), headG = new THREE.SphereGeometry(0.12, 10, 8).translate(0, 1.68, 0), legG = new THREE.BoxGeometry(0.11, 0.62, 0.13).translate(0, -0.31, 0);
-const torsos = new THREE.InstancedMesh(torsoG, M(0xffffff, { roughness: 0.95 }), NALL), heads = new THREE.InstancedMesh(headG, M(0xffffff), NALL), legsL = new THREE.InstancedMesh(legG, M(0xffffff), NALL), legsR = new THREE.InstancedMesh(legG, M(0xffffff), NALL);
-{ const c = new THREE.Color(); for (let i = 0; i < NALL; i++) { c.setHex(CLOTH[(hash(i, 1) * CLOTH.length) | 0]); torsos.setColorAt(i, c); c.setHex(SKIN[(hash(i, 2) * SKIN.length) | 0]); heads.setColorAt(i, c); legsL.setColorAt(i, c); legsR.setColorAt(i, c); } }
-for (const m of [torsos, heads, legsL, legsR]) { m.frustumCulled = false; scene.add(m); }
+const WALKERS = []; { const r = seeded(99), tot = ZONES.reduce((s, z) => s + z[4], 0), pick = () => { let a = r() * tot; for (const Z of ZONES) { a -= Z[4]; if (a <= 0) return Z; } return ZONES[0]; };
+  for (let k = 0; k < NWALK; k++) { const Z = pick(), p = { Z, x: Z[0] + (r() - 0.5) * 2 * Z[2], z: Z[1] + (r() - 0.5) * 2 * Z[3], tx: 0, tz: 0, v: (LOOK[k].child ? 1.3 : 0.9) + r() * 0.5, wait: r() * 8, h: r() * 6, carry: !LOOK[k].child && r() < 0.18, r };
+    p.tx = p.x; p.tz = p.z; WALKERS.push(p); } }
+// the yards' daily work: a pool of people placed at the yards nearest you
+const ACTS = []; for (let k = 0; k < NACT; k++) ACTS.push({ i: NWALK + k, spot: null, kind: "stand", x: 0, z: 0, h: 0, ph: k });
+let actAt = null;
+function assignYards() { const spots = []; for (const g of TILES.values()) for (const Y of g.userData.yards || []) if (Math.abs(Y.x - P_.x) < 260 && Math.abs(Y.z - P_.z) < 260) spots.push(Y);
+  spots.sort((a, b) => Math.hypot(a.x - P_.x, a.z - P_.z) - Math.hypot(b.x - P_.x, b.z - P_.z)); const keep = new Set(spots.slice(0, Math.floor(NACT / 2.2)));
+  for (const A of ACTS) if (A.spot && !keep.has(A.spot)) A.spot = null;
+  const busy = new Map(); for (const A of ACTS) if (A.spot) busy.set(A.spot, (busy.get(A.spot) || 0) + 1);
+  for (const Y of keep) { let n = busy.get(Y) || 0; const want = Y.n;
+    for (const A of ACTS) { if (n >= want) break; if (A.spot) continue; A.spot = Y; const role = Y.roles[n], a = Y.ry + n * 2.1 + 0.6, r_ = role === "play" ? 3 : 1.25;
+      A.kind = role; A.x = Y.x + Math.cos(a) * r_; A.z = Y.z + Math.sin(a) * r_; A.h = Math.atan2(Y.x - A.x, Y.z - A.z);
+      if (role === "grind") { A.x = Y.mx + 0.55; A.z = Y.mz; A.h = -Math.PI / 2; } n++; } } }
+// the chunkey game and its watchers
+const WATCH = []; { const r = seeded(31); for (let k = 0; k < NCH - 2; k++) { const sd = r() < 0.5 ? -1 : 1; WATCH.push({ i: NWALK + NACT + 2 + k, x: CHUNKEY[0] + sd * (CHUNKEY[2] + 2 + r() * 3), z: CHUNKEY[1] + (r() - 0.5) * 2 * CHUNKEY[3], h: sd > 0 ? -Math.PI / 2 : Math.PI / 2, kind: r() < 0.4 ? "sit" : r() < 0.6 ? "talk" : "stand" }); } }
 const stone = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.05, 16).rotateZ(Math.PI / 2), M(0x8a8478)); scene.add(stone);
 const poles = [0, 1].map(() => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 2.6, 6).rotateX(Math.PI / 2), M(0x8a6a3a)); scene.add(m); return m; });
-const _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s = V3(1, 1, 1), _m = new THREE.Matrix4(), _p = V3(0, 0, 0);
-function placePerson(i, x, z, h, s, walk, sit) { const g = groundH(x, z) - (sit ? 0.55 * s : 0); _s.set(s, s, s);
-  _e.set(0, h, 0, "YXZ"); _q.setFromEuler(_e); _p.set(x, g, z); _m.compose(_p, _q, _s); torsos.setMatrixAt(i, _m); heads.setMatrixAt(i, _m);
-  for (const [im, sd] of [[legsL, 1], [legsR, -1]]) { _e.set(sit ? -1.5 : sd * walk, h, 0, "YXZ"); _q.setFromEuler(_e); _p.set(x + Math.cos(h) * 0.1 * sd * s, g + 0.62 * s, z - Math.sin(h) * 0.1 * sd * s); _m.compose(_p, _q, _s); im.setMatrixAt(i, _m); } }
-// dugout canoes: hollowed logs some 6.5 m long, drifting along the creek and the river
+// dugout canoes, drifting along the creek and the river
 const CANOES = []; { const r = seeded(808); for (let k = 0; k < 10; k++) CANOES.push({ line: k < 4 ? CAHOKIA_CK : MISSISSIPPI, s: r() * 4000 + (k < 4 ? 1800 : 3400), v: (k < 4 ? 0.9 : 1.4) * (r() < 0.5 ? 1 : -1), off: k < 4 ? (r() - 0.5) * 8 : (r() - 0.5) * 500 }); }
 const canoeIM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.35, 0.35, 6.5, 10, 1, false, 0, Math.PI).rotateX(Math.PI / 2).rotateZ(Math.PI), M(0x5a3e26, { side: THREE.DoubleSide }), CANOES.length);
 canoeIM.frustumCulled = false; scene.add(canoeIM);
-let chT = 0;
-function animatePeople(t, dt) {
-  const near = p => Math.abs(p.x - P_.x) < 1500 && Math.abs(p.z - P_.z) < 1500;
-  PEOPLE.forEach((p, i) => { if (!near(p)) { placePerson(i, p.x, p.z, p.h, 0.0001, 0, false); return; }
-    let walk = 0; if (p.wait > 0) p.wait -= dt;
-    else { const dx = p.tx - p.x, dz = p.tz - p.z, d = Math.hypot(dx, dz);
-      if (d < 0.6) { p.wait = 2 + p.r() * 14; const Z = p.Z; p.tx = Z[0] + (p.r() - 0.5) * 2 * Z[2]; p.tz = Z[1] + (p.r() - 0.5) * 2 * Z[3];
+let chT = 0, crowdF = 0;
+function animatePeople(t, dt) { crowdF++;
+  if (!actAt || Math.hypot(P_.x - actAt[0], P_.z - actAt[1]) > 50) { assignYards(); actAt = [P_.x, P_.z]; }
+  const near = (x, z) => Math.hypot(x - P_.x, z - P_.z), every = (d, i) => d < 150 || (d < 700 && (crowdF + i) % 4 === 0) || (d < 1500 && (crowdF + i) % 12 === 0);
+  WALKERS.forEach((p, i) => { const d = near(p.x, p.z); if (d > 1500 || INSIDE) { setPerson(i, 0, 0, 0, 0, "", t, 0, false); return; }
+    let moving = false; if (p.wait > 0) p.wait -= dt;
+    else { const dx = p.tx - p.x, dz = p.tz - p.z, dd = Math.hypot(dx, dz);
+      if (dd < 0.6) { p.wait = 2 + p.r() * 14; const Z = p.Z; p.tx = Z[0] + (p.r() - 0.5) * 2 * Z[2]; p.tz = Z[1] + (p.r() - 0.5) * 2 * Z[3];
         if (Math.hypot(p.tx - p.x, p.tz - p.z) > 160) { p.tx = p.x + (p.tx - p.x) * 0.3; p.tz = p.z + (p.tz - p.z) * 0.3; } }
-      else { p.x += dx / d * p.v * dt; p.z += dz / d * p.v * dt; p.h = Math.atan2(dx, dz); walk = 0.45 * Math.sin(t * 6 * p.v + p.ph); } }
-    placePerson(i, p.x, p.z, p.h, p.s, walk, false); });
-  WATCH.forEach((w, k) => placePerson(NP + k, w.x, w.z, w.h, w.s, 0, w.sit));
+      else { p.x += dx / dd * p.v * dt; p.z += dz / dd * p.v * dt; p.h = Math.atan2(dx, dz); moving = true; } }
+    if (every(d, i)) setPerson(i, p.x, groundH(p.x, p.z), p.z, p.h, p.carry ? "carry" : moving ? "walk" : (i % 3 ? "stand" : "talk"), t * (p.v / 1.1), moving ? 1 : 0); });
+  for (const A of ACTS) { if (!A.spot || INSIDE) { setPerson(A.i, 0, 0, 0, 0, "", t, 0, false); continue; } const d = near(A.x, A.z); if (!every(d, A.i)) continue;
+    if (A.kind === "play") { const a = t * 0.9 + A.ph, x = A.spot.x + 4 * Math.cos(a), z = A.spot.z + 3 * Math.sin(a * 1.2); setPerson(A.i, x, groundH(x, z), z, Math.atan2(-4 * Math.sin(a), 3.6 * Math.cos(a * 1.2)), "run", t, 1); }
+    else setPerson(A.i, A.x, groundH(A.x, A.z), A.z, A.h, A.kind, t); }
   // chunkey: a player bowls the stone down the yard; both run after it and throw their poles to land nearest where it stops
+  const cv = near(CHUNKEY[0], CHUNKEY[1]) < 1500 && !INSIDE;
+  WATCH.forEach(w => setPerson(w.i, w.x, groundH(w.x, w.z), w.z, w.h, w.kind, t, 0, cv));
   chT = (chT + dt) % 24; const dir = Math.floor(t / 24) % 2 ? -1 : 1, L = CHUNKEY[3] - 4, z0 = CHUNKEY[1] - dir * L, ph = chT;
-  const tt = clampN(ph - 1.5, 0, 11.1), sz = z0 + dir * (8 * tt - 0.36 * tt * tt), szEnd = z0 + dir * 44.4, visible = near({ x: CHUNKEY[0], z: CHUNKEY[1] });   // it rolls 44 m and stops
-  const stopped = ph > 11; stone.position.set(CHUNKEY[0], groundH(CHUNKEY[0], sz) + 0.1, sz); if (!stopped) stone.rotation.x = -dir * ph * 25; stone.visible = visible;
-  for (const q of [0, 1]) { const px = CHUNKEY[0] + (q ? 2.2 : -2.2), run = ph < 1.5 ? 0 : Math.min(40, (ph - 1.5) * 6.2), pz = z0 + dir * run, wk = ph > 1.5 && run < 40 ? 0.8 * Math.sin(t * 13 + q) : 0;
-    placePerson(NP + WATCH.length + q, px, pz, dir > 0 ? 0 : Math.PI, 1, wk, false);
+  const tt = clampN(ph - 1.5, 0, 11.1), sz = z0 + dir * (8 * tt - 0.36 * tt * tt), szEnd = z0 + dir * 44.4;   // it rolls 44 m and stops
+  stone.position.set(CHUNKEY[0], groundH(CHUNKEY[0], sz) + 0.1, sz); if (ph < 12.6) stone.rotation.x = -dir * ph * 25; stone.visible = cv;
+  for (const q of [0, 1]) { const px = CHUNKEY[0] + (q ? 2.2 : -2.2), run = ph < 1.5 ? 0 : Math.min(40, (ph - 1.5) * 6.2), pz = z0 + dir * run, moving = ph > 1.5 && run < 40;
+    setPerson(NWALK + NACT + q, px, groundH(px, pz), pz, dir > 0 ? 0 : Math.PI, moving ? "run" : "stand", t, 1, cv);
     const thrown = ph > 4 + q * 0.6, f = clampN((ph - 4 - q * 0.6) / 1.4, 0, 1), tz = szEnd + (q ? 1.1 : -0.8), lz = thrown ? lerpN(pz, tz, f) : pz, ly = thrown ? 1.4 + Math.sin(f * Math.PI) * 2.5 - f * 1.3 : 1.3;
-    poles[q].position.set(px + (q ? -0.4 : 0.4) * f, groundH(px, lz) + ly, lz); poles[q].rotation.set(thrown ? 0.3 - f * 0.25 : -0.1, 0, 0); poles[q].visible = visible; }
-  for (const m of [torsos, heads, legsL, legsR]) m.instanceMatrix.needsUpdate = true;
+    poles[q].position.set(px + (q ? -0.4 : 0.4) * f, groundH(px, lz) + ly, lz); poles[q].rotation.set(thrown ? 0.3 - f * 0.25 : -0.1, 0, 0); poles[q].visible = cv; }
+  for (const p of PARTS) CROWD[p].instanceMatrix.needsUpdate = true; basketIM.instanceMatrix.needsUpdate = true;
   CANOES.forEach((c, i) => { c.s += c.v * dt; const L2 = c.line, n = L2.S.length, u = c.s / 400, seg = L2.S[((Math.floor(u) % n) + n) % n], f = ((u % 1) + 1) % 1;
     const x = seg[0] + (seg[2] - seg[0]) * f, z = seg[1] + (seg[3] - seg[1]) * f;
     O3.position.set(x + c.off, WATER + 0.12, z); O3.rotation.set(0, Math.atan2(seg[2] - seg[0], seg[3] - seg[1]), 0); O3.scale.set(1, 1, 1); O3.updateMatrix(); canoeIM.setMatrixAt(i, O3.matrix); });
   canoeIM.instanceMatrix.needsUpdate = true; }
+
+// ---------- inside: every house, the hall on Monks Mound, the mound-top temples, the huts and shrines ----------
+// Built when you step through a doorway, from what excavated Stirling-phase houses show: walls of poles set in trenches,
+// hung with cane mats; a steep thatched roof on rafters; a central hearth; benches along the walls with mats and hides;
+// storage pits in the floor; shell-tempered pots and baskets; maize drying overhead; tools of chert, wood and bone.
+// (The floors were set a little below the ground outside; here they are drawn at ground level.)
+const caneMat = tex(128, 128, (g, w, h) => { g.fillStyle = "#b89a62"; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 8) for (let x = 0; x < w; x += 8) { const a = ((x + y) / 8) % 2; g.fillStyle = a ? "rgba(110,80,40,.35)" : "rgba(240,215,160,.3)"; g.fillRect(x, y, a ? 8 : 4, a ? 4 : 8); } }, [3, 3]);
+const IM = { wall: new THREE.MeshStandardMaterial({ map: daub, roughness: 0.95, side: THREE.DoubleSide, color: 0xd8c8a8 }), roof: new THREE.MeshStandardMaterial({ map: thatch, roughness: 1, side: THREE.DoubleSide, color: 0x8a7a60 }),
+  floor: new THREE.MeshStandardMaterial({ map: tex(256, 256, speckle("#7a6248", 3000, ["#6a5238", "#8a7258", "#5a4630"]), [3, 3]), roughness: 1 }), yellow: new THREE.MeshStandardMaterial({ color: 0xc8a848, roughness: 0.9 }),
+  mat: new THREE.MeshStandardMaterial({ map: caneMat, roughness: 0.95 }), hide: M(0x8a6040, { roughness: 1 }), fur: M(0x5a4030, { roughness: 1 }), wood: M(0x6a4a2c), pole: M(0x7a5a3a), pot: M(0x3e342c, { roughness: 0.7 }), potRed: M(0x8a4a32, { roughness: 0.7 }),
+  stone: M(0x8a8278), ember: new THREE.MeshBasicMaterial({ color: 0xff5a1a, toneMapped: false }), maizeY: M(0xd8b040), maizeR: M(0xa04030), herb: M(0x6a7a3a), chert: M(0xd8c8a8), copper: M(0xc87a3a, { metalness: 0.6, roughness: 0.35 }), shell: M(0xf2ead8, { roughness: 0.5 }), pit: M(0x1e1610, { roughness: 1 }) };
+const BOWL_G = new THREE.SphereGeometry(0.16, 12, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).rotateX(Math.PI).translate(0, 0.16, 0);
+function makeInterior(H) { const g = new THREE.Group(), items = [], d = H.d, w = H.w, wh = H.wallH, D = H.door, K = H.kind, big = K === "summit", sacred = big || K === "temple", tiny = K === "hut" || K === "shrine";
+  g.position.set(H.x, H.gy + 0.08, H.z); g.rotation.y = H.ry; const own = [];   // a little above the ground outside, so no grass shows through
+  const add = (geo, mat, x, y, z, ry = 0, rx = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); g.add(m); own.push(geo); return m; };
+  const tube = (a, b, r, mat) => { const dv = b.clone().sub(a), m = add(new THREE.CylinderGeometry(r, r, dv.length(), 6), mat, 0, 0, 0); m.position.copy(a).add(b).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(V3(0, 1, 0), dv.normalize()); return m; };
+  const item = (x, z, name, text) => items.push({ x, z, name, text });
+  // floor, walls (a doorway in the long wall facing out), roof on rafters, the poles of the walls
+  add(new THREE.PlaneGeometry(d, w).rotateX(-Math.PI / 2), K === "shrine" ? IM.yellow : IM.floor, 0, 0.03, 0);
+  const dw = Math.min(1.0, d * 0.22), dh = Math.min(1.6, wh * 0.8), wz = D * w / 2, bz = -D * w / 2;
+  add(new THREE.PlaneGeometry(d, wh), IM.wall, 0, wh / 2, bz * 0.995);
+  for (const sd of [-1, 1]) add(new THREE.PlaneGeometry((d - dw) / 2, wh), IM.wall, sd * (dw / 2 + (d - dw) / 4), wh / 2, wz * 0.995);
+  add(new THREE.PlaneGeometry(dw, wh - dh), IM.wall, 0, dh + (wh - dh) / 2, wz * 0.995);
+  for (const sd of [-1, 1]) add(new THREE.PlaneGeometry(w, wh), IM.wall, sd * d / 2 * 0.995, wh / 2, 0, Math.PI / 2);
+  const rf = new THREE.Mesh(ROOF_G, IM.roof); rf.scale.set(d + 1.0, H.roofH, w + 1.0); rf.position.y = wh; g.add(rf);
+  const ridgeX = 0.18 * (d + 1), top = wh + H.roofH, step = big ? 1.6 : 0.9;
+  for (let x = -d / 2 + 0.3; x <= d / 2 - 0.3; x += step) for (const sd of [-1, 1]) tube(V3(x, wh, sd * w / 2 * 0.97), V3(clampN(x, -ridgeX, ridgeX) * 0.95, top - 0.1, 0), big ? 0.08 : 0.04, IM.pole);
+  { const posts = []; for (let x = -d / 2 + 0.25; x < d / 2; x += 0.55) for (const sd of [-1, 1]) { if (sd === D && Math.abs(x) < dw / 2 + 0.1) continue; posts.push([x, 0, sd * (w / 2 - 0.05), 0.045, wh, 0.045, 0]); }
+    for (let z = -w / 2 + 0.25; z < w / 2; z += 0.55) for (const sd of [-1, 1]) posts.push([sd * (d / 2 - 0.05), 0, z, 0.045, wh, 0.045, 0]); g.add(instances(POST_G, IM.pole, posts)); }
+  item(0, bz * 0.9, "the walls", "Walls of upright poles set side by side in trenches dug for them (the wall-trench houses of this time), hung with woven cane mats; soil was banked against the foot outside. The roof: steep thatch of prairie grass on bent rafters. A house like this lasted perhaps 10-15 years.");
+  // the hearth and its fire
+  const hx = big ? 0 : 0, hz = big ? 1.5 * D : 0.15 * D;
+  add(HEARTH_G, IM.stone, hx, 0, hz).scale.setScalar(big ? 1.6 : 0.85); add(new THREE.CircleGeometry(big ? 0.55 : 0.3, 12).rotateX(-Math.PI / 2), IM.ember, hx, 0.06, hz);
+  for (const k of [0, 1, 2]) add(FLAME_G, flameM, hx + (k - 1) * 0.08, 0.06, hz + (k === 1 ? 0.06 : -0.03)).scale.set(big ? 1.5 : 0.8, big ? 1.6 : 0.8 + 0.2 * k, big ? 1.5 : 0.8);
+  const light = new THREE.PointLight(0xffa060, big ? 6 : 2.6, big ? 26 : 10, 1.6); light.position.set(hx, 0.6, hz); g.add(light);
+  item(hx, hz, "the hearth", "The fire in the middle of the floor: for cooking, warmth and light. There was no chimney; smoke worked out through the thatch, blackening the rafters. Stews of maize, beans of the wild kind, nuts, squash, fish and deer simmered in jars set at the fire's edge.");
+  // benches along the back wall (and an end wall), with mats and hides
+  if (!tiny) { const bl = d - 0.8, bzc = bz - Math.sign(bz) * 0.55; add(new THREE.BoxGeometry(bl, 0.45, 0.95), IM.wood, 0, 0.225, bzc);
+    add(new THREE.PlaneGeometry(bl, 0.95).rotateX(-Math.PI / 2), IM.mat, 0, 0.455, bzc); add(new THREE.BoxGeometry(1.6, 0.04, 0.8), IM.hide, -bl / 4, 0.48, bzc, 0.1); add(new THREE.BoxGeometry(1.3, 0.05, 0.7), IM.fur, bl / 4, 0.48, bzc, -0.08);
+    item(0, bzc, "the bench", "A bench along the wall on short posts, covered with cane mats, deer hides and a bearskin: a seat by day, a bed at night. Things were stored beneath it.");
+    if (!big) { add(new THREE.BoxGeometry(0.95, 0.45, w - 2.4), IM.wood, d / 2 - 0.55, 0.225, -D * 0.2); add(new THREE.PlaneGeometry(0.95, w - 2.4).rotateX(-Math.PI / 2), IM.mat, d / 2 - 0.55, 0.455, -D * 0.2); } }
+  // a storage pit in the floor, its lid pushed aside
+  if (!sacred) { const px = -d / 2 + 0.9, pz = D * (w / 2 - 0.9); add(new THREE.CircleGeometry(0.42, 14).rotateX(-Math.PI / 2), IM.pit, px, 0.04, pz); add(new THREE.CylinderGeometry(0.45, 0.45, 0.04, 14), IM.wood, px + 0.35, 0.06, pz - 0.2, 0, 0.12);
+    item(px, pz, "a storage pit", "A pit dug in the floor for maize, nuts and seeds, lined with grass or bark and covered. Pits like this are found under almost every house floor; once out of use they filled with household rubbish, which is much of what archaeologists learn from.");
+    // pots, bowls and baskets
+    const PP = [[-0.9, -0.5, 1.2, IM.pot], [-1.2, 0.2, 0.9, IM.potRed], [0.55, 0.25, 0.8, IM.pot], [d / 2 - 0.5, w / 2 - 0.5, 1.7, IM.pot], [-d / 2 + 0.5, -w / 2 + 0.5, 1.5, IM.potRed]];
+    for (const [x, z, s, m] of PP) if (Math.abs(x) < d / 2 - 0.3 && Math.abs(z) < w / 2 - 0.3) add(JAR_G, m, x, 0.03, z * D).scale.setScalar(s);
+    add(BOWL_G, IM.potRed, 0.7, 0.03, hz - 0.5 * D); add(BOWL_G, IM.pot, 0.95, 0.03, hz - 0.3 * D).scale.setScalar(0.8);
+    item(-0.9, -0.5 * D, "pots", "Shell-tempered pottery: burned, crushed mussel shell mixed into the clay, the Mississippian hallmark that made pots strong in the fire. Jars for cooking and storage, bowls and plates for serving; some polished black or red, some incised (Ramey Incised was made here at Cahokia).");
+    const bk = add(new THREE.CylinderGeometry(0.28, 0.22, 0.4, 12), IM.mat, d / 2 - 1.2, 0.23, -D * (w / 2 - 0.45)); item(bk.position.x, bk.position.z, "a basket", "Baskets of cane and bark, for gathering, carrying and storing: the most common containers of all, though few survive.");
+    // maize and herbs drying overhead
+    for (let k = 0; k < (tiny ? 2 : 6); k++) { const x = -d / 2 + 0.8 + k * (d - 1.6) / Math.max(1, (tiny ? 2 : 6) - 1), z = (k % 2 ? 0.4 : -0.4) * w / 2;
+      for (let e = 0; e < 5; e++) add(new THREE.CylinderGeometry(0.03, 0.022, 0.2, 6), k % 3 === 2 ? IM.herb : e % 3 === 1 ? IM.maizeR : IM.maizeY, x + (e - 2) * 0.05, wh + 0.15 - Math.abs(e - 2) * 0.03, z, 0, 0, (e - 2) * 0.15); }
+    item(0, 0.4 * w / 2, "maize drying overhead", "Ears of maize hung from the rafters to dry, out of reach of mice: the staple, grown in the fields around the town. Alongside it the old native crops (goosefoot, maygrass, knotweed, little barley, sunflower) and squash, and nuts gathered from the woods.");
+    // tools: a chert hoe, a bow and quiver, a log mortar and pestle
+    if (!tiny) { const hx2 = -d / 2 + 0.25; tube(V3(hx2, 0.05, -0.5), V3(hx2 + 0.12, 1.1, -0.45), 0.02, IM.wood); add(new THREE.BoxGeometry(0.03, 0.22, 0.12), IM.chert, hx2 + 0.02, 0.15, -0.52);
+      item(hx2, -0.5, "a hoe", "A hoe blade of Mill Creek chert, quarried in southern Illinois and traded far and wide, hafted on a wooden handle: the tool of the maize fields, worked mostly by women.");
+      add(new THREE.TorusGeometry(0.7, 0.012, 4, 20, Math.PI * 0.9), IM.wood, d / 2 - 0.08, 1.2, 0.6 * D, Math.PI / 2, 0, Math.PI / 2 - 0.45); add(new THREE.CylinderGeometry(0.05, 0.05, 0.6, 8), IM.hide, d / 2 - 0.1, 1.0, 0.95 * D, 0, 0.25);
+      item(d / 2 - 0.1, 0.8 * D, "a bow and quiver", "A bow and a quiver of arrows tipped with small triangular stone points. Deer were the main game; fish, waterfowl and turtles came from the lakes and sloughs.");
+      add(MORTAR_G, IM.wood, d / 2 - 0.9, 0.03, hz + 0.6 * D); tube(V3(d / 2 - 0.9, 0.5, hz + 0.6 * D), V3(d / 2 - 0.7, 1.6, hz + 0.55 * D), 0.035, IM.pole);
+      item(d / 2 - 0.9, hz + 0.6 * D, "a mortar and pestle", "A log hollowed into a mortar, with a long wooden pestle, for pounding maize into meal and grits.");
+      add(new THREE.PlaneGeometry(1.6, 1.1).rotateX(-Math.PI / 2), IM.mat, -0.9, 0.045, hz); } }
+  // the hall on Monks Mound: massive roof posts, a raised platform at the back with sacred things on it
+  if (big) { for (const x of [-d / 4, d / 4]) add(new THREE.CylinderGeometry(0.45, 0.5, top - 0.6, 10).translate(0, (top - 0.6) / 2, 0), IM.pole, x, 0, 0);
+    item(d / 4, 0, "the great posts", "Massive posts held up the roof, perhaps 12 m high at its peak: the excavators found the pits that held them. The hall is about 32 by 15 m (104 by 48 feet).");
+    const pz = bz - Math.sign(bz) * 1.6; add(new THREE.BoxGeometry(7, 0.7, 2.6), IM.wood, 0, 0.35, pz); add(new THREE.PlaneGeometry(7, 2.6).rotateX(-Math.PI / 2), IM.mat, 0, 0.705, pz);
+    add(new THREE.BoxGeometry(2, 0.05, 1.4), IM.fur, 0, 0.73, pz);
+    for (const k of [-2.6, -1.9]) add(new THREE.BoxGeometry(0.3, 0.42, 0.02), IM.copper, k, 0.92, pz - 0.2 * Math.sign(pz), 0.1);
+    for (const k of [1.8, 2.2, 2.6]) add(new THREE.CylinderGeometry(0.07, 0.07, 0.015, 16), IM.shell, k, 0.72, pz + 0.3 * Math.sign(pz));
+    for (const k of [-1.2, -0.95]) add(new THREE.CylinderGeometry(0.07, 0.07, 0.04, 14), IM.stone, k, 0.73, pz + 0.5 * Math.sign(pz));
+    add(new THREE.BoxGeometry(0.12, 0.02, 0.09), M(0xb89a78), 1.1, 0.72, pz - 0.2 * Math.sign(pz));
+    for (const [x, s] of [[3.2, 1.3], [-3.2, 1.1]]) add(JAR_G, IM.potRed, x, 0.71, pz).scale.setScalar(s);
+    item(0, pz, "the platform", "A raised platform at the back of the hall, with things of power that archaeologists have found at Cahokia and other Mississippian centres: embossed copper plates of Lake Superior copper (a copper workshop stood by Mound 34), gorgets of Gulf Coast shell, polished chunkey stones, fine pottery, and (by them) a small sandstone tablet engraved with a bird-man, like the one found on Monks Mound in 1971. Who sat here, and what the hall was for (a ruler's house, a temple, or both), is not known.");
+    for (const sd of [-1, 1]) { add(new THREE.BoxGeometry(0.95, 0.45, w - 3), IM.wood, sd * (d / 2 - 0.55), 0.225, 0); add(new THREE.PlaneGeometry(0.95, w - 3).rotateX(-Math.PI / 2), IM.mat, sd * (d / 2 - 0.55), 0.455, 0); } }
+  if (K === "temple") { const pz = bz - Math.sign(bz) * 0.9; add(new THREE.BoxGeometry(Math.min(3, d - 1), 0.5, 1.2), IM.wood, 0, 0.25, pz); add(JAR_G, IM.potRed, 0.6, 0.5, pz); add(new THREE.CylinderGeometry(0.07, 0.07, 0.015, 16), IM.shell, -0.5, 0.51, pz);
+    item(0, pz, "a mound-top building", "A building on a platform mound: perhaps a temple, a charnel house for honoured dead, or a leading family's home. Platform mounds were raised in stages, a new building put on each new summit."); }
+  if (K === "hut") item(0, 0, "a small hut", "One of the small buildings packed into the walled compound at East St. Louis: room for storage or a rite, not a family. Many held maize. About 1160 they all burned in a single fire, perhaps deliberately; here they still stand.");
+  if (K === "shrine") item(0, 0, "a shrine house", "A shrine house of the Emerald Acropolis: its floor plastered yellow, with small niche pits; buildings here were set to line up with the moon's rising. Up to about 100 such shrines and temples stood on the ridge at one time.");
+  // the people inside
+  const pzP = bz - Math.sign(bz) * 1.6;
+  const who = big ? [["sit", 0, pzP, true], ["stand", -1.6, pzP + D * 2.2], ["stand", 1.6, pzP + D * 2.2], ["sit", -3, hz + 1.2 * D]] : sacred ? [["sit", 0.5, bz * 0.4]] : tiny ? [] : [["sit", -0.9, hz], ["cook", 0.6, hz - 0.5 * D], ["sit", 0.6, bz * 0.6]];
+  who.forEach(([kind, x, z, onPlat], k) => { const p = personMesh(Math.round(Math.abs(H.x * 7 + H.z * 3)) + k, kind, x, onPlat ? 0.72 : 0.03, z, 0); p.rotation.y = Math.atan2(hx - x, hz - z); g.add(p); });
+  return { g, items, light, dw, own }; }
+let INSIDE = null;
+function houseCandidates() { const out = [...(CORE.houses || [])]; const ci = Math.floor(P_.x / TILE), cj = Math.floor(P_.z / TILE);
+  for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) { const g = TILES.get(i + "," + j); if (g && g.userData.houses) out.push(...g.userData.houses); } return out; }
+const doorPt = (H, out) => [H.x + Math.sin(H.ry) * (H.w / 2 + out) * H.door, H.z + Math.cos(H.ry) * (H.w / 2 + out) * H.door];
+function nearDoorHouse() { let best = null, bd = 1.9; for (const H of houseCandidates()) { const [x, z] = doorPt(H, 0.6); const d = Math.hypot(x - P_.x, z - P_.z); if (d < bd && Math.abs(groundH(x, z) - P_.y) < 1.5) { bd = d; best = H; } } return best; }
+const toLocal = (H, x, z) => { const dx = x - H.x, dz = z - H.z, c = Math.cos(H.ry), s = Math.sin(H.ry); return [dx * c - dz * s, dx * s + dz * c]; };
+const fromLocal = (H, lx, lz) => { const c = Math.cos(H.ry), s = Math.sin(H.ry); return [H.x + lx * c + lz * s, H.z - lx * s + lz * c]; };
+function setHouseShown(H, show) { const L = H.L; for (const [im, list, i] of [[L._walls, L.walls, H.wi], [L._roofs, L.roofs, H.ri], [L._doors, L.doors, H.di]]) { if (!im) continue;
+  if (show) { const [x, y, z, sx, sy, sz, ry] = list[i]; O3.position.set(x, y, z); O3.rotation.set(0, ry, 0); O3.scale.set(sx, sy, sz); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); } else im.setMatrixAt(i, ZEROM); im.instanceMatrix.needsUpdate = true; } }
+const ENTER_TEXT = { house: "You duck through the doorway into a family's house: one room, smoky and warm, lit by the fire and the light from the door. E near things to learn about them; E at the doorway (or just walk out) to leave.",
+  summit: "You enter the great hall on the summit of Monks Mound, the largest building known at Cahokia. E near things to learn about them; E at the doorway to leave.",
+  temple: "You step into the building on top of the mound. E near things to learn about them; E at the doorway to leave.", hut: "You squeeze into one of the small huts in the walled compound.", shrine: "You step into a shrine house on the Emerald ridge." };
+function enterHouse(H) { const I = makeInterior(H); scene.add(I.g); INSIDE = { H, ...I }; setHouseShown(H, false);
+  const [x, z] = fromLocal(H, 0, H.door * (H.w / 2 - 0.7)); P_.x = x; P_.z = z; P_.y = H.gy + 0.11; flying = false; const fy = Math.atan2(-(H.x - x), -(H.z - z)); if (renderer.xr.isPresenting) vrTurn = fy; else yaw = fy;
+  say(ENTER_TEXT[H.kind] || ENTER_TEXT.house, 14); }
+function leaveHouse(quiet) { if (!INSIDE) return; const H = INSIDE.H; setHouseShown(H, true); scene.remove(INSIDE.g); for (const geo of INSIDE.own) geo.dispose(); INSIDE = null;
+  if (!quiet) { const [x, z] = doorPt(H, 1.0); P_.x = x; P_.z = z; P_.y = groundAt(x, z); } }
+function insideStep() { const H = INSIDE.H, [lx, lz] = toLocal(H, P_.x, P_.z), hw = H.w / 2 - 0.3, hd = H.d / 2 - 0.3;   // keep within the walls; out through the doorway
+  if (lz * H.door > hw && Math.abs(lx) < INSIDE.dw / 2) { if (lz * H.door > H.w / 2 + 0.2) { leaveHouse(true); return; } return; }
+  const [x, z] = fromLocal(H, clampN(lx, -hd, hd), clampN(lz, -hw, hw)); P_.x = x; P_.z = z; }
+function insideInteract() { const H = INSIDE.H, [lx, lz] = toLocal(H, P_.x, P_.z);
+  if (Math.abs(lx) < 1.2 && Math.abs(lz - H.door * H.w / 2) < 1.4) { leaveHouse(); return; }
+  let best = null, bd = 1.8; for (const it of INSIDE.items) { const dd = Math.hypot(it.x - lx, it.z - lz); if (dd < bd) { bd = dd; best = it; } }
+  if (best) say(`<b>${best.name[0].toUpperCase() + best.name.slice(1)}</b> · ${best.text}`, 18); else say("Walk up to things (the hearth, the bench, the pots, the pit, the tools) and press E to learn about them; E at the doorway to leave.", 8); }
 
 // ---------- you: walking, running, travelling, discovering ----------
 const SPEEDS = [[1.4, "walking"], [3.5, "jogging"], [12, "fast"], [40, "very fast"], [120, "flying over the land"]];
@@ -565,17 +762,17 @@ addEventListener("wheel", e => { if (renderer.xr.isPresenting) return; speedI = 
 renderer.domElement.addEventListener("pointerdown", () => { dragging = true; start(); }); addEventListener("pointerup", () => dragging = false);
 addEventListener("pointermove", e => { if (!dragging) return; yaw -= e.movementX * 0.004; pitch = clampN(pitch - e.movementY * 0.004, -1.5, 1.5); });
 intro?.addEventListener("click", start);
-function groundAt(x, z) { const g = groundH(x, z); return g < WATER - 1.3 ? WATER - 1.3 : g; }   // in deep water you swim, head above the surface
+function groundAt(x, z) { if (INSIDE) return INSIDE.H.gy + 0.11; const g = groundH(x, z); return g < WATER - 1.3 ? WATER - 1.3 : g; }   // in deep water you swim, head above the surface
 // the journal: every place is found by walking to it; then you can travel back from the list
 const FOUND = new Set();
 function discover(p) { if (FOUND.has(p)) return; FOUND.add(p); say(`<b>${p.name}</b> · ${p.text}`, 22); drawGuide(); }
-function travelTo(p) { P_.x = p.at[0]; P_.z = p.at[1]; P_.y = groundAt(P_.x, P_.z); if (p.look) { const dx = p.look[0] - P_.x, dz = p.look[1] - P_.z; yaw = Math.atan2(-dx, -dz); if (renderer.xr.isPresenting) vrTurn = yaw; }
+function travelTo(p) { if (INSIDE) leaveHouse(true); P_.x = p.at[0]; P_.z = p.at[1]; P_.y = groundAt(P_.x, P_.z); if (p.look) { const dx = p.look[0] - P_.x, dz = p.look[1] - P_.z; yaw = Math.atan2(-dx, -dz); if (renderer.xr.isPresenting) vrTurn = yaw; }
   flying = false; updateGround(P_.x, P_.z, 99); say(`<b>${p.name}</b> · ${p.text}`, 18); }
 function drawGuide() { GUIDE.innerHTML = `<b>Journal</b> · ${FOUND.size} of ${PLACES.length} places found<br><span style="color:#c8b898;font-size:12px">click a found place to go back to it</span>` +
   PLACES.map((p, i) => FOUND.has(p) ? `<div data-i="${i}" style="cursor:pointer;padding:2px 4px;border-radius:5px">✦ ${p.name}</div>` : `<div style="color:#8a7a60;padding:2px 4px">· ${p.hint}</div>`).join(""); }
 GUIDE.addEventListener("click", e => { const d = e.target.closest("[data-i]"); if (!d) return; e.stopPropagation(); start(); travelTo(PLACES[+d.dataset.i]); });
 drawGuide();
-function interact() { if (!started) return start(); let best = null, bd = 1e9;
+function interact() { if (!started) return start(); if (INSIDE) return insideInteract(); const DH = nearDoorHouse(); if (DH) return enterHouse(DH); let best = null, bd = 1e9;
   for (const p of PLACES) { const d = Math.hypot(p.x - P_.x, p.z - P_.z); if (d < p.r * 1.5 && d < bd) { bd = d; best = p; } }
   if (best) { discover(best); say(`<b>${best.name}</b> · ${best.text}`, 22); return; }
   let mb = null, md = 1e9; for (const m of MOUNDS) { const d = Math.hypot(m.x - P_.x, m.z - P_.z) - Math.max(m.w, m.d) / 2; if (d < 25 && d < md) { md = d; mb = m; } }
@@ -647,7 +844,8 @@ function frame() {
     if (keys.ShiftLeft || keys.ShiftRight) run = 3; if (keys.ArrowLeft) yaw += 1.6 * dt; if (keys.ArrowRight) yaw -= 1.6 * dt; if (flying) up = (keys.Space ? 1 : 0) - (keys.KeyC ? 1 : 0); }
   fwd.y = 0; fwd.normalize(); side.crossVectors(fwd, UP).normalize();
   const sp = SPEEDS[speedI][0] * run;
-  if (mx || my) { P_.x += (fwd.x * -my + side.x * mx) * sp * dt; P_.z += (fwd.z * -my + side.z * mx) * sp * dt; }
+  if (mx || my) { const spIn = INSIDE ? Math.min(sp, 1.4) : sp; P_.x += (fwd.x * -my + side.x * mx) * spIn * dt; P_.z += (fwd.z * -my + side.z * mx) * spIn * dt; }
+  if (INSIDE) { flying = false; insideStep(); }
   const g = groundAt(P_.x, P_.z);
   if (flying) P_.y = Math.max(g, P_.y + up * Math.max(4, sp) * dt); else P_.y = g > P_.y ? Math.min(g, P_.y + Math.max(3.2, sp * 1.2) * dt) : Math.max(g, P_.y - Math.max(7, sp) * dt);
   rig.position.set(P_.x, P_.y, P_.z);
@@ -658,6 +856,7 @@ function frame() {
   sun.position.copy(rig.position).addScaledVector(sunDir, 800); sun.target.position.copy(rig.position);
   const day = clampN(el * 3 + 0.3, 0, 1), dusk = clampN(1 - Math.abs(el) * 4, 0, 1) * (el > -0.15 ? 1 : 0);
   sun.intensity = 2.6 * clampN(el * 3, 0, 1); sun.color.setRGB(1, 0.9 - 0.3 * dusk, 0.78 - 0.45 * dusk); hemi.intensity = 0.15 + 1.0 * day;
+  if (INSIDE) { sun.intensity *= 0.15; hemi.intensity *= 0.3; INSIDE.light.intensity = (INSIDE.H.kind === "summit" ? 6 : 2.6) * (0.85 + 0.1 * Math.sin(t * 13) + 0.05 * Math.sin(t * 29)); }   // indoors: the fire's light, a little daylight from the door
   const upC = new THREE.Color(0.32, 0.52, 0.80).multiplyScalar(0.05 + 0.95 * day), hor = new THREE.Color(0.80, 0.85, 0.87).multiplyScalar(0.06 + 0.94 * day).lerp(new THREE.Color(0.95, 0.55, 0.30), dusk * 0.6);
   skyMat.uniforms.up.value.copy(upC); skyMat.uniforms.hor.value.copy(hor); scene.fog.color.copy(hor); sky.position.copy(rig.position);
   sunDisc.position.copy(rig.position).addScaledVector(sunDir, 45000); sunDisc.lookAt(rig.position); sunDisc.visible = el > -0.05; sunDisc.material.color.setRGB(1, 0.95 - 0.35 * dusk, 0.85 - 0.5 * dusk);
@@ -672,7 +871,7 @@ function frame() {
     let nearP = null, nd = 1e9; for (const p of PLACES) { const d = Math.hypot(p.x - P_.x, p.z - P_.z); if (d < nd) { nd = d; nearP = p; } }
     const yw = yawNow(), dir = p => { const a = Math.atan2(p.x - P_.x, -(p.z - P_.z)), rel = a + yw, r = Math.atan2(Math.sin(rel), Math.cos(rel)), cmp = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"][((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8];
       return `${cmp}, ${Math.abs(r) < 0.4 ? "ahead" : Math.abs(r) > 2.6 ? "behind you" : r > 0 ? "to your right" : "to your left"}`; };
-    const where = nearP ? (nd < nearP.r ? `at <b>${nearP.name}</b>` : `nearest: <b>${FOUND.has(nearP) ? nearP.name : nearP.hint}</b>, ${nd < 1000 ? Math.round(nd) + " m" : (nd / 1000).toFixed(1) + " km"} ${dir(nearP)}`) : "";
+    const DH = INSIDE ? null : nearDoorHouse(), where = INSIDE ? `inside ${{ house: "a house", summit: "the great hall on Monks Mound", temple: "a mound-top building", hut: "a hut in the walled compound", shrine: "a shrine house" }[INSIDE.H.kind]} · E near things to learn about them; E at the doorway to leave` : DH ? `at a doorway · <b>E: go inside</b>` : nearP ? (nd < nearP.r ? `at <b>${nearP.name}</b>` : `nearest: <b>${FOUND.has(nearP) ? nearP.name : nearP.hint}</b>, ${nd < 1000 ? Math.round(nd) + " m" : (nd / 1000).toFixed(1) + " km"} ${dir(nearP)}`) : "";
     HUD.innerHTML = `<b>Cahokia, about 1100 CE</b> · ${hh}:${String(mm).padStart(2, "0")} · ${flying ? "flying" : SPEEDS[speedI][1] + (run > 1 ? ", running" : "")} (${(sp * 3.6).toFixed(sp < 3 ? 1 : 0)} km/h) · height ${Math.round(P_.y - baseH(P_.x, P_.z))} m above the plain<br>${where}<br>
       <span style="color:#c8b898;font-size:12.5px">WASD walk · drag to look · shift run · − / = pace · F fly · E read · M map (click it to zoom) · journal: click a found place to go back</span>`;
     if (vr && (vrDirty || ((t * 3) | 0) % 3 === 0)) { drawVR(where.replace(/<[^>]+>/g, "") + ` · ${flying ? "flying" : SPEEDS[speedI][1]}`, msgText || "Left stick walk · right stick turn · trigger run · A read · B pace · X travel to a found place · Y fly"); vrDirty = false; } }
