@@ -15,6 +15,14 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWid
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
+// VR posture: sitting or standing. Sitting raises your view on foot to a standing eye height; in the car, helicopter and on the
+// bike your eyes go to the seat's height either way. Remembered between visits; switch it here or on the wrist panel in VR.
+let SITTING = localStorage.getItem("vrPosture") === "sitting";
+const POSB = document.createElement("button"); POSB.style.cssText = "display:none;position:fixed;right:18px;bottom:72px;z-index:3;padding:10px 16px;font:600 14px -apple-system,sans-serif;border:0;border-radius:10px;background:#3a5a6e;color:#fff;cursor:pointer";
+const posLabel = () => SITTING ? "🪑 Sitting (tap for standing)" : "🧍 Standing (tap for sitting)";
+function setPosture(sit) { SITTING = sit; localStorage.setItem("vrPosture", sit ? "sitting" : "standing"); POSB.textContent = posLabel(); }
+POSB.textContent = posLabel(); POSB.onclick = e => { e.stopPropagation(); setPosture(!SITTING); }; document.body.appendChild(POSB);
+if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (ok) POSB.style.display = "block"; });
 
 // ---------- worlds: the Solar System, or another system, built inside this one page ----------
 // Going through a portal tears the current world down and builds the next on the same renderer, so the
@@ -97,7 +105,7 @@ renderer.setAnimationLoop(() => { try {
   rig.position.set(-0.42, 0.7, 0.3); if (vr) { camera.position.set(0, 0, 0); rig.rotation.y = car.rotation.y; } else { rig.rotation.y = car.rotation.y; camera.position.set(0, 0.55, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
   if ((dt0 -= dt) <= 0) { dt0 = 0.25; drawDash(); HUD.innerHTML = `<b>the deep-space highway</b>: ${NAMES[fromKey]} → ${NAMES[toKey]} · same 12-inch-Earth scale<br>click the dashboard (or W / S speed, T fast-forward, B turn back) · in VR, point and pull the trigger`; }
   if (!done && (s >= TOTAL && !back || s <= 0 && back)) { done = true; setTimeout(() => switchWorld(back ? fromKey : toKey), 0); }
-  renderer.render(scene, camera); } catch (e) { console.error(e); } });
+  const dyV = renderer.xr.isPresenting ? 0.55 - (SITTING ? 1.2 : 1.65) : 0; rig.position.y += dyV; renderer.render(scene, camera); rig.position.y -= dyV; } catch (e) { console.error(e); } });   // VR: eyes at the seat's height
 WORLD = { scene, track: TRACK, bodyKeep, headKeep, after: () => { document.getElementById("guide").style.display = ""; } }; TRACK = null;
 }
 
@@ -1603,7 +1611,7 @@ function stepBike(dt, vr) { let v = 0;
     if (vr) rig.rotation.set(0, bike.rotation.y + vrTurn, 0); else { rig.rotation.set(0, bike.rotation.y, 0); camera.position.y = 1.5; camera.rotation.set(pitch, yaw, 0, "YXZ"); }
     for (const b of BBTNS) if (b.flash > 0) b.flash -= dt; bikePanelT -= dt; if (bikePanelT <= 0) { drawBikePanel(); bikePanelT = 0.2; } }
   return v; }
-const PLACES = [["🚆 board the train", "#b8322a", "train"], ["🚁 helicopter flyover", "#f0b020", "heli"], ["🚲 ride the bike", "#5ab85a", "bike"], [EXO ? HOME_NAME : "Earth (the globe)", "#5a9ae8", () => [V3(0, 0, RE + 1.7), GC]], ...(EXO ? [] : [["the Moon", "#d8d8d8", () => moonSpot()]]), ["your car", "#ff6a5a", () => [car.position.clone().add(V3(-2.5, 0, 2.5)), car.position]],
+const PLACES = [[posLabel(), "#c9a227", "posture"], ["🚆 board the train", "#b8322a", "train"], ["🚁 helicopter flyover", "#f0b020", "heli"], ["🚲 ride the bike", "#5ab85a", "bike"], [EXO ? HOME_NAME : "Earth (the globe)", "#5a9ae8", () => [V3(0, 0, RE + 1.7), GC]], ...(EXO ? [] : [["the Moon", "#d8d8d8", () => moonSpot()]]), ["your car", "#ff6a5a", () => [car.position.clone().add(V3(-2.5, 0, 2.5)), car.position]],
   ...BODIES.map(b => [b.name === "the Sun" ? "Sun" : b.name, b.col, () => [b.stop.clone(), b.c]]),
   ...SMALL.map(b => [b.name, b.col, () => [b.stand.clone(), b.c]]),
   ...(EXO ? [["🌀 portal home: the Solar System", "#9a7aff", "exo:"]] : Object.entries(EXOSYS).map(([k, X]) => ["🌀 " + X.name, "#9a7aff", "exo:" + k])),
@@ -1611,7 +1619,7 @@ const PLACES = [["🚆 board the train", "#b8322a", "train"], ["🚁 helicopter 
 function moonSpot() { const d = V3(MC.x, 0, MC.z).normalize(); return [V3(MC.x - d.x * 1.6, 0, MC.z - d.z * 1.6), MC]; }
 function moonStand(m) { const pc = m.planet.c, mp = m.pos(), d = V3(mp.x - pc.x, 0, mp.z - pc.z).normalize(), back = Math.max(1.5, m.r * 30);
   return [V3(mp.x + d.x * back, 0, mp.z + d.z * back), mp]; }
-function teleport(i) { onDeck = null; lift.riding = false; const kind = PLACES[i][2]; if (typeof kind === "string" && kind.startsWith("exo:")) return goSystem(kind.slice(4)); if (typeof kind === "string" && kind.startsWith("star")) return enterStar(+kind.slice(4)); if (kind === "home") return leaveStar();
+function teleport(i) { const kind = PLACES[i][2]; if (kind === "posture") { setPosture(!SITTING); PLACES[i][0] = posLabel(); wristDirty = true; return; } onDeck = null; lift.riding = false; if (typeof kind === "string" && kind.startsWith("exo:")) return goSystem(kind.slice(4)); if (typeof kind === "string" && kind.startsWith("star")) return enterStar(+kind.slice(4)); if (kind === "home") return leaveStar();
   if (inStar >= 0) leaveStar(); if (kind === "train") return boardTrain(); if (kind === "heli") return enterHeli(); if (inHeli) exitHeli(true); if (kind === "bike") return enterBike(); if (inBike) exitBike(true); if (onTrain) onTrain = false; const [at, look] = PLACES[i][2](); if (inCar) exitCar(); flying = false; at.y = terrainH(at.x, at.z); rig.position.copy(at);
   const dx = look.x - at.x, dz = look.z - at.z, ry = Math.atan2(-dx, -dz);
   if (renderer.xr.isPresenting) { vrTurn = ry; rig.rotation.set(0, ry, 0); } else { yaw = ry; pitch = Math.atan2(look.y - at.y - 1.65, Math.hypot(dx, dz)); } wristDirty = true; }
@@ -1804,7 +1812,8 @@ function frame() {
   orientT -= dt; if (orientT <= 0) { orientGlobe(); orientT = 10; }
   hudT -= dt; if (hudT <= 0 && !vr) { readout(moved); hudT = 0.25; }
   updateMarkers(vr);
-  renderer.render(scene, camera);
+  const eyeT = inCar ? 0.55 : inHeli ? 0.6 : inBike ? 1.5 : 1.65, dyV = vr ? eyeT - (SITTING ? 1.2 : 1.65) : 0;   // VR: lift (or lower) your view for your posture and seat
+  rig.position.y += dyV; renderer.render(scene, camera); rig.position.y -= dyV;
 }
 // a world built while in VR carries on in VR: the headset supplies the eye height
 if (renderer.xr.isPresenting) { camera.position.set(0, 0, 0); start(); vrTurn = 0; renderer.xr.getSession().addEventListener("end", () => { camera.position.set(0, 1.65, 0); rig.rotation.set(0, 0, 0); }); }
