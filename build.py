@@ -318,3 +318,25 @@ CAH = CAH[:i0] + """<div id="intro"><div class="card">
 out8 = HERE / "cahokia.html"
 out8.write_text(CAH.replace("__THREE__", three).replace("__SCENE__", (HERE / "cahokia.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out8.name}, {out8.stat().st_size // 1024} KB")
+
+
+# ---- the ninth page: a day in the Cambrian --------------------------------------------------------
+CAMB = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>A day in the Cambrian</title>").replace("background:#c8d4d8", "background:#c8d0d4")
+i0, i1 = CAMB.index('<div id="intro">'), CAMB.index('<button id="vr">')
+CAMB = CAMB[:i0] + """<div id="intro"><div class="card">
+  <h1>A day in the Cambrian</h1>
+  <p>You are a biologist who has travelled back to one day in the Cambrian, __DATE__. You stand on bare land: there are no
+  plants anywhere yet. The sea, just ahead, teems with the animals of the Cambrian explosion: trilobites and other arthropods,
+  the great predator <i>Anomalocaris</i>, lobopodians, worms, sponges, comb jellies, and the first fish.</p>
+  <p>You have scuba gear. Walk into the sea and dive; swim close to animals and press <kbd>E</kbd> to examine and log them in your
+  field journal. Your wrist computer shows the date, the air (oxygen and CO₂), the tide, your depth and your air supply.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; in the sea you swim where you look, <kbd>space</kbd> up, <kbd>C</kbd> down &nbsp;&middot;&nbsp;
+  <kbd>shift</kbd> faster &nbsp;&middot;&nbsp; <kbd>&minus;</kbd> <kbd>=</kbd> pace &nbsp;&middot;&nbsp; <kbd>E</kbd> examine &nbsp;&middot;&nbsp; <kbd>F</kbd> fly<br>
+  In VR: left stick move, right stick turn (and up / down while swimming), trigger faster, <b>A</b> examine, <b>X</b> pace, <b>Y</b> fly; the computer is on your left wrist</p>
+  <p class="dim">The world is generated without end (add ?seed=2 for another coast). The date, the air, the sky, the land and the animals follow
+  the fossil record and the scientific literature; colours of the animals are unknown and shown in muted tones. Click to begin.</p>
+</div></div>
+""" + CAMB[i1:]
+out9 = HERE / "cambrian.html"
+out9.write_text(CAMB.replace("__DATE__", "about 518 million years ago").replace("__THREE__", three).replace("__SCENE__", (HERE / "cambrian.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out9.name}, {out9.stat().st_size // 1024} KB")
