@@ -53118,29 +53118,55 @@ const sky = new THREE.Mesh(new THREE.SphereGeometry(50000, 32, 16), skyMat); sky
 // Near the start (the origin) the coast runs roughly north-south, land to the west, sea to the east.
 function landMask(x, z) { const r = Math.hypot(x, z);
   return fbm(x / 9000 + 31, z / 9000 - 17, 4) - 0.5 + 0.22 * Math.tanh(-(x + 120 * Math.sin(z / 700)) / 2500) * Math.exp(-r / 30000) + 0.03 * (fbm(x / 900, z / 900 + 4, 3) - 0.5); }
+// Environments on land (no plants, so they differ by water, rock and microbes, not vegetation): a moisture field across the
+// region decides dry red sand seas and gravel plains, or humid lowlands darkened by microbial mats with wet hollows; braided
+// river plains run through both; bedrock uplands rise inland; tidal flats with wrinkled mats and small microbial mounds edge the sea.
+const wetness = (x, z) => fbm(x / 14000 + 120, z / 14000 - 60, 4);
+const washW = (x, z) => Math.abs(fbm(x / 2200 + 70, z / 2200 - 30, 3) - 0.5);
 function baseH(x, z) { const c = landMask(x, z);
   if (c < 0) { const d = -c;                                                          // the sea: tidal flats, a shallow shelf, then deeper water
     let h = -lerpN(0, 3, sstepN(d, 0, 0.012)) - 27 * sstepN(d, 0.006, 0.09) - 90 * sstepN(d, 0.12, 0.3);
     h += (fbm(x / 120, z / 120 + 7, 3) - 0.5) * 1.2 * sstepN(d, 0.004, 0.03);         // a gently rolling muddy floor
     return h + 0.25 * Math.sin(x * 0.9 + Math.sin(z * 0.37) * 2) * sstepN(d, 0.0, 0.01) * (1 - sstepN(d, 0.02, 0.05));   // ripple marks in the shallows
   }
+  const wet = wetness(x, z), dry = 1 - sstepN(wet, 0.38, 0.5);
   let h = 0.6 + 40 * sstepN(c, 0.0, 0.25) * (0.6 + 0.8 * fbm(x / 2500 + 9, z / 2500, 3)) + 140 * sstepN(c, 0.2, 0.5) * fbm(x / 6000, z / 6000 + 3, 4);
   h += Math.pow(1 - Math.abs(2 * fbm(x / 700 + 2, z / 700 - 5, 4) - 1), 4) * 22 * sstepN(c, 0.006, 0.06) + 6 * Math.pow(fbm(x / 140 + 9, z / 140, 3), 3) * sstepN(c, 0.004, 0.03);   // rocky ridges, knolls and outcrops
-  h += 2.2 * Math.max(0, Math.sin((x * 0.8 + z * 0.6) / 18 + 3 * fbm(x / 300, z / 300, 2))) * sstepN(fbm(x / 1800 + 50, z / 1800, 3), 0.55, 0.7) * sstepN(c, 0.01, 0.05);   // dune fields
-  const w = Math.abs(fbm(x / 2200 + 70, z / 2200 - 30, 3) - 0.5);                    // braided river washes: wide, flat, shallow beds
-  if (w < 0.05) h = lerpN(h, Math.min(h, 0.3 + 6 * sstepN(c, 0, 0.15)), sstepN(0.05 - w, 0, 0.02));
+  h += (2.2 + 9 * dry) * Math.max(0, Math.sin((x * 0.8 + z * 0.6) / (18 + 30 * dry) + 3 * fbm(x / 300, z / 300, 2))) * Math.max(dry * sstepN(fbm(x / 2500 + 50, z / 2500, 3), 0.42, 0.55), sstepN(fbm(x / 1800 + 50, z / 1800, 3), 0.55, 0.7)) * sstepN(c, 0.01, 0.05);   // dune fields, big in the dry country
+  if (wet > 0.58) h -= 1.4 * sstepN(fbm(x / 90 + 40, z / 90, 3), 0.55, 0.7) * sstepN(c, 0.01, 0.04);                                // wet hollows in the humid lowlands
+  const w = washW(x, z), ww = 0.05 + 0.03 * (1 - dry);                              // braided river washes: wide, flat, shallow beds
+  if (w < ww) h = lerpN(h, Math.min(h, 0.3 + 6 * sstepN(c, 0, 0.15)), sstepN(ww - w, 0, 0.02));
   return h * sstepN(c, 0, 0.004); }
+function biomeAt(x, z) { const c = landMask(x, z), h = baseH(x, z);
+  if (c < 0) { if (h > -0.3) return "tidal"; if (h < -50) return "deep"; if (h > -8) return "shoal"; return "delta"; }
+  if (h < 1.6 && c < 0.01) return "tidal"; if (h > 45) return "upland"; if (washW(x, z) < 0.06 + 0.02 * (wetness(x, z) > 0.45)) return "river";
+  const wet = wetness(x, z); return wet < 0.42 ? "desert" : wet > 0.53 ? "humid" : "plain"; }
+const BIOMES = {
+  tidal: ["Tidal flats", "Mud and sand flooded and drained twice a day. Microbial mats (cyanobacteria and other microbes) bind the surface into wrinkled skins and build small domes and mounds: microbial reefs and stromatolites were still common in the Cambrian. Animals had not yet come onto the flats; the first tracks appear about 20 million years later."],
+  plain: ["Gravel and sand plain", "Bare, rolling ground of rock fragments and sand. With no roots there is no real soil, only rubble broken by heat, frost and water, and patches of dark microbial crust where moisture lingers."],
+  desert: ["Dry sand sea", "The dry interior: red-brown sand piled by the wind into big dunes, and stony flats between. Bare land everywhere made the Cambrian far dustier than today, hazing the sky."],
+  humid: ["Humid lowland", "Where rain falls often, much of the ground is dark with biological soil crusts and microbial mats, and water stands in hollows. It is the nearest thing to green on land: no plants, only microbes, and perhaps some algae."],
+  river: ["Braided river plain", "With no plants to hold its banks, a river spreads into a wide sheet of shifting channels and gravel and sand bars, flooding across the plain after storms and carrying mud out to the delta, where the Chengjiang animals lived and were buried."],
+  upland: ["Bare bedrock uplands", "Bare rock, weathering in place: no soil, no plants, only lichen-free stone (lichens are not known until the Devonian) and scattered rubble."],
+  shoal: ["Sandy shallows", "Warm shallow water over rippled sand: the outer delta, stirred by waves."],
+  delta: ["The muddy delta front", "Soft grey mud under murky water, fed by river floods: the home of the Chengjiang animals. Floods and storms sometimes buried them alive, which is why they are preserved so well."],
+  deep: ["The oxygen-poor deep", "Below about 50 m the outer shelf held an oxygen-poor water mass. Little or nothing lived here."] };
 function groundColor(x, z, h, c) { const n1 = fbm(x / 40, z / 40, 3), n2 = fbm(x / 700 + 5, z / 700, 3), m = landMask(x, z);
   if (m < 0) { c.setRGB(0.42 + 0.06 * n1, 0.40 + 0.05 * n1, 0.33 + 0.03 * n1);                                     // grey-olive mud offshore
     if (h > -6) c.lerp(_c1.setRGB(0.66 + 0.06 * n1, 0.60 + 0.05 * n1, 0.47), sstepN(h, -6, -1.5));                // sand in the shallows
     if (fbm(x / 60 + 11, z / 60, 3) > 0.6 && h > -25) c.lerp(_c1.setRGB(0.32, 0.32, 0.27), 0.4);                   // darker, organic-rich mud
+    if (h > -1.5) c.lerp(_c1.setRGB(0.30 + 0.06 * n1, 0.34 + 0.05 * n1, 0.24), 0.55 * sstepN(fbm(x / 30 + 2, z / 30, 3), 0.4, 0.6));   // microbial mats on the low flats
     return c; }
+  const wet = wetness(x, z), dry = 1 - sstepN(wet, 0.38, 0.5), hum = sstepN(wet, 0.47, 0.55);
   c.setRGB(0.55 + 0.12 * n2, 0.44 + 0.08 * n2, 0.34 + 0.05 * n1);                                                  // weathered rock and regolith: browns, reds, greys
-  const sand = sstepN(fbm(x / 1800 + 50, z / 1800, 3), 0.5, 0.65); c.lerp(_c1.setRGB(0.76 + 0.05 * n1, 0.66 + 0.05 * n1, 0.50), sand * 0.8);
-  if (h < 1.6) c.lerp(_c1.setRGB(0.52 + 0.05 * n1, 0.48, 0.40), sstepN(1.6 - h, 0, 1.2) * 0.8);                       // wet tidal sand and mud
-  const damp = sstepN(1 - Math.abs(2 * fbm(x / 160 + 3, z / 160, 3) - 1), 0.75, 0.95) * (h < 6 ? 1 : 0.4);
-  c.lerp(_c1.setRGB(0.20 + 0.05 * n1, 0.21 + 0.04 * n1, 0.17), damp * 0.7);                                         // dark microbial crusts where it stays damp
-  if (h > 25) c.lerp(_c1.setRGB(0.47 + 0.08 * n1, 0.43 + 0.06 * n1, 0.40), sstepN(h, 25, 80));                     // grey bedrock uplands
+  c.lerp(_c1.setRGB(0.72 + 0.06 * n1, 0.45 + 0.05 * n1, 0.30), dry * 0.75);                                         // dry country: red-brown iron-stained sand
+  const sand = sstepN(fbm(x / 1800 + 50, z / 1800, 3), 0.5, 0.65); c.lerp(_c1.setRGB(0.76 + 0.05 * n1, 0.62 + 0.05 * n1, 0.46), sand * 0.6 * (1 - dry * 0.5));
+  if (h < 1.6) c.lerp(_c1.setRGB(0.42 + 0.05 * n1, 0.42, 0.34), sstepN(1.6 - h, 0, 1.2) * 0.8);                       // wet tidal sand and mud, matted
+  const damp = Math.max(sstepN(1 - Math.abs(2 * fbm(x / 160 + 3, z / 160, 3) - 1), 0.75, 0.95) * (h < 6 ? 1 : 0.4), hum * (0.8 + 0.2 * sstepN(n1, 0.3, 0.6)));
+  c.lerp(_c1.setRGB(0.045 + 0.03 * n1, 0.065 + 0.04 * n1, 0.035), damp * 0.92);                                         // dark microbial crusts and mats
+  if (wet > 0.58 && fbm(x / 90 + 40, z / 90, 3) > 0.62) c.lerp(_c1.setRGB(0.20, 0.27, 0.27), 0.7);                    // standing water in hollows
+  const w = washW(x, z); if (w < 0.08) c.lerp(_c1.setRGB(0.58 + 0.08 * n1, 0.56 + 0.06 * n1, 0.50), 0.7 * sstepN(0.08 - w, 0, 0.03) * (0.5 + 0.5 * sstepN(n1, 0.4, 0.6)));   // river gravel bars
+  if (h > 25) c.lerp(_c1.setRGB(0.47 + 0.08 * n1, 0.45 + 0.06 * n1, 0.43), sstepN(h, 25, 80));                     // grey bedrock uplands
   return c; }
 const _c1 = new THREE.Color();
 
@@ -53348,12 +53374,57 @@ const FAUNA = [
   F("Sinocylindra", AL, "drifting algal threads", "alga", { H: 0.04, n: 4 }, 0x6e7444, "drift", [2, 55], 1, 0.01, 0.8, [0.3, 3], "A free-floating alga, drifting in the water.")];
 FAUNA.forEach((s, k) => s.k = k * 7.3);
 
+// ---------- educated guesses at colour, and how each group relates to animals alive today ----------
+// No Cambrian animal's body colour is known (a few fossils keep pigment in eyes, or diffraction gratings that would shimmer).
+// The guesses below follow living relatives and common rules: swimmers counter-shaded (dark back, pale belly), seafloor animals
+// in mud tones with some pattern, sponges and polyps like their modern kin. Each animal's text says what the guess rests on.
+const GROUPS = {
+  [AR]: { formal: "phylum Arthropoda", kin: "Living relatives: insects, crustaceans (crabs, shrimp), spiders, scorpions, millipedes. Trilobites died out 252 million years ago; the great-appendage arthropods sit near the line leading to spiders and horseshoe crabs.", col: "Colours guessed from living crustaceans and horseshoe crabs: browns, reds and olives, with a paler underside." },
+  [RA]: { formal: "order Radiodonta, in the stem group of Arthropoda (within Panarthropoda)", kin: "No living members. They branched off just before true arthropods: distant aunts and uncles of all insects, crabs and spiders.", col: "Colour guessed: a large open-water predator, so counter-shaded (darker above, paler below), in reds and browns like many crustaceans." },
+  [LO]: { formal: "Lobopodia, an informal grade within Panarthropoda", kin: "Living relatives: velvet worms (Onychophora) and tardigrades (water bears) are the nearest; lobopodians also gave rise to arthropods.", col: "Colours guessed from living velvet worms: dusky blue-greys, browns and rusty oranges, often finely banded." },
+  [SC]: { formal: "Scalidophora (priapulids and palaeoscolecids), in Ecdysozoa", kin: "Living relatives: priapulid 'penis worms' still live in seafloor mud today; their wider relatives are nematodes and the arthropods (all moult their outer cuticle).", col: "Colours guessed from living priapulids: pinkish to pale brown, with darker rings." },
+  [BR]: { formal: "phylum Brachiopoda (lamp shells)", kin: "Still alive: about 400 species today. Lingula and its kin, burrowing on stalks, have barely changed since the Cambrian. Related to phoronid and bryozoan 'moss animals'.", col: "Colours guessed from living Lingula and other brachiopods: green-brown to amber shells." },
+  [HY]: { formal: "class Hyolitha, now placed with the Brachiopoda and their kin (Lophophorata)", kin: "No living members (extinct 252 million years ago); closest living relatives are brachiopods and phoronids.", col: "Colour guessed: a dull shell in mud tones, like many brachiopod shells." },
+  [PO]: { formal: "phylum Porifera (sponges)", kin: "Still alive everywhere in the sea: some 9,000 species. Sponges are the earliest-branching animals still living.", col: "Colours guessed from living sponges, which are often bright: yellows, oranges, tans and purples (from pigments and symbiotic microbes)." },
+  [CN]: { formal: "phylum Cnidaria", kin: "Living relatives: jellyfish, sea anemones, corals and hydras: stinging-celled animals, alive today in great variety.", col: "Colours guessed from living jellyfish and anemones: translucent, tinged pink and amber." },
+  [CT]: { formal: "phylum Ctenophora (comb jellies), including stem-group forms", kin: "Living relatives: comb jellies still swim in every ocean; the light rainbows along their comb rows are real (scattered light, not bioluminescence). Some scientists think ctenophores are the earliest-branching animals of all.", col: "Comb jellies are transparent today, so these are drawn glassy; the stalked stem forms are guessed in pale tan." },
+  [CH]: { formal: "phylum Chordata (including the earliest vertebrates)", kin: "Living relatives: every fish, amphibian, reptile, bird and mammal, including you. Haikouichthys and Myllokunmingia are among the first vertebrates; tunicates (sea squirts) and lancelets are living chordates too.", col: "Colour partly from evidence: their eyes held dark melanin (2026 study). The bodies are guessed counter-shaded and silvery, as in most small fish." },
+  [VE]: { formal: "phylum Vetulicolia (placement debated; probably early deuterostomes)", kin: "No living members. Probably early relatives of the chordates, perhaps near the tunicates: a distant branch of our own lineage.", col: "Colour guessed: a swimmer, so counter-shaded, in olive-browns." },
+  [CA]: { formal: "Cambroernida (in Ambulacraria)", kin: "No living members. Probably early relatives of echinoderms (starfish, sea urchins) and hemichordates (acorn worms).", col: "Colour guessed from modern discoid drifters and sea cucumbers: translucent violet-tan." },
+  [CG]: { formal: "phylum Chaetognatha (arrow worms) and their gnathiferan relatives", kin: "Living relatives: arrow worms are still major plankton predators today; gnathiferans also include rotifers.", col: "Arrow worms are nearly transparent today: drawn glassy-pale." },
+  [MO]: { formal: "stem-group Mollusca (Wiwaxia, Orthrozanclus)", kin: "Living relatives: snails, clams, octopuses and chitons. These armoured grazers sit near the base of the mollusc line.", col: "Colour partly from evidence: Wiwaxia's scales carry diffraction gratings, so they probably shimmered with iridescent colour." },
+  [EN]: { formal: "phylum Entoprocta (stem group)", kin: "Living relatives: entoprocts, tiny stalked filter feeders a millimetre or so tall, still alive today.", col: "Colour guessed: pale tan, like living entoprocts." },
+  [AL]: { formal: "algae (not animals)", kin: "Living relatives: green, red and brown seaweeds. On land there was nothing but microbes: these algae and cyanobacteria were the only 'plants' on Earth.", col: "Colours guessed from living algae: greens and red-browns." } };
+// per-species: back colour, belly or second colour, bands, shimmer (plus a note when it differs from the group's)
+const LOOKS = { Kunmingella: [0x9a6a3a, 0xc8a070], Eoredlichia: [0x6a5236, 0xb89a72, 1], Yunnanocephalus: [0x7a5a3e, 0xc0a07a, 1], Naraoia: [0xa8784a, 0xe0c8a0], Misszhouia: [0x8a6e48, 0xd8c09a],
+  Fuxianhuia: [0x7a4a2e, 0xc89068, 1], Chengjiangocaris: [0x8a5a34, 0xd0a070, 1], Leanchoilia: [0xb86a3a, 0xf0c8a0], Alalcomenaeus: [0x9a5034, 0xe0b08a], Haikoucaris: [0xa8603a, 0xe8c09a],
+  Isoxys: [0x7a7a5a, 0xe8e0c8], Chuandianella: [0x9a8a6a, 0xeee6d0], Xandarella: [0x6a5a3a, 0xb8a078, 1], Sinoburius: [0x7a6a4a, 0xc8b08a], Retifacies: [0x5a4a32, 0xb09870, 1],
+  Sidneyia: [0x6a3e2a, 0xb88a64, 1], Kylinxia: [0x9a4a30, 0xe0a880], Canadaspis: [0xa07a50, 0xe8d0a8], Pectocaris: [0xb09a74, 0xf0e8d0], Tuzoia: [0x8a6040, 0xe0c8a0], Synophalos: [0xc0a888, 0xf4ecdc], Primicaris: [0xa08a6a, 0xe0d0b0],
+  Amplectobelua: [0x8a3a2a, 0xe0a888, 0], Houcaris: [0xa0442e, 0xe8b498], Lyrarapax: [0x9a5a3a, 0xe0b090],
+  Hallucigenia: [0xb8703a, 0xe0b080, 1], Microdictyon: [0x4a4a5a, 0xb08050, 1], Luolishania: [0x6a5a50, 0xc0a080, 1], Onychodictyon: [0x5a3e34, 0xd09060, 1], Paucipodia: [0x8a6a5a, 0xd0b098, 1],
+  Cardiodictyon: [0x6a5248, 0xc0987a, 1], Diania: [0x7a5a3a, 0xc89a60, 1], Facivermis: [0xa07a5a, 0xe0c0a0], Jianshanopodia: [0x5a4a40, 0xb88a60, 1], Megadictyon: [0x4e4440, 0xb08458, 1],
+  Cricocosmia: [0xb07a6a, 0xe0b8a8, 1], Maotianshania: [0xc08a7a, 0xe8c4b4, 1], Mafangscolex: [0xa87064, 0xdcb0a0, 1], Selkirkia: [0xb88a7a, 0x8a7a5a], Sicyophorus: [0xd09484, 0xecc8b8, 1],
+  Diandongia: [0x8a7a4a, 0xc0b080], Lingulellotreta: [0x5a6a3e, 0xa89068], Heliomedusa: [0x7a6a42, 0xc0a878], Longtancunella: [0x6a6a44, 0xb0a07a], Linevitus: [0x8a7a62, 0xc0b090],
+  Leptomitus: [0xd8b04a, 0xe8d090], Choia: [0xc8783a, 0xe8c090], Paraleptomitella: [0x8a5a8a, 0xc0a0c0], Xianguangia: [0xd89a8a, 0xf0d0c0], Dinomischus: [0xc8b090, 0xe8dcc0], Archisaccophyllia: [0xc87a6a, 0xf0c0b0],
+  Yunnanoascus: [0xf0c8c8, 0xf0c8c8], Maotianoascus: [0xd8ecf4, 0xd8ecf4], Haikouichthys: [0x3e4a4a, 0xd8dcd8], Myllokunmingia: [0x44504e, 0xd8dcd4], Haikouella: [0x6a7a6a, 0xd0d4c8], Yunnanozoon: [0x7a7a5a, 0xd0ccb0], Shankouclava: [0xc0905a, 0xe8c8a0],
+  Vetulicola: [0x5a5a3a, 0xc8c0a0, 1], Didazoon: [0x6a5e40, 0xc8b898], Stellostomites: [0x9a7aa8, 0xd0c0d8], Rotadiscus: [0x8a6a9a, 0xc8b0d0], Eognathacantha: [0xe0e4e0, 0xe0e4e0], Amiskwia: [0xd8dcd8, 0xd8dcd8],
+  Wiwaxia: [0x4a6a8a, 0xa08060, 0, 1], Orthrozanclus: [0x5a6a7a, 0xa89070, 0, 1], Cotyledion: [0xc8b08a, 0xe8dcc0], Fuxianospira: [0x4a7a3a, 0x6a9a4a], Longfengshania: [0x8a4a3a, 0xb07050], Sinocylindra: [0x5a8a4a, 0x7aa05a] };
+for (const sp of FAUNA) { const L = LOOKS[sp.genus.split(" ")[0]]; if (L) { sp.col = L[0]; sp.col2 = L[1]; sp.bands = !!L[2]; sp.shimmer = !!L[3]; } }
+// paint a body: counter-shaded (top colour above, belly colour below), optional bands along the body
+function paint(geo, sp) { const p = geo.attributes.position, n = geo.attributes.normal, col = new Float32Array(p.count * 3), a = new THREE.Color(sp.col), b = new THREE.Color(sp.col2 ?? sp.col), c = new THREE.Color();
+  let z0 = 1e9, z1 = -1e9; for (let i = 0; i < p.count; i++) { z0 = Math.min(z0, p.getZ(i)); z1 = Math.max(z1, p.getZ(i)); }
+  const tall = sp.habit === "sessile" && ["sponge", "polyp", "cup", "alga"].includes(sp.plan);
+  for (let i = 0; i < p.count; i++) { const up = tall ? 0.5 + 0.5 * clampN(p.getY(i) / ((sp.o.H ?? 0.05) * 1.1), 0, 1) : clampN(0.5 + 0.7 * n.getY(i), 0, 1);
+    c.copy(b).lerp(a, up); if (sp.bands) { const f = (p.getZ(i) - z0) / Math.max(1e-6, z1 - z0); if (Math.floor(f * 9) % 2) c.multiplyScalar(0.78); }
+    col.set([c.r, c.g, c.b], i * 3); }
+  geo.setAttribute("color", new THREE.BufferAttribute(col, 3)); return geo; }
+
 // ---------- placing and moving the animals ----------
 // The seafloor is divided into 16 m cells; each cell's animals are fixed by its seed (species by depth and abundance), so the
 // same animals are always in the same places. Only the cells around you are filled (in this murky water you can see ~10-20 m).
 const LCELL = 16, LR = IS_HEADSET ? 30 : 40, LIFE = [];
-for (const sp of FAUNA) { const geo = BODY[sp.plan](sp.o), mat = sp.glass ? new THREE.MeshStandardMaterial({ color: sp.col, transparent: true, opacity: 0.4, roughness: 0.1, depthWrite: false })
-    : new THREE.MeshStandardMaterial({ color: sp.col, roughness: 0.7 }), cap = sp.cap ?? 40, im = new THREE.InstancedMesh(geo, mat, cap);
+for (const sp of FAUNA) { const geo = paint(BODY[sp.plan](sp.o), sp), mat = sp.glass ? new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: 0.4, roughness: 0.1, depthWrite: false })
+    : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: sp.shimmer ? 0.25 : 0.7, metalness: sp.shimmer ? 0.55 : 0.0 }), cap = sp.cap ?? 40, im = new THREE.InstancedMesh(geo, mat, cap);
   im.count = 0; im.frustumCulled = false; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(im); const L = { sp, im, cap, act: [] };
   if (sp.plan === "ctenophore") { L.comb = new THREE.InstancedMesh(BODY.combs(sp.o), new THREE.MeshBasicMaterial({ color: 0x88ffee, transparent: true, opacity: 0.8, toneMapped: false }), cap); L.comb.count = 0; L.comb.frustumCulled = false; scene.add(L.comb); }
   LIFE.push(L); }
@@ -53371,8 +53442,13 @@ function refreshLife() { const ci = Math.floor(P_.x / LCELL), cj = Math.floor(P_
   all.sort((a, b) => a.d - b.d); for (const a of all) if (a.L.act.length < a.L.cap) { a.L.act.push(a); ACTIVE.push(a); } }
 // rocks strewn over the bare land: boulders and slabs of weathered bedrock (no soil or plants to hide them)
 const ROCKS = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0x8a7a6a, roughness: 0.95, flatShading: true }), 1600); ROCKS.count = 0; ROCKS.frustumCulled = false; scene.add(ROCKS);
+const MATS = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x4a5034, roughness: 1 }), 900); MATS.count = 0; MATS.frustumCulled = false; scene.add(MATS);   // microbial domes on the tidal flats
 let rocksAt = null; const RCELL = 32;
 function refreshRocks() { const ci = Math.floor(P_.x / RCELL), cj = Math.floor(P_.z / RCELL), n = 6, c = new THREE.Color(); let k = 0;
+  let km = 0; for (let i = ci - n; i <= ci + n; i++) for (let j = cj - n; j <= cj + n; j++) { const x0 = i * RCELL, z0 = j * RCELL, h0 = baseH(x0, z0); if (h0 > 1.4 || h0 < -0.8) continue;
+    const r = seeded(i * 4421 + j * 9907 + 5), nd = 18 * sstepN(fbm(x0 / 200 + 8, z0 / 200, 3), 0.45, 0.65);
+    for (let q = 0; q < nd && km < 900; q++) { const x = x0 + r() * RCELL, z = z0 + r() * RCELL, s = 0.2 + r() * 0.7; O3.position.set(x, baseH(x, z) - 0.05, z); O3.rotation.set(0, r() * 6, 0); O3.scale.set(s, s * (0.25 + 0.3 * r()), s * (0.8 + 0.4 * r())); O3.updateMatrix(); MATS.setMatrixAt(km++, O3.matrix); } }
+  MATS.count = km; MATS.instanceMatrix.needsUpdate = true;
   for (let i = ci - n; i <= ci + n && k < 1600; i++) for (let j = cj - n; j <= cj + n && k < 1600; j++) { const x0 = i * RCELL, z0 = j * RCELL, m = landMask(x0, z0); if (m < 0.002) continue;
     const r = seeded(i * 7717 + j * 3301 + 9), dens = 14 * sstepN(fbm(x0 / 300 + 3, z0 / 300, 3), 0.45, 0.7) * (1 - 0.7 * sstepN(fbm(x0 / 1800 + 50, z0 / 1800, 3), 0.5, 0.65));
     for (let q = 0; q < dens && k < 1600; q++) { const x = x0 + r() * RCELL, z = z0 + r() * RCELL, s = 0.15 + Math.pow(r(), 3) * 1.6, flat = r() < 0.4;
@@ -53448,13 +53524,14 @@ function drawWrist(g, W, H) { g.clearRect(0, 0, W, H); g.fillStyle = "rgba(8,20,
   else { t(`air: O₂ ${ENV.O2pct}%  (est. ${ENV.O2range}; today 21%)`, 22, 128, 28, "#ffffff", 700); t(`CO₂ ~${ENV.CO2ppm.toLocaleString()} ppm (${ENV.CO2range}; today ~420)`, 22, 168, 23, "#ffe9a8", 600);
     t(`air ${ENV.airT} °C  ·  sun ${Math.round(ENV.sunL * 100)}% of today's`, 22, 206, 22); t(`tank ${Math.round(TANK.bar)} bar (full: 200)`, 22, 240, 22, "#a8c8c4"); }
   const hd = ((Math.round(-yawNow() * 180 / Math.PI) % 360) + 360) % 360; t(`heading ${hd}° ${["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(hd / 45) % 8]}`, 22, 290, 22);
+  if (biomeNow) t(BIOMES[biomeNow][0], 300, 290, 20, "#ffe9a8", 600);
   t(`species logged: ${LOGGED.size} of ${FAUNA.length}  ·  phyla ${new Set([...LOGGED].map(s => s.phylum)).size}`, 22, 330, 22, "#9ae8de", 600);
   t(swimming ? "E: examine the nearest animal" : "walk into the sea to dive; E: examine", 22, 370, 18, "#7a9a98"); }
 function yawNow() { const d = V3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())); return Math.atan2(-d.x, -d.z); }
 // the species journal: an animal is logged when you examine it (E) close up
-const LOGGED = new Set();
+const LOGGED = new Set(), PLACES_SEEN = new Set(); let biomeNow = null, biomeT = 0;
 function drawJournal() { const byP = {}; for (const s of FAUNA) (byP[s.phylum] = byP[s.phylum] || []).push(s);
-  JOURNAL.innerHTML = `<b>Field journal</b> · ${LOGGED.size} of ${FAUNA.length} species<br><span style="color:#8ab0ac;font-size:11.5px">swim close to an animal and press E to examine it</span>` +
+  JOURNAL.innerHTML = `<b>Environments</b> · ${PLACES_SEEN.size} of ${Object.keys(BIOMES).length}<br>` + Object.entries(BIOMES).map(([k, [n]]) => PLACES_SEEN.has(k) ? `<div data-b="${k}" style="padding-left:8px;cursor:pointer">✦ ${n}</div>` : `<div style="padding-left:8px;color:#5a7a78">· ?</div>`).join("") + `<div style="margin-top:8px"></div><b>Field journal</b> · ${LOGGED.size} of ${FAUNA.length} species<br><span style="color:#8ab0ac;font-size:11.5px">swim close to an animal and press E to examine it</span>` +
     Object.entries(byP).map(([p, L]) => `<div style="margin-top:5px;color:#9ae8de;font-weight:600">${p} <span style="color:#6a8a88;font-weight:400">${L.filter(s => LOGGED.has(s)).length}/${L.length}</span></div>` +
       L.map(s => LOGGED.has(s) ? `<div data-g="${FAUNA.indexOf(s)}" style="padding-left:8px;cursor:pointer">✦ <i>${s.genus}</i></div>` : `<div style="padding-left:8px;color:#5a7a78">· ${s.hint}</div>`).join("")).join(""); }
 // the hand lens: an examined animal floats in front of you, magnified, turning slowly, until you look away or press E again
@@ -53470,9 +53547,10 @@ function showLens(sp) { while (LENS.children.length > 2) LENS.remove(LENS.childr
   g.fillStyle = "#9ae8de"; g.font = "italic 600 34px -apple-system, Helvetica, sans-serif"; g.fillText(sp.genus.split(" ")[0], 18, 42);
   g.fillStyle = "#e6f0ee"; g.font = "26px -apple-system, Helvetica, sans-serif"; g.fillText(`shown ×${k >= 10 ? Math.round(k) : k.toFixed(1)}  ·  real length ${size >= 0.1 ? (size * 100).toFixed(0) : (size * 100).toFixed(1)} cm`, 18, 80); lensTex.needsUpdate = true;
   LENS.position.set(0, -0.02, -0.55); LENS.visible = true; lensT = 22; }
-JOURNAL.addEventListener("click", e => { const d = e.target.closest("[data-g]"); if (!d) return; e.stopPropagation(); const sp = FAUNA[+d.dataset.g]; showLens(sp); say(`<b><i>${sp.genus}</i></b> <span style="color:#9ae8de">· ${sp.phylum}</span><br>${sp.text}`, 22); });
+function speciesCard(sp, first) { const G = GROUPS[sp.phylum] || {}; return `<b><i>${sp.genus}</i></b> <span style="color:#9ae8de">· ${G.formal || sp.phylum}</span>${first ? " · <b>new to your journal</b>" : ""}<br>${sp.text}<br><span style="color:#bfe8c8">🧬 ${G.kin || ""}</span><br><span style="color:#a8b8b4;font-size:13px">🎨 ${G.col || ""}</span>`; }
+JOURNAL.addEventListener("click", e => { const bb = e.target.closest("[data-b]"); if (bb) { e.stopPropagation(); const [n, tx] = BIOMES[bb.dataset.b]; say(`<b>${n}</b> · ${tx}`, 20); return; } const d = e.target.closest("[data-g]"); if (!d) return; e.stopPropagation(); const sp = FAUNA[+d.dataset.g]; showLens(sp); say(speciesCard(sp, false), 32); });
 function interact() { if (!started) return start(); if (LENS.visible) { LENS.visible = false; return; } const s = nearestAnimal(swimming ? 3.5 : 2.5);
-  if (s) { const first = !LOGGED.has(s.sp); LOGGED.add(s.sp); drawJournal(); showLens(s.sp); say(`<b><i>${s.sp.genus}</i></b> <span style="color:#9ae8de">· ${s.sp.phylum}</span>${first ? " · <b>new to your journal</b>" : ""}<br>${s.sp.text}`, 26); return; }
+  if (s) { const first = !LOGGED.has(s.sp); LOGGED.add(s.sp); drawJournal(); showLens(s.sp); say(speciesCard(s.sp, first), 32); return; }
   say(swimming ? "No animal close enough to examine. Look along the seafloor and in the water around you; many are only a few centimetres long." : ENV.landNote, 14); }
 
 // ---------- VR ----------
@@ -53524,6 +53602,7 @@ function frame() {
     if (flying) P_.y = Math.max(g, P_.y + up * Math.max(4, sp) * dt); else P_.y = g > P_.y ? Math.min(g, P_.y + 4 * dt) : Math.max(g, P_.y - 6 * dt); }
   rig.position.set(P_.x, P_.y, P_.z);
   updateGround(P_.x, P_.z); updateLife(t, dt);
+  biomeT -= dt; if (biomeT <= 0 && started) { biomeT = 0.5; const b = biomeAt(P_.x, P_.z); if (b !== biomeNow) { biomeNow = b; const first = !PLACES_SEEN.has(b); PLACES_SEEN.add(b); drawJournal(); if (first) say(`<b>${BIOMES[b][0]}</b> · ${BIOMES[b][1]}`, 18); } }
   // the scuba: air used faster the deeper you are; refilled when you are back on land
   const camY = camera.getWorldPosition(V3(0, 0, 0)).y; depthNow = Math.max(0, SEA - camY);
   if (depthNow > 0.2) { TANK.bar = Math.max(0, TANK.bar - 20 * (1 + depthNow / 10) / TANK.litres / 60 * dt); diveMin += dt / 60; maxDepth = Math.max(maxDepth, depthNow); }
@@ -53548,7 +53627,7 @@ function frame() {
   msgT -= dt; if (msgT <= 0 && MSG.style.display !== "none") { MSG.style.display = "none"; msgText = ""; vrDirty = true; }
   wristTm -= dt; if (wristTm <= 0) { wristTm = 0.25; drawWrist(WRISTC.getContext("2d"), 512, 400); wristT.needsUpdate = true; }
   hudT -= dt; if (hudT <= 0) { hudT = 0.3; const near = nearestAnimal(swimming ? 6 : 3);
-    HUD.innerHTML = `<b>${ENV.dateLabel}</b> · ${ENV.siteLabel}<br>${swimming ? `diving · ${depthNow.toFixed(1)} m` : waterD > 0.3 ? "wading" : flying ? "flying (to look around)" : "on foot"}${fast ? ` · pace ×${[1, 3, 10, 30][fast]}` : ""}${near ? ` · nearby: ${LOGGED.has(near.sp) ? "<i>" + near.sp.genus + "</i>" : "an animal: press E to examine"}` : ""}<br>
+    HUD.innerHTML = `<b>${ENV.dateLabel}</b> · ${ENV.siteLabel}<br>${biomeNow ? `<span style="color:#ffe9a8">${BIOMES[biomeNow][0]}</span> · ` : ""}${swimming ? `diving · ${depthNow.toFixed(1)} m` : waterD > 0.3 ? "wading" : flying ? "flying (to look around)" : "on foot"}${fast ? ` · pace ×${[1, 3, 10, 30][fast]}` : ""}${near ? ` · nearby: ${LOGGED.has(near.sp) ? "<i>" + near.sp.genus + "</i>" : "an animal: press E to examine"}` : ""}<br>
       <span style="color:#8ab0ac;font-size:12.5px">WASD move · drag to look · in the sea you swim where you look (space up, C down) · shift faster · − / = pace · E examine · F fly</span>`;
     if (vr && (vrDirty || ((t * 3) | 0) % 3 === 0)) { drawVR(msgText); vrDirty = false; } }
   renderer.render(scene, camera);
