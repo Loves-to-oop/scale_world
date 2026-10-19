@@ -53116,16 +53116,18 @@ const sky = new THREE.Mesh(new THREE.SphereGeometry(50000, 32, 16), skyMat); sky
 // in wide sheets), dunes, and dark microbial crusts where the ground stays damp. At the coast a broad, gently sloping tidal flat;
 // offshore a shallow muddy shelf, deepening slowly. Sea level 0 is mean sea level; the tide moves it up and down.
 // Near the start (the origin) the coast runs roughly north-south, land to the west, sea to the east.
+// each place you can visit is its own stretch of coast: SG holds its settings (set when you arrive)
+const SG = { ox: 0, oz: 0, wetBias: 0, carbonate: false, deep: 1, mud: [0.42, 0.40, 0.33], sand: [0.66, 0.60, 0.47], land: 1, stroma: false, reef: false };
 function landMask(x, z) { const r = Math.hypot(x, z);
-  return fbm(x / 9000 + 31, z / 9000 - 17, 4) - 0.5 + 0.22 * Math.tanh(-(x + 120 * Math.sin(z / 700)) / 2500) * Math.exp(-r / 30000) + 0.03 * (fbm(x / 900, z / 900 + 4, 3) - 0.5); }
+  return fbm(x / 9000 + 31 + SG.ox, z / 9000 - 17 + SG.oz, 4) - 0.5 + 0.22 * Math.tanh(-(x + 120 * Math.sin(z / 700)) / 2500) * Math.exp(-r / 30000) + 0.03 * (fbm(x / 900, z / 900 + 4, 3) - 0.5); }
 // Environments on land (no plants, so they differ by water, rock and microbes, not vegetation): a moisture field across the
 // region decides dry red sand seas and gravel plains, or humid lowlands darkened by microbial mats with wet hollows; braided
 // river plains run through both; bedrock uplands rise inland; tidal flats with wrinkled mats and small microbial mounds edge the sea.
-const wetness = (x, z) => fbm(x / 14000 + 120, z / 14000 - 60, 4);
+const wetness = (x, z) => fbm(x / 14000 + 120 + SG.ox, z / 14000 - 60 + SG.oz, 4) + SG.wetBias;
 const washW = (x, z) => Math.abs(fbm(x / 2200 + 70, z / 2200 - 30, 3) - 0.5);
 function baseH(x, z) { const c = landMask(x, z);
   if (c < 0) { const d = -c;                                                          // the sea: tidal flats, a shallow shelf, then deeper water
-    let h = -lerpN(0, 3, sstepN(d, 0, 0.012)) - 27 * sstepN(d, 0.006, 0.09) - 90 * sstepN(d, 0.12, 0.3);
+    let h = -lerpN(0, 3, sstepN(d, 0, 0.012)) - 27 * SG.deep * sstepN(d, 0.006, 0.09) - 90 * SG.deep * sstepN(d, 0.12, 0.3);
     h += (fbm(x / 120, z / 120 + 7, 3) - 0.5) * 1.2 * sstepN(d, 0.004, 0.03);         // a gently rolling muddy floor
     return h + 0.25 * Math.sin(x * 0.9 + Math.sin(z * 0.37) * 2) * sstepN(d, 0.0, 0.01) * (1 - sstepN(d, 0.02, 0.05));   // ripple marks in the shallows
   }
@@ -53152,16 +53154,16 @@ const BIOMES = {
   delta: ["The muddy delta front", "Soft grey mud under murky water, fed by river floods: the home of the Chengjiang animals. Floods and storms sometimes buried them alive, which is why they are preserved so well."],
   deep: ["The oxygen-poor deep", "Below about 50 m the outer shelf held an oxygen-poor water mass. Little or nothing lived here."] };
 function groundColor(x, z, h, c) { const n1 = fbm(x / 40, z / 40, 3), n2 = fbm(x / 700 + 5, z / 700, 3), m = landMask(x, z);
-  if (m < 0) { c.setRGB(0.42 + 0.06 * n1, 0.40 + 0.05 * n1, 0.33 + 0.03 * n1);                                     // grey-olive mud offshore
-    if (h > -6) c.lerp(_c1.setRGB(0.66 + 0.06 * n1, 0.60 + 0.05 * n1, 0.47), sstepN(h, -6, -1.5));                // sand in the shallows
+  if (m < 0) { c.setRGB(SG.mud[0] + 0.06 * n1, SG.mud[1] + 0.05 * n1, SG.mud[2] + 0.03 * n1);                     // the seafloor: mud, or pale lime sand
+    if (h > -6 * SG.deep) c.lerp(_c1.setRGB(SG.sand[0] + 0.06 * n1, SG.sand[1] + 0.05 * n1, SG.sand[2]), sstepN(h, -6 * SG.deep, -1.5));   // sand in the shallows
     if (fbm(x / 60 + 11, z / 60, 3) > 0.6 && h > -25) c.lerp(_c1.setRGB(0.32, 0.32, 0.27), 0.4);                   // darker, organic-rich mud
-    if (h > -1.5) c.lerp(_c1.setRGB(0.30 + 0.06 * n1, 0.34 + 0.05 * n1, 0.24), 0.55 * sstepN(fbm(x / 30 + 2, z / 30, 3), 0.4, 0.6));   // microbial mats on the low flats
+    if (h > -1.5) c.lerp(_c1.setRGB(0.22 + 0.06 * n1, 0.24 + 0.05 * n1, 0.17), 0.5 * sstepN(fbm(x / 30 + 2, z / 30, 3), 0.45, 0.65));   // wrinkled microbial mats on the low flats
     return c; }
   const wet = wetness(x, z), dry = 1 - sstepN(wet, 0.38, 0.5), hum = sstepN(wet, 0.47, 0.55);
   c.setRGB(0.55 + 0.12 * n2, 0.44 + 0.08 * n2, 0.34 + 0.05 * n1);                                                  // weathered rock and regolith: browns, reds, greys
   c.lerp(_c1.setRGB(0.72 + 0.06 * n1, 0.45 + 0.05 * n1, 0.30), dry * 0.75);                                         // dry country: red-brown iron-stained sand
   const sand = sstepN(fbm(x / 1800 + 50, z / 1800, 3), 0.5, 0.65); c.lerp(_c1.setRGB(0.76 + 0.05 * n1, 0.62 + 0.05 * n1, 0.46), sand * 0.6 * (1 - dry * 0.5));
-  if (h < 1.6) c.lerp(_c1.setRGB(0.42 + 0.05 * n1, 0.42, 0.34), sstepN(1.6 - h, 0, 1.2) * 0.8);                       // wet tidal sand and mud, matted
+  if (h < 1.6) c.lerp(SG.carbonate ? _c1.setRGB(0.70 + 0.05 * n1, 0.68, 0.58) : _c1.setRGB(0.42 + 0.05 * n1, 0.42, 0.34), sstepN(1.6 - h, 0, 1.2) * 0.8);   // wet tidal sand and mud (lime mud on carbonate coasts)
   const damp = Math.max(sstepN(1 - Math.abs(2 * fbm(x / 160 + 3, z / 160, 3) - 1), 0.75, 0.95) * (h < 6 ? 1 : 0.4), hum * (0.8 + 0.2 * sstepN(n1, 0.3, 0.6)));
   c.lerp(_c1.setRGB(0.045 + 0.03 * n1, 0.065 + 0.04 * n1, 0.035), damp * 0.92);                                         // dark microbial crusts and mats
   if (wet > 0.58 && fbm(x / 90 + 40, z / 90, 3) > 0.62) c.lerp(_c1.setRGB(0.20, 0.27, 0.27), 0.7);                    // standing water in hollows
@@ -53276,6 +53278,34 @@ const BODY = {
     for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; P.push(between(V3(Math.cos(a) * H * 0.17, H, Math.sin(a) * H * 0.17), V3(Math.cos(a) * H * 0.26, H * 1.12, Math.sin(a) * H * 0.26), H * 0.012, 3)); } return mergeG(P); },
   alga(o) { const H = o.H, P = []; for (let k = 0; k < (o.n ?? 5); k++) { const a = k * 1.3, x = Math.cos(a) * H * 0.08, z = Math.sin(a) * H * 0.08; let p = V3(x, 0, z);
       for (let s = 0; s < 4; s++) { const q = p.clone().add(V3(Math.sin(a + s) * H * 0.05, H * (0.22 + 0.04 * k / 5), Math.cos(a + s) * H * 0.05)); P.push(between(p, q, H * (0.02 - s * 0.003), 4)); p = q; } } return mergeG(P); } };
+// ---------- more body plans: reef builders and the animals of the other sites ----------
+// an archaeocyath: a porous, double-walled cup (a reef-building sponge); single, or branching into several cups
+BODY.archaeo = o => { const H = o.H, R = o.R ?? H * 0.3, P = [], cup = (x, z, h, r, ry, tilt) => { const m = new THREE.Matrix4().compose(V3(x, 0, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(tilt, ry, 0)), V3(1, 1, 1));
+    P.push([new THREE.CylinderGeometry(r, r * 0.25, h, 12, 3, true).translate(0, h / 2, 0).applyMatrix4(m), new THREE.Matrix4()]); P.push([new THREE.CylinderGeometry(r * 0.62, r * 0.18, h * 0.96, 10, 1, true).translate(0, h / 2, 0).applyMatrix4(m), new THREE.Matrix4()]);
+    for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; P.push([new THREE.BoxGeometry(r * 0.36, h * 0.9, r * 0.02).translate(Math.cos(a) * r * 0.75, h * 0.47, Math.sin(a) * r * 0.75).applyMatrix4(new THREE.Matrix4().makeRotationY(-a)).applyMatrix4(m), new THREE.Matrix4()]); } };   // the radial partitions (septa)
+  if (o.branch) for (let k = 0; k < o.branch; k++) { const a = k * 2.4; cup(Math.cos(a) * R * 0.8 * (k ? 1 : 0), Math.sin(a) * R * 0.8 * (k ? 1 : 0), H * (0.6 + 0.4 * ((k * 7) % 3) / 2), R * 0.6, a, k ? 0.35 : 0); }
+  else cup(0, 0, H, R, 0, 0); return mergeG(P); };
+// calcimicrobes (Epiphyton): dark, bushy, branching growths of calcified microbes; Renalcis: clotted, kidney-shaped lumps
+BODY.bush = o => { const H = o.H, P = []; const grow = (p, d, len, r, depth) => { const q = p.clone().addScaledVector(d, len); P.push(between(p, q, r, 4)); if (depth <= 0) { P.push([new THREE.SphereGeometry(1, 5, 4), TM(q.x, q.y, q.z, r * 2.2, r * 2.2, r * 2.2)]); return; }
+    for (let k = 0; k < 3; k++) { const a = k * 2.1 + depth, d2 = d.clone().add(V3(Math.cos(a) * 0.6, 0.15, Math.sin(a) * 0.6)).normalize(); grow(q, d2, len * 0.72, r * 0.72, depth - 1); } };
+  for (let k = 0; k < (o.n ?? 4); k++) grow(V3(Math.cos(k * 1.6) * H * 0.08, 0, Math.sin(k * 1.6) * H * 0.08), V3(Math.cos(k * 1.6) * 0.3, 1, Math.sin(k * 1.6) * 0.3).normalize(), H * 0.35, H * 0.035, 3); return mergeG(P); };
+BODY.clot = o => { const H = o.H, P = []; for (let k = 0; k < 14; k++) { const a = k * 2.4, r = Math.sqrt(k / 14) * H * 0.5; P.push([new THREE.SphereGeometry(1, 7, 5), TM(Math.cos(a) * r, H * (0.25 + 0.5 * ((k * 5) % 7) / 7), Math.sin(a) * r, H * 0.22, H * 0.18, H * 0.2)]); } return mergeG(P); };
+// a chancelloriid: an upright bag-shaped body studded with star-shaped spiny sclerites
+BODY.chancellorid = o => { const H = o.H, R = o.R ?? H * 0.18, P = [[new THREE.CylinderGeometry(R, R * 0.5, H, 10, 4), TM(0, H / 2, 0)]];
+  for (let k = 0; k < 40; k++) { const y = H * (0.08 + 0.88 * ((k * 0.618) % 1)), a = k * 2.4, rr = R * (0.5 + 0.5 * y / H); for (let s = 0; s < 5; s++) { const b = s / 5 * Math.PI * 2;
+      const d = V3(Math.cos(a), 0, Math.sin(a)), up = V3(0, 1, 0), t = d.clone().cross(up), dir = d.clone().multiplyScalar(0.6).addScaledVector(t, Math.cos(b)).addScaledVector(up, Math.sin(b)).normalize();
+      const p = V3(Math.cos(a) * rr, y, Math.sin(a) * rr); P.push(between(p, p.clone().addScaledVector(dir, R * 0.6), R * 0.03, 3)); } } return mergeG(P); };
+// Halkieria: a flattened slug covered in rows of scale-like sclerites, with a shell at each end
+BODY.halkieria = o => { const L = o.L, P = [[SPH(10, 6), TM(0, L * 0.06, 0, L * 0.18, L * 0.06, L * 0.5)]];
+  for (let k = 0; k < 22; k++) { const z = L * 0.4 - k * L * 0.036; for (const sd of [-1, 0, 1]) P.push([BOX(), TM(sd * L * 0.1, L * 0.1 + (sd ? 0 : 0.01 * L), z, L * 0.09, L * 0.008, L * 0.035, 0, 0, sd * 0.5)]); }
+  for (const z of [0.42, -0.42]) P.push([SPH(10, 5), TM(0, L * 0.12, z * L, L * 0.13, L * 0.05, L * 0.1)]); return mergeG(P); };
+// a gilled lobopodian (Kerygmachela, Pambdelurion): a soft body with flaps along its sides, stubby legs, and great frontal limbs
+BODY.gilled = o => { const L = o.L, P = [], n = 11, th = L * 0.06;
+  for (let k = 0; k < n; k++) { const z = L * 0.38 - k * L * 0.07, w = L * 0.16 * (1 - k * 0.04); P.push([SPH(8, 5), TM(0, th, z, w * 0.5, th, L * 0.045)]);
+    for (const sd of [-1, 1]) { P.push([SPH(5, 3), TM(sd * w * 0.75, th, z, w * 0.45, th * 0.12, L * 0.04, 0, sd * 0.3)]); P.push(between(V3(sd * w * 0.3, th * 0.5, z), V3(sd * w * 0.5, -th * 0.4, z), L * 0.012, 4)); } }
+  for (const sd of [-1, 1]) { let a = V3(sd * L * 0.04, th, L * 0.44); for (let k = 0; k < 5; k++) { const b = a.clone().add(V3(sd * L * 0.01, -L * 0.012 * k, L * 0.05)); P.push(between(a, b, L * (0.018 - k * 0.002), 4)); a = b; } }
+  if (o.tail) for (const sd of [-1, 1]) P.push(between(V3(sd * L * 0.03, th, -L * 0.4), V3(sd * L * 0.08, th, -L * (0.4 + o.tail)), L * 0.008, 3));
+  return mergeG(P); };
 
 // ---------- the date and the world: Chengjiang, about 518 million years ago ----------
 // SOURCES: age 518.03 ± 0.69 Ma (maximum; CA-ID-TIMS U-Pb on detrital zircons, Yang et al. 2018, J. Geol. Soc.); setting a river-fed
@@ -53289,7 +53319,9 @@ const ENV = { dateLabel: "about 518 million years ago", siteLabel: "the Chengjia
   arrival: "You step out of the time machine onto bare land, about 518 million years ago. There is not a single plant anywhere: just rock, sand and dark microbial crusts, under a hazy, dusty sky. The day is about 21 hours long; the Moon is a little closer and bigger. The air holds perhaps half today's oxygen and over ten times the CO₂, so you breathe from your tank. East, past the tidal flats, is the sea: a warm, murky delta front teeming with animals. Walk in and dive; press E close to animals to examine and log them.",
   landNote: "Bare land: no plants yet, no animals; only microbial crusts where it stays damp. The animals are all in the sea, to the east: walk in and dive.",
   deepNote: "Below about 50 m the water here lost its oxygen: the outer shelf held an oxygen-poor water mass. Nothing lives down here; the animals are in the shallower, oxygenated water toward shore." };
-const START = (() => { for (let x = -3000; x < 3000; x += 10) if (landMask(x, 0) < 0) return { x: x - 70, z: 0, yaw: -Math.PI / 2 }; return { x: 0, z: 0, yaw: -Math.PI / 2 }; })();
+function findStart() { for (let r = 0; r < 60000; r += 500) for (let a = 0; a < 6.28; a += 0.4) { const z0 = r * Math.sin(a), x0 = r * Math.cos(a);   // a shore: land just west of sea
+    for (let x = x0 - 3000; x < x0 + 3000; x += 10) if (landMask(x, z0) > 0.002 && landMask(x + 10, z0) <= 0 && baseH(x - 70, z0) > 0.8) return { x: x - 70, z: z0, yaw: -Math.PI / 2 }; } return { x: 0, z: 0, yaw: -Math.PI / 2 }; }
+let START = findStart();
 // more body plans
 BODY.medusa = o => { const L = o.L, P = [[new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), TM(0, 0, 0, L * 0.5, L * 0.4, L * 0.5)]];
   for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; P.push(between(V3(Math.cos(a) * L * 0.45, 0, Math.sin(a) * L * 0.45), V3(Math.cos(a) * L * 0.5, -L * 0.9, Math.sin(a) * L * 0.5), L * 0.008, 3)); } return mergeG(P); };
@@ -53419,6 +53451,21 @@ function paint(geo, sp) { const p = geo.attributes.position, n = geo.attributes.
     col.set([c.r, c.g, c.b], i * 3); }
   geo.setAttribute("color", new THREE.BufferAttribute(col, 3)); return geo; }
 
+// ---------- the places you can visit, all at (or very near) the same moment, about 518 million years ago ----------
+// Each has its own coast (a different stretch of the generated world), water, seafloor and animals. SITES entries set: where it is,
+// its age, the water (colour, murk, temperature), the seafloor, stromatolites and reefs, and which animals live there (sp.at).
+let DENS_X = 2;                                   // living seafloors were probably busier than fossil counts suggest: densities doubled
+const SITES = {
+  chengjiang: { name: "Chengjiang delta, South China", where: "Yunnan, China · then the South China microcontinent, in the tropics", age: "about 518 Ma (518.03 ± 0.69, a maximum age)",
+    g: { ox: 0, oz: 0, wetBias: 0.05, carbonate: false, deep: 1, mud: [0.42, 0.40, 0.33], sand: [0.66, 0.60, 0.47], stroma: false, reef: false },
+    water: [0.16, 0.30, 0.28], murk: 0.12, seaT: 30, traces: 1, tubes: 1, sky: [[0.42, 0.58, 0.80], [0.87, 0.85, 0.81]],
+    arrival: ENV.arrival } };
+let SITE_KEY = "chengjiang", SITE = SITES.chengjiang;
+for (const sp of FAUNA) if (!sp.at) sp.at = { chengjiang: { dens: sp.dens } };
+function applySite(key) { SITE_KEY = key; SITE = SITES[key]; Object.assign(SG, SITE.g);
+  ENV.siteLabel = SITE.name; ENV.seaT = SITE.seaT; ENV.murk = SITE.murk; ENV.skyUp = new THREE.Color(...SITE.sky[0]); ENV.skyHor = new THREE.Color(...SITE.sky[1]); }
+applySite("chengjiang");
+
 // ---------- placing and moving the animals ----------
 // The seafloor is divided into 16 m cells; each cell's animals are fixed by its seed (species by depth and abundance), so the
 // same animals are always in the same places. Only the cells around you are filled (in this murky water you can see ~10-20 m).
@@ -53430,7 +53477,9 @@ for (const sp of FAUNA) { const geo = paint(BODY[sp.plan](sp.o), sp), mat = sp.g
   LIFE.push(L); }
 function cellAnimals(ci, cj) { const r = seeded(ci * 92821 + cj * 68917 + 3), out = [], x0 = ci * LCELL, z0 = cj * LCELL;
   const d = -baseH(x0 + LCELL / 2, z0 + LCELL / 2); if (d < 0.3) return out;                    // only in the sea (depth at mean sea level)
-  for (const L of LIFE) { const sp = L.sp, [d0, d1] = sp.depth; if (d < d0 || d > d1) continue; const lam = sp.dens * LCELL * LCELL / 100 * (0.5 + fbm(x0 / 90 + sp.k, z0 / 90, 2));   // patchy
+  const reef = SG.reef ? reefAt(x0 + LCELL / 2, z0 + LCELL / 2) : 0;
+  for (const L of LIFE) { const sp = L.sp, at = sp.at?.[SITE_KEY]; if (!at) continue; const [d0, d1] = at.depth ?? sp.depth; if (d < d0 || d > d1) continue;
+    const lam = at.dens * DENS_X * LCELL * LCELL / 100 * (0.5 + fbm(x0 / 90 + sp.k, z0 / 90, 2)) * (at.reef === 1 ? reef : at.reef === -1 ? 1 - reef : 1);   // patchy; reef builders only on the reefs
     let n = Math.floor(lam) + (r() < lam % 1 ? 1 : 0); while (n-- > 0) out.push({ L, x: x0 + r() * LCELL, z: z0 + r() * LCELL, s: 0.75 + r() * 0.5, ph: r() * 100, h: r() * 6.28, lift: r() }); }
   return out; }
 const CELLS = new Map(); let lifeAt = null, ACTIVE = [];
@@ -53442,13 +53491,33 @@ function refreshLife() { const ci = Math.floor(P_.x / LCELL), cj = Math.floor(P_
   all.sort((a, b) => a.d - b.d); for (const a of all) if (a.L.act.length < a.L.cap) { a.L.act.push(a); ACTIVE.push(a); } }
 // rocks strewn over the bare land: boulders and slabs of weathered bedrock (no soil or plants to hide them)
 const ROCKS = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0x8a7a6a, roughness: 0.95, flatShading: true }), 1600); ROCKS.count = 0; ROCKS.frustumCulled = false; scene.add(ROCKS);
-const MATS = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x4a5034, roughness: 1 }), 900); MATS.count = 0; MATS.frustumCulled = false; scene.add(MATS);   // microbial domes on the tidal flats
+// reefs: where the shallow carbonate shelf builds mounds of archaeocyath sponges and calcimicrobes
+function reefAt(x, z) { const h = baseH(x, z); if (h > -1.5 || h < -25) return 0; return sstepN(fbm(x / 160 + 41 + SG.ox, z / 160 - 9, 3), 0.48, 0.6) * sstepN(-h, 1.5, 3); }
+// stromatolites (carbonate coasts only): knobbly domes and columns of layered microbial carbonate, a living dark mat on top
+const STROMA_G = (() => { const P = []; for (let k = 0; k < 9; k++) { const a = k * 2.4, r = k ? 0.55 : 0; P.push([new THREE.SphereGeometry(1, 9, 6), TM(Math.cos(a) * r * 0.6, 0.25 + (k ? 0 : 0.15), Math.sin(a) * r * 0.6, k ? 0.45 : 0.75, k ? 0.45 : 0.6, k ? 0.45 : 0.75)]); } return paint(mergeG(P), { col: 0x2e3428, col2: 0x7a7060, plan: "x", o: {} }); })();
+const STROMA = new THREE.InstancedMesh(STROMA_G, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), 700); STROMA.count = 0; STROMA.frustumCulled = false; scene.add(STROMA);
+// traces on the seafloor: burrow openings, trails, worm tubes, empty shells and moults (the litter of a living seafloor)
+const TR_HOLE = new THREE.InstancedMesh(new THREE.TorusGeometry(0.012, 0.006, 4, 8).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x3a3428, roughness: 1 }), 1500);
+const TR_TRAIL = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2e2a22, roughness: 1, transparent: true, opacity: 0.45, depthWrite: false }), 900);
+const TR_TUBE = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.004, 0.005, 1, 5).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ color: 0x9a8a6a, roughness: 1 }), 900);
+const TR_SHELL = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 7, 4, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xb8ac90, roughness: 0.8 }), 900);
+for (const m of [TR_HOLE, TR_TRAIL, TR_TUBE, TR_SHELL]) { m.count = 0; m.frustumCulled = false; scene.add(m); }
+let tracesAt = null;
+function refreshTraces() { const C = 8, ci = Math.floor(P_.x / C), cj = Math.floor(P_.z / C), n = IS_HEADSET ? 3 : 4, cnt = [0, 0, 0, 0], T = [TR_HOLE, TR_TRAIL, TR_TUBE, TR_SHELL], cap = [1500, 900, 900, 900];
+  const put = (k, x, y, z, ry, sx, sy, sz) => { if (cnt[k] >= cap[k]) return; O3.position.set(x, y, z); O3.rotation.set(0, ry, 0); O3.scale.set(sx, sy, sz); O3.updateMatrix(); T[k].setMatrixAt(cnt[k]++, O3.matrix); };
+  for (let i = ci - n; i <= ci + n; i++) for (let j = cj - n; j <= cj + n; j++) { const x0 = i * C, z0 = j * C, h0 = baseH(x0, z0); if (h0 > -0.4 || h0 < -55) continue;
+    const r = seeded(i * 5813 + j * 2711 + 17), bio = SITE.traces * (0.4 + fbm(x0 / 40 + 3, z0 / 40, 2));
+    for (let q = 0; q < 14 * bio; q++) { const x = x0 + r() * C, z = z0 + r() * C; put(0, x, baseH(x, z) + 0.003, z, 0, 0.6 + r(), 1, 0.6 + r()); }
+    for (let q = 0; q < 5 * bio; q++) { let x = x0 + r() * C, z = z0 + r() * C, a = r() * 6.28; const w = 0.006 + r() * 0.02; for (let s2 = 0; s2 < 6; s2++) { a += (r() - 0.5) * 0.8; const L = 0.06 + r() * 0.08; put(1, x, baseH(x, z) + 0.004, z, a, w, 1, L); x += Math.sin(a) * L; z += Math.cos(a) * L; } }
+    for (let q = 0; q < 6 * bio * SITE.tubes; q++) { const x = x0 + r() * C, z = z0 + r() * C; put(2, x, baseH(x, z) - 0.01, z, r() * 6, 1, 0.02 + r() * 0.05, 1); }
+    for (let q = 0; q < 5 * bio; q++) { const x = x0 + r() * C, z = z0 + r() * C, sz = 0.003 + r() * 0.01; put(3, x, baseH(x, z), z, r() * 6, sz, sz * 0.4, sz * 1.3); } }
+  T.forEach((m, k) => { m.count = cnt[k]; m.instanceMatrix.needsUpdate = true; }); }
 let rocksAt = null; const RCELL = 32;
 function refreshRocks() { const ci = Math.floor(P_.x / RCELL), cj = Math.floor(P_.z / RCELL), n = 6, c = new THREE.Color(); let k = 0;
-  let km = 0; for (let i = ci - n; i <= ci + n; i++) for (let j = cj - n; j <= cj + n; j++) { const x0 = i * RCELL, z0 = j * RCELL, h0 = baseH(x0, z0); if (h0 > 1.4 || h0 < -0.8) continue;
-    const r = seeded(i * 4421 + j * 9907 + 5), nd = 18 * sstepN(fbm(x0 / 200 + 8, z0 / 200, 3), 0.45, 0.65);
-    for (let q = 0; q < nd && km < 900; q++) { const x = x0 + r() * RCELL, z = z0 + r() * RCELL, s = 0.2 + r() * 0.7; O3.position.set(x, baseH(x, z) - 0.05, z); O3.rotation.set(0, r() * 6, 0); O3.scale.set(s, s * (0.25 + 0.3 * r()), s * (0.8 + 0.4 * r())); O3.updateMatrix(); MATS.setMatrixAt(km++, O3.matrix); } }
-  MATS.count = km; MATS.instanceMatrix.needsUpdate = true;
+  let km = 0; if (SG.stroma) for (let i = ci - n; i <= ci + n; i++) for (let j = cj - n; j <= cj + n; j++) { const x0 = i * RCELL, z0 = j * RCELL, h0 = baseH(x0, z0); if (h0 > 1.2 || h0 < -4) continue;   // stromatolites: intertidal and just below
+    const r = seeded(i * 4421 + j * 9907 + 5), nd = 22 * sstepN(fbm(x0 / 200 + 8, z0 / 200, 3), 0.42, 0.6);
+    for (let q = 0; q < nd && km < 700; q++) { const x = x0 + r() * RCELL, z = z0 + r() * RCELL, s = 0.15 + Math.pow(r(), 2) * 0.9, col = r() < 0.3; O3.position.set(x, baseH(x, z) - 0.08, z); O3.rotation.set(0, r() * 6, 0); O3.scale.set(s, s * (col ? 2.2 : 0.8 + 0.4 * r()), s); O3.updateMatrix(); STROMA.setMatrixAt(km++, O3.matrix); } }
+  STROMA.count = km; STROMA.instanceMatrix.needsUpdate = true;
   for (let i = ci - n; i <= ci + n && k < 1600; i++) for (let j = cj - n; j <= cj + n && k < 1600; j++) { const x0 = i * RCELL, z0 = j * RCELL, m = landMask(x0, z0); if (m < 0.002) continue;
     const r = seeded(i * 7717 + j * 3301 + 9), dens = 14 * sstepN(fbm(x0 / 300 + 3, z0 / 300, 3), 0.45, 0.7) * (1 - 0.7 * sstepN(fbm(x0 / 1800 + 50, z0 / 1800, 3), 0.5, 0.65));
     for (let q = 0; q < dens && k < 1600; q++) { const x = x0 + r() * RCELL, z = z0 + r() * RCELL, s = 0.15 + Math.pow(r(), 3) * 1.6, flat = r() < 0.4;
@@ -53465,7 +53534,8 @@ function animalPos(a, t, out) { const sp = a.L.sp, L = sp.o.L ?? sp.o.H ?? sp.o.
   else { const [h0, h1] = sp.alt ?? [0.3, 2]; y = floor + h0 + (h1 - h0) * a.lift + 0.15 * Math.sin(t * 0.7 + a.ph); y = Math.min(y, SEA - 0.4); }
   out.set(x, y, z); return h; }
 const _q = new THREE.Quaternion(), _e = new THREE.Euler(), _sc = V3(1, 1, 1), _mm = new THREE.Matrix4(), _cc = new THREE.Color();
-function updateLife(t, dt) { if (!rocksAt || Math.hypot(P_.x - rocksAt[0], P_.z - rocksAt[1]) > 40) { refreshRocks(); rocksAt = [P_.x, P_.z]; } if (!lifeAt || Math.hypot(P_.x - lifeAt[0], P_.z - lifeAt[1]) > 4 || t - lifeAt[2] > 2) { refreshLife(); lifeAt = [P_.x, P_.z, t]; }
+function updateLife(t, dt) { if (!rocksAt || Math.hypot(P_.x - rocksAt[0], P_.z - rocksAt[1]) > 40) { refreshRocks(); rocksAt = [P_.x, P_.z]; }
+  if (!tracesAt || Math.hypot(P_.x - tracesAt[0], P_.z - tracesAt[1]) > 8) { refreshTraces(); tracesAt = [P_.x, P_.z]; } if (!lifeAt || Math.hypot(P_.x - lifeAt[0], P_.z - lifeAt[1]) > 4 || t - lifeAt[2] > 2) { refreshLife(); lifeAt = [P_.x, P_.z, t]; }
   for (const L of LIFE) { const sp = L.sp; L.act.forEach((a, i) => { const h = animalPos(a, t, _po); a.px = _po.x; a.py = _po.y; a.pz = _po.z;
       const sway = sp.habit === "sessile" || sp.habit === "burrow" ? 0.12 * Math.sin(t * 0.8 + a.ph) : 0, roll = sp.habit === "drift" ? t * 0.3 + a.ph : 0;
       _e.set(sway + (sp.habit === "swim" || sp.habit === "hunt" ? 0.08 * Math.sin(t * 2 + a.ph) : 0), sp.habit === "sessile" || sp.habit === "burrow" ? a.h : h, sway * 0.6, "YXZ"); _q.setFromEuler(_e);
@@ -53515,7 +53585,7 @@ intro?.addEventListener("click", start);
 function drawWrist(g, W, H) { g.clearRect(0, 0, W, H); g.fillStyle = "rgba(8,20,24,.92)"; g.beginPath(); g.roundRect(0, 0, W, H, 26); g.fill();
   g.strokeStyle = "#5ac8be"; g.lineWidth = 4; g.stroke(); const t = (s, x, y, sz, col = "#e6f0ee", w = 400) => { g.fillStyle = col; g.font = `${w} ${sz}px -apple-system, Helvetica, sans-serif`; g.fillText(s, x, y); };
   const hh = Math.floor(clockH), mm = Math.floor((clockH % 1) * 60);
-  t(ENV.dateLabel, 22, 42, 26, "#9ae8de", 700); t(`${hh}:${String(mm).padStart(2, "0")} of a ${ENV.dayH}-hour day  ·  tide ${SEA >= 0 ? "+" : ""}${SEA.toFixed(1)} m`, 22, 78, 22);
+  t(`${ENV.dateLabel.replace("about ", "~").replace(" million years ago", " Ma")} · ${SITE.name.split(",")[0]}`, 22, 42, 26, "#9ae8de", 700); t(`${hh}:${String(mm).padStart(2, "0")} of a ${ENV.dayH}-hour day  ·  tide ${SEA >= 0 ? "+" : ""}${SEA.toFixed(1)} m`, 22, 78, 22);
   if (swimming || depthNow > 0.3) { const air = TANK.bar, low = air < 50;
     t(`depth ${depthNow.toFixed(1)} m  (max ${maxDepth.toFixed(1)})`, 22, 128, 34, "#ffffff", 700);
     t(`tank ${Math.round(air)} bar${low ? "  · LOW: surface!" : ""}`, 22, 172, 30, low ? "#ff8a6a" : "#ffe9a8", 700);
@@ -53530,10 +53600,14 @@ function drawWrist(g, W, H) { g.clearRect(0, 0, W, H); g.fillStyle = "rgba(8,20,
 function yawNow() { const d = V3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())); return Math.atan2(-d.x, -d.z); }
 // the species journal: an animal is logged when you examine it (E) close up
 const LOGGED = new Set(), PLACES_SEEN = new Set(); let biomeNow = null, biomeT = 0;
-function drawJournal() { const byP = {}; for (const s of FAUNA) (byP[s.phylum] = byP[s.phylum] || []).push(s);
-  JOURNAL.innerHTML = `<b>Environments</b> · ${PLACES_SEEN.size} of ${Object.keys(BIOMES).length}<br>` + Object.entries(BIOMES).map(([k, [n]]) => PLACES_SEEN.has(k) ? `<div data-b="${k}" style="padding-left:8px;cursor:pointer">✦ ${n}</div>` : `<div style="padding-left:8px;color:#5a7a78">· ?</div>`).join("") + `<div style="margin-top:8px"></div><b>Field journal</b> · ${LOGGED.size} of ${FAUNA.length} species<br><span style="color:#8ab0ac;font-size:11.5px">swim close to an animal and press E to examine it</span>` +
+function drawJournal() { const byP = {}; for (const s of FAUNA) if (s.at[SITE_KEY] || LOGGED.has(s)) (byP[s.phylum] = byP[s.phylum] || []).push(s);
+  JOURNAL.innerHTML = `<b>Travel</b> <span style="color:#8ab0ac;font-size:11.5px">(same moment, different places)</span><br>` + Object.entries(SITES).map(([k, S]) => `<div data-s="${k}" style="padding:1px 8px;cursor:pointer;${k === SITE_KEY ? "color:#ffe9a8;font-weight:600" : ""}">${k === SITE_KEY ? "▸" : "⤳"} ${S.name}</div>`).join("") + `<div style="margin-top:6px"></div><b>Environments</b> · ${PLACES_SEEN.size} of ${Object.keys(BIOMES).length}<br>` + Object.entries(BIOMES).map(([k, [n]]) => PLACES_SEEN.has(k) ? `<div data-b="${k}" style="padding-left:8px;cursor:pointer">✦ ${n}</div>` : `<div style="padding-left:8px;color:#5a7a78">· ?</div>`).join("") + `<div style="margin-top:8px"></div><b>Field journal</b> · ${LOGGED.size} of ${FAUNA.length} species<br><span style="color:#8ab0ac;font-size:11.5px">swim close to an animal and press E to examine it</span>` +
     Object.entries(byP).map(([p, L]) => `<div style="margin-top:5px;color:#9ae8de;font-weight:600">${p} <span style="color:#6a8a88;font-weight:400">${L.filter(s => LOGGED.has(s)).length}/${L.length}</span></div>` +
       L.map(s => LOGGED.has(s) ? `<div data-g="${FAUNA.indexOf(s)}" style="padding-left:8px;cursor:pointer">✦ <i>${s.genus}</i></div>` : `<div style="padding-left:8px;color:#5a7a78">· ${s.hint}</div>`).join("")).join(""); }
+// travel between the places of this moment (the time machine hops across the globe, not through time)
+function goSite(key) { applySite(key); START = findStart(); P_.x = START.x; P_.z = START.z; P_.y = baseH(P_.x, P_.z); yaw = START.yaw; if (renderer.xr.isPresenting) vrTurn = yaw; flying = false;
+  for (const L of LEVELS) { L.ox = NaN; L.oz = NaN; } CELLS.clear(); lifeAt = null; rocksAt = null; tracesAt = null; biomeNow = null; TANK.bar = 200; updateGround(P_.x, P_.z, 99); drawJournal();
+  say(`<b>${SITE.name}</b> · ${SITE.where} · ${SITE.age}<br>${SITE.arrival}`, 30); }
 // the hand lens: an examined animal floats in front of you, magnified, turning slowly, until you look away or press E again
 const LENS = new THREE.Group(); LENS.visible = false; camera.add(LENS); let lensT = 0;
 const lensLight = new THREE.PointLight(0xffffff, 1.2, 2, 1); lensLight.position.set(0.2, 0.3, 0.2); LENS.add(lensLight);
@@ -53548,7 +53622,7 @@ function showLens(sp) { while (LENS.children.length > 2) LENS.remove(LENS.childr
   g.fillStyle = "#e6f0ee"; g.font = "26px -apple-system, Helvetica, sans-serif"; g.fillText(`shown ×${k >= 10 ? Math.round(k) : k.toFixed(1)}  ·  real length ${size >= 0.1 ? (size * 100).toFixed(0) : (size * 100).toFixed(1)} cm`, 18, 80); lensTex.needsUpdate = true;
   LENS.position.set(0, -0.02, -0.55); LENS.visible = true; lensT = 22; }
 function speciesCard(sp, first) { const G = GROUPS[sp.phylum] || {}; return `<b><i>${sp.genus}</i></b> <span style="color:#9ae8de">· ${G.formal || sp.phylum}</span>${first ? " · <b>new to your journal</b>" : ""}<br>${sp.text}<br><span style="color:#bfe8c8">🧬 ${G.kin || ""}</span><br><span style="color:#a8b8b4;font-size:13px">🎨 ${G.col || ""}</span>`; }
-JOURNAL.addEventListener("click", e => { const bb = e.target.closest("[data-b]"); if (bb) { e.stopPropagation(); const [n, tx] = BIOMES[bb.dataset.b]; say(`<b>${n}</b> · ${tx}`, 20); return; } const d = e.target.closest("[data-g]"); if (!d) return; e.stopPropagation(); const sp = FAUNA[+d.dataset.g]; showLens(sp); say(speciesCard(sp, false), 32); });
+JOURNAL.addEventListener("click", e => { const ss = e.target.closest("[data-s]"); if (ss) { e.stopPropagation(); start(); goSite(ss.dataset.s); return; } const bb = e.target.closest("[data-b]"); if (bb) { e.stopPropagation(); const [n, tx] = BIOMES[bb.dataset.b]; say(`<b>${n}</b> · ${tx}`, 20); return; } const d = e.target.closest("[data-g]"); if (!d) return; e.stopPropagation(); const sp = FAUNA[+d.dataset.g]; showLens(sp); say(speciesCard(sp, false), 32); });
 function interact() { if (!started) return start(); if (LENS.visible) { LENS.visible = false; return; } const s = nearestAnimal(swimming ? 3.5 : 2.5);
   if (s) { const first = !LOGGED.has(s.sp); LOGGED.add(s.sp); drawJournal(); showLens(s.sp); say(speciesCard(s.sp, first), 32); return; }
   say(swimming ? "No animal close enough to examine. Look along the seafloor and in the water around you; many are only a few centimetres long." : ENV.landNote, 14); }
@@ -53585,7 +53659,7 @@ function frame() {
   let mx = 0, my = 0, run = 1, up = 0;
   if (vr) { const s = renderer.xr.getSession();
     for (const src of s?.inputSources || []) { const gp = src.gamepad; if (!gp) continue; const [ax, ay] = stick(gp.axes);
-      if (src.handedness === "left") { mx += ax; my += ay; if (tap("L", gp, 4)) fast = (fast + 1) % 4; if (tap("L", gp, 5)) flying = !flying; }
+      if (src.handedness === "left") { mx += ax; my += ay; if (tap("L", gp, 4)) fast = (fast + 1) % 4; if (tap("L", gp, 5)) flying = !flying; if (tap("L", gp, 3)) { const K = Object.keys(SITES); goSite(K[(K.indexOf(SITE_KEY) + 1) % K.length]); } }
       else { if (gp.buttons[0]?.value > 0.3) run = 2.5; if (tap("R", gp, 4)) interact(); if (swimming || flying) up = -ay * 0.8; if (tap("R", gp, 5)) up = 0;
         if (Math.abs(ax) > 0.7 && snap) { vrTurn -= Math.sign(ax) * Math.PI / 6; snap = false; } else if (Math.abs(ax) < 0.3) snap = true; } }
     rig.rotation.y = vrTurn; fwd.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(rig.quaternion); }
@@ -53616,7 +53690,7 @@ function frame() {
   sun.intensity = 2.5 * ENV.sunL * clampN(el * 3, 0, 1) * att; sun.color.setRGB(1, 0.9 - 0.3 * dusk, 0.78 - 0.45 * dusk); hemi.intensity = (0.12 + 1.0 * day) * (under ? 0.5 + 0.5 * att : 1);
   const upC = ENV.skyUp.clone().multiplyScalar(0.05 + 0.95 * day), hor = ENV.skyHor.clone().multiplyScalar(0.06 + 0.94 * day).lerp(new THREE.Color(0.95, 0.5, 0.28), dusk * 0.65);
   skyMat.uniforms.up.value.copy(upC); skyMat.uniforms.hor.value.copy(hor); sky.position.copy(rig.position);
-  if (under) { const u = new THREE.Color(0.16, 0.30, 0.28).multiplyScalar((0.2 + 0.8 * day) * (0.35 + 0.65 * att)); scene.fog.color.copy(u); scene.fog.density = ENV.murk; renderer.setClearColor(u); sky.visible = false; }
+  if (under) { const u = new THREE.Color(...SITE.water).multiplyScalar((0.2 + 0.8 * day) * (0.35 + 0.65 * att)); scene.fog.color.copy(u); scene.fog.density = ENV.murk; renderer.setClearColor(u); sky.visible = false; }
   else { scene.fog.color.copy(hor); scene.fog.density = IS_HEADSET ? 0.00016 : 0.00011; sky.visible = true; }
   sunDisc.position.copy(rig.position).addScaledVector(sunDir, 45000); sunDisc.lookAt(rig.position); sunDisc.visible = el > -0.05 && !under; sunDisc.material.color.setRGB(1, 0.95 - 0.35 * dusk, 0.85 - 0.5 * dusk);
   const moonDir = V3(Math.cos(dayA + 2.4), Math.sin(dayA + 2.4) * 0.8 + 0.1, -0.25).normalize(); moonDisc.position.copy(rig.position).addScaledVector(moonDir, 45000); moonDisc.lookAt(rig.position); moonDisc.visible = moonDir.y > 0 && !under; moonDisc.material.opacity = 0.35 + 0.65 * (1 - day);
