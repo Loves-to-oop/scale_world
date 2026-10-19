@@ -245,8 +245,10 @@ const ENV = { dateLabel: "about 518 million years ago", siteLabel: "the Chengjia
   arrival: "You step out of the time machine onto bare land, about 518 million years ago. There is not a single plant anywhere: just rock, sand and dark microbial crusts, under a hazy, dusty sky. The day is about 21 hours long; the Moon is a little closer and bigger. The air holds perhaps half today's oxygen and over ten times the CO₂, so you breathe from your tank. East, past the tidal flats, is the sea: a warm, murky delta front teeming with animals. Walk in and dive; press E close to animals to examine and log them.",
   landNote: "Bare land: no plants yet, no animals; only microbial crusts where it stays damp. The animals are all in the sea, to the east: walk in and dive.",
   deepNote: "Below about 50 m the water here lost its oxygen: the outer shelf held an oxygen-poor water mass. Nothing lives down here; the animals are in the shallower, oxygenated water toward shore." };
-function findStart() { for (let r = 0; r < 60000; r += 500) for (let a = 0; a < 6.28; a += 0.4) { const z0 = r * Math.sin(a), x0 = r * Math.cos(a);   // a shore: land just west of sea
-    for (let x = x0 - 3000; x < x0 + 3000; x += 10) if (landMask(x, z0) > 0.002 && landMask(x + 10, z0) <= 0 && baseH(x - 70, z0) > 0.3 && baseH(x + 400, z0) < -3) return { x: x - 70, z: z0, yaw: -Math.PI / 2 }; } return { x: 0, z: 0, yaw: -Math.PI / 2 }; }
+function findStart() {   // a beach: dry land a little above the water, with the sea within ~200 m; you face the sea
+  for (let r = 0; r < 80000; r += 250) { const n = Math.max(1, Math.round(r / 250 * 6)); for (let q = 0; q < n; q++) { const a = q / n * 6.283, x = r * Math.cos(a), z = r * Math.sin(a), h = baseH(x, z);
+      if (h < 0.4 || h > 4) continue; for (let k = 0; k < 16; k++) { const b = k / 16 * 6.283; if (baseH(x + Math.cos(b) * 150, z + Math.sin(b) * 150) < -2 && baseH(x + Math.cos(b) * 60, z + Math.sin(b) * 60) < 0.6) return { x, z, yaw: Math.atan2(-Math.cos(b), -Math.sin(b)) }; } } }
+  return { x: 0, z: 0, yaw: -Math.PI / 2 }; }
 let START = findStart();
 // more body plans
 BODY.medusa = o => { const L = o.L, P = [[new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), TM(0, 0, 0, L * 0.5, L * 0.4, L * 0.5)]];
@@ -458,7 +460,7 @@ FAUNA.push(
   S("Arthroaspis bergstroemi", AR, "a large flat arthropod", "arthropod", { L: 0.21, W: 0.09, segs: 12, head: 0.18, taper: 0.4, antennae: 0.2, tail: 0.1 }, 0x5e4630, 0xb08a64, "crawl", SP(1.5), 0.02, 1.5, 0, "A big artiopod over 21 cm and one of the commonest animals here: scavenger burrows cluster around its dead.", { cap: 12 }),
   S("Campanamuta mantonae", AR, "a swimming arthropod near the bottom", "arthropod", { L: 0.06, W: 0.02, segs: 12, head: 0.2, taper: 0.4, antennae: 0.3 }, 0x7a5434, 0xd0a880, "swim", SP(5), 0.05, 1.2, [0.1, 0.8], "A common arthropod ~5-8 cm swimming near the bottom; its gut and muscles survive in three dimensions."),
   S("Kleptothule rasmusseni", AR, "a tiny arthropod", "arthropod", { L: 0.01, W: 0.005, segs: 8 }, 0x9a7a54, 0xe0c8a0, "swim", SP(10), 0.03, 0.6, [0.05, 0.5], "A tiny, abundant arthropod about 1 cm long."),
-  S("Isoxys volucris", AR, "a swimmer in a two-valved shell, big eyes", "arthropod", { L: 0.03, W: 0.022, segs: 6, shell: true, eyes: true }, 0x7a7a5a, 0xe8e0c8, "swim", both(SP(8), EB(3)), 0.1, 2.5, [0.5, 6], "Isoxys, a swimming arthropod in a folded two-valved shell 2-4 cm long with big eyes: one of the commonest swimmers in Cambrian seas worldwide, perhaps in shoals."),
+  S("Isoxys volucris", AR, "a swimmer in a two-valved shell, big eyes", "arthropod", { L: 0.03, W: 0.022, segs: 6, shell: true, eyes: true }, 0x7a7a5a, 0xe8e0c8, "swim", both(SP(8), EB(3), FL(1.5), RF(1.5, -1)), 0.1, 2.5, [0.5, 6], "Isoxys, a swimming arthropod in a folded two-valved shell 2-4 cm long with big eyes: one of the commonest swimmers in Cambrian seas worldwide, perhaps in shoals."),
   S("Kiisortoqia soperi", AR, "a trilobite-like predator with grasping arms", "arthropod", { L: 0.05, W: 0.025, segs: 10, head: 0.2, great: 0.35, tail: 0.1 }, 0x8a4a30, 0xd8a07a, "swim", SP(0.5), 0.05, 1, [0.05, 0.6], "A ~5 cm arthropod with a trilobite-like body and radiodont-like grasping front arms."),
   S("Pambdelurion whittingtoni", LO, "a big gilled swimmer with grasping arms", "gilled", { L: 0.4 }, 0x7a4a3a, 0xd8a890, "hunt", SP(0.15), 0.25, 5, [0.2, 1.5], "A gilled lobopodian ~40 cm, one of the largest and commonest animals here: flaps along its sides for swimming, stubby legs below, and big frontal limbs: a link between lobopodians and radiodonts.", { cap: 6 }),
   S("Kerygmachela kierkegaardi", LO, "a gilled swimmer with a forked tail", "gilled", { L: 0.18, tail: 0.3 }, 0x84503a, 0xe0b098, "hunt", SP(0.1), 0.2, 4, [0.3, 3], "A gilled lobopodian ~10-25 cm with long tail spines; its brain and eyes are preserved.", { cap: 6 }),
@@ -495,13 +497,13 @@ FAUNA.push(
   S("Anomalocaris daleyae", RA, "a big swimming predator with huge eyes", "radiodont", { L: 0.5 }, 0x8a3a2a, 0xe0a888, "hunt", EB(0.05), 0.5, 8, [0.6, 4], "A radiodont ~50 cm. Fossil eyes from this very site, ~2-3 cm across, carry over 16,000 lenses each: among the sharpest eyes of the Cambrian.", { cap: 4 }),
   S("Echidnacaris briggsi", RA, "a radiodont with spiny arms", "radiodont", { L: 0.3 }, 0x8a4430, 0xe0b090, "hunt", EB(0.08), 0.4, 6, [0.5, 3], "A radiodont with spiny grasping arms ~10 cm long.", { cap: 4 }),
   S("Tuzoia australis", AR, "a swimmer with a big spiny shell", "arthropod", { L: 0.1, W: 0.08, segs: 6, shell: true, eyes: true }, 0x8a6040, 0xe0c8a0, "swim", EB(0.4), 0.08, 2, [0.5, 4], "A bivalved arthropod with a large spiny-edged shell ~10 cm."),
-  S("Oestokerkus megacholix", AR, "a whip-clawed swimmer", "arthropod", { L: 0.05, W: 0.014, segs: 11, head: 0.15, great: 0.6, tail: 0.15 }, 0xb06a3a, 0xf0c8a0, "swim", EB(0.4), 0.06, 1.2, [0.1, 1], "A leanchoiliid ~5 cm with long whip-like great appendages."),
+  S("Oestokerkus megacholix", AR, "a whip-clawed swimmer", "arthropod", { L: 0.05, W: 0.014, segs: 11, head: 0.15, great: 0.6, tail: 0.15 }, 0xb06a3a, 0xf0c8a0, "swim", both(EB(0.4), FL(0.3)), 0.06, 1.2, [0.1, 1], "A leanchoiliid ~5 cm with long whip-like great appendages."),
   S("Tanglangia longicaudata", AR, "a small great-appendage arthropod", "arthropod", { L: 0.03, W: 0.01, segs: 10, great: 0.3, tail: 0.12 }, 0x9a5434, 0xe0b08a, "swim", EB(0.3), 0.04, 0.8, [0.05, 0.6], "A megacheiran up to 3.5 cm."),
-  S("Emucaris fava", AR, "a soft-shielded arthropod", "arthropod", { L: 0.02, W: 0.014, segs: 3, head: 0.45, taper: 0.2, antennae: 0.35 }, 0x9a8a6a, 0xe0c8a0, "crawl", EB(1), 0.01, 0.6, 0, "A nektaspid ~2 cm."),
+  S("Emucaris fava", AR, "a soft-shielded arthropod", "arthropod", { L: 0.02, W: 0.014, segs: 3, head: 0.45, taper: 0.2, antennae: 0.35 }, 0x9a8a6a, 0xe0c8a0, "crawl", both(EB(1), FL(0.8)), 0.01, 0.6, 0, "A nektaspid ~2 cm."),
   S("Myoscolex ateles", CC, "a mysterious swimming worm", "worm", { L: 0.04, r: 0.003, curl: 0.8 }, 0xb0907a, 0xe0c8b4, "swim", EB(0.8), 0.04, 1.2, [0.2, 2], "A problematic animal, a few cm, whose relationships are still debated."),
   S("Nesonektris aldridgei", VE, "a vetulicolian", "vetulicolian", { L: 0.05 }, 0x5e5a3e, 0xc8c0a0, "swim", EB(0.3), 0.06, 1.5, [0.4, 3], "A vetulicolian ~5 cm."),
   S("Wronascolex", SC, "a plated burrowing worm", "worm", { L: 0.05, r: 0.003 }, 0xa87064, 0xdcb0a0, "burrow", EB(1.5), 0, 0, 0, "A palaeoscolecid worm armoured with tiny plates.", { bury: 0.6 }),
-  S("Emu Bay brachiopod", BR, "a brachiopod", "brachiopod", { L: 0.015 }, 0x8a7a4a, 0xc0b080, "sessile", EB(2), 0, 0, 0, "Brachiopods and hyoliths under 2 cm were common here, although filter feeders overall were scarce."));
+  S("Emu Bay brachiopod", BR, "a brachiopod", "brachiopod", { L: 0.015 }, 0x8a7a4a, 0xc0b080, "sessile", both(EB(2), FL(2)), 0, 0, 0, "Brachiopods and hyoliths under 2 cm were common here, although filter feeders overall were scarce."));
 for (const sp of FAUNA) if (!sp.k) sp.k = FAUNA.indexOf(sp) * 7.3;
 
 // ---------- the places you can visit, all at (or very near) the same moment, about 518 million years ago ----------
@@ -710,7 +712,7 @@ function toggleTravel() { if (TRAVEL.style.display !== "none") { TRAVEL.style.di
 TRAVEL.addEventListener("click", e => { e.stopPropagation(); const s = e.target.closest("[data-s]"); if (s) { TRAVEL.style.display = "none"; goSite(s.dataset.s); return; }
   if (e.target.dataset.z) { mapSpan = +e.target.dataset.z; drawTravelMap(); return; } if (e.target.dataset.x) { TRAVEL.style.display = "none"; return; }
   if (e.target === TMAP) { const r = TMAP.getBoundingClientRect(), x = P_.x + ((e.clientX - r.left) / r.width - 0.5) * mapSpan, z = P_.z + ((e.clientY - r.top) / r.height - 0.5) * mapSpan; TRAVEL.style.display = "none"; jumpTo(x, z); } });
-function jumpTo(x, z) { P_.x = x; P_.z = z; const g = baseH(x, z); P_.y = g < SEA - 1.3 ? SEA - 1.25 : g; flying = false; lifeAt = null; rocksAt = null; tracesAt = null; updateGround(P_.x, P_.z, 99);
+function jumpTo(x, z) { P_.x = x; P_.z = z; const g = baseH(x, z); P_.y = g < SEA - 1.3 ? SEA + 0.3 - camera.position.y : g; flying = false; lifeAt = null; rocksAt = null; tracesAt = null; updateGround(P_.x, P_.z, 99);
   say(g < SEA - 1.3 ? `You are floating at the surface, over ${(-g).toFixed(0)} m of water. Dive with C (or look down and swim).` : "You arrive on land.", 8); }
 // the hand lens: an examined animal floats in front of you, magnified, turning slowly, until you look away or press E again
 const LENS = new THREE.Group(); LENS.visible = false; camera.add(LENS); let lensT = 0;
@@ -763,18 +765,18 @@ function frame() {
   let mx = 0, my = 0, run = 1, up = 0;
   if (vr) { const s = renderer.xr.getSession();
     for (const src of s?.inputSources || []) { const gp = src.gamepad; if (!gp) continue; const [ax, ay] = stick(gp.axes);
-      if (src.handedness === "left") { mx += ax; my += ay; if (tap("L", gp, 4)) fast = (fast + 1) % 6; if (tap("L", gp, 5)) flying = !flying; if (tap("L", gp, 3)) { const K = Object.keys(SITES); goSite(K[(K.indexOf(SITE_KEY) + 1) % K.length]); } }
+      if (src.handedness === "left") { mx += ax; my += ay; if (tap("L", gp, 4)) fast = (fast + 1) % 6; if (tap("L", gp, 5)) flying = !flying; }
       else { if (gp.buttons[0]?.value > 0.3) run = 2.5; if (tap("R", gp, 4)) interact(); if (swimming || flying) up = -ay * 0.8; if (tap("R", gp, 5)) up = 0;
         if (Math.abs(ax) > 0.7 && snap) { vrTurn -= Math.sign(ax) * Math.PI / 6; snap = false; } else if (Math.abs(ax) < 0.3) snap = true; } }
     rig.rotation.y = vrTurn; fwd.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(rig.quaternion); }
   else { camera.rotation.set(pitch, yaw, 0, "YXZ"); camera.getWorldDirection(fwd); if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD) mx += 1; if (keys.KeyA) mx -= 1;
     if (keys.ShiftLeft || keys.ShiftRight) run = 2.5; if (keys.ArrowLeft) yaw += 1.6 * dt; if (keys.ArrowRight) yaw -= 1.6 * dt; up = (keys.Space ? 1 : 0) - (keys.KeyC ? 1 : 0); }
   const floorY = baseH(P_.x, P_.z), eyeY = P_.y + 1.6, waterD = SEA - floorY;
-  swimming = !flying && waterD > 1.3;                                                   // deeper than chest height: you swim
+  swimming = !flying && waterD > Math.min(1.3, Math.max(0.9, camera.position.y * 0.8));                                                   // deeper than chest height: you swim
   const look = fwd.clone(); side.crossVectors(V3(fwd.x, 0, fwd.z).normalize(), UP).normalize();
   if (swimming) { const sp = (0.9 * run) * PACE[fast], f = V3(look.x, look.y, look.z).normalize();   // swim where you look; fins
     P_.x += (f.x * -my + side.x * mx) * sp * dt; P_.z += (f.z * -my + side.z * mx) * sp * dt; P_.y += (f.y * -my + up * 0.8) * sp * dt;
-    P_.y = clampN(P_.y, baseH(P_.x, P_.z) + 0.25, SEA - 1.25); }   // up to floating at the surface, head out                        // between the floor and floating at the surface
+    P_.y = clampN(P_.y, baseH(P_.x, P_.z) + 0.25, SEA + 0.3 - camera.position.y); }   // up to floating at the surface, your head (at its real height) out of the water                        // between the floor and floating at the surface
   else { fwd.y = 0; fwd.normalize(); const sp = (waterD > 0.4 ? 0.8 : 1.4) * run * PACE[fast];
     P_.x += (fwd.x * -my + side.x * mx) * sp * dt; P_.z += (fwd.z * -my + side.z * mx) * sp * dt; const g = baseH(P_.x, P_.z);
     if (flying) P_.y = Math.max(g, P_.y + up * Math.max(4, sp) * dt); else P_.y = g > P_.y ? Math.min(g, P_.y + 4 * dt) : Math.max(g, P_.y - 6 * dt); }
@@ -786,7 +788,7 @@ function frame() {
   if (depthNow > 0.2) { TANK.bar = Math.max(0, TANK.bar - 20 * (1 + depthNow / 10) / TANK.litres / 60 * dt); diveMin += dt / 60; maxDepth = Math.max(maxDepth, depthNow); }
   else if (waterD < 0.1 && TANK.bar < 200) { TANK.bar = Math.min(200, TANK.bar + 40 * dt); if (TANK.bar >= 200) { diveMin = 0; maxDepth = 0; } }
   if (depthNow > 50 && !frame.deepSaid) { frame.deepSaid = true; say(ENV.deepNote, 14); } if (depthNow < 40) frame.deepSaid = false;
-  if (TANK.bar <= 0 && depthNow > 0.2) { P_.y = Math.min(P_.y + 1.2 * dt, SEA - 1.25); if (msgT <= 0) say("Your tank is empty: you are rising to the surface. Swim back to shore to swap tanks.", 8); }
+  if (TANK.bar <= 0 && depthNow > 0.2) { P_.y = Math.min(P_.y + 1.2 * dt, SEA + 0.3 - camera.position.y); if (msgT <= 0) say("Your tank is empty: you are rising to the surface. Swim back to shore to swap tanks.", 8); }
   // sun, moon and sky through the day; the light dims and turns green-blue underwater
   const dayA = (clockH / ENV.dayH * 24 - 6) / 12 * Math.PI, el = Math.sin(dayA), sunDir = V3(-Math.cos(dayA), Math.max(el, -0.3), 0.3).normalize();
   sun.position.copy(rig.position).addScaledVector(sunDir, 800); sun.target.position.copy(rig.position);
