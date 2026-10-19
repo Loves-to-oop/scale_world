@@ -246,7 +246,7 @@ const ENV = { dateLabel: "about 518 million years ago", siteLabel: "the Chengjia
   landNote: "Bare land: no plants yet, no animals; only microbial crusts where it stays damp. The animals are all in the sea, to the east: walk in and dive.",
   deepNote: "Below about 50 m the water here lost its oxygen: the outer shelf held an oxygen-poor water mass. Nothing lives down here; the animals are in the shallower, oxygenated water toward shore." };
 function findStart() { for (let r = 0; r < 60000; r += 500) for (let a = 0; a < 6.28; a += 0.4) { const z0 = r * Math.sin(a), x0 = r * Math.cos(a);   // a shore: land just west of sea
-    for (let x = x0 - 3000; x < x0 + 3000; x += 10) if (landMask(x, z0) > 0.002 && landMask(x + 10, z0) <= 0 && baseH(x - 70, z0) > 0.8) return { x: x - 70, z: z0, yaw: -Math.PI / 2 }; } return { x: 0, z: 0, yaw: -Math.PI / 2 }; }
+    for (let x = x0 - 3000; x < x0 + 3000; x += 10) if (landMask(x, z0) > 0.002 && landMask(x + 10, z0) <= 0 && baseH(x - 70, z0) > 0.3 && baseH(x + 400, z0) < -3) return { x: x - 70, z: z0, yaw: -Math.PI / 2 }; } return { x: 0, z: 0, yaw: -Math.PI / 2 }; }
 let START = findStart();
 // more body plans
 BODY.medusa = o => { const L = o.L, P = [[new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), TM(0, 0, 0, L * 0.5, L * 0.4, L * 0.5)]];
@@ -367,15 +367,142 @@ const LOOKS = { Kunmingella: [0x9a6a3a, 0xc8a070], Eoredlichia: [0x6a5236, 0xb89
   Yunnanoascus: [0xf0c8c8, 0xf0c8c8], Maotianoascus: [0xd8ecf4, 0xd8ecf4], Haikouichthys: [0x3e4a4a, 0xd8dcd8], Myllokunmingia: [0x44504e, 0xd8dcd4], Haikouella: [0x6a7a6a, 0xd0d4c8], Yunnanozoon: [0x7a7a5a, 0xd0ccb0], Shankouclava: [0xc0905a, 0xe8c8a0],
   Vetulicola: [0x5a5a3a, 0xc8c0a0, 1], Didazoon: [0x6a5e40, 0xc8b898], Stellostomites: [0x9a7aa8, 0xd0c0d8], Rotadiscus: [0x8a6a9a, 0xc8b0d0], Eognathacantha: [0xe0e4e0, 0xe0e4e0], Amiskwia: [0xd8dcd8, 0xd8dcd8],
   Wiwaxia: [0x4a6a8a, 0xa08060, 0, 1], Orthrozanclus: [0x5a6a7a, 0xa89070, 0, 1], Cotyledion: [0xc8b08a, 0xe8dcc0], Fuxianospira: [0x4a7a3a, 0x6a9a4a], Longfengshania: [0x8a4a3a, 0xb07050], Sinocylindra: [0x5a8a4a, 0x7aa05a] };
-for (const sp of FAUNA) { const L = LOOKS[sp.genus.split(" ")[0]]; if (L) { sp.col = L[0]; sp.col2 = L[1]; sp.bands = !!L[2]; sp.shimmer = !!L[3]; } }
+for (const sp of FAUNA) { const L = sp.col2 === undefined && LOOKS[sp.genus.split(" ")[0]]; if (L) { sp.col = L[0]; sp.col2 = L[1]; sp.bands = !!L[2]; sp.shimmer = !!L[3]; } }
 // paint a body: counter-shaded (top colour above, belly colour below), optional bands along the body
 function paint(geo, sp) { const p = geo.attributes.position, n = geo.attributes.normal, col = new Float32Array(p.count * 3), a = new THREE.Color(sp.col), b = new THREE.Color(sp.col2 ?? sp.col), c = new THREE.Color();
   let z0 = 1e9, z1 = -1e9; for (let i = 0; i < p.count; i++) { z0 = Math.min(z0, p.getZ(i)); z1 = Math.max(z1, p.getZ(i)); }
-  const tall = sp.habit === "sessile" && ["sponge", "polyp", "cup", "alga"].includes(sp.plan);
+  const tall = sp.habit === "sessile" && ["sponge", "polyp", "cup", "alga", "archaeo", "bush", "clot", "chancellorid", "frond", "tubes"].includes(sp.plan);
   for (let i = 0; i < p.count; i++) { const up = tall ? 0.5 + 0.5 * clampN(p.getY(i) / ((sp.o.H ?? 0.05) * 1.1), 0, 1) : clampN(0.5 + 0.7 * n.getY(i), 0, 1);
     c.copy(b).lerp(a, up); if (sp.bands) { const f = (p.getZ(i) - z0) / Math.max(1e-6, z1 - z0); if (Math.floor(f * 9) % 2) c.multiplyScalar(0.78); }
     col.set([c.r, c.g, c.b], i * 3); }
   geo.setAttribute("color", new THREE.BufferAttribute(col, 3)); return geo; }
+
+// ---------- more animals: the rest of the Chengjiang fauna we drew from, and the animals of the other places ----------
+// SOURCES: Chengjiang species list (Paleobiota of the Maotianshan Shales, with its citations); Sirius Passet: Harper et al. 2019
+// (J. Geol. Soc.); Siberian reefs: Zhuravlev et al. 2022 and the Treatise on the Archaeocyatha; Emu Bay Shale: the 2024 Sci. Adv.
+// study of >25,000 specimens; Flinders Ranges: Wilkawillina/Wirrapowie limestone studies. Sizes marked "~" are approximate.
+BODY.frond = o => { const H = o.H, P = [between(V3(0, 0, 0), V3(0, H * 0.3, 0), H * 0.03, 5), [SPH(8, 6), TM(0, H * 0.65, 0, H * 0.16, H * 0.38, H * 0.03)]];
+  for (let k = 0; k < 10; k++) for (const sd of [-1, 1]) P.push([BOX(), TM(sd * H * 0.1, H * (0.35 + k * 0.06), 0, H * 0.14, H * 0.012, H * 0.02, 0, 0, sd * 0.4)]); return mergeG(P); };
+BODY.tubes = o => { const H = o.H, P = []; for (let k = 0; k < (o.n ?? 7); k++) { const a = k * 2.4, r = Math.sqrt(k) * H * 0.12; P.push([new THREE.CylinderGeometry(H * 0.06, H * 0.03, H * (0.6 + 0.4 * ((k * 3) % 5) / 5), 6, 1, true), TM(Math.cos(a) * r, H * 0.4, Math.sin(a) * r, 1, 1, 1, Math.cos(a) * 0.2, 0, Math.sin(a) * 0.2)]); } return mergeG(P); };
+const MI = "Calcimicrobes (cyanobacteria)", AN = "Annelida (segmented worms)", CC = "Chancelloriids & problematica", HE = "Hemichordata";
+Object.assign(GROUPS, {
+  [MI]: { formal: "not animals: probably calcified cyanobacteria (blue-green bacteria)", kin: "Living relatives: cyanobacteria still build microbial mats and stromatolites today (as at Shark Bay, Australia); they made Earth's oxygen in the first place.", col: "Colours guessed from living microbial mats: dark green-brown to near black when alive, grey-white where dead and calcified." },
+  [AN]: { formal: "phylum Annelida (segmented worms)", kin: "Living relatives: earthworms, leeches and the marine bristle worms (polychaetes), alive today in huge variety.", col: "Colours guessed from living bristle worms: pinkish-tan with paler bristles." },
+  [CC]: { formal: "problematic: chancelloriids and others of uncertain place (chancelloriids may be early relatives of sponges, or of the scale-bearing 'coeloscleritophorans')", kin: "No living members, and no agreed close living relatives.", col: "Colour unknown and guessed: pale tan with darker spines." },
+  [HE]: { formal: "phylum Hemichordata", kin: "Living relatives: acorn worms and the tiny colonial pterobranchs; hemichordates are cousins of the echinoderms and, more distantly, of the chordates.", col: "Colour guessed from living pterobranchs: pale amber." } });
+GROUPS[PO].kin += " Archaeocyaths (reef-building cups) are an extinct group of sponges that died out in the middle Cambrian; they built the first animal reefs.";
+const at = (site, dens, depth, more) => ({ [site]: { dens, ...(depth ? { depth } : {}), ...(more || {}) } });
+const S = (genus, phylum, hint, plan, o, col, col2, habit, sites, speed, range, alt, text, extra = {}) => ({ genus, phylum, hint, plan, o, col, col2, habit, at: sites, depth: [1, 200], dens: 0, speed, range, alt, text, ...extra });
+const CJ = (d, more) => at("chengjiang", d, [2, 50], more), SP = (d, more) => at("sirius", d, [8, 160], more), RF = (d, reef = 1, more) => at("reef", d, [1, 30], { reef, ...(more || {}) }),
+  EB = (d, more) => at("emubay", d, [4, 120], more), FL = (d, reef = 0, more) => at("flinders", d, [0.3, 25], { reef, ...(more || {}) });
+const both = (...xs) => Object.assign({}, ...xs);
+FAUNA.push(
+  // --- Chengjiang: more arthropods
+  S("Saperion glumaceum", AR, "an arthropod with one big shield", "arthropod", { L: 0.07, W: 0.04, segs: 3, head: 0.3, taper: 0.1, antennae: 0.3 }, 0x7a5a3a, 0xc8a478, "crawl", CJ(0.6), 0.012, 0.8, 0, "An artiopod ~5-10 cm whose back segments are fused into one trilobite-like shield."),
+  S("Kuamaia lata", AR, "a broad, flat arthropod", "arthropod", { L: 0.06, W: 0.04, segs: 6, head: 0.3, taper: 0.3, antennae: 0.3 }, 0x84603e, 0xd0aa80, "crawl", CJ(0.6), 0.012, 0.8, 0, "A broad artiopod ~3-8 cm, found only here."),
+  S("Skioldia aldna", AR, "a small flat arthropod", "arthropod", { L: 0.04, W: 0.025, segs: 7, head: 0.3, taper: 0.3, antennae: 0.3 }, 0x8a6a48, 0xd0b088, "crawl", CJ(0.3), 0.01, 0.6, 0, "A small artiopod ~3-5 cm."),
+  S("Acanthomeridion serratum", AR, "a spiny-edged arthropod", "arthropod", { L: 0.04, W: 0.022, segs: 9, head: 0.25, taper: 0.5, antennae: 0.3, tail: 0.1 }, 0x7a5638, 0xc89c70, "crawl", CJ(0.5), 0.01, 0.6, 0, "An artiopod ~2-5 cm with spiny side edges."),
+  S("Pygmaclypeatus daziensis", AR, "a tiny wide arthropod", "arthropod", { L: 0.014, W: 0.0175, segs: 4, head: 0.4, taper: 0.2 }, 0x8a6a4a, 0xd8bc98, "crawl", CJ(0.3), 0.005, 0.3, 0, "A tiny artiopod, wider than long: 1.4 by 1.75 cm."),
+  S("Cindarella eucalla", AR, "an arthropod with eyes under its shield", "arthropod", { L: 0.07, W: 0.03, segs: 12, head: 0.2, taper: 0.5, antennae: 0.3, eyes: true }, 0x6e5034, 0xc09868, "crawl", CJ(0.5), 0.012, 0.8, 0, "A xandarellid ~5-10 cm, whose eyes sat on stalks under the head shield."),
+  S("Urokodia aequalis", AR, "a millipede-like arthropod", "arthropod", { L: 0.03, W: 0.012, segs: 14, head: 0.12, taper: 0.4, antennae: 0.25 }, 0x8a6040, 0xd0a480, "crawl", CJ(0.3), 0.008, 0.5, 0, "An artiopod ~2-4 cm with many similar segments, perhaps the most primitive artiopod."),
+  S("Jianfengia multisegmentalis", AR, "a long thin great-appendage arthropod", "arthropod", { L: 0.035, W: 0.008, segs: 18, head: 0.1, taper: 0.3, great: 0.25, eyes: "stalk" }, 0xa05a38, 0xe8b890, "swim", CJ(0.6), 0.04, 0.8, [0.05, 0.4], "A very long, slender great-appendage arthropod under 4 cm."),
+  S("Fortiforceps foliosa", AR, "a great-appendage arthropod with big eyes", "arthropod", { L: 0.035, W: 0.01, segs: 12, head: 0.15, great: 0.3, eyes: "stalk" }, 0x9a5434, 0xe0b08a, "swim", CJ(0.6), 0.04, 0.8, [0.05, 0.5], "A great-appendage arthropod up to 4 cm with big stalked eyes."),
+  S("Parapeytoia yunnanensis", AR, "a larger great-appendage predator", "arthropod", { L: 0.09, W: 0.025, segs: 12, head: 0.15, great: 0.35, eyes: true, tail: 0.1 }, 0x8a442c, 0xd8a07a, "swim", CJ(0.15), 0.05, 1.5, [0.1, 0.6], "A great-appendage predator ~8-10 cm, once mistaken for a radiodont."),
+  S("Occacaris oviformis", AR, "a shelled swimmer with grasping claws", "arthropod", { L: 0.02, W: 0.016, segs: 5, shell: true, great: 0.3 }, 0xa08860, 0xece0c8, "swim", CJ(0.25), 0.05, 1, [0.3, 2], "A ~2 cm arthropod in a two-valved shell with grasping great appendages."),
+  S("Ercaicunia multinodosa", AR, "a tiny swimmer with a serrated shell", "arthropod", { L: 0.01, W: 0.008, segs: 6, shell: true }, 0xb09a78, 0xf0e8d8, "swim", CJ(0.4), 0.04, 0.8, [0.1, 0.6], "A tiny hymenocarine about 1 cm long with a serrated shell edge."),
+  S("Clypecaris serrata", AR, "a small swimmer with spiny claws", "arthropod", { L: 0.02, W: 0.01, segs: 10, shell: true, great: 0.2 }, 0xa89070, 0xf0e4d0, "swim", CJ(0.3), 0.05, 1, [0.3, 2], "A hymenocarine ~1-2.5 cm with spiny grasping limbs."),
+  S("Jugatacaris agilis", AR, "a swimmer with a finned shell", "arthropod", { L: 0.04, W: 0.02, segs: 12, shell: true }, 0x9a8a68, 0xeae2cc, "swim", CJ(0.3), 0.06, 1.5, [0.5, 3], "A hymenocarine with a 3-4 cm shell bearing a fin-like ridge on top."),
+  S("Branchiocaris yunnanensis", AR, "a shrimp-like swimmer in a shell", "arthropod", { L: 0.05, W: 0.025, segs: 10, shell: true, antennae: 0.2 }, 0x9a7a54, 0xe8d4b0, "swim", CJ(0.2), 0.05, 1.5, [0.5, 3], "A bivalved arthropod ~5 cm."),
+  S("Erratus sperare", AR, "an arthropod with flaps and legs", "arthropod", { L: 0.05, W: 0.014, segs: 14, head: 0.12, taper: 0.5 }, 0x9a6040, 0xe0b490, "swim", CJ(0.2), 0.05, 1, [0.05, 0.5], "A basal arthropod 3.7-7.2 cm with both swimming flaps and walking legs: an early step in arthropod evolution."),
+  S("Liangwangshania biloba", AR, "a fuxianhuiid", "arthropod", { L: 0.07, W: 0.022, segs: 14, head: 0.14, taper: 0.7, antennae: 0.2, tail: 0.1 }, 0x7a4a2e, 0xc89068, "crawl", CJ(0.2), 0.015, 1, 0, "A fuxianhuiid arthropod ~7 cm."),
+  S("Tsunyidiscus niutitangensis", AR, "a tiny trilobite with three segments", "trilobite", { L: 0.005, segs: 3 }, 0x7a6248, 0xc0a880, "crawl", CJ(3), 0.003, 0.2, 0, "An eodiscid trilobite only 3-6 mm long, with just three body segments."),
+  S("Kuanyangia pustulosa", AR, "a redlichiid trilobite", "trilobite", { L: 0.035 }, 0x6e5434, 0xb89a70, "crawl", CJ(1.5), 0.01, 0.6, 0, "A redlichiid trilobite ~2-5 cm."),
+  S("Wutingaspis tingi", AR, "another redlichiid trilobite", "trilobite", { L: 0.035, segs: 15 }, 0x745838, 0xbc9e74, "crawl", CJ(1.5), 0.01, 0.6, 0, "A redlichiid trilobite ~2-5 cm."),
+  S("Kunyangella cheni", AR, "a tiny bean-shelled arthropod", "arthropod", { L: 0.004, W: 0.003, segs: 4, shell: true }, 0x9a7044, 0xd0ac80, "crawl", CJ(12), 0.003, 0.2, 0, "A bradoriid 2-5 mm long, a relative of Kunmingella.", { cap: 50 }),
+  // --- Chengjiang: more radiodonts and lobopodians
+  S("Ramskoeldia platyacantha", RA, "a big radiodont with crushing arms", "radiodont", { L: 0.4 }, 0x7a3a28, 0xe0a888, "hunt", CJ(0.06), 0.4, 6, [0.4, 2.5], "An amplectobeluid radiodont, the body perhaps 30-50 cm, with jaw-like crushing bases on its arms.", { cap: 4 }),
+  S("Innovatiocaris maotianshanensis", RA, "a radiodont", "radiodont", { L: 0.15 }, 0x8a4430, 0xe8b498, "hunt", CJ(0.05), 0.3, 4, [0.4, 2.5], "A radiodont; a young specimen is 15.2 cm long.", { cap: 4 }),
+  S("Cambroraster", RA, "a radiodont with a huge head shield", "radiodont", { L: 0.25, flaps: 9 }, 0x6a4a3a, 0xc8a088, "hunt", CJ(0.03), 0.15, 3, [0.1, 0.5], "A hurdiid radiodont, known here only from its broad head shields; in the Burgess Shale it reached ~30 cm and sifted the mud like a living rake.", { cap: 3 }),
+  S("Antennacanthopodia gracilis", LO, "a tiny velvet-worm relative", "lobopodian", { L: 0.025, r: 0.001, legs: 10 }, 0x4a4a5a, 0xa07850, "crawl", CJ(0.15), 0.005, 0.4, 0, "A stem velvet worm ~1.5-3 cm with two pairs of antennae: an early relative of the onychophorans."),
+  // --- Chengjiang: worms, tubes, chancelloriids, shells, sponges
+  S("Corynetis brevis", SC, "a worm with a spiny proboscis", "worm", { L: 0.03, r: 0.003, proboscis: true }, 0xc08a7a, 0xe8c4b4, "burrow", CJ(2), 0, 0, 0, "An archaeopriapulid worm ~1-5 cm that hunted from its burrow.", { bury: 0.5 }),
+  S("Xiaoheiqingella peculiaris", SC, "a tiny priapulid", "worm", { L: 0.009, r: 0.001, proboscis: true }, 0xd09484, 0xecc8b8, "burrow", CJ(0.5), 0, 0, 0, "A crown-group priapulid under 1 cm: an early member of the living priapulid group.", { bury: 0.4 }),
+  S("Tabelliscolex hexagonus", SC, "a worm with hexagonal plates", "worm", { L: 0.06, r: 0.003 }, 0xa87064, 0xdcb0a0, "burrow", CJ(2), 0, 0, 0, "A palaeoscolecid worm ~3-10 cm with rows of hexagonal plates.", { bury: 0.6 }),
+  S("Paraselkirkia jinningensis", SC, "a worm in a cone-shaped tube", "worm", { L: 0.03, r: 0.003, proboscis: true, curl: 0.05 }, 0xb88a7a, 0x8a7a5a, "burrow", CJ(2.5), 0, 0, 0, "A tube-dwelling archaeopriapulid, its tube 1-4 cm.", { bury: 0.6 }),
+  S("Archotuba conoidalis", CC, "a cluster of small cone tubes", "tubes", { H: 0.04, n: 7 }, 0xb8a888, 0xd8ccb0, "sessile", CJ(1.5), 0, 0, 0, "Clusters of conical tubes 1-5 cm long, made by an unknown animal."),
+  S("Iotuba chengjiangensis", AN, "a bristly burrowing worm", "worm", { L: 0.05, r: 0.003 }, 0xc0907a, 0xe8c8b0, "burrow", CJ(0.3), 0, 0, 0, "An annelid 'cage worm' ~2-8 cm (formerly 'Eophoronis', first thought to be a phoronid).", { bury: 0.5 }),
+  S("Protosagitta spinosa", CG, "an arrow worm", "arrow", { L: 0.02 }, 0xe0e4e0, 0xe0e4e0, "swim", CJ(0.2), 0.08, 1.2, [0.5, 3], "An early arrow worm ~1-3 cm with grasping spines.", { glass: true }),
+  S("Allonnia phrixothrix", CC, "a spiny bag-shaped animal", "chancellorid", { H: 0.1 }, 0xb0986e, 0xe0d0b0, "sessile", CJ(0.8), 0, 0, 0, "A chancelloriid ~5-15 cm: an upright, bag-shaped animal covered in star-shaped spiny sclerites, filtering water through an opening at the top."),
+  S("Burithes yunnanensis", HY, "a hyolith", "hyolith", { L: 0.03 }, 0x8a7c64, 0xc0b498, "crawl", CJ(3), 0.002, 0.2, 0, "A hyolith ~1-4 cm."),
+  S("Lingulella chengjiangensis", BR, "a burrowing brachiopod", "brachiopod", { L: 0.01, pedicle: 1.4 }, 0x5a6a3e, 0xa89068, "burrow", CJ(6), 0, 0, 0, "A lingulid brachiopod ~1 cm in a burrow on a long stalk.", { bury: 0.2 }),
+  S("Yuganotheca elegans", BR, "a small attached brachiopod", "brachiopod", { L: 0.01, pedicle: 0.5 }, 0x7a6a44, 0xb8a47a, "sessile", CJ(0.4), 0, 0, 0, "A ~1 cm brachiopod-like animal with features of both brachiopods and phoronids."),
+  S("Saetaspongia densa", PO, "a bristly sponge", "sponge", { H: 0.05, R: 0.015 }, 0xc8903a, 0xe8c088, "sessile", CJ(1), 0, 0, 0, "A sponge ~1-10 cm bristling with fine spicules."),
+  S("Triticispongia diagonata", PO, "a small wheat-grain sponge", "sponge", { H: 0.02, R: 0.007 }, 0xd0a050, 0xecd090, "sessile", CJ(1), 0, 0, 0, "A small sponge ~1-3 cm."),
+  S("Quadrolaminiella diagonalis", PO, "a tall sponge", "sponge", { H: 0.12, R: 0.02, shape: "tube" }, 0xa06a9a, 0xd0b0d0, "sessile", CJ(0.8), 0, 0, 0, "A tall tube sponge ~5-20 cm."),
+  // --- Chengjiang: cnidarians, comb jellies, fronds, deuterostomes
+  S("Batofasciculus ramificans", CT, "an armoured comb jelly", "ctenophore", { L: 0.05, rows: 8 }, 0xdceaf0, 0xdceaf0, "drift", CJ(0.15), 0.03, 1.5, [0.8, 5], "A scleroctenophore ~3-6 cm: a comb jelly armoured with stiff plates.", { glass: true }),
+  S("Sinoascus paillatus", CT, "a small comb jelly", "ctenophore", { L: 0.03, rows: 8 }, 0xe0eef4, 0xe0eef4, "drift", CJ(0.2), 0.03, 1.2, [0.8, 5], "A small comb jelly ~2-5 cm.", { glass: true }),
+  S("Daihua sanqiong", CT, "a stalked, tentacled cup", "polyp", { H: 0.03, R: 0.006, tent: 18 }, 0xd0b098, 0xece0d0, "sessile", CJ(0.15), 0, 0, 0, "A stalked stem-group comb jelly a few cm tall with feathery tentacles."),
+  S("Stromatoveris psygmoglena", CT, "a feathery frond", "frond", { H: 0.07 }, 0xc8a87a, 0xe8d8b8, "sessile", CJ(0.15), 0, 0, 0, "A frond ~3-10 cm, once compared to the Ediacaran Charnia; perhaps a relative of comb jellies."),
+  S("Phlogites longus", CA, "a tentacled cup on a stalk", "cup", { H: 0.04 }, 0x9a7aa8, 0xd0c0d8, "sessile", CJ(0.2), 0, 0, 0, "A tentacled cambroernid ~2-5 cm."),
+  S("Herpetogaster collinsi", CA, "a curled, tentacled animal on a stalk", "cup", { H: 0.04 }, 0x8a6a9a, 0xc8b0d0, "sessile", CJ(0.15), 0, 0, 0, "A cambroernid ~3-5 cm with branched tentacles, anchored by a stalk."),
+  S("Galeaplumosus abilus", HE, "a tiny feathery colony", "polyp", { H: 0.015, R: 0.003, tent: 10 }, 0xd0a868, 0xecd8b0, "sessile", CJ(0.3), 0, 0, 0, "A pterobranch-like hemichordate ~1-3 cm."),
+  S("Zhongjianichthys rostratus", CH, "a slim tiny fish", "fish", { L: 0.027 }, 0x46524e, 0xd8dcd4, "swim", CJ(0.12), 0.12, 2, [0.4, 3], "A slim early vertebrate ~2.5-3 cm with no back fin."),
+  S("Cathaymyrus diadexus", CH, "a lancelet-like chordate", "fish", { L: 0.03 }, 0xb0aca0, 0xe8e4dc, "swim", CJ(0.15), 0.06, 1, [0.05, 0.5], "A lancelet-like chordate ~2-5 cm."),
+  S("Cheungkongella ancestralis", CH, "an early sea squirt", "cup", { H: 0.02 }, 0xc0905a, 0xe8c8a0, "sessile", CJ(0.1), 0, 0, 0, "One of the earliest tunicates (sea squirts), ~2 cm."),
+  S("Yuyuanozoon magnificissimi", VE, "the largest vetulicolian", "vetulicolian", { L: 0.2 }, 0x54523a, 0xc8c0a0, "swim", CJ(0.05), 0.12, 3, [0.4, 3], "The largest vetulicolian, up to 20 cm.", { cap: 6 }),
+  S("Beidazoon venustum", VE, "the smallest vetulicolian", "vetulicolian", { L: 0.025 }, 0x6a6448, 0xd0c8a8, "swim", CJ(0.15), 0.06, 1.5, [0.3, 2], "The smallest vetulicolian, ~2-3 cm."),
+  S("Heteromorphus longicaudatus", VE, "a long-tailed vetulicolian", "vetulicolian", { L: 0.07 }, 0x5e5a3e, 0xc8c0a0, "swim", CJ(0.4), 0.08, 2, [0.4, 3], "A vetulicolian ~5-10 cm."),
+  // --- Sirius Passet, North Greenland
+  S("Buenellus higginsi", AR, "a trilobite of the dark slope", "trilobite", { L: 0.04 }, 0x5a4a3a, 0xa89070, "crawl", SP(8), 0.01, 0.6, 0, "The commonest trilobite of Sirius Passet, 2-5 cm: a mud-grubbing omnivore, and the fossil that dates the site."),
+  S("Arthroaspis bergstroemi", AR, "a large flat arthropod", "arthropod", { L: 0.21, W: 0.09, segs: 12, head: 0.18, taper: 0.4, antennae: 0.2, tail: 0.1 }, 0x5e4630, 0xb08a64, "crawl", SP(1.5), 0.02, 1.5, 0, "A big artiopod over 21 cm and one of the commonest animals here: scavenger burrows cluster around its dead.", { cap: 12 }),
+  S("Campanamuta mantonae", AR, "a swimming arthropod near the bottom", "arthropod", { L: 0.06, W: 0.02, segs: 12, head: 0.2, taper: 0.4, antennae: 0.3 }, 0x7a5434, 0xd0a880, "swim", SP(5), 0.05, 1.2, [0.1, 0.8], "A common arthropod ~5-8 cm swimming near the bottom; its gut and muscles survive in three dimensions."),
+  S("Kleptothule rasmusseni", AR, "a tiny arthropod", "arthropod", { L: 0.01, W: 0.005, segs: 8 }, 0x9a7a54, 0xe0c8a0, "swim", SP(10), 0.03, 0.6, [0.05, 0.5], "A tiny, abundant arthropod about 1 cm long."),
+  S("Isoxys volucris", AR, "a swimmer in a two-valved shell, big eyes", "arthropod", { L: 0.03, W: 0.022, segs: 6, shell: true, eyes: true }, 0x7a7a5a, 0xe8e0c8, "swim", both(SP(8), EB(3)), 0.1, 2.5, [0.5, 6], "Isoxys, a swimming arthropod in a folded two-valved shell 2-4 cm long with big eyes: one of the commonest swimmers in Cambrian seas worldwide, perhaps in shoals."),
+  S("Kiisortoqia soperi", AR, "a trilobite-like predator with grasping arms", "arthropod", { L: 0.05, W: 0.025, segs: 10, head: 0.2, great: 0.35, tail: 0.1 }, 0x8a4a30, 0xd8a07a, "swim", SP(0.5), 0.05, 1, [0.05, 0.6], "A ~5 cm arthropod with a trilobite-like body and radiodont-like grasping front arms."),
+  S("Pambdelurion whittingtoni", LO, "a big gilled swimmer with grasping arms", "gilled", { L: 0.4 }, 0x7a4a3a, 0xd8a890, "hunt", SP(0.15), 0.25, 5, [0.2, 1.5], "A gilled lobopodian ~40 cm, one of the largest and commonest animals here: flaps along its sides for swimming, stubby legs below, and big frontal limbs: a link between lobopodians and radiodonts.", { cap: 6 }),
+  S("Kerygmachela kierkegaardi", LO, "a gilled swimmer with a forked tail", "gilled", { L: 0.18, tail: 0.3 }, 0x84503a, 0xe0b098, "hunt", SP(0.1), 0.2, 4, [0.3, 3], "A gilled lobopodian ~10-25 cm with long tail spines; its brain and eyes are preserved.", { cap: 6 }),
+  S("Tamisiocaris borealis", RA, "a radiodont that sieves plankton", "radiodont", { L: 0.5 }, 0x7a4632, 0xe0b098, "hunt", SP(0.03), 0.3, 6, [1, 5], "A radiodont, the body perhaps ~50 cm (estimated from 12 cm arms), that swept the water with finely bristled arms like a net, filtering plankton: an early 'gentle giant' filter feeder.", { cap: 3 }),
+  S("Halkieria evangelista", MO, "an armoured slug with a shell at each end", "halkieria", { L: 0.06 }, 0x5a5a4a, 0xa89878, "crawl", SP(0.6), 0.003, 0.4, 0, "Up to ~8 cm: a slug-like grazer covered in chain-mail scales, with a small shell at each end; it grazed the microbial mats. Probably near the base of the mollusc line."),
+  S("Timorebestia koprii", CG, "a giant arrow worm", "arrow", { L: 0.15 }, 0xd0d4d0, 0xe8ece8, "hunt", SP(0.1), 0.2, 4, [0.5, 4], "A giant early arrow worm up to 30 cm, with fins and jaws: one of the top predators of the open water here.", { glass: true, cap: 6 }),
+  S("Ooedigera peeli", VE, "a vetulicolian", "vetulicolian", { L: 0.04 }, 0x5e5a3e, 0xc8c0a0, "swim", SP(0.2), 0.06, 1.5, [0.3, 2], "A vetulicolian ~4 cm."),
+  S("Xystoscolex boreogyrus", SC, "a burrowing predatory worm", "worm", { L: 0.05, r: 0.003 }, 0xa87064, 0xdcb0a0, "burrow", SP(2), 0, 0, 0, "A palaeoscolecid worm, a burrowing predator.", { bury: 0.6 }),
+  S("Pygocirrus butyricampum", AN, "a small bristle worm", "worm", { L: 0.02, r: 0.0015 }, 0xc0907a, 0xe8c8b0, "crawl", SP(0.5), 0.004, 0.3, 0, "An early polychaete (bristle worm) 1-3 cm."),
+  S("Hyolithus", HY, "a hyolith", "hyolith", { L: 0.025 }, 0x8a7c64, 0xc0b498, "crawl", both(SP(2), RF(4, -1), FL(1.5)), 0.002, 0.2, 0, "A hyolith 1-3 cm: cone shell, lid and two struts. On reefs they stood between the cups."),
+  S("Hamptonia", PO, "a bristly vase sponge", "sponge", { H: 0.08, R: 0.02 }, 0xc8a050, 0xe8d090, "sessile", SP(1.5), 0, 0, 0, "A sponge 2-10 cm; sponges were the main filter feeders on this dark slope."),
+  S("Choia", PO, "a disc sponge with radiating spines", "sponge", { H: 0.01, R: 0.02, shape: "disc" }, 0xc8783a, 0xe8c090, "sessile", SP(2), 0, 0, 0, "A disc sponge ringed with long radiating spicules."),
+  // --- the archaeocyath reef, Siberia (and patch reefs off the Flinders coast)
+  S("Nochoroicyathus", PO, "a reef cup", "archaeo", { H: 0.04, R: 0.012 }, 0xd8c8a0, 0xa89070, "sessile", both(RF(60), FL(25, 1)), 0, 0, 0, "An archaeocyath, a reef-building sponge 1-3 cm across: a porous double-walled cup like two nested, perforated ice-cream cones joined by radial partitions. Archaeocyaths built the first animal reefs, and were gone by about 510 million years ago.", { cap: 120 }),
+  S("Archaeolynthus", PO, "a small single-walled cup", "archaeo", { H: 0.02, R: 0.005 }, 0xe0d0a8, 0xb09878, "sessile", both(RF(40), FL(15, 1)), 0, 0, 0, "A small, single-walled archaeocyath ~1 cm, on the reefs and the outer shelf.", { cap: 80 }),
+  S("Dictyocyathus", PO, "a branching reef cup", "archaeo", { H: 0.07, R: 0.015, branch: 6 }, 0xd0b888, 0x9a8060, "sessile", RF(15), 0, 0, 0, "A branching archaeocyath: branching and massive forms built the true framework of the reefs in shallow, current-swept water.", { cap: 60 }),
+  S("Coscinocyathus", PO, "a reef cup on the flanks", "archaeo", { H: 0.035, R: 0.012 }, 0xc8b490, 0x9a8464, "sessile", RF(10), 0, 0, 0, "An archaeocyath 1-3 cm, on the reef flanks and in cavities."),
+  S("Okulitchicyathus", PO, "a broad, dish-shaped reef cup", "archaeo", { H: 0.015, R: 0.05 }, 0xd8c09a, 0xa89070, "sessile", RF(3), 0, 0, 0, "A discoid archaeocyath, usually several cm across, exceptionally up to 50 cm."),
+  S("Epiphyton", MI, "dark bushy microbial tufts", "bush", { H: 0.1, n: 5 }, 0x2e3426, 0x5a5a48, "sessile", both(RF(40), FL(20, 1)), 0, 0, 0, "Calcified microbes forming dark, bushy tufts: tiny branches that build up into shrubby masses centimetres to decimetres across, binding the reef together and hanging down inside its cavities.", { cap: 80 }),
+  S("Renalcis", MI, "grey clotted microbial lumps", "clot", { H: 0.12 }, 0x5a5a50, 0x8a8678, "sessile", both(RF(30), FL(15, 1)), 0, 0, 0, "Calcified microbes in clotted, kidney-shaped clusters, forming grey lumpy crusts: much of the reef's bulk.", { cap: 70 }),
+  S("Girvanella", MI, "microbe-coated balls on the sand", "clot", { H: 0.03 }, 0x8a8470, 0xb8b0a0, "sessile", both(RF(6, -1), FL(12)), 0, 0, 0, "Tangled microbial tubes that coat grains and pebbles, rolling them into round 'oncoids' a few cm across on the sandy floor."),
+  S("Cysticyathus", CN, "a tiny coral-like polyp", "polyp", { H: 0.015, R: 0.004, tent: 12 }, 0xd8a890, 0xf0d0c0, "sessile", RF(6), 0, 0, 0, "A coralomorph: a tiny coral-like animal whose place is uncertain (true corals come later)."),
+  S("Fallotaspis", AR, "a reef trilobite", "trilobite", { L: 0.04 }, 0x6e5434, 0xb89a70, "crawl", RF(3, -1), 0.01, 0.6, 0, "A trilobite ~1-5 cm crawling between and inside the reefs."),
+  S("Judomia", AR, "another reef trilobite", "trilobite", { L: 0.05 }, 0x765a38, 0xc0a274, "crawl", RF(2, -1), 0.01, 0.6, 0, "A trilobite of the Siberian reefs."),
+  S("Chancelloria", CC, "a spiny bag on the reef floor", "chancellorid", { H: 0.06 }, 0xb0986e, 0xe0d0b0, "sessile", both(RF(4, -1), EB(1.5), FL(3)), 0, 0, 0, "A chancelloriid 2-10 cm: an upright spiny bag; whole beds of Cambrian rock are made of their scattered star-shaped spines."),
+  S("Lapworthella", BR, "a small spiky cone shell", "cup", { H: 0.012 }, 0xb8a888, 0xd8ccb0, "sessile", RF(3), 0, 0, 0, "A tommotiid: an early relative of brachiopods armoured with small cone-shaped plates."),
+  S("Hexactinellid sponge", PO, "a glassy-spiculed sponge", "sponge", { H: 0.08, R: 0.02, shape: "tube" }, 0xe0dcc8, 0xc8c0a8, "sessile", RF(3, -1), 0, 0, 0, "A glass sponge with a skeleton of six-rayed silica spicules, on the reef margins and in deeper water."),
+  // --- Emu Bay Shale, Kangaroo Island
+  S("Estaingia bilobata", AR, "a small trilobite, everywhere", "trilobite", { L: 0.02 }, 0x6a5236, 0xb89a72, "crawl", EB(60), 0.008, 0.5, 0, "Over 80% of all the animals found here: a small trilobite 1-3 cm that coped with low-oxygen water.", { cap: 90 }),
+  S("Redlichia rex", AR, "a giant trilobite", "trilobite", { L: 0.2, segs: 15 }, 0x5a3e2a, 0xb08a64, "crawl", EB(0.3), 0.02, 1.5, 0, "A giant trilobite up to ~25 cm, a predator and scavenger: its spiny legs could tear prey.", { cap: 8 }),
+  S("Redlichia takooensis", AR, "a large trilobite", "trilobite", { L: 0.06 }, 0x6a4a30, 0xb89070, "crawl", EB(2), 0.012, 0.8, 0, "A redlichiid trilobite."),
+  S("Balcoracania dailyi", AR, "a trilobite with dozens of segments", "trilobite", { L: 0.04, segs: 30 }, 0x7a5a3a, 0xc8a478, "crawl", both(EB(0.3), FL(8)), 0.01, 0.6, 0, "An emuellid trilobite with up to 103 body segments; they swarmed in vast numbers on tidal flats and in pools."),
+  S("Megapharanaspis nedini", AR, "a large emuellid trilobite", "trilobite", { L: 0.1, segs: 20 }, 0x6a4a32, 0xb89070, "crawl", EB(0.4), 0.015, 1, 0, "A large emuellid trilobite up to ~10 cm."),
+  S("Anomalocaris daleyae", RA, "a big swimming predator with huge eyes", "radiodont", { L: 0.5 }, 0x8a3a2a, 0xe0a888, "hunt", EB(0.05), 0.5, 8, [0.6, 4], "A radiodont ~50 cm. Fossil eyes from this very site, ~2-3 cm across, carry over 16,000 lenses each: among the sharpest eyes of the Cambrian.", { cap: 4 }),
+  S("Echidnacaris briggsi", RA, "a radiodont with spiny arms", "radiodont", { L: 0.3 }, 0x8a4430, 0xe0b090, "hunt", EB(0.08), 0.4, 6, [0.5, 3], "A radiodont with spiny grasping arms ~10 cm long.", { cap: 4 }),
+  S("Tuzoia australis", AR, "a swimmer with a big spiny shell", "arthropod", { L: 0.1, W: 0.08, segs: 6, shell: true, eyes: true }, 0x8a6040, 0xe0c8a0, "swim", EB(0.4), 0.08, 2, [0.5, 4], "A bivalved arthropod with a large spiny-edged shell ~10 cm."),
+  S("Oestokerkus megacholix", AR, "a whip-clawed swimmer", "arthropod", { L: 0.05, W: 0.014, segs: 11, head: 0.15, great: 0.6, tail: 0.15 }, 0xb06a3a, 0xf0c8a0, "swim", EB(0.4), 0.06, 1.2, [0.1, 1], "A leanchoiliid ~5 cm with long whip-like great appendages."),
+  S("Tanglangia longicaudata", AR, "a small great-appendage arthropod", "arthropod", { L: 0.03, W: 0.01, segs: 10, great: 0.3, tail: 0.12 }, 0x9a5434, 0xe0b08a, "swim", EB(0.3), 0.04, 0.8, [0.05, 0.6], "A megacheiran up to 3.5 cm."),
+  S("Emucaris fava", AR, "a soft-shielded arthropod", "arthropod", { L: 0.02, W: 0.014, segs: 3, head: 0.45, taper: 0.2, antennae: 0.35 }, 0x9a8a6a, 0xe0c8a0, "crawl", EB(1), 0.01, 0.6, 0, "A nektaspid ~2 cm."),
+  S("Myoscolex ateles", CC, "a mysterious swimming worm", "worm", { L: 0.04, r: 0.003, curl: 0.8 }, 0xb0907a, 0xe0c8b4, "swim", EB(0.8), 0.04, 1.2, [0.2, 2], "A problematic animal, a few cm, whose relationships are still debated."),
+  S("Nesonektris aldridgei", VE, "a vetulicolian", "vetulicolian", { L: 0.05 }, 0x5e5a3e, 0xc8c0a0, "swim", EB(0.3), 0.06, 1.5, [0.4, 3], "A vetulicolian ~5 cm."),
+  S("Wronascolex", SC, "a plated burrowing worm", "worm", { L: 0.05, r: 0.003 }, 0xa87064, 0xdcb0a0, "burrow", EB(1.5), 0, 0, 0, "A palaeoscolecid worm armoured with tiny plates.", { bury: 0.6 }),
+  S("Emu Bay brachiopod", BR, "a brachiopod", "brachiopod", { L: 0.015 }, 0x8a7a4a, 0xc0b080, "sessile", EB(2), 0, 0, 0, "Brachiopods and hyoliths under 2 cm were common here, although filter feeders overall were scarce."));
+for (const sp of FAUNA) if (!sp.k) sp.k = FAUNA.indexOf(sp) * 7.3;
 
 // ---------- the places you can visit, all at (or very near) the same moment, about 518 million years ago ----------
 // Each has its own coast (a different stretch of the generated world), water, seafloor and animals. SITES entries set: where it is,
@@ -385,11 +512,40 @@ const SITES = {
   chengjiang: { name: "Chengjiang delta, South China", where: "Yunnan, China · then the South China microcontinent, in the tropics", age: "about 518 Ma (518.03 ± 0.69, a maximum age)",
     g: { ox: 0, oz: 0, wetBias: 0.05, carbonate: false, deep: 1, mud: [0.42, 0.40, 0.33], sand: [0.66, 0.60, 0.47], stroma: false, reef: false },
     water: [0.16, 0.30, 0.28], murk: 0.12, seaT: 30, traces: 1, tubes: 1, sky: [[0.42, 0.58, 0.80], [0.87, 0.85, 0.81]],
-    arrival: ENV.arrival } };
+    arrival: ENV.arrival, deepNote: ENV.deepNote } };
 let SITE_KEY = "chengjiang", SITE = SITES.chengjiang;
 for (const sp of FAUNA) if (!sp.at) sp.at = { chengjiang: { dens: sp.dens } };
-function applySite(key) { SITE_KEY = key; SITE = SITES[key]; Object.assign(SG, SITE.g);
-  ENV.siteLabel = SITE.name; ENV.seaT = SITE.seaT; ENV.murk = SITE.murk; ENV.skyUp = new THREE.Color(...SITE.sky[0]); ENV.skyHor = new THREE.Color(...SITE.sky[1]); }
+let applySite = function (key) { SITE_KEY = key; SITE = SITES[key]; Object.assign(SG, SITE.g);
+  ENV.siteLabel = SITE.name; ENV.seaT = SITE.seaT; ENV.murk = SITE.murk; ENV.skyUp = new THREE.Color(...SITE.sky[0]); ENV.skyHor = new THREE.Color(...SITE.sky[1]); };
+const BIOMES0 = JSON.parse(JSON.stringify(BIOMES));
+Object.assign(SITES, {
+  sirius: { name: "Sirius Passet, North Greenland", where: "Peary Land, Greenland · then the northern edge of Laurentia, ~15°S", age: "~515-518 Ma (indistinguishable in age from Chengjiang)",
+    g: { ox: 300, oz: 40, wetBias: -0.08, carbonate: true, deep: 4, mud: [0.16, 0.16, 0.15], sand: [0.80, 0.78, 0.70], stroma: false, reef: false },
+    water: [0.07, 0.13, 0.17], murk: 0.07, seaT: 26, traces: 0.8, tubes: 0.4, sky: [[0.42, 0.58, 0.80], [0.87, 0.85, 0.81]],
+    zones: { shoal: ["The platform edge", "White carbonate sand at the edge of a drowned limestone platform; beyond it the sea floor falls away down the slope."], delta: ["The upper slope", "The seafloor slopes into deeper, dimmer water."], deep: ["The dark slope", "Black, finely layered mud below storm wave base, filmed with microbial mats; the water at the bottom was low in oxygen, like a modern oxygen-minimum zone, yet never fully without it. This is where the Sirius Passet animals lived and were buried by mud flows sliding off the platform."] },
+    deepNote: "You are on the dark slope where the Sirius Passet animals lived: the bottom water here was low in oxygen, but not empty of it. Predators and swimmers dominate.",
+    arrival: "You arrive on a white limestone shore at the edge of Laurentia, the core of what will become North America. Offshore the platform edge drops down a slope into dim, deep water with black muddy floors, low in oxygen. The animals here are mostly swimmers and predators: the 40 cm gilled lobopodian Pambdelurion, Kerygmachela, the plankton-sieving radiodont Tamisiocaris, giant arrow worms, the armoured slug Halkieria. Dive deep, beyond about 30 m, to find them." },
+  reef: { name: "Archaeocyath reefs, Siberia", where: "Lena River, Yakutia, Russia · then the Siberian continent, in the tropics", age: "Atdabanian-Botoman reefs, ~521-514 Ma (bracketing 518 Ma)",
+    g: { ox: 120, oz: -80, wetBias: -0.12, carbonate: true, deep: 0.6, mud: [0.72, 0.70, 0.60], sand: [0.88, 0.85, 0.75], stroma: true, reef: true },
+    water: [0.10, 0.36, 0.46], murk: 0.035, seaT: 28, traces: 0.6, tubes: 0.4, sky: [[0.40, 0.58, 0.84], [0.86, 0.86, 0.84]],
+    zones: { shoal: ["The reef shelf", "Clear, warm, shallow water over white lime sand, dotted with reef mounds 1-6 m across: the first animal reefs, built by archaeocyath sponges and calcified microbes."], delta: ["The reef shelf", "Clear, warm, shallow water over white lime sand, dotted with reef mounds 1-6 m across."], deep: ["Below the reefs", "Deeper, quieter water below storm wave base: only small sponges and cavity dwellers."], tidal: ["Carbonate tidal flats", "Lime-mud flats with stromatolites: knobbly domes and columns of layered microbial carbonate, the living mat dark green-brown on top."] },
+    deepNote: "Below the reefs: deeper, quieter water where few reef builders live.",
+    arrival: "You arrive on a white carbonate shore in Siberia. The water is clear, warm and turquoise, the first animal reefs scattered across the shallow shelf: knee- to head-high mounds of archaeocyath cups (reef-building sponges), dark bushy and clotted calcified microbes, spiny chancelloriids, trilobites and hyoliths. On the tidal flats stand stromatolites. Wade in and snorkel or dive: the reefs start a few metres down." },
+  emubay: { name: "Emu Bay, Kangaroo Island, Australia", where: "Kangaroo Island, South Australia · then East Gondwana, in the tropics", age: "~512-514 Ma (a little younger: 4-6 million years after 518)",
+    g: { ox: -200, oz: 60, wetBias: -0.18, carbonate: false, deep: 2.6, mud: [0.34, 0.33, 0.30], sand: [0.58, 0.52, 0.42], stroma: false, reef: false },
+    water: [0.14, 0.24, 0.24], murk: 0.1, seaT: 27, traces: 0.7, tubes: 0.5, sky: [[0.42, 0.58, 0.82], [0.88, 0.85, 0.80]],
+    zones: { delta: ["The fan delta", "Pebble fans pour off rising fault blocks straight into the sea, building a steep fan delta; below, soft, soupy prodelta mud."], deep: ["The prodelta muds", "Soft grey mud 50-100 m down, its bottom water swinging between oxygenated and oxygen-free. Small trilobites (Estaingia) carpet it; big predators swim above."] },
+    deepNote: "The prodelta muds: the bottom water here sometimes lost its oxygen; the trilobite Estaingia coped with it.",
+    arrival: "You arrive in a rift valley on the edge of Gondwana (today's Australia): steep slopes of pebbles and boulders fanning straight into the sea. Offshore the floor drops into soft mud where the trilobite Estaingia lived in huge numbers, and above it swam Anomalocaris with its 16,000-lens eyes, giant Redlichia trilobites crawling below. This site is a little younger (~513 Ma)." },
+  flinders: { name: "Flinders Ranges tidal flats, Australia", where: "Flinders Ranges, South Australia · then East Gondwana, in the tropics", age: "Cambrian Stages 3-4 limestones (bracketing ~518 Ma)",
+    g: { ox: 77, oz: 190, wetBias: -0.3, carbonate: true, deep: 0.5, mud: [0.78, 0.76, 0.66], sand: [0.90, 0.87, 0.76], stroma: true, reef: true },
+    water: [0.12, 0.40, 0.46], murk: 0.03, seaT: 30, traces: 0.5, tubes: 0.3, sky: [[0.42, 0.58, 0.84], [0.88, 0.86, 0.82]],
+    zones: { tidal: ["Stromatolite flats", "Broad carbonate tidal flats in a dry climate: stromatolite domes and columns (dark living mats over layered lime), mud cracks, ripples and salty pans. No animals lived in the stromatolites; they grew where animals were few."], shoal: ["Lagoons and sand shoals", "Warm, clear, shallow lagoons, some very salty, with rolled microbial balls (oncoids) on the sand."], delta: ["Patch reefs offshore", "A little deeper: patch reefs of archaeocyaths and calcified microbes."] },
+    deepNote: "Deeper water off the platform.",
+    arrival: "You arrive on wide, sun-baked carbonate tidal flats on the dry edge of Gondwana (today's South Australia). The flats are studded with stromatolites, dark living microbial mats over layered lime; trilobites swarm in the pools; offshore lie clear lagoons and small archaeocyath patch reefs." } });
+const applySite0 = applySite;
+applySite = function (key) { applySite0(key); for (const k in BIOMES0) BIOMES[k] = BIOMES0[k].slice(); Object.assign(BIOMES, SITE.zones || {}); ENV.deepNote = SITE.deepNote || ENV.deepNote; ENV.arrival = SITE.arrival; };
+
 applySite("chengjiang");
 
 // ---------- placing and moving the animals ----------
@@ -492,7 +648,7 @@ snow.frustumCulled = false; scene.add(snow);
 // ---------- you: a biologist with scuba gear ----------
 const keys = {}; let yaw = START.yaw ?? -Math.PI / 2, pitch = -0.08, dragging = false, started = false, flying = false, fast = 0;
 const P_ = { x: START.x, z: START.z, y: 0 }; P_.y = baseH(P_.x, P_.z);
-const TANK = { bar: 200, litres: 12 }; let swimming = false, depthNow = 0, maxDepth = 0, diveMin = 0;
+const TANK = { bar: 200, litres: 12 }, PACE = [1, 3, 10, 30, 100, 400]; let swimming = false, depthNow = 0, maxDepth = 0, diveMin = 0;
 const intro = document.getElementById("intro");
 const HUD = document.createElement("div"); HUD.style.cssText = "position:fixed;left:14px;top:12px;z-index:2;background:rgba(12,24,28,.74);color:#e6f0ee;padding:10px 14px;border-radius:10px;font:13.5px/1.55 -apple-system,Helvetica,sans-serif;max-width:600px";
 const MSG = document.createElement("div"); MSG.style.cssText = "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:2;background:rgba(12,24,28,.86);color:#e6f0ee;padding:12px 18px;border-radius:12px;font:15px/1.5 -apple-system,Helvetica,sans-serif;max-width:780px;display:none";
@@ -502,7 +658,7 @@ document.body.append(HUD, MSG, JOURNAL, WRISTC);
 let msgT = 0, msgText = "", vrDirty = true;
 function say(t, secs = 14) { msgText = t; msgT = secs; MSG.innerHTML = t; MSG.style.display = "block"; vrDirty = true; }
 function start() { if (started) return; started = true; intro?.classList.add("gone"); say(ENV.arrival, 22); }
-addEventListener("keydown", e => { keys[e.code] = true; start(); if (e.code === "KeyE") interact(); if (e.code === "KeyF") flying = !flying; if (e.code === "Equal") fast = Math.min(3, fast + 1); if (e.code === "Minus") fast = Math.max(0, fast - 1); });
+addEventListener("keydown", e => { keys[e.code] = true; start(); if (e.code === "KeyE") interact(); if (e.code === "KeyF") flying = !flying; if (e.code === "Equal") fast = Math.min(5, fast + 1); if (e.code === "KeyT") toggleTravel(); if (e.code === "Minus") fast = Math.max(0, fast - 1); });
 addEventListener("keyup", e => keys[e.code] = false);
 renderer.domElement.addEventListener("pointerdown", () => { dragging = true; start(); }); addEventListener("pointerup", () => dragging = false);
 addEventListener("pointermove", e => { if (!dragging) return; yaw -= e.movementX * 0.004; pitch = clampN(pitch - e.movementY * 0.004, -1.5, 1.5); });
@@ -514,26 +670,48 @@ function drawWrist(g, W, H) { g.clearRect(0, 0, W, H); g.fillStyle = "rgba(8,20,
   t(`${ENV.dateLabel.replace("about ", "~").replace(" million years ago", " Ma")} · ${SITE.name.split(",")[0]}`, 22, 42, 26, "#9ae8de", 700); t(`${hh}:${String(mm).padStart(2, "0")} of a ${ENV.dayH}-hour day  ·  tide ${SEA >= 0 ? "+" : ""}${SEA.toFixed(1)} m`, 22, 78, 22);
   if (swimming || depthNow > 0.3) { const air = TANK.bar, low = air < 50;
     t(`depth ${depthNow.toFixed(1)} m  (max ${maxDepth.toFixed(1)})`, 22, 128, 34, "#ffffff", 700);
-    t(`tank ${Math.round(air)} bar${low ? "  · LOW: surface!" : ""}`, 22, 172, 30, low ? "#ff8a6a" : "#ffe9a8", 700);
+    t(`air tank ${Math.round(air)} bar${low ? "  · LOW: surface!" : ""}`, 22, 172, 30, low ? "#ff8a6a" : "#ffe9a8", 700);
     t(`water ${ENV.seaT} °C  ·  dive ${Math.floor(diveMin)} min`, 22, 212, 24);
     t(`pressure ${(1 + depthNow / 10.06).toFixed(2)} atm`, 22, 246, 22, "#a8c8c4"); }
   else { t(`air: O₂ ${ENV.O2pct}%  (est. ${ENV.O2range}; today 21%)`, 22, 128, 28, "#ffffff", 700); t(`CO₂ ~${ENV.CO2ppm.toLocaleString()} ppm (${ENV.CO2range}; today ~420)`, 22, 168, 23, "#ffe9a8", 600);
-    t(`air ${ENV.airT} °C  ·  sun ${Math.round(ENV.sunL * 100)}% of today's`, 22, 206, 22); t(`tank ${Math.round(TANK.bar)} bar (full: 200)`, 22, 240, 22, "#a8c8c4"); }
+    t(`air ${ENV.airT} °C  ·  sun ${Math.round(ENV.sunL * 100)}% of today's`, 22, 206, 22); t(`air tank ${Math.round(TANK.bar)} bar (a full tank is 200 bar)`, 22, 240, 22, "#a8c8c4"); }
   const hd = ((Math.round(-yawNow() * 180 / Math.PI) % 360) + 360) % 360; t(`heading ${hd}° ${["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(hd / 45) % 8]}`, 22, 290, 22);
   if (biomeNow) t(BIOMES[biomeNow][0], 300, 290, 20, "#ffe9a8", 600);
-  t(`species logged: ${LOGGED.size} of ${FAUNA.length}  ·  phyla ${new Set([...LOGGED].map(s => s.phylum)).size}`, 22, 330, 22, "#9ae8de", 600);
+  t(`species identified: ${LOGGED.size}  ·  T: travel anywhere`, 22, 330, 22, "#9ae8de", 600);
   t(swimming ? "E: examine the nearest animal" : "walk into the sea to dive; E: examine", 22, 370, 18, "#7a9a98"); }
 function yawNow() { const d = V3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())); return Math.atan2(-d.x, -d.z); }
 // the species journal: an animal is logged when you examine it (E) close up
 const LOGGED = new Set(), PLACES_SEEN = new Set(); let biomeNow = null, biomeT = 0;
 function drawJournal() { const byP = {}; for (const s of FAUNA) if (s.at[SITE_KEY] || LOGGED.has(s)) (byP[s.phylum] = byP[s.phylum] || []).push(s);
-  JOURNAL.innerHTML = `<b>Travel</b> <span style="color:#8ab0ac;font-size:11.5px">(same moment, different places)</span><br>` + Object.entries(SITES).map(([k, S]) => `<div data-s="${k}" style="padding:1px 8px;cursor:pointer;${k === SITE_KEY ? "color:#ffe9a8;font-weight:600" : ""}">${k === SITE_KEY ? "▸" : "⤳"} ${S.name}</div>`).join("") + `<div style="margin-top:6px"></div><b>Environments</b> · ${PLACES_SEEN.size} of ${Object.keys(BIOMES).length}<br>` + Object.entries(BIOMES).map(([k, [n]]) => PLACES_SEEN.has(k) ? `<div data-b="${k}" style="padding-left:8px;cursor:pointer">✦ ${n}</div>` : `<div style="padding-left:8px;color:#5a7a78">· ?</div>`).join("") + `<div style="margin-top:8px"></div><b>Field journal</b> · ${LOGGED.size} of ${FAUNA.length} species<br><span style="color:#8ab0ac;font-size:11.5px">swim close to an animal and press E to examine it</span>` +
+  JOURNAL.innerHTML = `<b>Environments</b> · ${PLACES_SEEN.size} of ${Object.keys(BIOMES).length}<br>` + Object.entries(BIOMES).map(([k, [n]]) => PLACES_SEEN.has(k) ? `<div data-b="${k}" style="padding-left:8px;cursor:pointer">✦ ${n}</div>` : `<div style="padding-left:8px;color:#5a7a78">· ?</div>`).join("") + `<div style="margin-top:8px"></div><b>Field notebook</b> · ${LOGGED.size} species identified<br><span style="color:#8ab0ac;font-size:11.5px">swim close to an animal and press E to examine it</span>` +
     Object.entries(byP).map(([p, L]) => `<div style="margin-top:5px;color:#9ae8de;font-weight:600">${p} <span style="color:#6a8a88;font-weight:400">${L.filter(s => LOGGED.has(s)).length}/${L.length}</span></div>` +
       L.map(s => LOGGED.has(s) ? `<div data-g="${FAUNA.indexOf(s)}" style="padding-left:8px;cursor:pointer">✦ <i>${s.genus}</i></div>` : `<div style="padding-left:8px;color:#5a7a78">· ${s.hint}</div>`).join("")).join(""); }
 // travel between the places of this moment (the time machine hops across the globe, not through time)
 function goSite(key) { applySite(key); START = findStart(); P_.x = START.x; P_.z = START.z; P_.y = baseH(P_.x, P_.z); yaw = START.yaw; if (renderer.xr.isPresenting) vrTurn = yaw; flying = false;
   for (const L of LEVELS) { L.ox = NaN; L.oz = NaN; } CELLS.clear(); lifeAt = null; rocksAt = null; tracesAt = null; biomeNow = null; TANK.bar = 200; updateGround(P_.x, P_.z, 99); drawJournal();
   say(`<b>${SITE.name}</b> · ${SITE.where} · ${SITE.age}<br>${SITE.arrival}`, 30); }
+// the travel panel: jump to any of the places, or click anywhere on the map of the land and sea around you
+const TRAVEL = document.createElement("div"); TRAVEL.style.cssText = "position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:4;background:rgba(10,22,26,.95);color:#e6f0ee;padding:16px 18px;border-radius:14px;font:14px/1.5 -apple-system,Helvetica,sans-serif;display:none;box-shadow:0 20px 60px rgba(0,0,0,.5)";
+const TBTN = document.createElement("button"); TBTN.textContent = "🌍 Travel (T)"; TBTN.style.cssText = "position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:3;padding:8px 16px;font:600 14px -apple-system,sans-serif;border:0;border-radius:10px;background:#2a6a66;color:#fff;cursor:pointer";
+document.body.append(TRAVEL, TBTN); TBTN.onclick = e => { e.stopPropagation(); start(); toggleTravel(); };
+const TMAP = document.createElement("canvas"); TMAP.width = TMAP.height = 420; TMAP.style.cssText = "width:420px;height:420px;border-radius:10px;cursor:crosshair;display:block;margin-top:8px";
+let mapSpan = 40000;
+function drawTravelMap() { const g = TMAP.getContext("2d"), N = 140, img = g.createImageData(N, N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const x = P_.x + (i / N - 0.5) * mapSpan, z = P_.z + (j / N - 0.5) * mapSpan, h = baseH(x, z), k = 4 * (j * N + i); let r, gg, b;
+    if (h < 0) { const d = Math.min(1, -h / (60 * SG.deep)); r = 70 - 40 * d; gg = 140 - 70 * d; b = 150 - 40 * d; } else { const w = wetness(x, z); r = 190 - 60 * Math.min(1, h / 120) - 60 * Math.max(0, w - 0.5) * 4; gg = 160 - 50 * Math.min(1, h / 120) - 30 * Math.max(0, w - 0.5) * 4; b = 120 - 30 * Math.min(1, h / 120); }
+    img.data[k] = r; img.data[k + 1] = gg; img.data[k + 2] = b; img.data[k + 3] = 255; }
+  const tmp = document.createElement("canvas"); tmp.width = tmp.height = N; tmp.getContext("2d").putImageData(img, 0, 0); g.imageSmoothingEnabled = true; g.drawImage(tmp, 0, 0, 420, 420);
+  g.fillStyle = "#ff5a3a"; g.beginPath(); g.arc(210, 210, 6, 0, 6.283); g.fill(); g.fillStyle = "#fff"; g.font = "600 13px -apple-system,sans-serif"; g.fillText(`you · map ${mapSpan / 1000} km across · north is up · click anywhere to go there`, 10, 410); }
+function toggleTravel() { if (TRAVEL.style.display !== "none") { TRAVEL.style.display = "none"; return; }
+  TRAVEL.innerHTML = `<b style="font-size:17px">Travel</b> · the same moment, ~518 million years ago<div style="color:#8ab0ac;font-size:12.5px">Jump to another place on Earth at this time, or click the map to go anywhere nearby. Everything is open; there is nothing to unlock.</div>` +
+    Object.entries(SITES).map(([k, S]) => `<div data-s="${k}" style="padding:4px 8px;margin-top:3px;border-radius:7px;cursor:pointer;background:${k === SITE_KEY ? "#2a4a46" : "#16282c"}">${k === SITE_KEY ? "▸" : "⤳"} <b>${S.name}</b> <span style="color:#8ab0ac;font-size:12px">· ${S.age}</span></div>`).join("") +
+    `<div style="margin-top:6px">Map: <button data-z="10000">10 km</button> <button data-z="40000">40 km</button> <button data-z="150000">150 km</button> &nbsp; <button data-x="1">close</button></div>`;
+  TRAVEL.append(TMAP); drawTravelMap(); TRAVEL.style.display = "block"; }
+TRAVEL.addEventListener("click", e => { e.stopPropagation(); const s = e.target.closest("[data-s]"); if (s) { TRAVEL.style.display = "none"; goSite(s.dataset.s); return; }
+  if (e.target.dataset.z) { mapSpan = +e.target.dataset.z; drawTravelMap(); return; } if (e.target.dataset.x) { TRAVEL.style.display = "none"; return; }
+  if (e.target === TMAP) { const r = TMAP.getBoundingClientRect(), x = P_.x + ((e.clientX - r.left) / r.width - 0.5) * mapSpan, z = P_.z + ((e.clientY - r.top) / r.height - 0.5) * mapSpan; TRAVEL.style.display = "none"; jumpTo(x, z); } });
+function jumpTo(x, z) { P_.x = x; P_.z = z; const g = baseH(x, z); P_.y = g < SEA - 1.3 ? SEA - 1.25 : g; flying = false; lifeAt = null; rocksAt = null; tracesAt = null; updateGround(P_.x, P_.z, 99);
+  say(g < SEA - 1.3 ? `You are floating at the surface, over ${(-g).toFixed(0)} m of water. Dive with C (or look down and swim).` : "You arrive on land.", 8); }
 // the hand lens: an examined animal floats in front of you, magnified, turning slowly, until you look away or press E again
 const LENS = new THREE.Group(); LENS.visible = false; camera.add(LENS); let lensT = 0;
 const lensLight = new THREE.PointLight(0xffffff, 1.2, 2, 1); lensLight.position.set(0.2, 0.3, 0.2); LENS.add(lensLight);
@@ -585,7 +763,7 @@ function frame() {
   let mx = 0, my = 0, run = 1, up = 0;
   if (vr) { const s = renderer.xr.getSession();
     for (const src of s?.inputSources || []) { const gp = src.gamepad; if (!gp) continue; const [ax, ay] = stick(gp.axes);
-      if (src.handedness === "left") { mx += ax; my += ay; if (tap("L", gp, 4)) fast = (fast + 1) % 4; if (tap("L", gp, 5)) flying = !flying; if (tap("L", gp, 3)) { const K = Object.keys(SITES); goSite(K[(K.indexOf(SITE_KEY) + 1) % K.length]); } }
+      if (src.handedness === "left") { mx += ax; my += ay; if (tap("L", gp, 4)) fast = (fast + 1) % 6; if (tap("L", gp, 5)) flying = !flying; if (tap("L", gp, 3)) { const K = Object.keys(SITES); goSite(K[(K.indexOf(SITE_KEY) + 1) % K.length]); } }
       else { if (gp.buttons[0]?.value > 0.3) run = 2.5; if (tap("R", gp, 4)) interact(); if (swimming || flying) up = -ay * 0.8; if (tap("R", gp, 5)) up = 0;
         if (Math.abs(ax) > 0.7 && snap) { vrTurn -= Math.sign(ax) * Math.PI / 6; snap = false; } else if (Math.abs(ax) < 0.3) snap = true; } }
     rig.rotation.y = vrTurn; fwd.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(rig.quaternion); }
@@ -594,10 +772,10 @@ function frame() {
   const floorY = baseH(P_.x, P_.z), eyeY = P_.y + 1.6, waterD = SEA - floorY;
   swimming = !flying && waterD > 1.3;                                                   // deeper than chest height: you swim
   const look = fwd.clone(); side.crossVectors(V3(fwd.x, 0, fwd.z).normalize(), UP).normalize();
-  if (swimming) { const sp = (0.9 * run) * [1, 3, 10, 30][fast], f = V3(look.x, look.y, look.z).normalize();   // swim where you look; fins
+  if (swimming) { const sp = (0.9 * run) * PACE[fast], f = V3(look.x, look.y, look.z).normalize();   // swim where you look; fins
     P_.x += (f.x * -my + side.x * mx) * sp * dt; P_.z += (f.z * -my + side.z * mx) * sp * dt; P_.y += (f.y * -my + up * 0.8) * sp * dt;
-    P_.y = clampN(P_.y, baseH(P_.x, P_.z) + 0.25 - 0, SEA - 1.45); }                        // between the floor and floating at the surface
-  else { fwd.y = 0; fwd.normalize(); const sp = (waterD > 0.4 ? 0.8 : 1.4) * run * [1, 3, 10, 30][fast];
+    P_.y = clampN(P_.y, baseH(P_.x, P_.z) + 0.25, SEA - 1.25); }   // up to floating at the surface, head out                        // between the floor and floating at the surface
+  else { fwd.y = 0; fwd.normalize(); const sp = (waterD > 0.4 ? 0.8 : 1.4) * run * PACE[fast];
     P_.x += (fwd.x * -my + side.x * mx) * sp * dt; P_.z += (fwd.z * -my + side.z * mx) * sp * dt; const g = baseH(P_.x, P_.z);
     if (flying) P_.y = Math.max(g, P_.y + up * Math.max(4, sp) * dt); else P_.y = g > P_.y ? Math.min(g, P_.y + 4 * dt) : Math.max(g, P_.y - 6 * dt); }
   rig.position.set(P_.x, P_.y, P_.z);
@@ -608,7 +786,7 @@ function frame() {
   if (depthNow > 0.2) { TANK.bar = Math.max(0, TANK.bar - 20 * (1 + depthNow / 10) / TANK.litres / 60 * dt); diveMin += dt / 60; maxDepth = Math.max(maxDepth, depthNow); }
   else if (waterD < 0.1 && TANK.bar < 200) { TANK.bar = Math.min(200, TANK.bar + 40 * dt); if (TANK.bar >= 200) { diveMin = 0; maxDepth = 0; } }
   if (depthNow > 50 && !frame.deepSaid) { frame.deepSaid = true; say(ENV.deepNote, 14); } if (depthNow < 40) frame.deepSaid = false;
-  if (TANK.bar <= 0 && depthNow > 0.2) { P_.y = Math.min(P_.y + 1.2 * dt, SEA - 1.45); if (msgT <= 0) say("Your tank is empty: you are rising to the surface. Swim back to shore to swap tanks.", 8); }
+  if (TANK.bar <= 0 && depthNow > 0.2) { P_.y = Math.min(P_.y + 1.2 * dt, SEA - 1.25); if (msgT <= 0) say("Your tank is empty: you are rising to the surface. Swim back to shore to swap tanks.", 8); }
   // sun, moon and sky through the day; the light dims and turns green-blue underwater
   const dayA = (clockH / ENV.dayH * 24 - 6) / 12 * Math.PI, el = Math.sin(dayA), sunDir = V3(-Math.cos(dayA), Math.max(el, -0.3), 0.3).normalize();
   sun.position.copy(rig.position).addScaledVector(sunDir, 800); sun.target.position.copy(rig.position);
@@ -620,14 +798,14 @@ function frame() {
   else { scene.fog.color.copy(hor); scene.fog.density = IS_HEADSET ? 0.00016 : 0.00011; sky.visible = true; }
   sunDisc.position.copy(rig.position).addScaledVector(sunDir, 45000); sunDisc.lookAt(rig.position); sunDisc.visible = el > -0.05 && !under; sunDisc.material.color.setRGB(1, 0.95 - 0.35 * dusk, 0.85 - 0.5 * dusk);
   const moonDir = V3(Math.cos(dayA + 2.4), Math.sin(dayA + 2.4) * 0.8 + 0.1, -0.25).normalize(); moonDisc.position.copy(rig.position).addScaledVector(moonDir, 45000); moonDisc.lookAt(rig.position); moonDisc.visible = moonDir.y > 0 && !under; moonDisc.material.opacity = 0.35 + 0.65 * (1 - day);
-  water.position.set(Math.round(P_.x / 100) * 100, SEA, Math.round(P_.z / 100) * 100); waterMat.opacity = under ? 0.9 : 0.78;
+  water.position.set(Math.round(P_.x / 100) * 100, SEA, Math.round(P_.z / 100) * 100); waterMat.opacity = under ? 0.55 : 0.78; waterMat.emissive.setRGB(...SITE.water).multiplyScalar(under ? 2.2 * (0.2 + 0.8 * day) : 0);   // from below, the surface glows with daylight
   snow.visible = under; if (under) { const cp = camera.getWorldPosition(V3(0, 0, 0)); snow.position.set(Math.round(cp.x / 30) * 30, cp.y, Math.round(cp.z / 30) * 30);
     const a = snow.geometry.attributes.position; for (let i = 0; i < NSNOW; i++) { let y = a.getY(i) - dt * 0.02; if (y < -15) y += 30; a.setY(i, y); } a.needsUpdate = true; }
   if (LENS.visible) { LENS.userData.piv.rotation.y += dt * 0.5; LENS.userData.piv.rotation.x = 0.5; lensT -= dt; if (lensT <= 0) LENS.visible = false; }
   msgT -= dt; if (msgT <= 0 && MSG.style.display !== "none") { MSG.style.display = "none"; msgText = ""; vrDirty = true; }
   wristTm -= dt; if (wristTm <= 0) { wristTm = 0.25; drawWrist(WRISTC.getContext("2d"), 512, 400); wristT.needsUpdate = true; }
   hudT -= dt; if (hudT <= 0) { hudT = 0.3; const near = nearestAnimal(swimming ? 6 : 3);
-    HUD.innerHTML = `<b>${ENV.dateLabel}</b> · ${ENV.siteLabel}<br>${biomeNow ? `<span style="color:#ffe9a8">${BIOMES[biomeNow][0]}</span> · ` : ""}${swimming ? `diving · ${depthNow.toFixed(1)} m` : waterD > 0.3 ? "wading" : flying ? "flying (to look around)" : "on foot"}${fast ? ` · pace ×${[1, 3, 10, 30][fast]}` : ""}${near ? ` · nearby: ${LOGGED.has(near.sp) ? "<i>" + near.sp.genus + "</i>" : "an animal: press E to examine"}` : ""}<br>
+    HUD.innerHTML = `<b>${ENV.dateLabel}</b> · ${ENV.siteLabel}<br>${biomeNow ? `<span style="color:#ffe9a8">${BIOMES[biomeNow][0]}</span> · ` : ""}${swimming ? `diving · ${depthNow.toFixed(1)} m` : waterD > 0.3 ? "wading" : flying ? "flying (to look around)" : "on foot"}${fast ? ` · pace ×${PACE[fast]}` : ""}${near ? ` · nearby: ${LOGGED.has(near.sp) ? "<i>" + near.sp.genus + "</i>" : "an animal: press E to examine"}` : ""}<br>
       <span style="color:#8ab0ac;font-size:12.5px">WASD move · drag to look · in the sea you swim where you look (space up, C down) · shift faster · − / = pace · E examine · F fly</span>`;
     if (vr && (vrDirty || ((t * 3) | 0) % 3 === 0)) { drawVR(msgText); vrDirty = false; } }
   renderer.render(scene, camera);
