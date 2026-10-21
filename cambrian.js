@@ -571,7 +571,7 @@ function refreshLife() { const ci = Math.floor(P_.x / LCELL), cj = Math.floor(P_
   for (let i = ci - n; i <= ci + n; i++) for (let j = cj - n; j <= cj + n; j++) { const k = i + "," + j; keep.add(k); if (!CELLS.has(k)) CELLS.set(k, cellAnimals(i, j)); }
   for (const k of CELLS.keys()) if (!keep.has(k)) CELLS.delete(k);
   for (const L of LIFE) L.act = [];
-  const all = []; for (const k of keep) for (const a of CELLS.get(k)) { a.d = Math.hypot(a.x - P_.x, a.z - P_.z); if (a.d < LR) all.push(a); }
+  const all = []; for (const k of keep) for (const a of CELLS.get(k)) { a.d = Math.hypot(a.x - P_.x, a.z - P_.z); if (a.d < LR && (a.L.sp.at[SITE_KEY].land || (a.floor ?? baseH(a.x, a.z)) < SEA - 0.3)) all.push(a); }   // none stranded by a low tide
   all.sort((a, b) => a.d - b.d); for (const a of all) if (a.L.act.length < a.L.cap) { a.L.act.push(a); ACTIVE.push(a); } }
 // rocks strewn over the bare land: boulders and slabs of weathered bedrock (no soil or plants to hide them)
 const ROCKS = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0x8a7a6a, roughness: 0.95, flatShading: true }), 1600); ROCKS.count = 0; ROCKS.frustumCulled = false; scene.add(ROCKS);

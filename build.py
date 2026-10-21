@@ -340,3 +340,27 @@ CAMB = CAMB[:i0] + """<div id="intro"><div class="card">
 out9 = HERE / "cambrian.html"
 out9.write_text(CAMB.replace("__DATE__", "about 518 million years ago").replace("__THREE__", three).replace("__SCENE__", (HERE / "cambrian.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out9.name}, {out9.stat().st_size // 1024} KB")
+
+
+# ---- the tenth page: a day in the Devonian ------------------------------------------------------
+DEV = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>A day in the Devonian</title>").replace("background:#c8d4d8", "background:#c8d6e0")
+i0, i1 = DEV.index('<div id="intro">'), DEV.index('<button id="vr">')
+DEV = DEV[:i0] + """<div id="intro"><div class="card">
+  <h1>A day in the Devonian</h1>
+  <p>You are a biologist who has travelled back about 380 million years, to the Late Devonian: the Age of Fishes. The first
+  forests are rising along the rivers, Archaeopteris trees up to 25 m tall, though there are still no seeds, flowers or grass and no
+  animals bigger than a scorpion on land. In the water: armoured placoderms, early sharks, lungfish, coelacanths, and the lobe-finned
+  fishes on their way to becoming land animals, like Tiktaalik.</p>
+  <p>You start on the shore of the Miguasha estuary (Quebec). Use 🌍 Travel (T) to go to the Gogo reef (Australia), the rivers of Tiktaalik
+  (Arctic Canada), a Baltic delta (Latvia) or Scotland, or click anywhere on the map. Dive with your scuba gear; press <kbd>E</kbd> by any animal or
+  plant to examine it. The wrist computer shows the air (oxygen ~18%), the date and time, your depth and your air.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; in the water you swim where you look, <kbd>space</kbd> up, <kbd>C</kbd> down &nbsp;&middot;&nbsp;
+  <kbd>shift</kbd> faster &nbsp;&middot;&nbsp; <kbd>&minus;</kbd> <kbd>=</kbd> pace &nbsp;&middot;&nbsp; <kbd>E</kbd> examine &nbsp;&middot;&nbsp; <kbd>F</kbd> fly &nbsp;&middot;&nbsp; <kbd>T</kbd> travel<br>
+  In VR: left stick move, right stick turn (and up / down while swimming), trigger faster, <b>A</b> examine, <b>X</b> pace, <b>Y</b> fly; the computer is on your left wrist</p>
+  <p class="dim">The sites span about ±5 million years around 380 Ma, as noted on arrival. Plants, animals, air and climate follow the scientific literature;
+  colours are unknown and are educated guesses, explained for each species. Click to begin.</p>
+</div></div>
+""" + DEV[i1:]
+out10 = HERE / "devonian.html"
+out10.write_text(DEV.replace("__THREE__", three).replace("__SCENE__", (HERE / "devonian.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out10.name}, {out10.stat().st_size // 1024} KB")
