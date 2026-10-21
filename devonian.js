@@ -139,7 +139,7 @@ function mergeG(parts) { let n = 0; const gs = parts.map(([g, m]) => { const q =
   const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let o = 0; for (const q of gs) { pos.set(q.attributes.position.array, o * 3); nor.set(q.attributes.normal.array, o * 3); o += q.attributes.position.count; }
   const out = new THREE.BufferGeometry(); out.setAttribute("position", new THREE.BufferAttribute(pos, 3)); out.setAttribute("normal", new THREE.BufferAttribute(nor, 3)); return out; }
 const TM = (x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0) => new THREE.Matrix4().compose(V3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), V3(sx, sy, sz));
-const SPH = (w = 8, h = 6) => new THREE.SphereGeometry(1, w, h), CYL = (s = 6) => new THREE.CylinderGeometry(1, 1, 1, s), CONE = (s = 6) => new THREE.ConeGeometry(1, 1, s), BOX = () => new THREE.BoxGeometry(1, 1, 1);
+const SPH = (w = 8, h = 6) => new THREE.SphereGeometry(1, Math.round(w * 1.4), Math.round(h * 1.4)), CYL = (s = 6) => new THREE.CylinderGeometry(1, 1, 1, s + 2), CONE = (s = 6) => new THREE.ConeGeometry(1, 1, s + 2), BOX = () => new THREE.BoxGeometry(1, 1, 1);   // (a little smoother than the Cambrian page)
 const between = (a, b, r, seg = 5) => { const d = b.clone().sub(a), m = new THREE.Matrix4(), q = new THREE.Quaternion().setFromUnitVectors(V3(0, 1, 0), d.clone().normalize()); m.compose(a.clone().add(b).multiplyScalar(0.5), q, V3(r, d.length(), r)); return [CYL(seg), m]; };
 // every template builds an animal pointing along +z (head forward), lying on y = 0 for bottom dwellers
 const BODY = {
@@ -285,14 +285,32 @@ BODY.cladoxylopsid = o => { const H = o.H, P = [[new THREE.CylinderGeometry(H * 
     for (let s = 0; s < 4; s++) { const b = d.clone().multiplyScalar(H * (0.08 + s * 0.04)).add(V3(0, H, 0)); P.push(between(b, b.clone().add(V3(Math.cos(a + 1) * H * 0.04, -H * 0.03, Math.sin(a + 1) * H * 0.04)), H * 0.004, 3)); } }
   return mergeG(P); };
 BODY.lycopsid = o => { const H = o.H, P = [[new THREE.CylinderGeometry(H * 0.03, H * 0.045, H * 0.8, 8), TM(0, H * 0.4, 0)]]; for (const sd of [-1, 1]) { P.push(between(V3(0, H * 0.78, 0), V3(sd * H * 0.12, H * 0.98, 0), H * 0.022, 6)); P.push([SPH(7, 5), TM(sd * H * 0.13, H, 0, H * 0.06, H * 0.08, H * 0.06)]); }
-  for (let k = 0; k < 30; k++) { const y = H * (0.1 + 0.7 * k / 30), a = k * 2.4; P.push([CONE(3), TM(Math.cos(a) * H * 0.04, y, Math.sin(a) * H * 0.04, H * 0.008, H * 0.05, H * 0.008, 0, 0, Math.cos(a) * 1.2)]); } return mergeG(P); };
+  for (let k = 0; k < 12; k++) { const y = H * (0.1 + 0.7 * k / 12), a = k * 2.4; P.push([CONE(1), TM(Math.cos(a) * H * 0.04, y, Math.sin(a) * H * 0.04, H * 0.008, H * 0.05, H * 0.008, 0, 0, Math.cos(a) * 1.2)]); } return mergeG(P); };
+// a clump of leafless, forking green stems (Psilophyton-type early plants)
+BODY.psilophyte = o => { const H = o.H, P = []; const fork = (p, d, len, r, n) => { const q = p.clone().addScaledVector(d, len); P.push(between(p, q, r, 3)); if (n <= 0) return;
+    for (const sd of [-1, 1]) fork(q, d.clone().applyAxisAngle(V3(Math.cos(n * 1.7), 0, Math.sin(n * 1.7)), sd * 0.4).normalize(), len * 0.75, r * 0.8, n - 1); };
+  for (let k = 0; k < 6; k++) { const a = k * 2.4, rr = Math.sqrt(k) * H * 0.1; fork(V3(Math.cos(a) * rr, 0, Math.sin(a) * rr), V3(Math.cos(a) * 0.15, 1, Math.sin(a) * 0.15).normalize(), H * 0.35, H * 0.018, 2); } return mergeG(P); };
+// early fern-like plants: a rosette of arching, divided fronds
+BODY.fern = o => { const H = o.H, P = []; for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; let p = V3(0, 0, 0);
+    for (let s = 0; s < 3; s++) { const t = (s + 1) / 3, q = V3(Math.cos(a) * H * 0.55 * t, H * (0.9 * t - 0.55 * t * t), Math.sin(a) * H * 0.55 * t); P.push(between(p, q, H * 0.012, 2));
+      for (const sd of [-1, 1]) P.push([BOX(), TM((p.x + q.x) / 2 + Math.cos(a + sd * 1.57) * H * 0.05, (p.y + q.y) / 2, (p.z + q.z) / 2 + Math.sin(a + sd * 1.57) * H * 0.05, H * 0.1 * (1 - t * 0.6), H * 0.006, H * 0.03, 0, -a - sd * 1.57, 0)]); p = q; } } return mergeG(P); };
+// a shrubby progymnosperm: a short woody bush of fine branches
+BODY.shrub = o => { const H = o.H, P = []; const grow = (p, d, len, r, n) => { const q = p.clone().addScaledVector(d, len); P.push(between(p, q, r, 4)); if (n <= 0) { P.push([SPH(5, 4), TM(q.x, q.y, q.z, H * 0.07, H * 0.05, H * 0.07)]); return; }
+    for (let k = 0; k < 3; k++) { const a = k * 2.1 + n; grow(q, d.clone().add(V3(Math.cos(a) * 0.6, 0.3, Math.sin(a) * 0.6)).normalize(), len * 0.7, r * 0.7, n - 1); } };
+  grow(V3(0, 0, 0), V3(0, 1, 0), H * 0.35, H * 0.03, 3); return mergeG(P); };
+// moss and liverwort mats: low, cushion-like green patches
+BODY.moss = o => { const H = o.H, P = []; for (let k = 0; k < 6; k++) { const a = k * 2.4, r = Math.sqrt(k) * H * 1.5; P.push([new THREE.SphereGeometry(1, 6, 3, 0, Math.PI * 2, 0, Math.PI / 2), TM(Math.cos(a) * r, 0, Math.sin(a) * r, H * 1.6, H * 0.5, H * 1.4)]); } return mergeG(P); };
+// a fallen Archaeopteris log
+BODY.log = o => { const L = o.L, P = [[new THREE.CylinderGeometry(L * 0.025, L * 0.035, L, 8).rotateZ(Math.PI / 2), TM(0, L * 0.03, 0)]]; for (let k = 0; k < 4; k++) P.push(between(V3(L * (0.1 + k * 0.1) - L / 2, L * 0.03, 0), V3(L * (0.15 + k * 0.1) - L / 2, L * 0.08, L * 0.05 * (k % 2 ? 1 : -1)), L * 0.006, 3)); return mergeG(P); };
+// Prototaxites: a branchless trunk-like organism up to ~8 m, of uncertain kinship (long thought a giant fungus)
+BODY.prototaxites = o => { const H = o.H, P = [[new THREE.CylinderGeometry(H * 0.06, H * 0.08, H, 12), TM(0, H / 2, 0)], [new THREE.SphereGeometry(1, 10, 6), TM(0, H, 0, H * 0.06, H * 0.04, H * 0.06)]]; return mergeG(P); };
 BODY.lowplants = o => { const H = o.H, P = []; for (let k = 0; k < 14; k++) { const a = k * 2.4, r = Math.sqrt(k) * H * 0.12; let p = V3(Math.cos(a) * r, 0, Math.sin(a) * r);
     for (let s = 0; s < 3; s++) { const q = p.clone().add(V3((s - 1) * H * 0.05 * Math.cos(k), H * (0.3 + 0.05 * (k % 3)), (s - 1) * H * 0.05 * Math.sin(k))); P.push(between(p, q, H * 0.02, 3)); p = q; } } return mergeG(P); };
 
 // paint a body: counter-shaded (top colour above, belly colour below), optional bands along the body
 function paint(geo, sp) { const p = geo.attributes.position, n = geo.attributes.normal, col = new Float32Array(p.count * 3), a = new THREE.Color(sp.col), b = new THREE.Color(sp.col2 ?? sp.col), c = new THREE.Color();
   let z0 = 1e9, z1 = -1e9; for (let i = 0; i < p.count; i++) { z0 = Math.min(z0, p.getZ(i)); z1 = Math.max(z1, p.getZ(i)); }
-  const tall = sp.habit === "sessile" && ["sponge", "polyp", "cup", "alga", "archaeo", "bush", "clot", "chancellorid", "frond", "tubes", "stromatoporoid", "tabulate", "horncoral", "crinoid", "archaeopteris", "lycopsid", "cladoxylopsid", "lowplants"].includes(sp.plan);
+  const tall = sp.habit === "sessile" && ["sponge", "polyp", "cup", "alga", "archaeo", "bush", "clot", "chancellorid", "frond", "tubes", "stromatoporoid", "tabulate", "horncoral", "crinoid", "archaeopteris", "lycopsid", "cladoxylopsid", "lowplants", "fern", "psilophyte", "shrub", "moss", "prototaxites"].includes(sp.plan);
   for (let i = 0; i < p.count; i++) { const up = tall ? 0.5 + 0.5 * clampN(p.getY(i) / ((sp.o.H ?? 0.05) * 1.1), 0, 1) : clampN(0.5 + 0.7 * n.getY(i), 0, 1);
     c.copy(b).lerp(a, up); if (sp.bands) { const f = (p.getZ(i) - z0) / Math.max(1e-6, z1 - z0); if (Math.floor(f * 9) % 2) c.multiplyScalar(0.78); }
     col.set([c.r, c.g, c.b], i * 3); }
@@ -413,14 +431,26 @@ const FAUNA = [
 FAUNA.forEach((s, k) => s.k = k * 7.3);
 // the plants
 const FLORA = [
-  { genus: "Archaeopteris", phylum: PT, plan: "archaeopteris", o: { H: 22 }, col: 0x6a9a3e, col2: 0x6a5038, habit: "sessile", dens: 0.45, cap: 3500, biomes: { humid: 1, river: 1.2, plain: 0.2, tidal: 0.05, desert: 0.02, upland: 0.05 }, at: { miguasha: 1, fram: 1, lode: 0.7, scaat: 0.5, gogo: 0.15 },
-    text: "Archaeopteris, the first great tree: up to 24-30 m, with a trunk of conifer-like wood up to 1 m across, but leaves in flat fern-like sprays and spores instead of seeds (a progymnosperm). It formed the first forests." },
-  { genus: "Lycopsid", phylum: PT, plan: "lycopsid", o: { H: 3 }, col: 0x4e6a30, col2: 0x5a5034, habit: "sessile", dens: 2.5, cap: 4000, wet: true, biomes: { tidal: 0.8, humid: 0.6, river: 0.8, plain: 0.1 }, at: { miguasha: 0.6, fram: 1, lode: 1.2, scaat: 0.6, gogo: 0.1 },
-    text: "Small tree lycopsids a few metres tall, their stems covered with spirally arranged small leaves, in the wetlands and deltas; relatives of today's clubmosses and quillworts." },
-  { genus: "Cladoxylopsid", phylum: PT, plan: "cladoxylopsid", o: { H: 8 }, col: 0x5a6a34, col2: 0x6a5a3c, habit: "sessile", dens: 0.12, cap: 600, biomes: { humid: 0.4, river: 0.4 }, at: { miguasha: 1, fram: 1, lode: 1, scaat: 1, gogo: 0.2 },
+  { genus: "Archaeopteris", phylum: PT, plan: "archaeopteris", o: { H: 22 }, col: 0x6a9a3e, col2: 0x6a5038, habit: "sessile", dens: 0.45, cap: 3500, biomes: { humid: 1, river: 1.4, plain: 0.12, tidal: 0.03, desert: 0.01, upland: 0.03 }, at: { miguasha: 1.3, fram: 1, lode: 0.12, scaat: 0.7, gogo: 0.02 },
+    text: "Archaeopteris, the first great tree: up to 24-30 m, with a trunk of conifer-like wood up to 1 m across, but leaves in flat fern-like sprays and spores instead of seeds (a progymnosperm). It formed the first forests, often almost single-species stands along rivers and coasts." },
+  { genus: "Tree lycopsid (Protolepidodendropsis-type)", phylum: PT, plan: "lycopsid", o: { H: 5 }, col: 0x5a7a34, col2: 0x6a5a3a, habit: "sessile", dens: 1.2, cap: 4000, wet: true, biomes: { tidal: 1, humid: 1.4, river: 1.1, plain: 0.5 }, at: { lode: 2.4, fram: 0.4, miguasha: 0.06, scaat: 0.05 },
+    text: "A tree lycopsid a few metres tall, its trunk covered in a pattern of leaf bases and small spiralled leaves, forking near the top. In some equatorial wetlands and deltas (as in the Frasnian lycopsid forests of Svalbard) these, not Archaeopteris, made the forest. Relatives of today's clubmosses and quillworts." },
+  { genus: "Small lycopsids", phylum: PT, plan: "lycopsid", o: { H: 1.6 }, col: 0x4e6a30, col2: 0x5a5034, habit: "sessile", dens: 2, cap: 4000, wet: true, biomes: { tidal: 0.8, humid: 0.5, river: 0.8, plain: 0.1 }, at: { miguasha: 0.6, fram: 1, lode: 1, scaat: 0.5, gogo: 0.05 },
+    text: "Small lycopsids in the wet places: relatives of clubmosses, with stems clothed in tiny leaves." },
+  { genus: "Cladoxylopsid", phylum: PT, plan: "cladoxylopsid", o: { H: 8 }, col: 0x5a6a34, col2: 0x6a5a3c, habit: "sessile", dens: 0.08, cap: 600, biomes: { humid: 0.4, river: 0.4 }, at: { miguasha: 1, fram: 1, lode: 0.5, scaat: 0.6, gogo: 0.1 },
     text: "A cladoxylopsid (like Eospermatopteris/Wattieza): a palm-like tree ~8-10 m with a crown of branchlets and no true leaves; the trees of the oldest forests, declining by now." },
-  { genus: "Low plants", phylum: PT, plan: "lowplants", o: { H: 0.5 }, col: 0x5a7a34, col2: 0x6a6a3a, habit: "sessile", dens: 6, cap: 6000, biomes: { plain: 1, humid: 0.8, river: 0.9, tidal: 0.5, desert: 0.15, upland: 0.25 }, at: { miguasha: 1, fram: 1, lode: 1, scaat: 1, gogo: 0.4 },
-    text: "Low ground cover: early ferns and fern-like plants, relict leafless plants, and mosses and liverworts on damp ground." }];
+  { genus: "Early fern-like plants", phylum: PT, plan: "fern", o: { H: 0.9 }, col: 0x5e8a36, col2: 0x4a6a2a, habit: "sessile", dens: 3, cap: 5000, biomes: { humid: 1, river: 1, plain: 0.25, tidal: 0.2 }, at: { miguasha: 1, fram: 1, lode: 0.6, scaat: 0.6, gogo: 0.1 },
+    text: "Early fern-like plants with divided fronds, growing in the forest shade and on damp ground: relatives of the ferns and horsetails, still primitive." },
+  { genus: "Psilophyton-type plants", phylum: PT, plan: "psilophyte", o: { H: 0.5 }, col: 0x6a8a3a, col2: 0x5a6a30, habit: "sessile", dens: 2.5, cap: 6000, biomes: { plain: 1, tidal: 0.6, river: 0.5, humid: 0.2, desert: 0.25, upland: 0.3 }, at: { miguasha: 0.8, fram: 0.8, lode: 0.6, scaat: 1, gogo: 0.3 },
+    text: "Clumps of leafless, forking green stems: the old style of land plant, from before leaves and trees, now a relict on open ground. No grass existed: this patchy, stemmy cover, with bare soil between, was the 'meadow' of the Devonian." },
+  { genus: "Shrubby progymnosperm", phylum: PT, plan: "shrub", o: { H: 1.5 }, col: 0x5a7a34, col2: 0x5a4a30, habit: "sessile", dens: 0.25, cap: 2000, biomes: { plain: 1, river: 0.5, humid: 0.3, desert: 0.2 }, at: { miguasha: 1, fram: 1, lode: 0.5, scaat: 1, gogo: 0.2 },
+    text: "A small woody shrub (an aneurophyte progymnosperm), relatives of Archaeopteris; they declined sharply during the Frasnian." },
+  { genus: "Mosses and liverworts", phylum: PT, plan: "moss", o: { H: 0.15 }, col: 0x4e7a2e, col2: 0x3e5a24, habit: "sessile", dens: 2, cap: 4000, wet: true, biomes: { humid: 1.2, river: 1.2, tidal: 0.8, plain: 0.2 }, at: { miguasha: 1, fram: 1, lode: 1.2, scaat: 0.5, gogo: 0.2 },
+    text: "Cushions of mosses and liverworts on damp ground: almost certainly everywhere, though they hardly fossilize." },
+  { genus: "Fallen log", phylum: PT, plan: "log", o: { L: 9 }, col: 0x5a4430, col2: 0x4a3828, habit: "sessile", dens: 0.15, cap: 1500, biomes: { humid: 1, river: 1 }, at: { miguasha: 1, fram: 1, lode: 0.3, scaat: 0.6, gogo: 0.05 },
+    text: "A fallen Archaeopteris trunk. Logs of its wood (Callixylon) up to 1.5 m across are found as fossils; decay by fungi, millipedes and other small animals returned it to the soil." },
+  { genus: "Prototaxites", phylum: PT, plan: "prototaxites", o: { H: 7 }, col: 0xb8b0a0, col2: 0x8a8070, habit: "sessile", dens: 0.004, cap: 100, biomes: { plain: 1, river: 0.5, desert: 0.5 }, at: { miguasha: 1, fram: 1, lode: 1, scaat: 1, gogo: 1 },
+    text: "Prototaxites: a branchless trunk-like organism up to ~8 m tall, the tallest living thing on land before trees. Long thought to be a giant fungus; recent work questions even that, so its kinship is uncertain. It was rare by now and soon gone." }];
 function findStart() {   // a beach: dry land a little above the water, with the water within ~200 m; you face it
   for (let r = 0; r < 80000; r += 250) { const n = Math.max(1, Math.round(r / 250 * 6)); for (let q = 0; q < n; q++) { const a = q / n * 6.283, x = r * Math.cos(a), z = r * Math.sin(a), h = baseH(x, z);
       if (h < 0.4 || h > 4) continue; for (let k = 0; k < 16; k++) { const b = k / 16 * 6.283; if (baseH(x + Math.cos(b) * 150, z + Math.sin(b) * 150) < -2 && baseH(x + Math.cos(b) * 60, z + Math.sin(b) * 60) < 0.6) return { x, z, yaw: Math.atan2(-Math.cos(b), -Math.sin(b)) }; } } }
@@ -437,26 +467,26 @@ const SITES = {
     zones: { shoal: ["The estuary shallows", "Brackish, tidal water where a river meets the sea; the bottom is sand and mud. Here Bothriolepis grazes in thousands, Eusthenopteron hunts, and schools of tiny acanthodians shelter."], delta: ["The estuary channel", "The deeper, murkier channel of the estuary."], deep: ["The outer estuary", "Deeper water toward the open sea."] },
     arrival: "You arrive on the bank of a warm tropical estuary, about 380 million years ago, in what will become Quebec. Behind you rise the first forests: Archaeopteris trees up to 25 m tall, conifer-like trunks with fern-like leaves. In the brackish water ahead swim the fish of Miguasha: box-armoured Bothriolepis in thousands, the big lobe-finned predator Eusthenopteron, lungfish, an early coelacanth, schools of spiny acanthodians, and, very rarely, Elpistostege, a fish with finger bones." },
   gogo: { name: "Gogo reef, Western Australia", where: "Kimberley, Western Australia · then the margin of Gondwana, ~30°S", age: "late Givetian-early Frasnian, ~384-382 Ma (a little older)",
-    g: { ox: 120, oz: -80, wetBias: -0.28, carbonate: true, deep: 3, mud: [0.30, 0.30, 0.28], sand: [0.88, 0.85, 0.76], stroma: false, reef: true },
+    g: { ox: 120, oz: -80, wetBias: -0.45, carbonate: true, deep: 3, mud: [0.30, 0.30, 0.28], sand: [0.88, 0.85, 0.76], stroma: false, reef: true },
     water: [0.08, 0.34, 0.46], murk: 0.035, seaT: 24, traces: 0.6, tubes: 0.3, sky: [[0.32, 0.52, 0.86], [0.80, 0.85, 0.88]],
     zones: { shoal: ["The reef and reef flat", "Clear, warm water over the reef: lumpy cream-grey domes of stromatoporoid sponges, finger thickets, crusts of calcified microbes, corals: part of a barrier reef system 1,400 km long."], delta: ["The fore-reef slope", "The reef front drops steeply down a slope of rubble and crinoid meadows into the basin."], deep: ["The Gogo basin", "Hundreds of metres deep and stagnant at the bottom: dead fish sank into black mud and were sealed in stone nodules, preserving even muscles and embryos."] },
     deepNote: "You are over the Gogo basin: its deep water had little or no oxygen at the bottom. The fish lived higher up, near the reef.",
-    arrival: "You arrive on a dry shore of Gondwana (today's Western Australia) beside one of the great barrier reefs of the Devonian, 1,400 km long, built by stromatoporoid sponges and microbes rather than modern corals. In the clear water: armoured placoderms like the 1.5 m predator Eastmanosteus, tusked Onychodus, lungfish, early sharks, coiled ammonoids, and Materpiscis, the oldest known mother. (This site is a little older, ~383 Ma.)" },
+    arrival: "You arrive on a dry, rocky shore of ancient Precambrian rock on the edge of Gondwana (today's Western Australia), almost bare of plants, beside one of the great barrier reefs of the Devonian, 1,400 km long, built by stromatoporoid sponges and microbes rather than modern corals. In the clear water: armoured placoderms like the 1.5 m predator Eastmanosteus, tusked Onychodus, lungfish, early sharks, coiled ammonoids, and Materpiscis, the oldest known mother. (This site is a little older, ~383 Ma.)" },
   fram: { name: "Fram rivers (Tiktaalik), Arctic Canada", where: "Ellesmere Island, Nunavut, Canada · then the north of Euramerica, near the equator", age: "Frasnian, ~375 Ma (loosely dated; a little younger)",
     g: { ox: 300, oz: 40, wetBias: 0.1, carbonate: false, deep: 0.25, mud: [0.38, 0.36, 0.30], sand: [0.60, 0.54, 0.42], stroma: false, reef: false },
     water: [0.18, 0.25, 0.18], murk: 0.13, seaT: 24, traces: 0.6, tubes: 0.2, sky: [[0.32, 0.52, 0.86], [0.80, 0.85, 0.88]],
     zones: { shoal: ["Shallow river channels", "Warm, shallow, fresh water in streams winding across a coastal floodplain: the world of Tiktaalik. (The water here is drawn as broad channels and backwaters.)"], delta: ["The river", "Deeper fresh water in the main channels."], deep: ["Deep channel", "The deepest water of the river system."] },
     arrival: "You arrive on a tropical floodplain in what is now the Canadian Arctic. Streams wind through forests of Archaeopteris and lycopsid wetlands. In the warm shallows lurks Tiktaalik, a 2 m fish with a neck, lungs and wrist-like fins; with it the huge-mouthed ambusher Laccognathus, Holoptychius, Eusthenopteron and armoured Bothriolepis. (This site is a little younger, ~375 Ma.)" },
   lode: { name: "Lode delta, Latvia", where: "Gauja river, Latvia · then the Baltic part of Euramerica, in the tropics", age: "early Frasnian, ~380-383 Ma",
-    g: { ox: -200, oz: 60, wetBias: 0.05, carbonate: false, deep: 0.35, mud: [0.42, 0.40, 0.34], sand: [0.64, 0.58, 0.46], stroma: false, reef: false },
+    g: { ox: -200, oz: 60, wetBias: 0.18, carbonate: false, deep: 0.35, mud: [0.42, 0.40, 0.34], sand: [0.64, 0.58, 0.46], stroma: false, reef: false },
     water: [0.18, 0.26, 0.22], murk: 0.14, seaT: 25, traces: 0.7, tubes: 0.3, sky: [[0.32, 0.52, 0.86], [0.80, 0.85, 0.88]],
     zones: { shoal: ["Tidal delta channels", "Shallow, murky, brackish channels of a delta, littered with plant debris: the home of Panderichthys."] },
-    arrival: "You arrive in a tropical delta of tidal channels on the Baltic coast of Euramerica. In the shallow, murky, plant-strewn water lives Panderichthys, a 1 m flat-headed fish with eyes on top of its head, a step on the way to Tiktaalik; with it porolepiform ambushers and armoured antiarchs." },
+    arrival: "You arrive in a tropical delta of tidal channels on the Baltic coast of Euramerica, its wetlands forested not by Archaeopteris but by tree lycopsids a few metres tall, as in the Frasnian lycopsid forests known from Svalbard. In the shallow, murky, plant-strewn water lives Panderichthys, a 1 m flat-headed fish with eyes on top of its head, a step on the way to Tiktaalik; with it porolepiform ambushers and armoured antiarchs." },
   scaat: { name: "Scaat Craig rivers, Scotland", where: "near Elgin, Scotland · then the Old Red Sandstone continent (Euramerica)", age: "late Frasnian, ~375 Ma (a little younger)",
-    g: { ox: 77, oz: 190, wetBias: -0.12, carbonate: false, deep: 0.2, mud: [0.46, 0.34, 0.28], sand: [0.70, 0.52, 0.40], stroma: false, reef: false },
+    g: { ox: 77, oz: 190, wetBias: -0.32, carbonate: false, deep: 0.2, mud: [0.46, 0.34, 0.28], sand: [0.70, 0.52, 0.40], stroma: false, reef: false },
     water: [0.22, 0.25, 0.18], murk: 0.12, seaT: 24, traces: 0.5, tubes: 0.2, sky: [[0.32, 0.52, 0.86], [0.80, 0.85, 0.88]],
     zones: { shoal: ["River channel", "A sandy, pebbly river channel in the red Old Red Sandstone country."] },
-    arrival: "You arrive by a river on the semi-arid Old Red Sandstone continent, in what will be Scotland: red soils, sparser plants, forests along the water. In the river live armoured Bothriolepis, acanthodians, porolepiforms, and Elginerpeton, one of the first animals with legs, known only from fragments. (This site is a little younger, ~375 Ma.)" } };
+    arrival: "You arrive by a river on the semi-arid Old Red Sandstone continent, in what will be Scotland: red soils and mostly bare ground with patchy low plants, and forest only in ribbons along the rivers. In the river live armoured Bothriolepis, acanthodians, porolepiforms, and Elginerpeton, one of the first animals with legs, known only from fragments. (This site is a little younger, ~375 Ma.)" } };
 let SITE_KEY = "miguasha", SITE = SITES.miguasha;
 let applySite = function (key) { SITE_KEY = key; SITE = SITES[key]; Object.assign(SG, SITE.g);
   ENV.siteLabel = SITE.name; ENV.seaT = SITE.seaT; ENV.murk = SITE.murk; ENV.skyUp = new THREE.Color(...SITE.sky[0]); ENV.skyHor = new THREE.Color(...SITE.sky[1]);
@@ -474,9 +504,10 @@ let floraAt0 = null;
 function refreshFlora() { const ci = Math.floor(P_.x / FCELL), cj = Math.floor(P_.z / FCELL), n = Math.ceil(FRAD / FCELL), cnt = FLIFE.map(() => 0), cells = [];
   for (let i = ci - n; i <= ci + n; i++) for (let j = cj - n; j <= cj + n; j++) { const d = Math.hypot(i - ci, j - cj) * FCELL; if (d <= FRAD) cells.push([d, i, j]); }
   cells.sort((a, b) => a[0] - b[0]);
-  for (const [, i, j] of cells) { const x0 = i * FCELL, z0 = j * FCELL, b = floraAt(x0 + FCELL / 2, z0 + FCELL / 2); if (!b) continue; const r = seeded(i * 6151 + j * 9133 + 77);
-    const patch = 0.4 + 1.2 * fbm(x0 / 220 + 13 + SG.ox, z0 / 220, 3);
-    FLIFE.forEach((F, k) => { const fl = F.fl, w = (fl.biomes[b] ?? 0) * (fl.at?.[SITE_KEY] ?? (fl.at ? 0 : 1)); if (!w) return; let lam = fl.dens * w * patch * FCELL * FCELL / 100, m = Math.floor(lam) + (r() < lam % 1 ? 1 : 0);
+  const NEAR = IS_HEADSET ? 50 : 80;                                                   // small plants only near you (too small to see farther away)
+  for (const [dc, i, j] of cells) { const x0 = i * FCELL, z0 = j * FCELL, b = floraAt(x0 + FCELL / 2, z0 + FCELL / 2); if (!b) continue; const r = seeded(i * 6151 + j * 9133 + 77);
+    const patch = 0.4 + 1.2 * fbm(x0 / 220 + 13 + SG.ox, z0 / 220, 3), gap = sstepN(fbm(x0 / 60 + 4 + SG.ox, z0 / 60, 3), 0.35, 0.6);   // open ground is patchy: bare soil between
+    FLIFE.forEach((F, k) => { const fl = F.fl; if ((fl.o.H ?? 3) < 2 && dc > NEAR) return; const w = (fl.biomes[b] ?? 0) * (fl.at?.[SITE_KEY] ?? (fl.at ? 0 : 1)); if (!w) return; let lam = fl.dens * w * patch * (fl.o.H < 2 && b !== "humid" ? gap : 1) * FCELL * FCELL / 100, m = Math.floor(lam) + (r() < lam % 1 ? 1 : 0);
       while (m-- > 0 && cnt[k] < F.im.instanceMatrix.count) { const x = x0 + r() * FCELL, z = z0 + r() * FCELL, h = baseH(x, z); if (h < SEA + 0.15 && !fl.wet) continue;
         const s = 0.6 + r() * 0.7; O3.position.set(x, h - 0.05, z); O3.rotation.set((r() - 0.5) * 0.08, r() * 6.28, (r() - 0.5) * 0.08); O3.scale.setScalar(s); O3.updateMatrix(); F.im.setMatrixAt(cnt[k]++, O3.matrix); } }); }
   FLIFE.forEach((F, k) => { F.im.count = cnt[k]; F.im.instanceMatrix.needsUpdate = true; }); }
@@ -565,7 +596,7 @@ const DAY_REAL_MIN = 30;                                    // real minutes for 
 let clockH = ENV.startHour;                                  // local solar time, on a day of ENV.dayH hours
 scene.fog = new THREE.FogExp2(0xc8d0d4, IS_HEADSET ? 0.00016 : 0.00011);
 const sun = new THREE.DirectionalLight(0xfff2dc, 2.4); scene.add(sun, sun.target);
-const hemi = new THREE.HemisphereLight(0xc4d4e4, 0x8a7a64, 1.0); scene.add(hemi);
+const hemi = new THREE.HemisphereLight(0xc4d4e4, 0x6a7a4a, 1.0); scene.add(hemi); const fill = new THREE.DirectionalLight(0xbfd4ff, 0.35); fill.position.set(-1, 0.6, -0.4); scene.add(fill);
 const sunDisc = new THREE.Mesh(new THREE.CircleGeometry(420, 24), new THREE.MeshBasicMaterial({ color: 0xfff6e0, fog: false, toneMapped: false })); scene.add(sunDisc);
 const moonDisc = new THREE.Mesh(new THREE.CircleGeometry(420 * ENV.moonScale, 32), new THREE.MeshBasicMaterial({ color: 0xe8e8e0, fog: false, transparent: true })); scene.add(moonDisc);
 // the sea surface, seen from above and from below; murky water under it
