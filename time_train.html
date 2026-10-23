@@ -53540,6 +53540,72 @@ function updateScenes(xT) { for (const ev of EVENTS) { const f = SC[ev[0]]; if (
 function periodFolk(K, x0, r) { for (let k = 0; k < 10; k++) { const x = x0 + r() * TILE, y = yearAt(x), E = era(y); if (!["modern", "postwar", "early20", "railway", "colonial"].includes(E)) continue; const dz = 30 + r() * 120, z = trackZ(x) + dz, gy = terrainH(x, z); if (gy < 0.5) continue;
     const C = COLS(y), n = 1 + Math.floor(r() * 3); for (let q = 0; q < n; q++) person(K, x - x0 + (r() - 0.5) * 4, gy, z + (r() - 0.5) * 4, r() * 6, C[(r() * C.length) | 0]); } }
 
+// ---------- what stands on the timeline lanes: the person, the country's flag, the animal ----------
+const FLAGS = { "United States": [0xb8382a, 0xf0f0f0, 0xb8382a, 0xf0f0f0, 0x2a3a6a], "New York State": [0x2a3a7a, 0xd8b84a], "Province of New York (British)": [0xc8302a, 0xf0f0f0, 0x1a2a6a], "New Netherland (Dutch)": [0xe87a2a, 0xf0f0f0, 0x2a4a9a],
+  "Haudenosaunee Confederacy (c.)": [0x5a2a7a, 0xf0f0f0], "Soviet Union": [0xc8201a, 0xd8b84a], "United Kingdom": [0x1a2a6a, 0xf0f0f0, 0xc8201a], "Kingdom of England": [0xf0f0f0, 0xc8201a], "Qing dynasty": [0xe8c83a, 0x2a5aa8],
+  "Ming dynasty": [0xc8201a, 0xe8c83a], "Mughal Empire": [0x2a7a3a, 0xe8c83a], "Ottoman Empire": [0xc8201a, 0xf0f0f0], "Aztec Empire": [0x2a8a5a, 0xc8201a], "Inca Empire": [0xc8201a, 0xe8a83a, 0xe8e83a, 0x2a8a3a, 0x2a6ac8, 0x7a3a9a],
+  "Mali Empire": [0x2a8a3a, 0xe8c83a, 0xc8201a], "Mongol Empire": [0x2a4ac8, 0xf0f0f0], "Holy Roman Empire": [0xe8c83a, 0x1a1a1a], "Byzantine Empire": [0x7a2a6a, 0xe8c83a], "Abbasid Caliphate": [0x1a1a1a], "Tang dynasty": [0xe8c83a, 0xc8201a],
+  "Roman Empire (West)": [0xa8201a, 0xe8c83a], "Roman Republic": [0xa8201a, 0xe8c83a], "Han dynasty": [0xc8201a, 0x1a1a1a], "Achaemenid Persian Empire": [0xc8a83a, 0x7a2a2a], "Ancient Egypt, dynastic (c.)": [0xe8c83a, 0x2a6ac8, 0xc8201a] };
+const SPECIES_LOOK = { "Woolly mammoth": ["mammoth", 1], "American mastodon": ["mastodon", 1], "Smilodon (sabre-tooth)": ["cat", 1], "Dire wolf": ["wolf", 1], "Giant beaver": ["beaver", 1], "Tyrannosaurus rex": ["theropod", 3.6],
+  "Triceratops": ["triceratops", 1], "Megalodon": ["shark", 1], "Dogs, domesticated (c.)": ["wolf", 0.7] };
+function animal2(K, kind, x, gy, z, ry, s) { const c = Math.cos(ry), sn = Math.sin(ry), at = (a, b) => [x + sn * b + c * a, z + c * b - sn * a];
+  if (kind === "shark") { const [bx, bz] = at(0, 0); K.add("ball", "grey", bx, gy + 3, bz, 3, 3, 16, ry, 0x6a7480); const [fx, fz] = at(0, 1); K.add("box", "grey", fx, gy + 4, fz, 0.3, 3, 3, ry, 0x6a7480); const [tx, tz] = at(0, -8.5); K.add("box", "grey", tx, gy + 1.5, tz, 0.3, 4, 1.5, ry, 0x6a7480); return; }
+  const T = { cat: [1.9, 1.0, 0xb08a54], wolf: [1.5, 0.85, 0x7a6a5a], beaver: [2.2, 0.8, 0x5a3e2a], triceratops: [8, 3, 0x6a6a48] }[kind]; if (!T) { animal(K, kind, x, gy, z, ry, s); return; }
+  const [L, H, col] = [T[0] * s, T[1] * s, T[2]]; const [bx, bz] = at(0, 0); K.add("ball", "hide", bx, gy + H * 0.62, bz, L * 0.5, H * 0.5, L, ry, col);
+  for (const [a, b] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) { const [lx, lz] = at(a * L * 0.17, b * L * 0.32); K.add("box", "hide", lx, gy, lz, L * 0.12, H * 0.5, L * 0.12, ry, col); }
+  const [hx, hz] = at(0, L * 0.55); K.add("ball", "hide", hx, gy + H * 0.7, hz, L * 0.3, H * 0.4, L * 0.32, ry, col);
+  if (kind === "cat") for (const a of [-1, 1]) { const [tx, tz] = at(a * 0.06, L * 0.68); K.add("box", "white", tx, gy + H * 0.35, tz, 0.04, 0.3, 0.05, ry, 0xf0e8d8); }   // the sabre teeth
+  if (kind === "triceratops") { const [fx, fz] = at(0, L * 0.45); K.add("box", "hide", fx, gy + H * 0.9, fz, L * 0.4, H * 0.8, 0.3, ry, 0x7a6a48); for (const a of [-1, 1]) { const [tx, tz] = at(a * 0.5, L * 0.72); K.add("box", "white", tx, gy + H * 0.9, tz, 0.15, 0.15, 1.2, ry, 0xe8dcc0); } }
+  if (kind === "beaver") { const [tx, tz] = at(0, -L * 0.6); K.add("box", "hide", tx, gy + 0.1, tz, L * 0.25, 0.1, L * 0.35, ry, 0x3a2a1e); } }
+function lanePropFor(w, K) { const ry = trackH(w.x) + Math.PI / 2, name = w.it[0];
+  if (w.G === TL.people) { const mid = (w.it[1] + w.it[2]) / 2, C = COLS(Math.min(mid, NOW)); person(K, 0, 0, 0, ry, C[name.length % C.length], 1.25); }
+  else if (w.G === TL.countries) { const cols = FLAGS[name] || [0x4a8ad8, 0xf0f0f0]; K.add("box", "wood", 0, 0, 0, 0.15, 7, 0.15, 0); cols.forEach((c, i) => K.add("box", "wall", 0, 6.4 - (i + 1) * 2.4 / cols.length, 1.4, 0.06, 2.4 / cols.length, 2.6, 0, c)); }
+  else { const L = SPECIES_LOOK[name]; if (L) animal2(K, L[0], 0, 0, 0, ry + 1.2, L[1]); else if (/Homo|Neander|Denisov|Australo|Paranthropus/.test(name)) { for (let k = 0; k < 3; k++) person(K, k * 1.2, 0, k * 0.8, ry, [0x7a5a3a, 0x8a6a4a, 0x6a4a30][k], name.includes("Australo") || name.includes("habilis") ? 0.75 : 0.95); }
+    else if (name.startsWith("Maize")) for (let k = 0; k < 9; k++) K.add("cyl", "leaf", (k % 3), 0, (k / 3 | 0) - 1, 0.25, 2.4, 0.25, 0, 0x5a8a2a); else if (name.startsWith("Gigantopithecus")) person(K, 0, 0, 0, ry, 0x6a4a2a, 1.8); } }
+
+// ---------- inventions: an exhibit on a stone pedestal beside the line at each invention's year ----------
+// [year, name, model]  (years: calendar, negative BCE; deep ones from years before present). Dates are the usual textbook ones; many are approximate.
+const INV = [[2007, "the smartphone", "phone"], [1991, "the World Wide Web", "screen"], [1981, "the personal computer (IBM PC)", "pc"], [1973, "the mobile phone call", "brick"], [1971, "the microprocessor", "chip"], [1960, "the laser", "laser"],
+  [1947, "the transistor", "chip"], [1945, "the electronic computer (ENIAC)", "racks"], [1928, "penicillin", "dish"], [1927, "television", "tv"], [1895, "radio", "radio"], [1886, "the motor car (Benz)", "benz"], [1885, "the safety bicycle", "bike"],
+  [1877, "the phonograph", "phono"], [1876, "the telephone", "phone1876"], [1868, "the typewriter", "typewriter"], [1867, "dynamite", "dynamite"], [1857, "the passenger elevator", "elevator"], [1839, "photography", "camera"], [1837, "the telegraph", "telegraph"],
+  [1804, "the steam locomotive", "loco"], [1796, "vaccination", "dish"], [1793, "the cotton gin", "box"], [1769, "Watt's steam engine", "engine"], [1712, "the steam engine (Newcomen)", "engine"], [1656, "the pendulum clock", "clock"], [1608, "the telescope", "telescope"],
+  [1440, "the printing press with movable type", "press"], [1286, "eyeglasses", "glasses"], [1280, "the mechanical clock (c.)", "clock"], [1088, "the magnetic compass described (China)", "compass"], [850, "gunpowder (c., China)", "dynamite"], [105, "paper (China)", "paper"],
+  [-199, "Roman concrete (c.)", "arch"], [-1199, "ironworking (c.)", "anvil"], [-2999, "bronze (c.)", "anvil"], [-3199, "writing (cuneiform, c.)", "tablet"], [-3499, "the wheel (c.)", "wheel"], [-3999, "the sailing boat (c.)", "sail"], [-6999, "pottery vessels in the Near East (c.)", "pot"],
+  [-8999, "farming tools: sickles and grinding stones (c.)", "sickle"], [NOW - 20000, "pottery (c., China)", "pot"], [NOW - 40000, "the sewing needle (c.)", "needle"], [NOW - 70000, "the bow and arrow (c.)", "bow"], [NOW - 1e6, "the control of fire (c.)", "fire"],
+  [NOW - 3.3e6, "stone tools (Lomekwi, c.)", "stone"]];
+const INV_MODEL = {
+  phone: K => { K.add("box", "wall", 0, 0, 0, 2, 4, 0.3, 0, 0x1a1a1a); K.add("box", "glow", 0, 0.2, 0.16, 1.8, 3.6, 0.02, 0, 0x6a9ad8); }, screen: K => { K.add("box", "wall", 0, 0, 0, 3.4, 2.4, 0.3, 0, 0xd8d8d0); K.add("box", "glow", 0, 0.2, 0.16, 3, 2, 0.02, 0, 0x4a7ad8); },
+  pc: K => { K.add("box", "wall", 0, 0, 0, 3, 0.8, 2.4, 0, 0xd8d0b8); K.add("box", "wall", 0, 0.8, -0.2, 2.6, 2, 2, 0, 0xd8d0b8); K.add("box", "glow", 0, 1.0, 0.82, 2, 1.5, 0.02, 0, 0x2a8a3a); }, brick: K => { K.add("box", "wall", 0, 0, 0, 1, 3.5, 0.8, 0, 0x2a2a2a); K.add("box", "wall", 0.3, 3.5, 0, 0.12, 1.2, 0.12, 0, 0x2a2a2a); },
+  chip: K => { K.add("box", "wall", 0, 0.3, 0, 2.4, 0.3, 2.4, 0, 0x2a2a2a); for (let k = 0; k < 8; k++) for (const e of [-1, 1]) K.add("box", "lead", -1 + k * 0.28, 0, e * 1.3, 0.1, 0.4, 0.3, 0); }, laser: K => { K.add("cyl", "wall", 0, 1, 0, 1, 2.5, 1, 0, 0xc8c8c8); K.add("box", "glow", 0, 2, 0, 0.12, 0.12, 30, 0, 0xff3a2a); },
+  racks: K => { for (let k = 0; k < 4; k++) { K.add("box", "wall", -3 + k * 2, 0, 0, 1.6, 3.4, 0.8, 0, 0x3a3a3a); for (let q = 0; q < 6; q++) K.add("ball", "glow", -3 + k * 2, 0.6 + q * 0.45, 0.42, 0.15, 0.15, 0.05, 0, 0xffb040); } }, dish: K => { K.add("cyl", "glass2", 0, 0, 0, 2.6, 0.4, 2.6, 0, 0xe0f0f0); K.add("cyl", "wall", 0, 0.05, 0, 2.2, 0.2, 2.2, 0, 0xd8d8a0); },
+  tv: K => { K.add("box", "wood", 0, 0, 0, 3, 3, 2.4, 0); K.add("box", "glow", 0, 1.4, 1.22, 1.6, 1.2, 0.02, 0, 0xa0a8b0); }, radio: K => { K.add("box", "wood", 0, 0, 0, 2.4, 3, 1.4, 0); K.add("cyl", "wall", 0, 2, 0.72, 1.2, 0.05, 1.2, 0, 0xc8b88a); },
+  benz: K => { K.add("box", "wood", 0, 1, 0, 1.6, 0.6, 2.6, 0, 0x2a2a2a); for (const [a, b, r] of [[-0.9, -0.8, 1.4], [0.9, -0.8, 1.4], [0, 1.1, 0.9]]) K.add("cyl", "wall", a, r / 2, b, r, 0.12, r, Math.PI / 2, 0x3a3a3a); }, bike: K => { for (const b of [-1, 1]) K.add("cyl", "wall", 0, 0.7, b, 1.4, 0.08, 1.4, Math.PI / 2, 0x2a2a2a); K.add("box", "wall", 0, 1.1, 0, 0.1, 0.1, 2, 0, 0x8a1a1a); },
+  phono: K => { K.add("box", "wood", 0, 0, 0, 1.6, 0.8, 1.6, 0); K.add("cone", "lead", 0.4, 1.4, 0, 2, 2.4, 2, 0); }, phone1876: K => { K.add("box", "wood", 0, 0, 0, 1.4, 2.4, 0.8, 0); K.add("cyl", "lead", 0, 2.4, 0.5, 0.4, 0.8, 0.4, 0, 0x2a2a2a); },
+  typewriter: K => { K.add("box", "wall", 0, 0, 0, 2.6, 1, 2, 0, 0x1a1a1a); for (let k = 0; k < 12; k++) K.add("cyl", "white", -1 + (k % 6) * 0.4, 1, 0.5 - (k / 6 | 0) * 0.4, 0.25, 0.1, 0.25, 0, 0xf0f0f0); K.add("cyl", "wall", 0, 1.4, -0.6, 0.5, 2.4, 0.5, Math.PI / 2, 0x2a2a2a); },
+  dynamite: K => { for (let k = 0; k < 5; k++) K.add("cyl", "wall", -0.8 + k * 0.4, 0, 0, 0.36, 2.4, 0.36, 0, 0xc8302a); K.add("box", "wall", 0, 2.4, 0, 0.05, 1, 0.05, 0, 0xd8c88a); }, elevator: K => { for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) K.add("box", "wood", a, 0, b, 0.2, 6, 0.2, 0); K.add("box", "wood", 0, 2, 0, 1.8, 0.2, 1.8, 0); },
+  camera: K => { K.add("box", "wood", 0, 2, 0, 1.4, 1.4, 2, 0); K.add("cyl", "lead", 0, 2.7, 1.2, 0.6, 0.6, 0.6, Math.PI / 2, 0x3a3a3a); for (const a of [-0.6, 0, 0.6]) K.add("box", "wood", a, 0, 0, 0.08, 2, 0.08, 0); }, telegraph: K => { K.add("box", "wood", 0, 0, 0, 2.4, 0.3, 1.2, 0); K.add("box", "lead", 0.4, 0.3, 0, 1.2, 0.15, 0.2, 0); K.add("cyl", "wall", -0.6, 0.3, 0, 0.5, 0.8, 0.5, 0, 0x8a5a2a); },
+  loco: K => { K.add("cyl", "wall", 0, 1.2, 0, 1.6, 1.6, 4, Math.PI / 2, 0x2a2a2a); K.add("cyl", "wall", 0, 2, 1.6, 0.4, 2.4, 0.4, 0, 0x2a2a2a); K.add("box", "wood", 0, 0.4, -2.4, 1.6, 2, 1.4, 0); }, box: K => { K.add("box", "wood", 0, 0, 0, 2.4, 1.8, 1.6, 0); K.add("cyl", "lead", 0, 1, 0.8, 0.6, 2.4, 0.6, Math.PI / 2, 0x6a6a6a); },
+  engine: K => { K.add("cyl", "wall", 0, 0, 0, 1.6, 3, 1.6, 0, 0x8a3a2a); K.add("box", "wood", 2, 3.8, 0, 6, 0.4, 0.4, 0); K.add("box", "wall", 4.6, 0, 0, 0.3, 4, 0.3, 0, 0x5a5a5a); K.add("cyl", "wall", -2, 0, 0, 1.2, 8, 1.2, 0, 0x9a5a48); },
+  clock: K => { K.add("box", "wood", 0, 0, 0, 1.4, 5, 0.8, 0); K.add("cyl", "white", 0, 4, 0.42, 1.1, 0.05, 1.1, Math.PI / 2, 0xf0ece0); K.add("box", "lead", 0, 1.2, 0.42, 0.06, 2.2, 0.06, 0, 0xc8a83a); }, telescope: K => { for (const a of [-0.5, 0.5]) K.add("box", "wood", a, 0, 0, 0.08, 2, 0.08, 0); K.add("cyl", "wood", 0, 2.2, 0, 0.35, 4, 0.35, 1.0, 0x6a4a2c); },
+  press: K => { K.add("box", "wood", -1, 0, 0, 0.4, 5, 0.4, 0); K.add("box", "wood", 1, 0, 0, 0.4, 5, 0.4, 0); K.add("box", "wood", 0, 4.6, 0, 2.4, 0.4, 0.6, 0); K.add("box", "wood", 0, 1.8, 0, 2, 0.4, 1.8, 0); K.add("cyl", "wood", 0, 2.2, 0, 0.2, 2.4, 0.2, 0); K.add("box", "white", 0, 1.2, 1.2, 1.4, 0.05, 1, 0, 0xf0ece0); },
+  glasses: K => { for (const a of [-0.7, 0.7]) K.add("cyl", "glass2", a, 1.5, 0, 1.1, 0.1, 1.1, Math.PI / 2, 0xd8e8f0); K.add("box", "lead", 0, 1.5, 0, 0.4, 0.08, 0.08, 0); }, compass: K => { K.add("cyl", "wood", 0, 0, 0, 2.2, 0.4, 2.2, 0); K.add("box", "wall", 0, 0.45, 0, 0.1, 0.06, 1.8, 0.5, 0xc8201a); },
+  paper: K => { for (let k = 0; k < 6; k++) K.add("box", "white", (k % 2) * 0.1, k * 0.05, 0, 2, 0.04, 2.6, k * 0.05, 0xf0e8d0); }, arch: K => { for (const e of [-1, 1]) K.add("box", "wall", e * 1.6, 0, 0, 0.8, 2.6, 1, 0, 0xc8c0b0); K.add("box", "wall", 0, 2.6, 0, 4, 0.8, 1, 0, 0xc8c0b0); },
+  anvil: K => { K.add("box", "lead", 0, 0, 0, 1.2, 1, 0.8, 0, 0x3a3a3a); K.add("box", "lead", 0.2, 1, 0, 2.2, 0.5, 0.8, 0, 0x3a3a3a); }, tablet: K => { K.add("box", "wall", 0, 0, 0, 2, 2.6, 0.5, 0, 0xb8906a); for (let k = 0; k < 5; k++) K.add("box", "wall", 0, 0.4 + k * 0.45, 0.26, 1.6, 0.06, 0.02, 0, 0x6a4a30); },
+  wheel: K => { K.add("cyl", "wood", 0, 1.6, 0, 3.2, 0.3, 3.2, Math.PI / 2, 0x7a5a3a); K.add("box", "wood", 0, 1.6, 0, 0.3, 3, 0.35, 0); }, sail: K => { K.add("box", "wood", 0, 0, 0, 1.2, 0.6, 4, 0); K.add("box", "wood", 0, 0, 0, 0.12, 4, 0.12, 0); K.add("box", "white", 0, 1.4, 0.1, 0.05, 2.4, 2, 0, 0xe8dcc0); },
+  pot: K => { K.add("ball", "wall", 0, 1.1, 0, 1.6, 2, 1.6, 0, 0xa8603a); K.add("cyl", "wall", 0, 1.9, 0, 1, 0.5, 1, 0, 0xa8603a); }, sickle: K => { K.add("box", "wood", 0, 0, 0, 0.15, 1.2, 0.15, 0); K.add("box", "white", 0.5, 1.2, 0, 1.2, 0.15, 0.05, 0.3, 0xd8d0c0); K.add("box", "wall", 1.6, 0, 0, 1.6, 0.4, 1, 0, 0x8a8478); },
+  needle: K => { K.add("box", "white", 0, 0.5, 0, 0.12, 3.4, 0.12, 0.2, 0xe8dcc8); }, bow: K => { K.add("box", "wood", 0, 0, 0, 0.12, 3.4, 0.12, 0); K.add("box", "white", 0.6, 0, 0, 0.02, 3.4, 0.02, 0, 0xe8e0d0); K.add("box", "wood", 0.3, 1.7, 0, 2.4, 0.06, 0.06, 0); },
+  fire: K => { for (let k = 0; k < 5; k++) K.add("box", "wood", 0, 0.1, 0, 0.2, 0.2, 2.2, k * 0.6, 0x5a3a24); K.add("cone", "glow", 0, 0.2, 0, 1.2, 2.2, 1.2, 0, 0xff8a2a); K.add("cone", "glow", 0, 0.2, 0, 0.6, 1.4, 0.6, 0, 0xffe07a); },
+  stone: K => { K.add("ball", "grey", 0, 0.7, 0, 1.8, 1.2, 1.2, 0.4, 0x8a8478); } };
+const INVOBJ = new Map();
+function updateInventions(xT) { for (const iv of INV) { const ex = xOfYear(iv[0]), d = ex - xT, on = d > -900 && d < 1800, has = INVOBJ.has(iv[0]);
+    if (on && !has) { const K = new Kit(), dz = 46, z = trackZ(ex) + dz, gy = Math.max(terrainH(ex, z), 0.3), ry = trackH(ex) - Math.PI / 2;
+      K.add("box", "wall", 0, -0.5, 0, 6, 2.0, 6, 0, 0xc8c0b0); const MK = new Kit(); (INV_MODEL[iv[2]] || INV_MODEL.box)(MK); const g = new THREE.Group(), base = K.build(); g.add(base); const mg = MK.build(); mg.position.y = 1.5; mg.rotation.y = ry; mg.scale.setScalar(1.6); g.add(mg);
+      const c = document.createElement("canvas"); c.width = 512; c.height = 160; const cg = c.getContext("2d"); cg.fillStyle = "#1a1a1a"; cg.fillRect(0, 0, 512, 160); cg.strokeStyle = "#c8a24a"; cg.lineWidth = 6; cg.strokeRect(4, 4, 504, 152);
+      cg.fillStyle = "#f0d890"; cg.font = "700 40px Georgia, serif"; cg.fillText(fmtYear(iv[0]), 20, 54); cg.fillStyle = "#f0ece0"; let fs = 36; do { cg.font = `${fs}px Georgia, serif`; } while (cg.measureText(iv[1]).width > 470 && --fs > 18); cg.fillText(iv[1], 20, 116);
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const plq = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 1.75), new THREE.MeshBasicMaterial({ map: t, toneMapped: false })); plq.position.set(0, 0.6, 0); plq.rotation.y = ry; plq.translateZ(3.02); g.add(plq);
+      INVOBJ.set(iv[0], anchor(g, ex, gy, z)); }
+    else if (!on && has) { const g = INVOBJ.get(iv[0]); unanchor(g); g.traverse(o => { if (o.isInstancedMesh) o.dispose(); if (o.material?.map) o.material.map.dispose(); }); INVOBJ.delete(iv[0]); } } }
+
 // ---------- timelines: lanes on the river side of the line, a band for each life, country and species, from its start year to its end ----------
 // Years are calendar years (negative = BCE, astronomically: -43 is 44 BCE); species are given in years before present. Dates are the usual
 // published ones; "c." ones are approximate. Lanes are assigned so overlapping bands sit side by side.
@@ -53568,7 +53634,7 @@ const fmtRange = (a, b) => { const ongoing = b >= NOW - 0.5, ba = BP(a); if (ba 
 for (const k in TL) { const lanes = []; TL[k].items.sort((p, q) => q[2] - p[2]).forEach(it => { const x0 = xOfYear(it[2]), x1 = xOfYear(it[1]); let L = lanes.findIndex(e => e < x0 - 60); if (L < 0) { L = lanes.length; lanes.push(0); } lanes[L] = x1; it.lane = L; it.x0 = x0; it.x1 = x1; }); TL[k].nl = lanes.length; }
 const TLIM = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), new THREE.MeshBasicMaterial({ toneMapped: false }), 7000); TLIM.count = 0; TLIM.frustumCulled = false; WORLD.add(TLIM);
 const TLAB = []; for (let k = 0; k < 40; k++) { const c = document.createElement("canvas"); c.width = 768; c.height = 128; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(20, 3.4), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, toneMapped: false })); m.rotation.x = -0.6; const g = new THREE.Group(); g.add(m); WORLD.add(g); TLAB.push({ g, c, t, key: null }); }
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(20, 3.4), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, toneMapped: false })); m.rotation.x = -0.6; const g = new THREE.Group(); g.add(m); WORLD.add(g); TLAB.push({ g, c, t, key: null, prop: null }); }
 function updateTimelines(xT) { const lo = xT - 700, hi = xT + 1400; let n = 0; const want = [];
   for (const k in TL) { const G = TL[k], laneW = Math.min(4.5, 36 / Math.max(1, G.nl)); _lc.setHex(G.col);
     for (const it of G.items) { if (it.x1 < lo || it.x0 > hi) continue; const dz = G.dz0 - it.lane * laneW, a = Math.max(it.x0, lo), b = Math.min(it.x1, hi);
@@ -53578,11 +53644,12 @@ function updateTimelines(xT) { const lo = xT - 700, hi = xT + 1400; let n = 0; c
       if (it.x1 - it.x0 < 160 && it.x0 > lo && it.x0 < hi) want.push({ key: it[0] + "@s", x: (it.x0 + it.x1) / 2, dz, it, G }); } }
   TLIM.count = n; TLIM.instanceMatrix.needsUpdate = true; if (TLIM.instanceColor) TLIM.instanceColor.needsUpdate = true;
   want.sort((p, q) => Math.abs(p.x - xT) - Math.abs(q.x - xT)); const keep = new Set(want.slice(0, TLAB.length).map(w => w.key));
-  for (const L of TLAB) if (L.key && !keep.has(L.key)) L.key = null;
+  for (const L of TLAB) if (L.key && !keep.has(L.key)) { L.key = null; if (L.prop) { WORLD.remove(L.prop); L.prop.traverse(o => o.isInstancedMesh && o.dispose()); L.prop = null; } }
   for (const w of want.slice(0, TLAB.length)) { let L = TLAB.find(L => L.key === w.key); if (!L) { L = TLAB.find(L => !L.key); if (!L) continue; L.key = w.key; const g = L.c.getContext("2d"); g.clearRect(0, 0, 768, 128);
       g.font = "700 48px Helvetica, Arial, sans-serif"; g.lineWidth = 8; g.strokeStyle = "rgba(0,0,0,.45)"; const s1 = w.it[0], s2 = fmtRange(w.it[1], w.it[2]); g.strokeText(s1, 12, 54); g.fillStyle = w.G.css; g.fillText(s1, 12, 54);
-      g.font = "600 36px Helvetica, Arial, sans-serif"; g.strokeText(s2, 12, 108); g.fillStyle = "#ffffff"; g.fillText(s2, 12, 108); L.t.needsUpdate = true; }
-    const z = trackZ(w.x) + w.dz + 1.5, h = Math.max(terrainH(w.x, z), 0.2); L.g.position.set(w.x - ORIGIN.x, h + 1.8, z - ORIGIN.z); L.g.rotation.y = trackH(w.x) + Math.PI / 2; }
+      g.font = "600 36px Helvetica, Arial, sans-serif"; g.strokeText(s2, 12, 108); g.fillStyle = "#ffffff"; g.fillText(s2, 12, 108); L.t.needsUpdate = true;
+      const K = new Kit(); lanePropFor(w, K); L.prop = K.build(); WORLD.add(L.prop); }
+    const z = trackZ(w.x) + w.dz + 1.5, h = Math.max(terrainH(w.x, z), 0.2); L.g.position.set(w.x - ORIGIN.x, h + 1.8, z - ORIGIN.z); L.g.rotation.y = trackH(w.x) + Math.PI / 2; if (L.prop) { const px = w.x + 8, pz = trackZ(px) + w.dz; L.prop.position.set(px - ORIGIN.x, Math.max(terrainH(px, pz), 0.2), pz - ORIGIN.z); } }
   for (const L of TLAB) L.g.visible = !!L.key; }
 EVENTS.push([1681, "The last dodos die on Mauritius."], [1768, "The last Steller's sea cows are killed."], [1914, "Martha, the last passenger pigeon, dies; billions once flew over this valley."], [1936, "The last thylacine (Tasmanian tiger) dies."]);
 
@@ -53592,6 +53659,11 @@ let trainX = 0, started = false, running = true, sleeping = false;
 const keys = {}; let yaw = Math.PI / 2 - 0.15, pitch = -0.02, dragging = false;
 const P_ = { x: 1.0, z: carZ(3) + 3 };
 const intro = document.getElementById("intro");
+// posture for VR, chosen on the start card: sitting lifts your view to a standing eye height (remembered)
+let SITTING = localStorage.getItem("vrPosture") === "sitting";
+{ const card = intro?.querySelector(".card"), row = document.createElement("p"); row.innerHTML = 'In VR, are you <button data-p="standing">🧍 standing</button> or <button data-p="sitting">🪑 sitting</button>?';
+  const paint = () => row.querySelectorAll("button").forEach(b => { b.style.cssText = "font:600 14px -apple-system,sans-serif;padding:6px 12px;margin:0 4px;border-radius:8px;cursor:pointer;border:2px solid #1d4e66;" + ((b.dataset.p === "sitting") === SITTING ? "background:#1d4e66;color:#fff" : "background:#fff;color:#1d4e66"); });
+  row.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); SITTING = b.dataset.p === "sitting"; localStorage.setItem("vrPosture", b.dataset.p); paint(); }); paint(); card?.insertBefore(row, card.lastElementChild); }
 const HUD = document.createElement("div"); HUD.style.cssText = "position:fixed;left:14px;top:12px;z-index:2;background:rgba(12,22,32,.78);color:#e8eef4;padding:10px 14px;border-radius:10px;font:13.5px/1.55 -apple-system,Helvetica,sans-serif;max-width:640px";
 const BIG = document.createElement("div"); BIG.style.cssText = "position:fixed;right:18px;top:12px;z-index:2;background:rgba(12,22,32,.78);color:#f0d890;padding:8px 16px;border-radius:10px;font:700 34px/1.1 Helvetica,Arial,sans-serif;text-align:right";
 const MSG = document.createElement("div"); MSG.style.cssText = "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:2;background:rgba(12,22,32,.88);color:#e8eef4;padding:12px 18px;border-radius:12px;font:15px/1.5 -apple-system,Helvetica,sans-serif;max-width:780px;display:none";
@@ -53644,8 +53716,8 @@ function frame() {
     if (keys.ArrowLeft) yaw += 1.6 * dt; if (keys.ArrowRight) yaw -= 1.6 * dt; }
   fwd.y = 0; fwd.normalize(); side.set(-fwd.z, 0, fwd.x);
   if (mx || my) { const sp = 1.3 * run * dt, nx = P_.x + (fwd.x * -my + side.x * mx) * sp, nz = P_.z + (fwd.z * -my + side.z * mx) * sp; if (walkable(nx, nz)) { P_.x = nx; P_.z = nz; } else if (walkable(nx, P_.z)) P_.x = nx; else if (walkable(P_.x, nz)) P_.z = nz; }
-  rig.position.set(P_.x, 0, P_.z);
-  updateGround(trainX, tz); streamTiles(trainX); updateSigns(trainX); updateBoards(trainX); updateLines(trainX); updateScenes(trainX);
+  rig.position.set(P_.x, vr && SITTING ? 0.45 : 0, P_.z);
+  updateGround(trainX, tz); streamTiles(trainX); updateSigns(trainX); updateBoards(trainX); updateLines(trainX); updateScenes(trainX); updateInventions(trainX);
   // a summer afternoon's light; the sky a little colder in the ice ages
   const S = sunDir(15.5, 42), ice = iceThick(yearAt(trainX)) / 1100; sun.position.copy(S.v).multiplyScalar(800); sun.intensity = 2.4; hemi.intensity = 1.05;
   const upC = new THREE.Color(0.32, 0.52, 0.84).lerp(new THREE.Color(0.55, 0.65, 0.8), ice * 0.4), hor = new THREE.Color(0.80, 0.85, 0.88).lerp(new THREE.Color(0.9, 0.93, 0.96), ice * 0.5);
