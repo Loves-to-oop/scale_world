@@ -53383,6 +53383,7 @@ function genTile(ti) { const r = seeded(ti * 7919 + 11), x0 = ti * TILE, K = new
   // the rails, from when the Hudson River Railroad opened (1851) to now; before that the train runs on nothing anyone can see
   for (let k = 0; k < TILE; k += 2.5) { const x = x0 + k, y = yearAt(x); if (y < 1851 || y > NOW + 40) continue; const z = trackZ(x), gy = trackE(x) - 0.6, ry = trackH(x); K.add("box", "tie", X(x), gy, ZZ(z), 2.6, 0.16, 0.25, ry + Math.PI / 2);
     if (k % 10 === 0) for (const e of [-0.72, 0.72]) K.add("box", "rail", X(x) + Math.sin(ry + Math.PI / 2) * e, gy + 0.16, ZZ(z) + Math.cos(ry + Math.PI / 2) * e, 0.08, 0.15, 10.1, ry); }
+  periodFolk(K, x0, r);
   return anchor(K.build(), x0, 0, 0); }
 function streamTiles(x) { const ci = Math.floor(x / TILE); let made = 0;
   for (let d = 0; d <= TR; d++) for (const i of d ? [ci + d, ci - d] : [ci]) { if (!TILES.has(i) && made < 2) { TILES.set(i, genTile(i)); made++; } }
@@ -53391,14 +53392,14 @@ function streamTiles(x) { const ci = Math.floor(x / TILE); let made = 0;
 // ---------- a sign at every year, and boards for events ----------
 // Signs stand on the right of the line, one every 25 m (one a second). Boards mark events (world and local history), placed at their year.
 const signLabel = y => { const b = Math.round(BP(y)), r = Math.round(y); if (y > NOW + 0.5) return [String(r), "the future"]; if (b >= 10000) return [b.toLocaleString(), "years ago"]; return r > 0 ? [String(r), r < 1000 ? "CE" : ""] : [String(1 - r), "BCE"]; };
-const SIGNS = []; const NSIGN = IS_HEADSET ? 50 : 80;
+const SIGNS = []; const NSIGN = 12;   // a big sign every 10 years (the lines on the ground mark every year)
 for (let k = 0; k < NSIGN; k++) { const c = document.createElement("canvas"); c.width = 256; c.height = 128; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  const g = new THREE.Group(), b = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.3), new THREE.MeshBasicMaterial({ map: t, toneMapped: false })); b.position.y = 3.2; g.add(b); const bk = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.3), M(0x5a5a5a)); bk.rotation.y = Math.PI; bk.position.y = 3.2; g.add(bk);
+  const g = new THREE.Group(); g.scale.setScalar(1.8); const b = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.3), new THREE.MeshBasicMaterial({ map: t, toneMapped: false })); b.position.y = 3.2; g.add(b); const bk = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.3), M(0x5a5a5a)); bk.rotation.y = Math.PI; bk.position.y = 3.2; g.add(bk);
   const p = new THREE.Mesh(new THREE.BoxGeometry(0.12, 3.2, 0.12).translate(0, 1.6, 0), M(0x5a5a5a)); g.add(p); WORLD.add(g); SIGNS.push({ g, c, t, b, year: null, x: 0 }); }
 function drawSign(S, y) { const g = S.c.getContext("2d"), [a, b] = signLabel(y); g.fillStyle = "#123a2a"; g.fillRect(0, 0, 256, 128); g.strokeStyle = "#f0e8d0"; g.lineWidth = 6; g.strokeRect(5, 5, 246, 118);
   g.fillStyle = "#f8f4e8"; g.textAlign = "center"; let fs = 70; do { g.font = `700 ${fs}px Helvetica, Arial, sans-serif`; } while (g.measureText(a).width > 230 && --fs > 20); g.fillText(a, 128, b ? 78 : 88); if (b) { g.font = "600 24px Helvetica, Arial, sans-serif"; g.fillText(b, 128, 112); } S.t.needsUpdate = true; }
-function updateSigns(xT) { const yT = yearAt(xT), y0 = Math.ceil(yT + NSIGN * 0.25), want = new Set(); for (let k = 0; k < NSIGN; k++) want.add(y0 - k);
-  const free = SIGNS.filter(S => !want.has(S.year)); for (const y of want) { if (SIGNS.some(S => S.year === y)) continue; const S = free.pop(); if (!S) break; S.year = y; drawSign(S, y); S.x = xOfYear(y); }
+function updateSigns(xT) { const yT = yearAt(xT), y0 = Math.ceil((yT + 40) / 10) * 10, want = new Set(); for (let k = 0; k < NSIGN; k++) want.add(y0 - k * 10);
+  const free = SIGNS.filter(S => !want.has(S.year)); for (const y of want) { if (SIGNS.some(S => S.year === y)) continue; const S = free.pop(); if (!S) break; S.year = y; drawSign(S, y); S.x = xOfYear(y) - 6; }
   for (const S of SIGNS) { if (S.year === null) continue; const z = trackZ(S.x) + 7, gy = Math.max(terrainH(S.x, z), trackE(S.x) - 0.6); S.g.position.set(S.x - ORIGIN.x, gy, z - ORIGIN.z); S.g.rotation.y = trackH(S.x) - Math.PI / 2; } }   // facing the line
 // events: [year, text]  (negative years are BCE: -2559 is 2560 BCE; deep-time entries use years before present)
 const EVENTS = [[2026, "You board the train. Every second from now is a year further back."], [2020, "The COVID-19 pandemic spreads worldwide."], [2012, "The rover Curiosity lands on Mars."], [2008, "A global financial crisis."],
@@ -53446,6 +53447,141 @@ function drawItinerary(xT) { for (const [C, W, H, big] of [[ITC, 512, 768, false
       y += big ? 34 : 24; } }
   itT.needsUpdate = true; mapT.needsUpdate = true; }
 
+// ---------- yard lines: a painted line across the land at every year (thicker every 5), numbers on the ground every 5 years ----------
+const LINE_IM = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), 5000);
+LINE_IM.count = 0; LINE_IM.frustumCulled = false; WORLD.add(LINE_IM);
+const NUMS = []; for (let k = 0; k < 14; k++) { const c = document.createElement("canvas"); c.width = 512; c.height = 200; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(14, 5.5), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, toneMapped: false })); m.rotation.x = -(Math.PI / 2 - 0.3);
+  const g = new THREE.Group(); g.add(m); WORLD.add(g); NUMS.push({ g, c, t, year: null }); }
+let linesAt = null; const _lc = new THREE.Color();
+function updateLines(xT) { const yT = yearAt(xT), yr = Math.round(yT); if (linesAt === yr) return; linesAt = yr; let n = 0;
+  for (let y = yr + 24; y >= yr - 60; y--) { const x = xOfYear(y), ry = trackH(x), five = y % 5 === 0, ten = y % 10 === 0, w = ten ? 1.4 : five ? 0.9 : 0.4; _lc.setHex(ten ? 0xffe27a : 0xffffff);
+    for (let dz = -RIVER0 + 15; dz < 280 && n < 5000; dz += 4) { if (Math.abs(dz) < 5) continue; const z = trackZ(x) + dz, h = terrainH(x, z); if (h < 0.3) continue;
+      O3.position.set(x - ORIGIN.x, h + 0.04, z - ORIGIN.z); O3.rotation.set(0, ry, 0); O3.scale.set(4.2, 0.06, w); O3.updateMatrix(); LINE_IM.setMatrixAt(n, O3.matrix); LINE_IM.setColorAt(n, _lc); n++; } }
+  LINE_IM.count = n; LINE_IM.instanceMatrix.needsUpdate = true; if (LINE_IM.instanceColor) LINE_IM.instanceColor.needsUpdate = true;
+  const want = []; for (let y = Math.floor((yr + 25) / 5) * 5; y >= yr - 60; y -= 5) want.push(y);
+  for (const N of NUMS) if (!want.includes(N.year)) N.year = null;
+  for (const y of want) { if (NUMS.some(N => N.year === y)) continue; const N = NUMS.find(N => N.year === null); if (!N) break; N.year = y; const g = N.c.getContext("2d"), [a, b] = signLabel(y);
+    g.clearRect(0, 0, 512, 200); g.textAlign = "center"; let fs = 150; do { g.font = `800 ${fs}px Helvetica, Arial, sans-serif`; } while (g.measureText(a).width > 490 && --fs > 30);
+    g.lineWidth = 10; g.strokeStyle = "rgba(0,0,0,.35)"; g.strokeText(a, 256, 150); g.fillStyle = y % 10 === 0 ? "#ffe27a" : "#ffffff"; g.fillText(a, 256, 150); if (b) { g.font = "700 40px Helvetica"; g.fillText(b, 256, 195); } N.t.needsUpdate = true; }
+  for (const N of NUMS) { N.g.visible = N.year !== null; if (!N.g.visible) continue; const x = xOfYear(N.year) + 9, z = trackZ(x) + 22, h = Math.max(terrainH(x, z), 0.2);
+    N.g.position.set(x - ORIGIN.x, h + 1.0, z - ORIGIN.z); N.g.rotation.y = trackH(x) - Math.PI / 2; }
+  updateTimelines(xT); }
+function relineAfterRecentre() { linesAt = null; }
+
+// ---------- event scenes: people and things of each event, standing at its year ----------
+KM.glow = new THREE.MeshBasicMaterial({ toneMapped: false }); KM.glass2 = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.3 });
+const COLS = y => y > 1990 ? [0x2a4a8a, 0xb8382a, 0x3a3a3a, 0xe8e8e4, 0x6a8a3a, 0xd8a83a] : y > 1945 ? [0x3a5a8a, 0x8a3a3a, 0xc8b88a, 0x5a6a4a, 0xe8dcc0] : y > 1900 ? [0x3a3a3e, 0x5a4a3a, 0x6a6a6a, 0x2a2a3a, 0xc8bca0] :
+  y > 1750 ? [0x2a2a3a, 0x5a3a2a, 0x8a2e24, 0xe8e0d0, 0x3a4a6a] : y > 1500 ? [0x5a3a2a, 0x2a2a2a, 0x8a6a4a, 0xa83a2a, 0xe8e0d0] : [0x8a6a4a, 0x6a4a30, 0xa88a6a, 0xc8a878];
+function crowd(K, P, along, dz, n, r, y, face = 0, col) { const R = seeded(Math.round(along * 31 + dz * 7 + n)); const C = col ? [col] : COLS(y);
+  for (let k = 0; k < n; k++) { const [x, gy, z, ry] = P(along + (R() - 0.5) * r * 2, dz + (R() - 0.5) * r); person(K, x, gy, z, ry + face + (R() - 0.5) * 0.6, C[(R() * C.length) | 0]); } }
+function ranks(K, P, along, dz, rows, cols, col, y) { for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) { const [x, gy, z, ry] = P(along + j * 1.6, dz + i * 1.6); person(K, x, gy, z, ry, col); K.add("box", "wood", x + 0.3, gy + 0.9, z, 0.06, 1.4, 0.06, 0); } }
+function flag(K, P, along, dz, cols, h = 8) { const [x, gy, z, ry] = P(along, dz); K.add("box", "wood", x, gy, z, 0.12, h, 0.12, 0); cols.forEach((c, i) => K.add("box", "wall", x + Math.sin(ry) * 0, gy + h - 0.6 - i * 0.5, z + 1.2, 0.05, 0.5, 2.2, ry, c)); }
+function shipHull(K, x, gy, z, ry, L, W, H, col) { K.add("box", "wall", x, gy - H * 0.5, z, W, H, L, ry, col); }
+const SC = {
+  2020: (K, P, y) => { crowd(K, P, 0, 30, 14, 14, y); for (let k = 0; k < 14; k++) {} },
+  2012: (K, P, y) => { const [x, gy, z, ry] = P(0, 45); K.add("box", "wall", x, gy + 2, z, 0.6, 7, 12, ry, 0x1a1a1a); K.add("box", "glow", x - 0.4 * Math.sin(ry + Math.PI / 2), gy + 2.5, z, 0.1, 6, 11, ry, 0xc8603a); crowd(K, P, 0, 28, 20, 8, y, Math.PI); },   // Mars on a big screen
+  2007: (K, P, y) => crowd(K, P, 0, 25, 16, 10, y),
+  2001: (K, P, y) => { for (const a of [-12, 12]) { const [x, gy, z] = P(a, 120); K.add("box", "glow", x, gy, z, 6, 1500, 6, 0, 0x9ab8ff); } crowd(K, P, 0, 30, 24, 10, y, Math.PI, 0x3a3a3a); },   // two beams of light in memory
+  1998: (K, P) => { const [x, gy, z, ry] = P(0, 200); K.add("box", "wall", x, gy + 300, z, 4, 4, 70, ry, 0xe8e8e8); for (const e of [-1, 1]) K.add("box", "glow", x, gy + 300, z + e * 30, 30, 0.3, 12, ry + Math.PI / 2, 0x6a7aa8); },   // the space station overhead
+  1989: (K, P, y) => { const [x, gy, z, ry] = P(0, 40); K.add("box", "wall", x, gy, z, 1.2, 3.6, 40, ry, 0xd8d0c0); for (let k = 0; k < 8; k++) { const [px, pg, pz] = P(-17 + k * 5, 40); K.add("box", "wall", px - 0.62 * Math.sin(ry + Math.PI / 2), pg + 0.5, pz, 0.05, 2, 3, ry, [0xd83a3a, 0x3a8ad8, 0xe8c83a, 0x3ab85a][k % 4]); person(K, px, pg + 3.6, pz, ry, COLS(y)[k % 5]); } crowd(K, P, 0, 30, 20, 18, y); },   // the Berlin Wall
+  1981: (K, P) => { const [x, gy, z, ry] = P(0, 140); K.add("cyl", "wall", x, gy, z, 8.4, 47, 8.4, 0, 0xc86a2a); K.add("cone", "wall", x, gy + 47, z, 8.4, 9, 8.4, 0, 0xc86a2a); for (const e of [-1, 1]) K.add("cyl", "wall", x + e * 6, gy, z, 3.7, 45, 3.7, 0, 0xf0f0ec); K.add("box", "wall", x, gy + 5, z - 6, 6, 37, 24, ry + Math.PI / 2, 0xf0f0ec); },   // the Space Shuttle
+  1969: (K, P, y) => { const [x, gy, z] = P(0, 130); let h = gy; for (const [d, L, c] of [[10, 42, 0xf4f4f0], [10, 25, 0xf4f4f0], [6.6, 18, 0xf4f4f0], [6.6, 8, 0x2a2a2a], [3.9, 4, 0xf4f4f0]]) { K.add("cyl", "wall", x, h, z, d, L, d, 0, c); K.add("cyl", "wall", x, h + L * 0.82, z, d + 0.1, L * 0.05, d + 0.1, 0, 0x1a1a1a); h += L; } K.add("cone", "wall", x, h, z, 3.9, 6, 3.9, 0, 0xf4f4f0); K.add("box", "wall", x, h + 6, z, 0.3, 10, 0.3, 0, 0xd83a2a);   // Saturn V
+    crowd(K, P, 0, 40, 40, 20, y, 0); flag(K, P, -15, 35, [0xb8382a, 0xf0f0f0, 0xb8382a, 0xf0f0f0, 0x2a3a6a]); },
+  1957: (K, P, y) => { const [x, gy, z] = P(20, 150); K.add("ball", "glass2", x, gy + 180, z, 3, 3, 3, 0, 0xe8e8e8); for (let k = 0; k < 4; k++) K.add("box", "wall", x + Math.cos(k) * 4, gy + 178, z + Math.sin(k) * 4, 0.1, 0.1, 8, k, 0xcccccc); crowd(K, P, 0, 30, 20, 12, y); },
+  1953: (K, P) => { for (let k = 0; k < 40; k++) { const a = k * 0.5, [x, gy, z] = P(Math.cos(a) * 4, 40 + Math.sin(a) * 4); K.add("ball", "wall", x, gy + k * 0.5, z, 1, 1, 1, 0, 0x3a8ad8); const [x2, , z2] = P(-Math.cos(a) * 4, 40 - Math.sin(a) * 4); K.add("ball", "wall", x2, gy + k * 0.5, z2, 1, 1, 1, 0, 0xd83a3a); } },   // the double helix
+  1945: (K, P, y) => { crowd(K, P, 0, 30, 50, 22, y); ranks(K, P, -20, 45, 3, 10, 0x4a5a3a); for (let k = 0; k < 6; k++) flag(K, P, -25 + k * 10, 26, [0xb8382a, 0xf0f0f0, 0x2a3a6a]); },   // V-J Day
+  1939: (K, P) => ranks(K, P, -15, 35, 4, 16, 0x5a5a3a),
+  1929: (K, P, y) => { const [x, gy, z, ry] = P(0, 60); K.add("box", "wall", x, gy - 0.5, z, 20, 16, 34, ry, 0xd8d0c0); for (let k = 0; k < 8; k++) { const [cx, cg, cz] = P(-14 + k * 4, 49); K.add("cyl", "wall", cx, cg, cz, 1.4, 14, 1.4, 0, 0xe8e0d0); } K.add("gable", "roof", x, gy + 15.5, z, 21, 4, 35, ry, 0xd8d0c0); crowd(K, P, 0, 38, 50, 18, y, Math.PI); },   // a run on the bank
+  1927: (K, P) => { const [x, gy, z, ry] = P(0, 60); K.add("box", "wall", x, gy + 120, z, 1.6, 1.6, 8.4, ry, 0xc8c8c8); K.add("box", "wall", x, gy + 120.8, z, 14, 0.3, 2, ry, 0xc8c8c8); },   // the Spirit of St. Louis overhead
+  1918: (K, P, y) => { ranks(K, P, -20, 40, 3, 14, 0x7a6a4a); crowd(K, P, 0, 28, 30, 22, y); for (let k = 0; k < 5; k++) flag(K, P, -20 + k * 10, 25, [0xb8382a, 0xf0f0f0, 0x2a3a6a]); },
+  1914: (K, P) => ranks(K, P, -18, 35, 4, 14, 0x7a6a4a),
+  1913: (K, P, y) => { const [x, gy, z, ry] = P(0, 90); K.add("box", "wall", x, gy - 0.5, z, 60, 34, 90, ry, 0xd8ccb0); for (let k = 0; k < 3; k++) { const [ax, ag, az] = P(-25 + k * 25, 44.5); K.add("box", "glass2", ax, ag + 6, az, 1, 18, 9, ry, 0x6a8aa8); } crowd(K, P, 0, 35, 30, 30, y); },   // Grand Central
+  1912: (K, P) => { const [x, , z, ry] = P(0, -450); shipHull(K, x, 2, z, ry, 269, 28, 12, 0x1a1a1a); K.add("box", "wall", x, 2, z, 26, 10, 180, ry, 0xf0ece0); for (let k = 0; k < 4; k++) { const [fx, , fz] = P(-60 + k * 38, -450); K.add("cyl", "wall", fx, 12, fz, 6, 18, 6, 0, 0xd8a85a); K.add("cyl", "wall", fx, 28, fz, 6.1, 3, 6.1, 0, 0x1a1a1a); } },   // the Titanic (on its way to New York)
+  1908: (K, P, y) => { const R = seeded(1908); for (let k = 0; k < 10; k++) { const [x, gy, z, ry] = P(-30 + k * 7, 40 + (k % 2) * 5); car(K, x, gy, z, ry, 1910, () => 0.45 + R() * 0.1); } crowd(K, P, 0, 30, 14, 25, y); },   // a row of Model Ts
+  1903: (K, P, y) => { const [x, gy, z, ry] = P(0, 50); for (const e of [0, 1.8]) K.add("box", "wall", x, gy + 2 + e, z, 12.3, 0.1, 2, ry + Math.PI / 2, 0xe8dcc0); crowd(K, P, 0, 44, 5, 6, y); },   // the Wright Flyer
+  1886: (K, P) => { const [x, , z] = P(0, -520); K.add("box", "wall", x, -6, z, 40, 6, 40, 0, 0xb8b0a0); K.add("box", "wall", x, 0, z, 20, 47, 20, 0, 0xc8c0b0); K.add("cyl", "wall", x, 47, z, 10, 30, 10, 0, 0x6aa89a); K.add("ball", "wall", x, 80, z, 6, 7, 6, 0, 0x6aa89a);
+    K.add("box", "wall", x + 4, 80, z, 2, 14, 2, 0, 0x6aa89a); K.add("ball", "glow", x + 4, 95, z, 3, 3, 3, 0, 0xffd27a); },   // the Statue of Liberty
+  1883: (K, P) => { const [, , , ry] = P(0, -300); for (const dz of [-280, -760]) { const [x, , z] = P(0, dz); K.add("box", "wall", x, -6, z, 40, 90, 18, ry, 0xb8a888); } const [mx, , mz] = P(0, -520); K.add("box", "wall", mx, 38, mz, 600, 3, 26, ry + Math.PI / 2, 0x8a7a6a); },   // the Brooklyn Bridge
+  1879: (K, P, y) => { for (let k = 0; k < 8; k++) { const [x, gy, z] = P(-28 + k * 8, 30); K.add("box", "wood", x, gy, z, 0.25, 6, 0.25, 0); K.add("ball", "glow", x, gy + 6.4, z, 0.8, 0.9, 0.8, 0, 0xffe0a0); } crowd(K, P, 0, 34, 16, 20, y); },   // electric light
+  1869: (K, P, y) => { for (const e of [-1, 1]) { const [x, gy, z, ry] = P(e * 8, 30); K.add("cyl", "wall", x, gy + 1.2, z, 2.2, 2.2, 7, ry + Math.PI / 2, 0x2a2a2a); K.add("cone", "wall", x - 3 * e * Math.cos(ry), gy + 3.2, z, 1.8, 3, 1.8, 0, 0x3a3a3a); K.add("box", "wall", x + 4 * e, gy + 1, z, 3, 3.5, 3, ry, 0x8a3a2a); } crowd(K, P, 0, 38, 40, 22, y); },   // the golden spike: two locomotives meet
+  1865: (K, P) => ranks(K, P, -18, 35, 3, 14, 0x2a3a6a), 1861: (K, P) => ranks(K, P, -18, 35, 3, 14, 0x2a3a6a),
+  1851: (K, P, y) => { const [x, gy, z, ry] = P(18, 8); K.add("cyl", "wall", x, gy + 1.4, z, 2, 2, 6, ry + Math.PI / 2, 0x2a3a2a); K.add("cone", "wall", x, gy + 3, z, 1.4, 2.5, 1.4, 0, 0x2a2a2a); for (let k = 1; k < 4; k++) { const [cx, cg, cz] = P(18 + k * 8, 8); K.add("box", "wall", cx, cg + 0.6, cz, 2.6, 2.6, 7, ry, 0xa85a3a); } crowd(K, P, 0, 25, 40, 22, y); },   // the first train on the Hudson River Railroad
+  1825: (K, P, y) => { const [x, , z, ry] = P(0, -200); shipHull(K, x, 0.8, z, ry, 24, 4, 1.6, 0x6a4a2c); K.add("box", "wall", x, 0.8, z, 3, 2, 10, ry, 0xe8dcc0); crowd(K, P, 0, 28, 14, 14, y); },   // a canal boat
+  1807: (K, P, y) => { const [x, , z, ry] = P(0, -260); steamboat(K, x, 0, z, ry); crowd(K, P, 0, -150, 30, 18, y); },   // the Clermont, cheered from the bank
+  1789: (K, P, y) => { const [x, gy, z, ry] = P(0, 55); K.add("box", "wall", x, gy - 0.5, z, 14, 14, 30, ry, 0xd8d0c0); crowd(K, P, 0, 36, 60, 22, y, Math.PI); flag(K, P, 0, 44, [0xb8382a, 0xf0f0f0, 0xb8382a]); },   // Washington's inauguration
+  1776: (K, P, y) => { ranks(K, P, -14, 40, 3, 12, 0x2a3a6a); crowd(K, P, 0, 28, 30, 20, y); flag(K, P, 0, 34, [0xb8382a, 0xf0f0f0, 0xb8382a, 0xf0f0f0]); },
+  1664: (K, P) => { for (const a of [-60, 30]) { const [x, , z, ry] = P(a, -380); shipHull(K, x, 1.5, z, ry, 36, 9, 5, 0x4a3a2a); for (const m of [-8, 6]) { const [mx, , mz] = P(a + m, -380); K.add("box", "wood", mx, 2, mz, 0.5, 24, 0.5, 0); K.add("box", "wall", mx, 8, mz + 0.5, 0.1, 12, 12, ry + Math.PI / 2, 0xe8e0d0); } } },   // English warships
+  1624: (K, P, y) => { const [x, gy, z, ry] = P(0, 70); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2; K.add("box", "wall", x + Math.cos(a) * 25, gy - 1, z + Math.sin(a) * 25, k % 2 ? 2 : 50, 5, k % 2 ? 50 : 2, 0, 0x8a6a4a); } windmill(K, x, gy, z, ry, []); crowd(K, P, 0, 40, 12, 20, y); crowd(K, P, 30, 45, 8, 10, 1300); },   // a Dutch fort and windmill
+  1626: (K, P, y) => { crowd(K, P, 0, 32, 8, 6, 1600); crowd(K, P, 6, 32, 8, 6, 1300); },
+  1609: (K, P) => { const [x, , z, ry] = P(0, -330); shipHull(K, x, 1.2, z, ry, 25, 6, 4, 0x5a3a24); for (const m of [-6, 2, 8]) { const [mx, , mz] = P(m, -330); K.add("box", "wood", mx, 2, mz, 0.4, 18, 0.4, 0); K.add("box", "wall", mx, 7, mz + 0.4, 0.1, 9, 8, ry + Math.PI / 2, 0xe8dcc0); }
+    for (let k = 0; k < 6; k++) { const [cx, , cz, cr] = P(-30 + k * 12, -230 - (k % 2) * 30); boat(K, cx, 0.05, cz, cr, "canoe"); person(K, cx, 0.2, cz, cr, 0x6a4a30, 0.8); } crowd(K, P, 0, -150, 16, 20, 1300); },   // the Half Moon meets Lenape canoes
+  1492: (K, P) => { for (const [a, s] of [[-50, 1], [0, 0.8], [40, 0.75]]) { const [x, , z, ry] = P(a, -380); shipHull(K, x, 1.5, z, ry, 24 * s, 7 * s, 4, 0x6a4a30); for (const m of [-6, 3]) { const [mx, , mz] = P(a + m * s, -380); K.add("box", "wood", mx, 2, mz, 0.4, 18 * s, 0.4, 0); K.add("box", "wall", mx, 8 * s, mz + 0.4, 0.1, 9 * s, 9 * s, ry + Math.PI / 2, 0xe8dcc0); } } },   // three caravels
+  1000: (K, P) => { const [x, , z, ry] = P(0, -260); shipHull(K, x, 0.8, z, ry, 23, 5, 1.6, 0x5a3a24); K.add("box", "wood", x, 1, z, 0.4, 12, 0.4, 0); K.add("box", "wall", x, 4, z + 0.4, 0.1, 7, 8, ry + Math.PI / 2, 0xb83a2a); for (let k = 0; k < 10; k++) { const [sx, , sz] = P(-9 + k * 2, -257.5); K.add("cyl", "wall", sx, 0.8, sz, 1, 1, 0.1, ry, [0xd8c83a, 0xb83a2a][k % 2]); } },   // a Norse ship
+  79: (K, P) => { const [x, gy, z] = P(0, 2500); K.add("cone", "wall", x, gy, z, 1800, 900, 1800, 0, 0x5a5048); K.add("ball", "wall", x, gy + 1500, z, 900, 1200, 900, 0, 0x8a8278); },   // a volcano erupts (Vesuvius stands in)
+  [-2559]: (K, P, y) => { const [x, gy, z, ry] = P(0, 320); K.add("pyr", "wall", x, gy, z, 230, 146, 230, ry, 0xe8d8b0); crowd(K, P, -40, 120, 30, 30, y); },   // the Great Pyramid
+  [-2499]: (K, P) => { for (let k = 0; k < 30; k++) { const a = k / 30 * Math.PI * 2, [x, gy, z] = P(Math.cos(a) * 16, 60 + Math.sin(a) * 16); K.add("box", "wall", x, gy, z, 2, 4.1, 1.1, -a, 0x9a948a); if (k % 2) K.add("box", "wall", x, gy + 4.1, z, 3.4, 0.8, 1.1, -a, 0x9a948a); } },   // Stonehenge
+  [-752]: (K, P, y) => { const [x, gy, z, ry] = P(0, 55); K.add("box", "wall", x, gy - 0.5, z, 14, 1.5, 24, ry, 0xe8e0d0); for (let k = 0; k < 6; k++) for (const e of [-1, 1]) { const [cx, cg, cz] = P(-10 + k * 4, 55 + e * 6); K.add("cyl", "wall", cx, cg + 1, cz, 1.2, 9, 1.2, 0, 0xf0ece0); } K.add("gable", "roof", x, gy + 10, z, 15, 3.5, 25, ry, 0xe8e0d0); crowd(K, P, 0, 38, 20, 16, y); },   // a temple
+  [-775]: (K, P, y) => { for (let k = 0; k < 8; k++) { const [x, gy, z, ry] = P(-10 + k * 3, 32 + k % 2); person(K, x, gy, z, ry, 0xc8a080); } crowd(K, P, 0, 45, 30, 30, y); },   // runners at Olympia
+  [NOW - 13000]: (K, P) => { const [x, gy, z, ry] = P(0, 70); animal(K, "mastodon", x, gy, z, ry, 1.1); for (let k = 0; k < 6; k++) { const a = k * 1.05, [px, pg, pz] = P(Math.cos(a) * 10, 70 + Math.sin(a) * 10); person(K, px, pg, pz, a + Math.PI, 0x8a6a4a); K.add("box", "wood", px, pg + 1.2, pz, 0.06, 0.06, 2.6, a, 0x6a4a2c); } },   // Clovis hunters
+  [NOW - 300000]: (K, P) => crowd(K, P, 0, 40, 8, 8, -1e6),
+  [NOW - 66.0e6]: (K, P) => { const [x, gy, z] = P(-400, 1500); K.add("ball", "glow", x, gy + 1800, z, 120, 120, 120, 0, 0xfff0c0); for (let k = 1; k < 12; k++) K.add("ball", "glow", x - k * 90, gy + 1800 + k * 60, z - k * 40, 120 - k * 8, 120 - k * 8, 120 - k * 8, 0, k < 4 ? 0xffb050 : 0xc86a3a);   // the asteroid's fireball
+    for (let k = 0; k < 6; k++) { const [ax, ag, az, ar] = P(-20 + k * 8, 60 + (k % 2) * 8); animal(K, "hadrosaur", ax, ag, az, ar + 0.5, 1); } } };
+const SCENEOBJ = new Map();
+function updateScenes(xT) { for (const ev of EVENTS) { const f = SC[ev[0]]; if (!f) continue; const ex = xOfYear(ev[0]), d = ex - xT, on = d > -1200 && d < 2400, has = SCENEOBJ.has(ev[0]);
+    if (on && !has) { const K = new Kit(), P = (along, dz) => { const x = ex + along, z = trackZ(x) + dz; return [x - ex, Math.max(terrainH(x, z), dz < -RIVER0 ? 0 : -1e9), z, trackH(x)]; };
+      f(K, P, ev[0]); SCENEOBJ.set(ev[0], anchor(K.build(), ex, 0, 0)); }
+    else if (!on && has) { const g = SCENEOBJ.get(ev[0]); unanchor(g); g.traverse(o => o.isInstancedMesh && o.dispose()); SCENEOBJ.delete(ev[0]); } } }
+// ordinary people of each period, about their business beside the line
+function periodFolk(K, x0, r) { for (let k = 0; k < 10; k++) { const x = x0 + r() * TILE, y = yearAt(x), E = era(y); if (!["modern", "postwar", "early20", "railway", "colonial"].includes(E)) continue; const dz = 30 + r() * 120, z = trackZ(x) + dz, gy = terrainH(x, z); if (gy < 0.5) continue;
+    const C = COLS(y), n = 1 + Math.floor(r() * 3); for (let q = 0; q < n; q++) person(K, x - x0 + (r() - 0.5) * 4, gy, z + (r() - 0.5) * 4, r() * 6, C[(r() * C.length) | 0]); } }
+
+// ---------- timelines: lanes on the river side of the line, a band for each life, country and species, from its start year to its end ----------
+// Years are calendar years (negative = BCE, astronomically: -43 is 44 BCE); species are given in years before present. Dates are the usual
+// published ones; "c." ones are approximate. Lanes are assigned so overlapping bands sit side by side.
+const B_ = bp => NOW - bp;
+const TL = { people: { col: 0xe8b83a, css: "#e8b83a", dz0: -26, items: [
+  ["Barack Obama", 1961, NOW], ["Neil Armstrong", 1930, 2012], ["Rosa Parks", 1913, 2005], ["Martin Luther King Jr.", 1929, 1968], ["Albert Einstein", 1879, 1955], ["Marie Curie", 1867, 1934], ["Franklin D. Roosevelt", 1882, 1945],
+  ["Harriet Tubman", 1822, 1913], ["Sitting Bull", 1831, 1890], ["Frederick Douglass", 1818, 1895], ["Abraham Lincoln", 1809, 1865], ["Charles Darwin", 1809, 1882], ["Ada Lovelace", 1815, 1852], ["Queen Victoria", 1819, 1901],
+  ["Napoleon Bonaparte", 1769, 1821], ["Wolfgang Amadeus Mozart", 1756, 1791], ["George Washington", 1732, 1799], ["Benjamin Franklin", 1706, 1790], ["Tamanend (Lenape chief)", 1625, 1701], ["Isaac Newton", 1643, 1727],
+  ["Pocahontas", 1596, 1617], ["Henry Hudson", 1565, 1611], ["Galileo Galilei", 1564, 1642], ["William Shakespeare", 1564, 1616], ["Elizabeth I", 1533, 1603], ["Leonardo da Vinci", 1452, 1519], ["Christopher Columbus", 1451, 1506],
+  ["Joan of Arc", 1412, 1431], ["Dante Alighieri", 1265, 1321], ["Genghis Khan", 1162, 1227], ["Charlemagne", 742, 814], ["Muhammad", 570, 632], ["Constantine the Great", 272, 337], ["Jesus of Nazareth (c.)", -3, 30],
+  ["Cleopatra VII", -68, -29], ["Julius Caesar", -99, -43], ["Alexander the Great", -355, -322], ["Aristotle", -383, -321], ["Socrates", -469, -398], ["Confucius", -550, -478], ["The Buddha (c.)", -562, -482],
+  ["Ramesses II (c.)", -1302, -1212], ["Tutankhamun (c.)", -1340, -1322], ["Hammurabi (c.)", -1809, -1749], ["Ötzi the Iceman (c.)", -3344, -3299]] },
+  countries: { col: 0x4a8ad8, css: "#6aa8f0", dz0: -66, items: [
+  ["United States", 1776, NOW], ["New York State", 1788, NOW], ["Province of New York (British)", 1664, 1776], ["New Netherland (Dutch)", 1614, 1664], ["Haudenosaunee Confederacy (c.)", 1450, NOW], ["Soviet Union", 1922, 1991],
+  ["United Kingdom", 1707, NOW], ["Kingdom of England", 927, 1707], ["Qing dynasty", 1644, 1912], ["Ming dynasty", 1368, 1644], ["Mughal Empire", 1526, 1857], ["Ottoman Empire", 1299, 1922], ["Aztec Empire", 1428, 1521], ["Inca Empire", 1438, 1533],
+  ["Mali Empire", 1235, 1670], ["Mongol Empire", 1206, 1368], ["Cahokia (city, c.)", 1050, 1350], ["Great Zimbabwe (c.)", 1100, 1450], ["Holy Roman Empire", 962, 1806], ["Byzantine Empire", 330, 1453], ["Abbasid Caliphate", 750, 1258],
+  ["Tang dynasty", 618, 907], ["Classic Maya (c.)", 250, 900], ["Roman Empire (West)", -26, 476], ["Roman Republic", -508, -26], ["Han dynasty", -201, 220], ["Achaemenid Persian Empire", -549, -329], ["Akkadian Empire (c.)", -2333, -2153],
+  ["Ancient Egypt, dynastic (c.)", -3099, -29]] },
+  species: { col: 0x4ab85a, css: "#6ad87a", dz0: -106, items: [
+  ["Homo sapiens (us)", B_(300000), NOW], ["Dogs, domesticated (c.)", B_(15000), NOW], ["Maize, domesticated (c.)", B_(9000), NOW], ["Neanderthals", B_(400000), B_(40000)], ["Denisovans (c.)", B_(300000), B_(30000)],
+  ["Homo erectus", B_(1.9e6), B_(110000)], ["Woolly mammoth", B_(800000), B_(4000)], ["American mastodon", B_(3.5e6), B_(10500)], ["Smilodon (sabre-tooth)", B_(2.5e6), B_(10000)], ["Dire wolf", B_(250000), B_(13000)],
+  ["Giant beaver", B_(1.4e6), B_(10000)], ["Gigantopithecus", B_(2e6), B_(300000)], ["Homo habilis", B_(2.4e6), B_(1.4e6)], ["Paranthropus", B_(2.7e6), B_(1.2e6)], ["Australopithecus afarensis", B_(3.9e6), B_(2.9e6)],
+  ["Megalodon", B_(23e6), B_(3.6e6)], ["Tyrannosaurus rex", B_(68e6), B_(66e6)], ["Triceratops", B_(68e6), B_(66e6)]] } };
+const fmtRange = (a, b) => { const ongoing = b >= NOW - 0.5, ba = BP(a); if (ba >= 10000) { const f = v => v >= 1e6 ? `${(v / 1e6).toFixed(v >= 1e7 ? 0 : 1)} million` : `${Math.round(v / 1000).toLocaleString()},000`; return ongoing ? `${f(ba)} years ago – now` : `${f(ba)} – ${f(BP(b))} years ago`; }
+  const y = v => Math.round(v) > 0 ? String(Math.round(v)) : `${1 - Math.round(v)} BCE`; return ongoing ? `${y(a)} – now` : `${y(a)} – ${y(b)}`; };
+for (const k in TL) { const lanes = []; TL[k].items.sort((p, q) => q[2] - p[2]).forEach(it => { const x0 = xOfYear(it[2]), x1 = xOfYear(it[1]); let L = lanes.findIndex(e => e < x0 - 60); if (L < 0) { L = lanes.length; lanes.push(0); } lanes[L] = x1; it.lane = L; it.x0 = x0; it.x1 = x1; }); TL[k].nl = lanes.length; }
+const TLIM = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), new THREE.MeshBasicMaterial({ toneMapped: false }), 7000); TLIM.count = 0; TLIM.frustumCulled = false; WORLD.add(TLIM);
+const TLAB = []; for (let k = 0; k < 40; k++) { const c = document.createElement("canvas"); c.width = 768; c.height = 128; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(20, 3.4), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, toneMapped: false })); m.rotation.x = -0.6; const g = new THREE.Group(); g.add(m); WORLD.add(g); TLAB.push({ g, c, t, key: null }); }
+function updateTimelines(xT) { const lo = xT - 700, hi = xT + 1400; let n = 0; const want = [];
+  for (const k in TL) { const G = TL[k], laneW = Math.min(4.5, 36 / Math.max(1, G.nl)); _lc.setHex(G.col);
+    for (const it of G.items) { if (it.x1 < lo || it.x0 > hi) continue; const dz = G.dz0 - it.lane * laneW, a = Math.max(it.x0, lo), b = Math.min(it.x1, hi);
+      for (let x = a; x < b && n < 7000; x += 8) { const len = Math.min(8, b - x), xm = x + len / 2, z = trackZ(xm) + dz, h = terrainH(xm, z); if (h < 0.3) continue;
+        O3.position.set(xm - ORIGIN.x, h + 0.06, z - ORIGIN.z); O3.rotation.set(0, trackH(xm), 0); O3.scale.set(laneW * 0.8, 0.07, len + 0.2); O3.updateMatrix(); TLIM.setMatrixAt(n, O3.matrix); TLIM.setColorAt(n, _lc); n++; }
+      const first = Math.max(it.x0 + 6, lo), step = 160; for (let x = it.x0 + 6 + Math.ceil((first - it.x0 - 6) / step) * step; x < Math.min(it.x1, hi); x += step) want.push({ key: it[0] + "@" + Math.round(x), x, dz, it, G });
+      if (it.x1 - it.x0 < 160 && it.x0 > lo && it.x0 < hi) want.push({ key: it[0] + "@s", x: (it.x0 + it.x1) / 2, dz, it, G }); } }
+  TLIM.count = n; TLIM.instanceMatrix.needsUpdate = true; if (TLIM.instanceColor) TLIM.instanceColor.needsUpdate = true;
+  want.sort((p, q) => Math.abs(p.x - xT) - Math.abs(q.x - xT)); const keep = new Set(want.slice(0, TLAB.length).map(w => w.key));
+  for (const L of TLAB) if (L.key && !keep.has(L.key)) L.key = null;
+  for (const w of want.slice(0, TLAB.length)) { let L = TLAB.find(L => L.key === w.key); if (!L) { L = TLAB.find(L => !L.key); if (!L) continue; L.key = w.key; const g = L.c.getContext("2d"); g.clearRect(0, 0, 768, 128);
+      g.font = "700 48px Helvetica, Arial, sans-serif"; g.lineWidth = 8; g.strokeStyle = "rgba(0,0,0,.45)"; const s1 = w.it[0], s2 = fmtRange(w.it[1], w.it[2]); g.strokeText(s1, 12, 54); g.fillStyle = w.G.css; g.fillText(s1, 12, 54);
+      g.font = "600 36px Helvetica, Arial, sans-serif"; g.strokeText(s2, 12, 108); g.fillStyle = "#ffffff"; g.fillText(s2, 12, 108); L.t.needsUpdate = true; }
+    const z = trackZ(w.x) + w.dz + 1.5, h = Math.max(terrainH(w.x, z), 0.2); L.g.position.set(w.x - ORIGIN.x, h + 1.8, z - ORIGIN.z); L.g.rotation.y = trackH(w.x) + Math.PI / 2; }
+  for (const L of TLAB) L.g.visible = !!L.key; }
+EVENTS.push([1681, "The last dodos die on Mauritius."], [1768, "The last Steller's sea cows are killed."], [1914, "Martha, the last passenger pigeon, dies; billions once flew over this valley."], [1936, "The last thylacine (Tasmanian tiger) dies."]);
+
 // ---------- the journey ----------
 // A year passes every second, so days and seasons would flicker past 365 times a second: the light is held at a summer afternoon.
 let trainX = 0, started = false, running = true, sleeping = false;
@@ -53460,8 +53596,8 @@ document.body.append(HUD, BIG, MSG, FADE);
 let msgT = 0, msgText = "", vrDirty = true;
 function say(t, secs = 14) { msgText = t; msgT = secs; MSG.innerHTML = t; MSG.style.display = "block"; vrDirty = true; }
 function start() { if (started) return; started = true; intro?.classList.add("gone");
-  say("All aboard. The train is leaving the present: every second is a year further back, one sign per year outside. You are in the lounge car; the itinerary is on the front wall of every car. Walk through the train; the observation car is at the back. N jumps ahead to the next stop; E in a roomette berth sleeps eight hours (28,800 years).", 22); }
-function jumpTo(x) { trainX = x; const T = trackXZ(trainX); recentre(T.x, T.z); for (const L of LEVELS) L.ox = NaN; updateGround(T.x, T.z, 99); }
+  say("All aboard. The train is leaving the present: every second is a year further back, a line across the ground at every year (numbers every 5 years, a big sign every 10), and scenes of the events at their years. You are in the lounge car; the itinerary is on the front wall of every car. Walk through the train; the observation car is at the back. N jumps ahead to the next stop; E in a roomette berth sleeps eight hours (28,800 years).", 22); }
+function jumpTo(x) { linesAt = null; trainX = x; const T = trackXZ(trainX); recentre(T.x, T.z); for (const L of LEVELS) L.ox = NaN; updateGround(T.x, T.z, 99); }
 const trackXZ = x => ({ x, z: trackZ(x) });
 function nextStop() { return STOPS.find(([yr]) => (xOfYear(yr) - trainX) / V > 20); }
 function goSleep() { if (sleeping) return; sleeping = true; FADE.style.opacity = 1; setTimeout(() => { jumpTo(trainX + 8 * 3600 * V); FADE.style.opacity = 0; sleeping = false; say(`You slept eight hours, and wake 28,800 years earlier: ${fmtYear(yearAt(trainX))}.`, 10); }, 1400); }
@@ -53493,7 +53629,7 @@ renderer.setAnimationLoop(() => { try { frame(); } catch (e) { if (loopErrs++ < 
 function frame() {
   const dt = Math.min(clock.getDelta(), 0.1), t = clock.elapsedTime, vr = renderer.xr.isPresenting;
   if (started && running && !sleeping) trainX += V * dt;                                // exactly one year per second
-  const tz = trackZ(trainX); if (Math.hypot(trainX - ORIGIN.x, tz - ORIGIN.z) > 1500) recentre(trainX, tz);
+  const tz = trackZ(trainX); if (Math.hypot(trainX - ORIGIN.x, tz - ORIGIN.z) > 1500) { recentre(trainX, tz); linesAt = null; }
   TRAIN.position.set(trainX - ORIGIN.x, trackE(trainX) + 0.5, tz - ORIGIN.z); TRAIN.rotation.set(0, trackH(trainX), 0); TRAIN.rotateX(Math.atan2(trackE(trainX + 40) - trackE(trainX - 40), 80) * 0.5);
   let mx = 0, my = 0, run = 1;
   if (vr) { const s = renderer.xr.getSession(); for (const src of s?.inputSources || []) { const gp = src.gamepad; if (!gp) continue; const [ax, ay] = stick(gp.axes);
@@ -53505,7 +53641,7 @@ function frame() {
   fwd.y = 0; fwd.normalize(); side.set(-fwd.z, 0, fwd.x);
   if (mx || my) { const sp = 1.3 * run * dt, nx = P_.x + (fwd.x * -my + side.x * mx) * sp, nz = P_.z + (fwd.z * -my + side.z * mx) * sp; if (walkable(nx, nz)) { P_.x = nx; P_.z = nz; } else if (walkable(nx, P_.z)) P_.x = nx; else if (walkable(P_.x, nz)) P_.z = nz; }
   rig.position.set(P_.x, 0, P_.z);
-  updateGround(trainX, tz); streamTiles(trainX); updateSigns(trainX); updateBoards(trainX);
+  updateGround(trainX, tz); streamTiles(trainX); updateSigns(trainX); updateBoards(trainX); updateLines(trainX); updateScenes(trainX);
   // a summer afternoon's light; the sky a little colder in the ice ages
   const S = sunDir(15.5, 42), ice = iceThick(yearAt(trainX)) / 1100; sun.position.copy(S.v).multiplyScalar(800); sun.intensity = 2.4; hemi.intensity = 1.05;
   const upC = new THREE.Color(0.32, 0.52, 0.84).lerp(new THREE.Color(0.55, 0.65, 0.8), ice * 0.4), hor = new THREE.Color(0.80, 0.85, 0.88).lerp(new THREE.Color(0.9, 0.93, 0.96), ice * 0.5);
@@ -53514,7 +53650,7 @@ function frame() {
   const ev = EVENTS.find(e => { const d = xOfYear(e[0]) - trainX; return d > -40 && d < 60; }); if (ev && ev !== lastEv) { lastEv = ev; say(`<b>${fmtYear(ev[0])}</b> · ${ev[1]}`, 10); }
   msgT -= dt; if (msgT <= 0 && MSG.style.display !== "none") { MSG.style.display = "none"; msgText = ""; vrDirty = true; }
   itTm -= dt; if (itTm <= 0) { itTm = 0.5; drawItinerary(trainX); }
-  hudT -= dt; if (hudT <= 0) { hudT = 0.25; const y = yearAt(trainX), n = nextStop(); BIG.textContent = fmtYear(y);
+  hudT -= dt; if (hudT <= 0) { hudT = 0.25; const y = yearAt(camera.getWorldPosition(V3(0, 0, 0)).x + ORIGIN.x), n = nextStop();   // the year where you are standing BIG.textContent = fmtYear(y);
     HUD.innerHTML = `<b>One year every second</b> · ${CARS[carAt(P_.z)]}${running ? "" : " · paused"}<br>${n ? `next: <b>${n[1]}</b> (${fmtYear(n[0])}) in ${fmtWait((xOfYear(n[0]) - trainX) / V)}` : ""}<br>
       <span style="color:#9ab4c8;font-size:12.5px">WASD walk · drag to look · N jump to the next stop · P pause · E in a roomette berth: sleep 8 hours (28,800 years)</span>`;
     if (vr) drawVR(fmtYear(y), msgText || (n ? `next: ${n[1]} in ${fmtWait((xOfYear(n[0]) - trainX) / V)} · left stick walk · right stick turn · A sleep / next stop · Y jump ahead` : "")); }
