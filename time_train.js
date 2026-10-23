@@ -367,12 +367,13 @@ const STOPS = [[2000, "2000"], [1969, "The Moon landing"], [1900, "1900"], [1851
   [NOW - 470e6, "Plants reach land"], [NOW - 518e6, "Chengjiang's seas (the Cambrian page)"], [NOW - 538e6, "The Cambrian explosion"], [NOW - 575e6, "The Ediacaran animals"], [NOW - 700e6, "Snowball Earth"],
   [NOW - 1.6e9, "Complex (eukaryotic) cells, by then"], [NOW - 2.4e9, "The Great Oxidation: oxygen in the air"], [NOW - 3.7e9, "The earliest signs of life"], [NOW - 4.4e9, "The oldest crystals (zircons)"], [NOW - 4.51e9, "The Moon forms"],
   [NOW - 4.54e9, "The Earth forms"], [NOW - 4.6e9, "The Sun forms"], [NOW - 13.6e9, "The first stars"], [NOW - 13.787e9 + 380000, "The universe becomes transparent (the cosmic microwave background)"], [NOW - 13.787e9, "The Big Bang"]];
+const fmtDist = s => { const m = s * V; return m < 1000 ? `${Math.round(m)} m` : m < 1e7 ? `${(m / 1000).toLocaleString(undefined, { maximumFractionDigits: m < 1e5 ? 1 : 0 })} km` : `${(m / 1e9).toLocaleString(undefined, { maximumFractionDigits: 2 })} million km`; };
 const fmtWait = s => s < 0 ? "passed" : s < 90 ? `${Math.round(s)} s` : s < 5400 ? `${Math.floor(s / 60)} min ${Math.round(s % 60)} s` : s < 172800 ? `${Math.floor(s / 3600)} h ${Math.round(s % 3600 / 60)} min` : s < 63072000 ? `${(s / 86400).toFixed(1)} days` : s < 31557600e6 ? `${(s / 31557600).toLocaleString(undefined, { maximumFractionDigits: s < 31557600e3 ? 1 : 0 })} years` : s < 31557600e9 ? `${(s / 31557600e6).toFixed(1)} million years` : `${(s / 31557600e9).toFixed(2)} billion years`;
 function drawItinerary(xT) { for (const [C, W, H, big] of [[ITC, 512, 768, false], [MAPC, 1024, 640, true]]) { const g = C.getContext("2d"); g.fillStyle = "#0f2030"; g.fillRect(0, 0, W, H); g.strokeStyle = "#c8a24a"; g.lineWidth = 8; g.strokeRect(4, 4, W - 8, H - 8);
     g.fillStyle = "#f0d890"; g.font = `700 ${big ? 40 : 34}px Helvetica, Arial, sans-serif`; g.fillText("ITINERARY", 24, big ? 54 : 50); g.fillStyle = "#e8eef4"; g.font = `${big ? 24 : 20}px Helvetica, Arial, sans-serif`;
     g.fillText(`now: ${fmtYear(yearAt(xT))} · one year every second`, 24, big ? 90 : 82); let y = big ? 132 : 120, n = 0;
     for (const [yr, name] of STOPS) { const wait = (xOfYear(yr) - xT) / V; if (wait < -5) continue; if (++n > (big ? 14 : 18)) break; g.fillStyle = wait < 30 ? "#ffd27a" : "#e8eef4"; g.font = `${big ? 24 : 20}px Helvetica, Arial, sans-serif`;
-      if (big) { g.fillText(name, 24, y); g.fillText(fmtYear(yr), 520, y); g.textAlign = "right"; g.fillText(fmtWait(wait), W - 24, y); g.textAlign = "left"; } else { g.fillText(name, 20, y); g.fillStyle = "#9ab4c8"; g.fillText(`${fmtYear(yr)} · ${fmtWait(wait)}`, 20, y + 22); y += 12; }
+      if (big) { g.fillText(name, 24, y); g.fillText(fmtYear(yr), 470, y); g.textAlign = "right"; g.fillText(fmtWait(wait), W - 170, y); g.fillStyle = "#9ab4c8"; g.fillText(fmtDist(wait), W - 24, y); g.textAlign = "left"; } else { g.fillText(name, 20, y); g.fillStyle = "#9ab4c8"; g.fillText(`${fmtYear(yr)} · ${fmtWait(wait)} · ${fmtDist(wait)}`, 20, y + 22); y += 12; }
       y += big ? 34 : 24; } }
   itT.needsUpdate = true; mapT.needsUpdate = true; }
 
@@ -578,6 +579,178 @@ function updateArch(xT) { for (const A of ARCH) { const [yr, , build, dz0] = A, 
     if (on && !has) { const K = new Kit(), z = trackZ(ex) + (dz || 0), g = dz ? Math.max(terrainH(ex, z), 0.3) : 0; build(K, 0, g, z, trackH(ex), ex); ARCHOBJ.set(yr, anchor(K.build(), ex, 0, 0)); }
     else if (!on && has) { const g = ARCHOBJ.get(yr); unanchor(g); g.traverse(o => o.isInstancedMesh && o.dispose()); ARCHOBJ.delete(yr); } } }
 
+// ---------- re-enactments: battles and events playing out, and the everyday work of each age, beside the line ----------
+// Figures move (marching, firing, hammering, hoeing, paddling); muzzle flashes, smoke, sparks and fire glow come and go. Each scene
+// loops while it is near. Everyday scenes recur every 600 m (24 years) through their age; a plaque says what and where (several are
+// world history, not this valley's: North America had no Bronze or Iron Age).
+const FIG = { body: new THREE.CylinderGeometry(0.2, 0.28, 1.0, 7).translate(0, 1.0, 0), head: new THREE.SphereGeometry(0.13, 8, 6).translate(0, 1.66, 0), hat: new THREE.CylinderGeometry(0.16, 0.19, 0.15, 7).translate(0, 1.83, 0),
+  leg: new THREE.BoxGeometry(0.11, 0.55, 0.13).translate(0, -0.28, 0), arm: new THREE.BoxGeometry(0.09, 0.55, 0.1).translate(0, -0.27, 0), tool: new THREE.BoxGeometry(0.05, 0.05, 1.3).translate(0, 0, 0.55) };
+const figMat = new THREE.MeshStandardMaterial({ roughness: 0.9 }), ZF = new THREE.Matrix4().makeScale(0, 0, 0);
+const _fm = new THREE.Matrix4(), _fq = new THREE.Quaternion(), _fe = new THREE.Euler(), _fs = V3(1, 1, 1), _fp = V3(0, 0, 0);
+class Troop { constructor(g, n) { this.n = n; this.M = {}; for (const k of ["body", "head", "hat", "legL", "legR", "armL", "armR", "tool"]) { const im = new THREE.InstancedMesh(FIG[k.replace(/[LR]$/, "")], figMat, n); im.frustumCulled = false; g.add(im); this.M[k] = im; } }
+  color(i, cloth, hat, leg = 0x3a3028, skin = 0xc8a080, tool = 0x5a4a3a) { const c = new THREE.Color(), M = this.M; M.body.setColorAt(i, c.setHex(cloth)); M.armL.setColorAt(i, c); M.armR.setColorAt(i, c); M.hat.setColorAt(i, c.setHex(hat ?? skin));
+    M.head.setColorAt(i, c.setHex(skin)); M.legL.setColorAt(i, c.setHex(leg)); M.legR.setColorAt(i, c); M.tool.setColorAt(i, c.setHex(tool)); }
+  set(i, x, y, z, h, o = {}) { const s = o.s ?? 1, M = this.M, ch = Math.cos(h), sh = Math.sin(h), aR = o.aR ?? 0, walk = o.walk ?? 0; y -= o.sit ? 0.55 * s : 0; _fs.set(s, s, s);
+    _fe.set(o.lean ?? 0, h, 0, "YXZ"); _fq.setFromEuler(_fe); _fm.compose(_fp.set(x, y, z), _fq, _fs); M.body.setMatrixAt(i, _fm); M.head.setMatrixAt(i, _fm); M.hat.setMatrixAt(i, o.hat === false ? ZF : _fm);
+    for (const [k, sd, a, ht, off] of [["legL", 1, o.sit ? -1.4 : walk, 0.55, 0.1], ["legR", -1, o.sit ? -1.4 : -walk, 0.55, 0.1], ["armL", 1, o.aL ?? 0, 1.45, 0.27], ["armR", -1, aR, 1.45, 0.27]]) {
+      _fe.set(a, h, 0, "YXZ"); _fq.setFromEuler(_fe); _fm.compose(_fp.set(x + ch * off * sd * s, y + ht * s, z - sh * off * sd * s), _fq, _fs); M[k].setMatrixAt(i, _fm); }
+    if (o.tool !== undefined) { const ly = 1.45 - 0.55 * Math.cos(aR), lz = -0.55 * Math.sin(aR), lx = -0.27; _fe.set(o.tool, h, 0, "YXZ"); _fq.setFromEuler(_fe); _fs.set(s, s, s * (o.tl ?? 1));
+      _fm.compose(_fp.set(x + (lx * ch + lz * sh) * s, y + ly * s, z + (-lx * sh + lz * ch) * s), _fq, _fs); M.tool.setMatrixAt(i, _fm); } else M.tool.setMatrixAt(i, ZF); }
+  done() { for (const m of Object.values(this.M)) m.instanceMatrix.needsUpdate = true; } }
+class FX { constructor(g) { const mk = (geo, mat, n) => { const m = new THREE.InstancedMesh(geo, mat, n); m.count = 0; m.frustumCulled = false; g.add(m); return m; };
+    this.F = mk(new THREE.SphereGeometry(1, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffd890, toneMapped: false }), 80);
+    this.S = mk(new THREE.SphereGeometry(1, 7, 5), new THREE.MeshStandardMaterial({ color: 0xdedcd4, transparent: true, opacity: 0.5, depthWrite: false, roughness: 1 }), 240);
+    this.B = mk(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ roughness: 0.8 }), 200);
+    this.G = mk(new THREE.SphereGeometry(1, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff7a2a, toneMapped: false }), 40); this.c = new THREE.Color(); }
+  begin() { this.nf = this.ns = this.nb = this.ng = 0; }
+  put(m, n, x, y, z, sx, sy, sz, ry = 0, rx = 0) { O3.position.set(x, y, z); O3.rotation.set(rx, ry, 0, "YXZ"); O3.scale.set(sx, sy, sz); O3.updateMatrix(); m.setMatrixAt(n, O3.matrix); }
+  flash(x, y, z, s) { if (this.nf < 80) this.put(this.F, this.nf++, x, y, z, s, s, s); }
+  smoke(x, y, z, s) { if (this.ns < 240) this.put(this.S, this.ns++, x, y, z, s, s, s); }
+  glow(x, y, z, s) { if (this.ng < 40) this.put(this.G, this.ng++, x, y, z, s, s * 1.3, s); }
+  box(x, y, z, sx, sy, sz, ry, rx, col) { if (this.nb >= 200) return; this.put(this.B, this.nb, x, y, z, sx, sy, sz, ry, rx); this.B.setColorAt(this.nb++, this.c.setHex(col)); }
+  end() { this.F.count = this.nf; this.S.count = this.ns; this.B.count = this.nb; this.G.count = this.ng; for (const m of [this.F, this.S, this.B, this.G]) m.instanceMatrix.needsUpdate = true; if (this.B.instanceColor) this.B.instanceColor.needsUpdate = true; } }
+function scaffold(K, x, gy, z, w, h, d, ry) { for (let a = -w / 2; a <= w / 2; a += 4) for (const e of [-1, 1]) K.add("box", "wood", x + Math.cos(ry) * a + Math.sin(ry) * e * d / 2, gy, z - Math.sin(ry) * a + Math.cos(ry) * e * d / 2, 0.2, h, 0.2, ry); }
+const fwdOf = h => [Math.sin(h), Math.cos(h)];
+function arc(F, x0, z0, x1, z1, gy, f, hgt, col, len = 1.4) { const x = lerpN(x0, x1, f), z = lerpN(z0, z1, f), y = gy + 1.6 + Math.sin(f * Math.PI) * hgt; F.box(x, y, z, 0.05, 0.05, len, Math.atan2(x1 - x0, z1 - z0), -Math.cos(f * Math.PI) * 0.8, col); }
+function plaque(g, P, title, text) { const c = document.createElement("canvas"); c.width = 640; c.height = 200; const cg = c.getContext("2d"); cg.fillStyle = "#1e2a24"; cg.fillRect(0, 0, 640, 200); cg.strokeStyle = "#c8a24a"; cg.lineWidth = 6; cg.strokeRect(4, 4, 632, 192);
+  cg.fillStyle = "#f0d890"; cg.font = "700 40px Georgia, serif"; cg.fillText(title, 20, 52); cg.fillStyle = "#f0ece0"; cg.font = "28px Georgia, serif"; const words = text.split(" "); let ln = "", y = 96;
+  for (const w of words) { if (cg.measureText(ln + w).width > 600) { cg.fillText(ln, 20, y); y += 34; ln = ""; } ln += w + " "; } cg.fillText(ln, 20, y);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const [x, gy, z, ry] = P(-14, 62), m = new THREE.Mesh(new THREE.PlaneGeometry(9, 2.8), new THREE.MeshBasicMaterial({ map: t, toneMapped: false })); m.position.set(x, gy + 3.2, z); m.rotation.y = ry - Math.PI / 2; g.add(m);
+  const p = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3, 0.2).translate(0, 1.5, 0), M(0x4a3a2a)); p.position.set(x, gy, z); g.add(p); }
+// ---- a battle between two lines (muskets, rifles), with optional cannon, trenches, tanks and aircraft
+function battle(o) { return (K, g, P, y) => { const n = o.n ?? 14, T = new Troop(g, n * 2), F = new FX(g), dA = 70, dB = 140;
+  for (let i = 0; i < n; i++) { T.color(i, o.colA, o.hatA, o.legA); T.color(n + i, o.colB, o.hatB, o.legB); }
+  if (o.trench) for (const dz of [dA, dB]) for (let a = -40; a <= 40; a += 8) { const [x, gy, z, ry] = P(a, dz); K.add("box", "wall", x, gy - 0.2, z + 1.6 * (dz === dA ? 1 : -1), 8.2, 1.0, 1.2, ry, 0x6a5a40); }
+  const guns = o.cannon ? [[-30, dA - 12, 0], [30, dA - 12, 0], [-24, dB + 12, 1], [24, dB + 12, 1]] : [];
+  for (const [a, dz, s] of guns) { const [x, gy, z, ry] = P(a, dz); K.add("cyl", "lead", x, gy + 0.9, z, 0.5, 2.8, 0.5, ry + Math.PI / 2, 0x2a2a2a); for (const e of [-1, 1]) K.add("cyl", "wood", x + Math.cos(ry) * e, gy + 0.6, z, 1.3, 0.15, 1.3, ry, 0x5a3a24); }
+  return t => { F.begin(); const per = 8;
+    for (let s = 0; s < 2; s++) { const ph = (t + s * per / 2) % per, adv = Math.sin(t * 0.12 + s * 2) * (o.trench ? 0 : 5);
+      for (let i = 0; i < n; i++) { const al = -n * 1.15 + i * 2.3 + (s ? 1.1 : 0), dz = s ? dB - adv + (i % 2) * 1.3 : dA + adv - (i % 2) * 1.3, [x, gy, z, ry] = P(al, dz), h = ry + (s ? -Math.PI / 2 : Math.PI / 2), [fx, fz] = fwdOf(h);
+        const yy = gy - (o.trench ? 0.9 : o.kneel && i % 2 === 0 ? 0.35 : 0), stag = (i % 3) * 0.15;
+        if (ph > stag && ph < 2.2 + stag) { T.set(s * n + i, x, yy, z, h, { aR: -1.5, aL: -1.35, tool: -0.05 }); if (ph < 0.25 + stag) F.flash(x + fx * 1.7, yy + 1.4, z + fz * 1.7, 0.32); }
+        else T.set(s * n + i, x, yy, z, h, { aR: -0.5 + 0.35 * Math.sin(t * 3 + i), aL: -0.9, tool: -1.35 });
+        if (ph < 6) F.smoke(x + fx * (1.8 + ph * 0.4), yy + 1.5 + ph * 0.35, z + fz * (1.8 + ph * 0.4), 0.3 + ph * 0.45); } }
+    guns.forEach(([a, dz, s], k) => { const ph = (t + k * 1.7) % 6, [x, gy, z, ry] = P(a, dz), h = ry + (s ? -Math.PI / 2 : Math.PI / 2), [fx, fz] = fwdOf(h); if (ph < 0.3) F.flash(x + fx * 2.2, gy + 0.9, z + fz * 2.2, 1.2);
+      if (ph < 5) for (let q = 0; q < 3; q++) F.smoke(x + fx * (2.5 + ph * 0.8 + q), gy + 1 + ph * 0.5, z + fz * (2.5 + ph * 0.8 + q), 0.8 + ph * 0.8);
+      const bp = ph - 0.6; if (bp > 0 && bp < 3) { const [bx, bg, bz] = P(a * 0.6 + k * 7, s ? dA + 25 : dB - 25); if (bp < 0.25) F.flash(bx, bg + 1, bz, 2.4); F.smoke(bx, bg + 1 + bp * 2, bz, 1.5 + bp * 1.6); } });
+    if (o.tanks) for (let k = 0; k < 3; k++) { const ph = (t * 0.05 + k / 3) % 1, al = -70 + 140 * Math.abs(ph * 2 - 1), [x, gy, z, ry] = P(al, dA - 30 - k * 8), dir = ph < 0.5 ? 0 : Math.PI;
+      F.box(x, gy + 1.1, z, 3.4, 1.8, 6.5, ry + dir, 0, 0x4a5a3a); F.box(x, gy + 2.3, z, 2.2, 0.9, 2.6, ry + dir, 0, 0x4a5a3a); const [bx, bz] = fwdOf(ry + Math.PI / 2); F.box(x + bx * 2.4, gy + 2.3, z + bz * 2.4, 0.25, 0.25, 3, ry + Math.PI / 2, 0, 0x3a4a2a);
+      if ((t + k * 2) % 7 < 0.3) F.flash(x + bx * 4.2, gy + 2.3, z + bz * 4.2, 1); }
+    if (o.planes) for (let k = 0; k < 3; k++) { const a = t * 0.35 + k * 2.1, [cx, cg, cz] = P(0, 110), x = cx + Math.cos(a) * 160, z = cz + Math.sin(a) * 90, yy = cg + 90 + k * 12, hh = Math.atan2(-Math.sin(a) * 160, Math.cos(a) * 90) + Math.PI / 2;
+      F.box(x, yy, z, 1.2, 1.2, 9, hh, 0, 0x5a6a5a); F.box(x, yy + 0.2, z, 12, 0.2, 2, hh, 0, 0x5a6a5a); }
+    T.done(); F.end(); }; }; }
+// ---- the Battle of Hastings: Norman knights charging a Saxon shield wall, archers' volleys
+const hastings = (K, g, P, y) => { const T = new Troop(g, 34), F = new FX(g);
+  for (let i = 0; i < 14; i++) T.color(i, 0x8a8a90, 0x8a8a90, 0x5a4a3a); for (let i = 14; i < 24; i++) T.color(i, 0x6a4a2a, 0x8a8a90); for (let i = 24; i < 34; i++) T.color(i, 0x7a6a50, 0x4a3a2a);
+  return t => { F.begin(); const ch = (t % 14) / 14;
+    for (let i = 0; i < 14; i++) { const [x, gy, z, ry] = P(-20 + i * 3, 150); T.set(i, x, gy, z, ry - Math.PI / 2, { aL: -1.2, aR: -0.3 + 0.2 * Math.sin(t * 2 + i), tool: -1.2 }); F.box(x - Math.sin(ry + Math.PI / 2) * 0.6, gy + 1.1, z + 0.6, 1.0, 1.4, 0.12, ry, 0, [0xb8302a, 0xd8c83a, 0x2a4a8a][i % 3]); }   // the shield wall
+    for (let i = 0; i < 10; i++) { const d = ch < 0.6 ? 70 + ch / 0.6 * 70 : 140 - (ch - 0.6) / 0.4 * 70, [x, gy, z, ry] = P(-15 + i * 3.5, d - (i % 2) * 3), h = ry + (ch < 0.6 ? Math.PI / 2 : -Math.PI / 2), gal = Math.sin(t * 9 + i) * 0.15;
+      F.box(x, gy + 1.2 + gal, z, 0.9, 1.0, 2.4, h, 0, [0x4a3a2a, 0x2a2a2a, 0xd8d0c0][i % 3]); F.box(x + Math.sin(h) * 1.2, gy + 1.8 + gal, z + Math.cos(h) * 1.2, 0.4, 0.9, 0.5, h, -0.5, 0x4a3a2a);
+      T.set(14 + i, x, gy + 0.9 + gal, z, h, { aR: -1.5, aL: -0.6, tool: -0.1, tl: 2.2, walk: -1.0 }); }   // knights with lances
+    for (let i = 0; i < 10; i++) { const [x, gy, z, ry] = P(-30 + i * 3, 55), h = ry + Math.PI / 2, ph = (t + i * 0.1) % 5; T.set(24 + i, x, gy, z, h, { aL: -2.0, aR: ph < 1 ? -1.6 : -1.9, tool: -0.6, tl: 0.8 });
+      if (ph > 1 && ph < 3.2) { const [tx, tg, tz] = P(-20 + i * 3, 150); arc(F, x, z, tx, tz, gy, (ph - 1) / 2.2, 30, 0x3a2a1a, 0.9); } }
+    T.done(); F.end(); }; };
+// ---- a Roman legion advancing with shields, javelins thrown
+const legion = (K, g, P, y) => { const T = new Troop(g, 40), F = new FX(g); for (let i = 0; i < 32; i++) T.color(i, 0xa8302a, 0x9a9aa0, 0x5a4a3a); for (let i = 32; i < 40; i++) T.color(i, 0x5a6a3a, 0x8a6a3a);
+  return t => { F.begin(); const adv = (Math.sin(t * 0.2) * 0.5 + 0.5) * 30;
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 8; c++) { const i = r * 8 + c, [x, gy, z, ry] = P(-10 + c * 2.4, 60 + adv - r * 2.2), h = ry + Math.PI / 2, w = Math.sin(t * 5 + c) * 0.35; T.set(i, x, gy, z, h, { walk: w, aL: -1.0, aR: -0.4, tool: -0.3 });
+      F.box(x + Math.sin(h) * 0.5, gy + 1.0, z + Math.cos(h) * 0.5, 0.9, 1.2, 0.1, h, 0, 0xa8302a); }
+    for (let i = 0; i < 8; i++) { const [x, gy, z, ry] = P(-12 + i * 3, 150), h = ry - Math.PI / 2, ph = (t + i * 0.3) % 6; T.set(32 + i, x, gy, z, h, { aR: ph < 1 ? -2.6 : -0.4, aL: -0.5 }); }
+    const ph = t % 6; if (ph > 1 && ph < 3) for (let c = 0; c < 8; c++) { const [x, gy, z] = P(-10 + c * 2.4, 60 + adv), [tx, , tz] = P(-12 + c * 3, 150); arc(F, x, z, tx, tz, gy, (ph - 1) / 2, 18, 0x6a4a2a, 2); }
+    T.done(); F.end(); }; };
+// ---- the Saturn V launch (1969), the Wright Flyer (1903), the Clermont (1807), building the pyramid (c. 2580 BCE)
+function saturn(K) { let h = 0; for (const [d, L, c] of [[10, 42, 0xf4f4f0], [10, 25, 0xf4f4f0], [6.6, 18, 0xf4f4f0], [6.6, 8, 0x2a2a2a], [3.9, 4, 0xf4f4f0]]) { K.add("cyl", "wall", 0, h, 0, d, L, d, 0, c); K.add("cyl", "wall", 0, h + L * 0.82, 0, d + 0.1, L * 0.05, d + 0.1, 0, 0x1a1a1a); h += L; } K.add("cone", "wall", 0, h, 0, 3.9, 6, 3.9, 0, 0xf4f4f0); K.add("box", "wall", 0, h + 6, 0, 0.3, 10, 0.3, 0, 0xd83a2a); }
+const launch = (K, g, P) => { const RK = new Kit(); saturn(RK); const rk = RK.build(); g.add(rk); const [x, gy, z] = P(0, 130); rk.position.set(x, gy, z); const F = new FX(g); K.add("box", "lead", x + 12, gy, z, 4, 110, 4, 0, 0x8a3a2a);
+  return t => { F.begin(); const a = t % 45; let yy = 0; if (a > 5) yy = 0.55 * (a - 5) ** 2; rk.position.y = gy + yy; rk.visible = yy < 2500;
+    if (a > 3) { F.glow(x, gy + yy - 6, z, 5 + Math.sin(t * 30) * 0.8); F.glow(x, gy + yy - 14, z, 3.5); }
+    for (let q = 0; q < 26; q++) { const ag = ((t * 1.3 + q * 0.37) % 9), puffY = Math.max(0, yy - ag * 0.55 * Math.max(0, a - 5) * 2.2); if (a > 3 && puffY < 2000) F.smoke(x + Math.sin(q * 2.3) * (4 + ag * 3), gy + puffY + 2, z + Math.cos(q * 2.3) * (4 + ag * 3), 4 + ag * 2.2); }
+    F.end(); }; };
+const wright = (K, g, P) => { const W = new Kit(); for (const e of [0, 1.8]) W.add("box", "wall", 0, e, 0, 1.9, 0.08, 12.3, 0, 0xe8dcc0); W.add("box", "wood", 0, 0.9, 2.5, 0.1, 1.8, 0.1, 0); W.add("box", "wall", 0, 0.9, -3.5, 1.2, 1.2, 0.08, 0, 0xe8dcc0); const fl = W.build(); g.add(fl);
+  const T = new Troop(g, 1); T.color(0, 0x3a3a3a, 0x3a3a3a); return t => { const a = t % 16, al = -40 + a * 6, [x, gy, z, ry] = P(al, 60), up = a > 3 ? Math.min(3, (a - 3) * 1.5) * (a < 14 ? 1 : (16 - a) / 2) : 0;
+    fl.position.set(x, gy + 0.3 + up, z); fl.rotation.y = ry + Math.PI; T.set(0, x, gy + 0.6 + up, z, ry + Math.PI, { lean: -1.4, hat: true }); T.done(); }; };
+const clermont = (K, g, P) => { const B = new Kit(); steamboat(B, 0, 0, 0, 0); const bt = B.build(); g.add(bt); const F = new FX(g);
+  return t => { F.begin(); const a = (t % 70) / 70, al = -350 + 700 * a, [x, , z, ry] = P(al, -280); bt.position.set(x, 0, z); bt.rotation.y = ry + Math.PI;
+    for (let q = 0; q < 14; q++) { const ag = (t * 0.8 + q * 0.4) % 6; F.smoke(x + ag * 4 + 0, 13 + ag * 1.4, z, 1 + ag * 0.7); } F.end(); }; };
+const pyramidTeam = (K, g, P, y) => { const T = new Troop(g, 22), F = new FX(g); for (let i = 0; i < 22; i++) T.color(i, 0xe8e0c8, undefined, 0x8a6a48, 0xa8784a);
+  return t => { F.begin(); const a = (t % 24) / 24, base = -30 + 60 * a, [bx, bg, bz, ry] = P(base, 110), h = ry + Math.PI;
+    F.box(bx, bg + 1.1, bz, 2.4, 1.6, 3, ry, 0, 0xd8c8a0); F.box(bx, bg + 0.15, bz, 1.6, 0.3, 4.2, ry, 0, 0x6a4a2c);
+    for (let i = 0; i < 20; i++) { const row = i % 2, k = (i / 2) | 0, [x, gy, z] = P(base + 4 + k * 1.3, 110 + (row ? 1.4 : -1.4)); T.set(i, x, gy, z, h, { walk: 0.4 * Math.sin(t * 3 + k), lean: 0.4, aR: -1.4, aL: -1.4, hat: false }); }
+    const [wx, wg, wz] = P(base + 2.5, 110); T.set(20, wx, wg, wz, h, { aR: -1.8, aL: -1.8, lean: 0.5, hat: false }); if ((t % 2) < 1) F.box(wx + 0.3, wg + 0.5, wz, 0.1, 0.8, 0.1, ry, 0, 0x6ab0d8);   // pouring water to wet the sand
+    const [ox, og, oz] = P(base + 18, 115); T.set(21, ox, og, oz, h, { aR: -2.6 + 0.6 * Math.sin(t * 4), aL: -0.5 }); T.done(); F.end(); }; };
+// ---- everyday work of each age
+function hammerer(T, i, x, gy, z, h, t, F, k = 0, sparks = true) { const ph = (t * 1.6 + k) % 1, up = ph < 0.6; T.set(i, x, gy, z, h, { aR: up ? -1.0 - ph / 0.6 * 1.7 : -2.7 + (ph - 0.6) / 0.4 * 1.9, aL: -0.9, tool: up ? -1.6 : 0.2, tl: 0.5 });
+  if (sparks && ph > 0.95) { const [fx, fz] = fwdOf(h); for (let q = 0; q < 4; q++) F.flash(x + fx * 0.9 + Math.sin(q * 2.1 + t) * 0.3, gy + 0.9 + q * 0.1, z + fz * 0.9 + Math.cos(q * 1.7 + t) * 0.3, 0.07); } }
+const DAILY_ACT = {
+  bronze: { title: "Casting bronze", text: "A Bronze Age village melts copper and tin in a clay furnace blown by bellows, pours it into moulds, hammers the blades. (In Europe and Asia: North America had no Bronze Age.)", build: (K, g, P) => { const T = new Troop(g, 6), F = new FX(g); for (let i = 0; i < 6; i++) T.color(i, [0x8a6a4a, 0x6a5a3a, 0xa88a5a][i % 3], undefined, 0x5a4a3a);
+      const [fx, fg, fz, ry] = P(0, 110); K.add("cone", "wall", fx, fg, fz, 2.4, 2.6, 2.4, 0, 0x8a5a3a); K.add("box", "wall", fx + 6, fg, fz, 1, 0.8, 0.8, 0, 0x5a5a5a); for (const [a, b] of [[-12, 100], [12, 125], [-14, 130]]) { const [hx, hg, hz] = P(a, b); K.add("cyl", "wall", hx, hg, hz, 6, 2.4, 6, 0, 0xb89a6a); K.add("cone", "roof", hx, hg + 2.4, hz, 7, 3.5, 7, 0, 0x9a8a5a); }
+      return t => { F.begin(); const h = ry + Math.PI / 2; F.glow(fx, fg + 2.6, fz, 0.6 + 0.2 * Math.sin(t * 13)); for (let q = 0; q < 8; q++) { const a = (t * 0.7 + q * 0.6) % 5; F.smoke(fx + a * 0.4, fg + 3 + a * 1.2, fz, 0.4 + a * 0.4); }
+        for (const [k, sd] of [[0, -1], [1, 1]]) { const ph = Math.sin(t * 5 + k * Math.PI); const [x, gy, z] = P(sd * 2.4, 108); T.set(k, x, gy, z, ry + (sd > 0 ? -Math.PI / 2 * 0 + Math.PI : 0), { sit: true, aR: -1.2 + 0.5 * ph, aL: -1.2 + 0.5 * ph }); }   // pumping the bellows
+        const c = (t % 12) / 12, [cx, cg, cz] = P(c < 0.5 ? lerpN(1.5, 6, c * 2) : lerpN(6, 1.5, (c - 0.5) * 2), 112); T.set(2, cx, cg, cz, ry + (c < 0.5 ? Math.PI : 0), { aR: -1.3, aL: -1.3, walk: 0.3 * Math.sin(t * 6) }); if (c < 0.5) F.glow(cx, cg + 1.0, cz + 0.6, 0.25);   // carrying the glowing crucible
+        const [ax, ag, az] = P(6, 104); hammerer(T, 3, ax, ag, az, h, t, F); const [bx, bg, bz] = P(-6, 104); hammerer(T, 4, bx, bg, bz, h, t, F, 0.4); const [sx, sg, sz] = P(-4, 115); T.set(5, sx, sg, sz, h, { sit: true, aR: -1.0 + 0.2 * Math.sin(t * 2), aL: -1.0 });
+        T.done(); F.end(); }; } },
+  iron: { title: "An Iron Age smithy", text: "Iron is smelted in a bloomery and hammered into tools and weapons at the forge. (In Europe, Africa and Asia: iron came to North America only with Europeans.)", build: (K, g, P) => DAILY_ACT.smithy.build(K, g, P, true) },
+  smithy: { title: "The blacksmith", text: "A smith hammers hot iron at the anvil; an apprentice works the bellows; horses wait to be shod.", build: (K, g, P, iron) => { const T = new Troop(g, 3), F = new FX(g); T.color(0, iron ? 0x6a5a3a : 0x3a3a3a, undefined, 0x3a3028); T.color(1, 0x8a6a4a); T.color(2, 0x5a4a3a);
+      const [x, gy, z, ry] = P(0, 110); K.add("box", "wall", x - 2, gy, z, 2, 1.1, 1.6, ry, 0x7a7068); K.add("box", "lead", x + 1, gy, z, 0.5, 0.7, 0.4, ry, 0x2a2a2a); K.add("box", "lead", x + 1, gy + 0.7, z, 0.9, 0.25, 0.4, ry, 0x2a2a2a);
+      K.add("box", "wood", x, gy + 3, z, 8, 0.2, 6, ry, 0x5a4a3a); for (const [a, b] of [[-3.6, -2.6], [3.6, -2.6], [-3.6, 2.6], [3.6, 2.6]]) K.add("box", "wood", x + a * Math.cos(ry) + b * Math.sin(ry), gy, z - a * Math.sin(ry) + b * Math.cos(ry), 0.2, 3, 0.2, 0);
+      if (!iron) { const [hx, hg, hz, hr] = P(10, 112); animal(K, "horse", hx, hg, hz, hr, 1); }
+      return t => { F.begin(); const h = ry - Math.PI / 2 * 0 + Math.PI / 2; F.glow(x - 2, gy + 1.15, z, 0.35 + 0.15 * Math.sin(t * 11)); for (let q = 0; q < 6; q++) { const a = (t * 0.8 + q * 0.7) % 4; F.smoke(x - 2, gy + 1.5 + a * 1.4, z, 0.3 + a * 0.35); }
+        const [ax, ag, az] = P(1, 108.6); hammerer(T, 0, ax, ag, az, h, t, F); const [bx, bg, bz] = P(-3.4, 110); T.set(1, bx, bg, bz, ry, { aR: -1.0 + 0.6 * Math.sin(t * 4), aL: -1.0 + 0.6 * Math.sin(t * 4) }); const [cx, cg, cz] = P(8, 113); T.set(2, cx, cg, cz, ry + Math.PI, { aL: -0.4 }); T.done(); F.end(); }; } },
+  plough: { title: "Ploughing", text: "A farmer ploughs behind a team of oxen; others sow and harrow.", build: (K, g, P) => { const T = new Troop(g, 3), F = new FX(g); for (let i = 0; i < 3; i++) T.color(i, [0x5a4a3a, 0xc8bca0, 0x3a4a6a][i], 0x6a5a3a);
+      for (let k = 0; k < 10; k++) { const [x, gy, z, ry] = P(0, 95 + k * 4); K.add("box", "wall", x, gy - 0.1, z, 2.2, 0.25, 70, ry, 0x5a4430); }
+      return t => { F.begin(); const ph = (t * 0.04) % 1, al = -34 + 68 * Math.abs(ph * 2 - 1), dz = 95 + Math.floor(t * 0.04 * 2) % 10 * 4, back = ph >= 0.5, [x, gy, z, ry] = P(al, dz), h = ry + (back ? 0 : Math.PI), [fx, fz] = fwdOf(h);
+        for (const e of [-0.7, 0.7]) F.box(x + fx * 3.5 + Math.cos(h) * e, gy + 0.9, z + fz * 3.5 - Math.sin(h) * e, 0.8, 1.1, 2.1, h, 0, 0x7a5a3a);
+        T.set(0, x, gy, z, h, { walk: 0.4 * Math.sin(t * 4), aR: -0.8, aL: -0.8, lean: 0.25 }); const [sx, sg, sz] = P(-al * 0.6, dz + 10); T.set(1, sx, sg, sz, h, { walk: 0.4 * Math.sin(t * 4 + 1), aR: -1.2 + 0.8 * Math.sin(t * 2), aL: -0.6 }); const [kx, kg, kz] = P(20, 88); T.set(2, kx, kg, kz, ry, {}); T.done(); F.end(); }; } },
+  lenape: { title: "A Lenape village", text: "Women hoe the maize, beans and squash; men fish from dugout canoes on the river and smoke the catch; the people of this valley before Europeans came.", build: (K, g, P) => { const T = new Troop(g, 8), F = new FX(g); for (let i = 0; i < 8; i++) T.color(i, [0x8a6a4a, 0xa88a6a, 0x6a4a30][i % 3], 0x1a1410, 0x6a4a30, 0xa8784a);
+      for (let k = 0; k < 40; k++) { const [x, gy, z] = P(-14 + (k % 8) * 3.5, 100 + ((k / 8) | 0) * 3.5); K.add("cyl", "leaf", x, gy, z, 0.3, 1.8, 0.3, 0, 0x5a8a2a); } const [lx, lg, lz, ry] = P(14, 120); longhouse(K, lx, lg, lz, ry, 18);
+      const canoes = [new Kit(), new Kit()].map(C => { C.add("box", "wood", 0, 0, 0, 0.8, 0.5, 7, 0); const m = C.build(); g.add(m); return m; });
+      return t => { F.begin(); const h = ry + Math.PI / 2; for (let i = 0; i < 4; i++) { const [x, gy, z] = P(-12 + i * 7, 102 + (i % 2) * 6); T.set(i, x, gy, z, h, { lean: 0.6, aR: -1.6 + 0.6 * Math.sin(t * 2.5 + i), aL: -1.6 + 0.6 * Math.sin(t * 2.5 + i), tool: 0.6, tl: 0.9 }); }
+        const [fx, fg, fz] = P(8, 132); F.glow(fx, fg + 0.3, fz, 0.4 + 0.12 * Math.sin(t * 12)); for (let q = 0; q < 6; q++) { const a = (t * 0.6 + q * 0.7) % 5; F.smoke(fx, fg + 1 + a * 1.3, fz, 0.4 + a * 0.4); } const [px, pg, pz] = P(9.5, 133); T.set(4, px, pg, pz, ry, { sit: true, aR: -1.2 });
+        canoes.forEach((cm, k) => { const a = ((t * 0.01 + k * 0.5) % 1), al = -200 + 400 * a, [x, , z, rr] = P(al, -205 - k * 30); cm.position.set(x, 0.1, z); cm.rotation.y = rr + Math.PI / 2 * 0; T.set(5 + k, x, -0.3, z, rr + Math.PI, { aR: -1.2 + 0.9 * Math.sin(t * 2 + k), aL: -1.2 + 0.9 * Math.sin(t * 2 + k), tool: 0.9, tl: 1.0 }); });
+        const [wx, wg, wz] = P(-18, 125); T.set(7, wx, wg, wz, ry, { walk: 0 }); T.done(); F.end(); }; } },
+  masons: { title: "Masons at work", text: "Masons dress stone and set it in the walls; a treadwheel crane, turned by men walking inside it, lifts the blocks. (Europe: the age of castles and cathedrals.)", build: (K, g, P) => { const T = new Troop(g, 6), F = new FX(g); for (let i = 0; i < 6; i++) T.color(i, [0x8a6a4a, 0x6a5a48, 0x9a3a2a][i % 3], 0xd8d0c0);
+      const [wx, wg, wz, ry] = P(0, 128); K.add("box", "wall", wx, wg, wz, 26, 9, 2.4, ry + Math.PI / 2, 0xd8ccb0); scaffold(K, wx, wg, wz - 2, 26, 10, 2, ry);
+      const wheel = new THREE.Group(); { const W = new Kit(); for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; W.add("box", "wood", 0, Math.sin(a) * 2.4, Math.cos(a) * 2.4, 2, 0.25, 1.3, 0, 0x6a4a2c); } wheel.add(W.build()); } const [cx, cg, cz] = P(-14, 118); wheel.position.set(cx, cg + 2.6, cz); wheel.rotation.y = ry + Math.PI / 2; g.add(wheel);
+      K.add("box", "wood", cx, cg, cz + 3, 0.4, 12, 0.4, 0); return t => { F.begin(); wheel.children[0].rotation.x = t * 0.6; const [tx, tg, tz] = P(-14, 118); T.set(0, tx, tg + 0.3, tz, ry, { walk: 0.4 * Math.sin(t * 3) });
+        const lift = (t * 0.4) % 10; F.box(cx, cg + 1 + lift, cz + 3, 1.2, 0.8, 1, ry, 0, 0xd8ccb0);
+        for (let i = 1; i < 5; i++) { const [x, gy, z] = P(-8 + i * 4, 120); hammerer(T, i, x, gy, z, ry + Math.PI / 2, t, F, i * 0.25); F.box(x + 0, gy + 0.4, z + 0.9, 0.9, 0.8, 0.9, ry, 0, 0xd8ccb0); } const [ux, ug, uz] = P(6, 128); T.set(5, ux, ug + 9, uz - 1.2, ry + Math.PI / 2, { aR: -1.2, aL: -1.2 }); T.done(); F.end(); }; } },
+  farm: { title: "The first farmers", text: "Early farmers hoe, sow and harvest wheat and barley, with mud-brick houses and penned sheep and goats. (First in the Near East, about 11,500 years ago; farming reached this valley much later.)", build: (K, g, P) => { const T = new Troop(g, 6), F = new FX(g); for (let i = 0; i < 6; i++) T.color(i, [0xc8b890, 0x8a6a4a, 0xa88a6a][i % 3], undefined, 0x8a6a48, 0xa8784a);
+      for (const [a, b] of [[-14, 128], [-6, 132], [10, 130]]) { const [x, gy, z, ry] = P(a, b); K.add("box", "wall", x, gy, z, 5, 2.6, 5, ry, 0xb89a72); K.add("box", "wall", x, gy + 2.6, z, 5.2, 0.3, 5.2, ry, 0x8a7a5a); } for (let k = 0; k < 6; k++) { const [x, gy, z, ry] = P(-14 + k * 6, 112); animal(K, k % 2 ? "deer" : "cow", x, gy, z, ry, 0.5); }
+      return t => { F.begin(); for (let i = 0; i < 5; i++) { const [x, gy, z, ry] = P(-16 + i * 7, 98 + (i % 2) * 4), h = ry + Math.PI / 2; if (i === 4) T.set(i, x, gy, z, h, { walk: 0.3 * Math.sin(t * 2), aR: -1.0 + 0.9 * Math.sin(t * 1.5), aL: -0.6 }); else T.set(i, x, gy, z, h, { lean: 0.55, aR: -1.6 + 0.7 * Math.sin(t * 2.2 + i), aL: -1.6 + 0.7 * Math.sin(t * 2.2 + i), tool: 0.7, tl: 0.8 }); }
+        const [x, gy, z, ry] = P(2, 125); T.set(5, x, gy, z, ry, { sit: true, aR: -1.0 + 0.4 * Math.sin(t * 3), aL: -1.0 + 0.4 * Math.sin(t * 3) }); T.done(); F.end(); }; } },
+  hunt: { title: "The hunt", text: "Clovis hunters close in on a mastodon with spears tipped with fluted stone points: this valley, about 13,000 years ago.", build: (K, g, P) => { const T = new Troop(g, 6), F = new FX(g); for (let i = 0; i < 6; i++) T.color(i, 0x8a6a4a, 0x5a3a24, 0x6a4a30, 0xa8784a);
+      const [mx, mg, mz, ry] = P(0, 115); animal(K, "mastodon", mx, mg, mz, ry + 0.6, 1.1); return t => { F.begin(); for (let i = 0; i < 6; i++) { const a = t * 0.12 + i * 1.05, r = 12 + 2 * Math.sin(t * 0.5 + i), x = mx + Math.cos(a) * r, z = mz + Math.sin(a) * r, gy = mg, h = Math.atan2(mx - x, mz - z), ph = (t + i * 1.3) % 8;
+        T.set(i, x, gy, z, h, { walk: 0.5 * Math.sin(t * 5 + i), aR: ph < 1.2 ? -2.8 : -1.2, aL: -0.7, tool: ph < 1.2 ? -0.2 : -0.6, tl: 1.7 }); if (ph > 1.2 && ph < 2.4) arc(F, x, z, mx, mz, gy, (ph - 1.2) / 1.2, 3, 0x6a4a2c, 2.2); } T.done(); F.end(); }; } },
+  camp: { title: "A hunters' camp", text: "People sit round the fire; one knaps a stone tool, striking flakes from a core. (Stone tools are more than 3 million years old; fire has been controlled for perhaps a million.)", build: (K, g, P) => { const T = new Troop(g, 5), F = new FX(g); for (let i = 0; i < 5; i++) T.color(i, 0x8a6a4a, 0x2a1a10, 0x6a4a30, 0x9a6a48); const [fx, fg, fz, ry] = P(0, 112); K.add("cone", "hide", fx + 8, fg, fz + 6, 4, 3.4, 4, 0, 0xa88a6a);
+      return t => { F.begin(); F.glow(fx, fg + 0.35, fz, 0.5 + 0.15 * Math.sin(t * 13)); for (let q = 0; q < 8; q++) { const a = (t * 0.7 + q * 0.6) % 5; F.smoke(fx + a * 0.3, fg + 1 + a * 1.3, fz, 0.4 + a * 0.4); }
+        for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + 0.4, x = fx + Math.cos(a) * 2.2, z = fz + Math.sin(a) * 2.2; T.set(i, x, fg, z, Math.atan2(fx - x, fz - z), { sit: true, aR: -1.1 + (i === 0 ? 0.6 * Math.sin(t * 7) : 0), aL: -1.1, hat: false }); if (i === 0 && Math.sin(t * 7) > 0.95) F.flash(x + (fx - x) * 0.3, fg + 0.6, z + (fz - z) * 0.3, 0.05); }
+        T.set(4, fx + 6, fg, fz - 4, ry, { walk: 0.3 * Math.sin(t * 4), aR: -0.3 }); T.done(); F.end(); }; } } };
+for (const k in DAILY_ACT) { const A = DAILY_ACT[k], b = A.build; A.label = true; }
+const DAILY = [[1830, 1900, ["plough"]], [1650, 1830, ["smithy", "plough"]], [1300, 1650, ["lenape"]], [500, 1300, ["lenape", "masons"]], [-500, 500, ["masons", "lenape"]], [-1200, -500, ["iron"]], [-3300, -1200, ["bronze"]],
+  [-9500, -3300, ["farm"]], [NOW - 13300, -9500, ["hunt", "camp"]], [NOW - 300000, NOW - 13300, ["camp"]]];
+const ACTS = [[1969, { title: "Apollo 11 launches", text: "The Saturn V lifts off, carrying three astronauts toward the Moon." }, launch], [1944, { title: "The Second World War", text: "Infantry, tanks and aircraft (shown as a generic battle of 1944, the year of D-Day)." }, battle({ colA: 0x5a6a3a, hatA: 0x4a5a32, legA: 0x5a6a3a, colB: 0x6a6a68, hatB: 0x5a5a5a, legB: 0x5a5a58, tanks: true, planes: true, cannon: true, kneel: true })],
+  [1916, { title: "The First World War", text: "Trench warfare and artillery (shown as 1916, the year of the Somme and Verdun)." }, battle({ colA: 0x8a7a54, hatA: 0x6a6a50, legA: 0x8a7a54, colB: 0x6a6e66, hatB: 0x5a5e58, legB: 0x6a6e66, trench: true, cannon: true })],
+  [1863, { title: "The Civil War", text: "Union and Confederate lines fire volleys, cannon behind them (shown as 1863, the year of Gettysburg)." }, battle({ colA: 0x2a3a6a, hatA: 0x2a3a6a, legA: 0x6a7a9a, colB: 0x8a8a8a, hatB: 0x7a7a7a, legB: 0x8a8a8a, cannon: true, kneel: true })],
+  [1777, { title: "The Battles of Saratoga", text: "Up this very river: American troops defeat a British army, the turning point of the Revolution." }, battle({ colA: 0x3a4a7a, hatA: 0x1a1a1a, legA: 0xe8e0d0, colB: 0xb8282a, hatB: 0x1a1a1a, legB: 0xe8e0d0, cannon: true })],
+  [1903, { title: "The first powered flight", text: "The Wright Flyer hops into the air at Kitty Hawk: 12 seconds, 37 m." }, wright], [1807, { title: "The Clermont", text: "Fulton's steamboat churns up the Hudson to Albany in 32 hours." }, clermont],
+  [1066, { title: "The Battle of Hastings", text: "Norman knights and archers attack the Saxon shield wall; William the Conqueror wins England." }, hastings], [-51, { title: "A Roman legion", text: "Legionaries advance behind their shields and hurl javelins (shown as 52 BCE, Caesar's siege of Alesia)." }, legion],
+  [-2578, { title: "Building the Great Pyramid", text: "Teams drag limestone blocks on wooden sledges, wetting the sand to ease the way." }, pyramidTeam]];
+EVENTS.push([1777, "The Battles of Saratoga, on the Hudson: the turning point of the Revolution."], [1944, "D-Day: the Allied landings in Normandy."], [1916, "The Battles of the Somme and Verdun."], [1863, "The Battle of Gettysburg."], [-51, "Caesar besieges Alesia (52 BCE)."]);
+SC[1969] = (K, P, y) => { crowd(K, P, 0, 40, 40, 20, y, 0); flag(K, P, -15, 35, [0xb8382a, 0xf0f0f0, 0xb8382a, 0xf0f0f0, 0x2a3a6a]); };   // the rocket itself now launches (below)
+SC[1807] = (K, P, y) => crowd(K, P, 0, -150, 30, 18, y);
+const LIVE = new Map();
+function actList(xT) { const out = [];
+  for (const [yr, lab, build] of ACTS) { const ex = xOfYear(yr); if (ex - xT > -900 && ex - xT < 1800) out.push(["E" + yr, ex, build, lab]); }
+  for (let k = Math.floor((xT - 900) / 600); k <= Math.floor((xT + 1800) / 600); k++) { const x = k * 600 + 300, y = yearAt(x), D = DAILY.find(d => y >= d[0] && y < d[1]); if (!D || iceThick(y) > 30 || x < 0) continue;
+    if (ACTS.some(A => Math.abs(xOfYear(A[0]) - x) < 260)) continue; const kind = D[2][Math.floor(hash(k, 7) * D[2].length)], A = DAILY_ACT[kind]; out.push(["D" + k, x, A.build, A]); }
+  return out; }
+function updateActs(xT, t) { const want = actList(xT), keys = new Set(want.map(w => w[0]));
+  for (const [k, L] of LIVE) if (!keys.has(k)) { unanchor(L.g); L.g.traverse(o => { if (o.isInstancedMesh) o.dispose(); if (o.material?.map) o.material.map.dispose(); }); LIVE.delete(k); }
+  let built = 0; for (const [k, ex, build, lab] of want) { if (LIVE.has(k) || built >= 1) continue; built++; const g = new THREE.Group(), K = new Kit(), y = yearAt(ex);
+    const P = (along, dz0) => { const dz = dz0 >= 0 ? dz0 - 50 : dz0, x = ex + along, z = trackZ(x) + dz;   // (scenes brought 50 m nearer the line)
+ return [along, dz < -RIVER0 ? 0 : Math.max(terrainH(x, z), 0.2), z, trackH(x)]; };
+    const upd = build(K, g, P, y); g.add(K.build()); plaque(g, P, lab.title, lab.text); LIVE.set(k, { g: anchor(g, ex, 0, 0), upd, ex }); }
+  for (const L of LIVE.values()) if (Math.abs(L.ex - xT) < 1600) L.upd(t); }
+
 // ---------- timelines: lanes on the river side of the line, a band for each life, country and species, from its start year to its end ----------
 // Years are calendar years (negative = BCE, astronomically: -43 is 44 BCE); species are given in years before present. Dates are the usual
 // published ones; "c." ones are approximate. Lanes are assigned so overlapping bands sit side by side.
@@ -624,6 +797,46 @@ function updateTimelines(xT) { const lo = xT - 700, hi = xT + 1400; let n = 0; c
     const z = trackZ(w.x) + w.dz + 1.5, h = Math.max(terrainH(w.x, z), 0.2); L.g.position.set(w.x - ORIGIN.x, h + 1.8, z - ORIGIN.z); L.g.rotation.y = trackH(w.x) + Math.PI / 2; if (L.prop) { const px = w.x + 8, pz = trackZ(px) + w.dz; L.prop.position.set(px - ORIGIN.x, Math.max(terrainH(px, pz), 0.2), pz - ORIGIN.z); } }
   for (const L of TLAB) L.g.visible = !!L.key; }
 EVENTS.push([1681, "The last dodos die on Mauritius."], [1768, "The last Steller's sea cows are killed."], [1914, "Martha, the last passenger pigeon, dies; billions once flew over this valley."], [1936, "The last thylacine (Tasmanian tiger) dies."]);
+
+// ---------- leaders: an upright board on each country's lane at the year each leader took power ----------
+const LEADERS = {
+  "United States": [[1789, "George Washington"], [1797, "John Adams"], [1801, "Thomas Jefferson"], [1809, "James Madison"], [1817, "James Monroe"], [1825, "John Quincy Adams"], [1829, "Andrew Jackson"], [1837, "Martin Van Buren"], [1841, "William Henry Harrison"], [1841.5, "John Tyler"],
+    [1845, "James K. Polk"], [1849, "Zachary Taylor"], [1850, "Millard Fillmore"], [1853, "Franklin Pierce"], [1857, "James Buchanan"], [1861, "Abraham Lincoln"], [1865, "Andrew Johnson"], [1869, "Ulysses S. Grant"], [1877, "Rutherford B. Hayes"], [1881, "James A. Garfield"], [1881.5, "Chester A. Arthur"],
+    [1885, "Grover Cleveland"], [1889, "Benjamin Harrison"], [1893, "Grover Cleveland"], [1897, "William McKinley"], [1901, "Theodore Roosevelt"], [1909, "William Howard Taft"], [1913, "Woodrow Wilson"], [1921, "Warren G. Harding"], [1923, "Calvin Coolidge"], [1929, "Herbert Hoover"],
+    [1933, "Franklin D. Roosevelt"], [1945, "Harry S. Truman"], [1953, "Dwight D. Eisenhower"], [1961, "John F. Kennedy"], [1963, "Lyndon B. Johnson"], [1969, "Richard Nixon"], [1974, "Gerald Ford"], [1977, "Jimmy Carter"], [1981, "Ronald Reagan"], [1989, "George H. W. Bush"],
+    [1993, "Bill Clinton"], [2001, "George W. Bush"], [2009, "Barack Obama"], [2017, "Donald Trump"], [2021, "Joe Biden"], [2025, "Donald Trump"]],
+  "United Kingdom": [[1707, "Queen Anne"], [1714, "George I"], [1727, "George II"], [1760, "George III"], [1820, "George IV"], [1830, "William IV"], [1837, "Queen Victoria"], [1901, "Edward VII"], [1910, "George V"], [1936, "Edward VIII"], [1936.5, "George VI"], [1952, "Elizabeth II"], [2022, "Charles III"]],
+  "Kingdom of England": [[927, "Æthelstan"], [1016, "Cnut the Great"], [1042, "Edward the Confessor"], [1066, "William I (the Conqueror)"], [1087, "William II"], [1100, "Henry I"], [1135, "Stephen"], [1154, "Henry II"], [1189, "Richard I (the Lionheart)"], [1199, "John"], [1216, "Henry III"],
+    [1272, "Edward I"], [1307, "Edward II"], [1327, "Edward III"], [1377, "Richard II"], [1399, "Henry IV"], [1413, "Henry V"], [1422, "Henry VI"], [1461, "Edward IV"], [1483, "Richard III"], [1485, "Henry VII"], [1509, "Henry VIII"], [1547, "Edward VI"], [1553, "Mary I"],
+    [1558, "Elizabeth I"], [1603, "James I"], [1625, "Charles I"], [1653, "Oliver Cromwell (Lord Protector)"], [1660, "Charles II"], [1685, "James II"], [1689, "William III and Mary II"], [1702, "Queen Anne"]],
+  "New Netherland (Dutch)": [[1626, "Peter Minuit (director)"], [1647, "Peter Stuyvesant (director-general)"]],
+  "Soviet Union": [[1922, "Vladimir Lenin"], [1924, "Joseph Stalin"], [1953, "Nikita Khrushchev"], [1964, "Leonid Brezhnev"], [1982, "Yuri Andropov"], [1984, "Konstantin Chernenko"], [1985, "Mikhail Gorbachev"]],
+  "Qing dynasty": [[1644, "Shunzhi Emperor"], [1661, "Kangxi Emperor"], [1722, "Yongzheng Emperor"], [1735, "Qianlong Emperor"], [1796, "Jiaqing Emperor"], [1850, "Xianfeng Emperor"], [1861, "Empress Dowager Cixi (regent)"], [1908, "Puyi"]],
+  "Ming dynasty": [[1368, "Hongwu Emperor"], [1402, "Yongle Emperor"], [1435, "Zhengtong Emperor"], [1572, "Wanli Emperor"], [1627, "Chongzhen Emperor"]],
+  "Mughal Empire": [[1526, "Babur"], [1530, "Humayun"], [1556, "Akbar the Great"], [1605, "Jahangir"], [1628, "Shah Jahan"], [1658, "Aurangzeb"], [1707, "Bahadur Shah I"], [1837, "Bahadur Shah II"]],
+  "Ottoman Empire": [[1299, "Osman I"], [1326, "Orhan"], [1451, "Mehmed II (the Conqueror)"], [1512, "Selim I"], [1520, "Suleiman the Magnificent"], [1566, "Selim II"], [1623, "Murad IV"], [1808, "Mahmud II"], [1876, "Abdul Hamid II"], [1918, "Mehmed VI"]],
+  "Aztec Empire": [[1428, "Itzcoatl"], [1440, "Moctezuma I"], [1486, "Ahuitzotl"], [1502, "Moctezuma II"]], "Inca Empire": [[1438, "Pachacuti"], [1471, "Topa Inca"], [1493, "Huayna Capac"], [1532, "Atahualpa"]],
+  "Mali Empire": [[1235, "Sundiata Keita"], [1312, "Mansa Musa"], [1341, "Mansa Suleyman"]], "Mongol Empire": [[1206, "Genghis Khan"], [1229, "Ögedei Khan"], [1251, "Möngke Khan"], [1260, "Kublai Khan"]],
+  "Holy Roman Empire": [[962, "Otto I"], [1155, "Frederick I Barbarossa"], [1220, "Frederick II"], [1273, "Rudolf I"], [1519, "Charles V"], [1740, "Maria Theresa (with Francis I)"], [1792, "Francis II"]],
+  "Byzantine Empire": [[330, "Constantine the Great"], [527, "Justinian I"], [610, "Heraclius"], [976, "Basil II"], [1081, "Alexios I Komnenos"], [1449, "Constantine XI"]], "Abbasid Caliphate": [[750, "al-Saffah"], [786, "Harun al-Rashid"], [813, "al-Ma'mun"]],
+  "Tang dynasty": [[618, "Emperor Gaozu"], [626, "Emperor Taizong"], [690, "Empress Wu Zetian"], [712, "Emperor Xuanzong"]],
+  "Roman Empire (West)": [[-26, "Augustus"], [14, "Tiberius"], [37, "Caligula"], [41, "Claudius"], [54, "Nero"], [69, "Vespasian"], [79, "Titus"], [81, "Domitian"], [98, "Trajan"], [117, "Hadrian"], [138, "Antoninus Pius"], [161, "Marcus Aurelius"], [180, "Commodus"],
+    [193, "Septimius Severus"], [284, "Diocletian"], [306, "Constantine the Great"], [379, "Theodosius I"], [475, "Romulus Augustulus"]],
+  "Roman Republic": [[-508, "the first consuls"], [-81, "Sulla (dictator)"], [-48, "Julius Caesar (dictator)"], [-43, "the Second Triumvirate"]], "Han dynasty": [[-201, "Emperor Gaozu"], [-140, "Emperor Wu"], [25, "Emperor Guangwu"]],
+  "Achaemenid Persian Empire": [[-549, "Cyrus the Great"], [-529, "Cambyses II"], [-521, "Darius I"], [-485, "Xerxes I"], [-335, "Darius III"]], "Akkadian Empire (c.)": [[-2333, "Sargon of Akkad"], [-2253, "Naram-Sin"]],
+  "Ancient Egypt, dynastic (c.)": [[-3099, "Narmer"], [-2588, "Khufu"], [-1478, "Hatshepsut"], [-1457, "Thutmose III"], [-1352, "Akhenaten"], [-1332, "Tutankhamun"], [-1278, "Ramesses II"], [-50, "Cleopatra VII"]] };
+const LEAD = []; for (const [cn, L] of Object.entries(LEADERS)) { const it = TL.countries.items.find(i => i[0] === cn); if (!it) continue; L.forEach(([y, nm], k) => LEAD.push({ cn, nm, y0: y, y1: k + 1 < L.length ? L[k + 1][0] : it[2], it })); }
+const LBOARDS = []; for (let k = 0; k < 10; k++) { const c = document.createElement("canvas"); c.width = 640; c.height = 220; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const g = new THREE.Group(), b = new THREE.Mesh(new THREE.PlaneGeometry(8.5, 2.9), new THREE.MeshBasicMaterial({ map: t, toneMapped: false })); b.position.y = 4.6; g.add(b); const bk = new THREE.Mesh(new THREE.PlaneGeometry(8.5, 2.9), M(0x2a3a5a)); bk.rotation.y = Math.PI; bk.position.y = 4.6; g.add(bk);
+  const p = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.2, 0.2).translate(0, 1.6, 0), M(0x4a4a4a)); g.add(p); g.scale.setScalar(1.7); WORLD.add(g); LBOARDS.push({ g, c, t, L: null }); }
+const fy = v => { const r = Math.floor(v); return r > 0 ? String(r) : `${1 - r} BCE`; };
+function updateLeaders(xT) { const near = LEAD.filter(L => { const x = xOfYear(L.y0); return x > xT - 700 && x < xT + 1500; }).sort((a, b) => Math.abs(xOfYear(a.y0) - xT) - Math.abs(xOfYear(b.y0) - xT)).slice(0, LBOARDS.length);
+  for (const B of LBOARDS) if (B.L && !near.includes(B.L)) B.L = null;
+  for (const L of near) { if (LBOARDS.some(B => B.L === L)) continue; const B = LBOARDS.find(B => !B.L); if (!B) break; B.L = L; const g = B.c.getContext("2d"); g.fillStyle = "#16284a"; g.fillRect(0, 0, 640, 220); g.strokeStyle = "#d8b84a"; g.lineWidth = 8; g.strokeRect(4, 4, 632, 212);
+    g.fillStyle = "#ffe08a"; let fs = 54; do { g.font = `700 ${fs}px Georgia, serif`; } while (g.measureText("👑 " + L.nm).width > 600 && --fs > 24); g.fillText("👑 " + L.nm, 22, 80);
+    g.fillStyle = "#e8eef8"; g.font = "32px Georgia, serif"; g.fillText(L.cn.replace(/ \(c\.\)/, ""), 22, 136); g.fillStyle = "#9ab8e8"; g.fillText(`${fy(L.y0)} – ${L.y1 >= NOW ? "now" : fy(L.y1)}`, 22, 186); B.t.needsUpdate = true; }
+  const laneW = Math.min(4.5, 36 / Math.max(1, TL.countries.nl));
+  for (const B of LBOARDS) { B.g.visible = !!B.L; if (!B.L) continue; const x = xOfYear(B.L.y0) - 3, z = trackZ(x) + TL.countries.dz0 - B.L.it.lane * laneW + 3, h = Math.max(terrainH(x, z), 0.2); B.g.position.set(x - ORIGIN.x, h, z - ORIGIN.z); B.g.rotation.y = trackH(x) + Math.PI / 2; } }   // facing the line from the river side
 
 // ---------- the journey ----------
 // A year passes every second, so days and seasons would flicker past 365 times a second: the light is held at a summer afternoon.
@@ -689,7 +902,7 @@ function frame() {
   fwd.y = 0; fwd.normalize(); side.set(-fwd.z, 0, fwd.x);
   if (mx || my) { const sp = 1.3 * run * dt, nx = P_.x + (fwd.x * -my + side.x * mx) * sp, nz = P_.z + (fwd.z * -my + side.z * mx) * sp; if (walkable(nx, nz)) { P_.x = nx; P_.z = nz; } else if (walkable(nx, P_.z)) P_.x = nx; else if (walkable(P_.x, nz)) P_.z = nz; }
   rig.position.set(P_.x, vr && SITTING ? 0.45 : 0, P_.z);
-  updateGround(trainX, tz); streamTiles(trainX); updateSigns(trainX); updateBoards(trainX); updateLines(trainX); updateScenes(trainX); updateInventions(trainX); updateArch(trainX);
+  updateGround(trainX, tz); streamTiles(trainX); updateSigns(trainX); updateBoards(trainX); updateLines(trainX); updateScenes(trainX); updateInventions(trainX); updateArch(trainX); updateActs(trainX, t); updateLeaders(trainX);
   // a summer afternoon's light; the sky a little colder in the ice ages
   const S = sunDir(15.5, 42), ice = iceThick(yearAt(trainX)) / 1100; sun.position.copy(S.v).multiplyScalar(800); sun.intensity = 2.4; hemi.intensity = 1.05;
   const upC = new THREE.Color(0.32, 0.52, 0.84).lerp(new THREE.Color(0.55, 0.65, 0.8), ice * 0.4), hor = new THREE.Color(0.80, 0.85, 0.88).lerp(new THREE.Color(0.9, 0.93, 0.96), ice * 0.5);
@@ -699,7 +912,7 @@ function frame() {
   msgT -= dt; if (msgT <= 0 && MSG.style.display !== "none") { MSG.style.display = "none"; msgText = ""; vrDirty = true; }
   itTm -= dt; if (itTm <= 0) { itTm = 0.5; drawItinerary(trainX); }
   hudT -= dt; if (hudT <= 0) { hudT = 0.25; const y = yearAt(camera.getWorldPosition(V3(0, 0, 0)).x + ORIGIN.x), n = nextStop();   // the year where you are standing BIG.textContent = fmtYear(y);
-    HUD.innerHTML = `<b>One year every second</b> · ${CARS[carAt(P_.z)]}${running ? "" : " · paused"}<br>${n ? `next: <b>${n[1]}</b> (${fmtYear(n[0])}) in ${fmtWait((xOfYear(n[0]) - trainX) / V)}` : ""}<br>
+    HUD.innerHTML = `<b>One year every second</b> · ${CARS[carAt(P_.z)]}${running ? "" : " · paused"}<br>${n ? `next: <b>${n[1]}</b> (${fmtYear(n[0])}) in ${fmtWait((xOfYear(n[0]) - trainX) / V)}, ${fmtDist((xOfYear(n[0]) - trainX) / V)} down the line` : ""}<br>
       <span style="color:#9ab4c8;font-size:12.5px">WASD walk · drag to look · N jump to the next stop · P pause · E in a roomette berth: sleep 8 hours (28,800 years)</span>`;
     if (vr) drawVR(fmtYear(y), msgText || (n ? `next: ${n[1]} in ${fmtWait((xOfYear(n[0]) - trainX) / V)} · left stick walk · right stick turn · A sleep / next stop · Y jump ahead` : "")); }
   renderer.render(scene, camera);
