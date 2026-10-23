@@ -53322,8 +53322,8 @@ let mapPanel;
   for (let r = 0; r < 5; r++) { const z = -CAR_L / 2 + 4 + r * 3.6; for (const sd of [-1, 1]) { const x = sd * 0.95;
       box(g, 0.7, 0.42, 0.7, x, 0.21, z, IMT.velvet); box(g, 0.12, 0.6, 0.7, x - sd * 0.32, 0.6, z, IMT.velvet); box(g, 0.7, 0.3, 0.12, x, 0.55, z - 0.32, IMT.velvet); box(g, 0.7, 0.3, 0.12, x, 0.55, z + 0.32, IMT.velvet); } }
   box(g, 2.2, 1.05, 0.5, 0, 0.52, CAR_L / 2 - 1.2, IMT.wood); box(g, 2.3, 0.05, 0.6, 0, 1.06, CAR_L / 2 - 1.2, IMT.brass);   // the bar
-  mapPanel = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.5), new THREE.MeshBasicMaterial({ map: mapT, toneMapped: false })); mapPanel.position.set(0, 1.45, -CAR_L / 2 + 0.95); g.add(mapPanel);   // facing back into the car
-  box(g, 2.6, 1.7, 0.06, 0, 1.45, -CAR_L / 2 + 0.9, IMT.wood);
+  mapPanel = new THREE.Mesh(new THREE.PlaneGeometry(1.25, 0.8), new THREE.MeshBasicMaterial({ map: mapT, toneMapped: false })); mapPanel.position.set(-0.8, 1.35, -CAR_L / 2 + 2.46); g.add(mapPanel);   // on a stand beside the aisle (the door stays clear)
+  box(g, 1.35, 1.8, 0.06, -0.8, 0.9, -CAR_L / 2 + 2.42, IMT.wood);
   addLight(g, 0, 2.2, -5, 0.5); addLight(g, 0, 2.2, 5, 0.5); }
 // the observation car: glass walls and roof, armchairs turned outward, and an open platform with a railing at the very back
 { const k = 4, g = shell(k, { glass: true, noBack: true }); WALK.push([-1.3, 1.3, carZ(k) - CAR_L / 2 - 0.1, carZ(k) + CAR_L / 2 + 0.05]); WALK.push([-1.35, 1.35, carZ(k) + CAR_L / 2, carZ(k) + CAR_L / 2 + 2.3]);
