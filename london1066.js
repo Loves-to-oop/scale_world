@@ -298,6 +298,137 @@ function groundColor(x, z, h, c) {
   if (v === 0 && Math.hypot(x - moorX, (z - moorZ) * 1.5) < 420) c.lerp(_c1.setRGB(0.42 + 0.06 * n1, 0.40, 0.27), 0.6);       // Moorfields fen
   return c; }
 
+// ---------- buildings as real geometry, merged by area ----------
+// Every building is built from its parts at true size (posts, wall panels, thick roofs, ridges, doors, shutters), with textures laid
+// at real scale (1 unit of texture = 1 m) and a colour per building, then merged into one mesh per material per 500 m square.
+const GT = (w, h, draw, metres) => { const t = tex(w, h, draw); t.repeat.set(1 / metres, 1 / metres); return t; };
+const G_TEX = {
+  daub: GT(256, 256, (g, w, h) => { speckle("#b0a084", 4000, ["#bcae92", "#a09074", "#c4b89c", "#968a70", "#aaa088"], 3, 3)(g, w, h);   // clay daub over wattle, smoothed by hand: 2 m square
+    for (let k = 0; k < 90; k++) { g.fillStyle = `rgba(${rnd() < 0.5 ? "80,66,46" : "200,186,160"},.10)`; g.beginPath(); g.ellipse(rnd() * w, rnd() * h, 8 + rnd() * 26, 6 + rnd() * 18, rnd() * 3, 0, 6.283); g.fill(); }   // hand-smoothed, uneven
+    g.fillStyle = "rgba(60,48,32,.35)"; g.fillRect(0, h - 14, w, 14); }, 2),
+  plank: GT(256, 256, (g, w, h) => { g.fillStyle = "#7a6a58"; g.fillRect(0, 0, w, h); for (let x = 0; x < w; x += 32) { const c = ["#8a7a66", "#76665a", "#948472", "#6e604e", "#827260"][(x / 32) % 5]; g.fillStyle = c; g.fillRect(x + 1, 0, 30, h);   // split oak planks, 25 cm
+      for (let k = 0; k < 14; k++) { g.fillStyle = "rgba(30,22,14,.22)"; g.fillRect(x + 2 + rnd() * 27, rnd() * h, 1, 10 + rnd() * 40); } g.fillStyle = "rgba(15,10,6,.55)"; g.fillRect(x, 0, 2, h); } g.fillStyle = "rgba(40,30,20,.4)"; g.fillRect(0, h - 10, w, 10); }, 2),
+  oak: GT(128, 128, (g, w, h) => { g.fillStyle = "#3e3024"; g.fillRect(0, 0, w, h); for (let k = 0; k < 160; k++) { g.fillStyle = ["rgba(80,62,44,.5)", "rgba(28,20,14,.5)"][k % 2]; g.fillRect(rnd() * w, 0, 1 + rnd() * 2, h); } }, 1),
+  thatch: GT(256, 256, (g, w, h) => { g.fillStyle = "#7e6a46"; g.fillRect(0, 0, w, h);   // water reed / straw, laid in courses; weathered grey-brown with moss
+    for (let k = 0; k < 6000; k++) { const x = rnd() * w, y = rnd() * h, l = 5 + rnd() * 14; g.strokeStyle = ["#9a8458", "#6a5836", "#8a7650", "#5a4a30", "#a8946a", "#7a7458"][(rnd() * 6) | 0]; g.globalAlpha = 0.55; g.lineWidth = 0.8 + rnd(); g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - 0.5) * 1.5, y + l); g.stroke(); }
+    g.globalAlpha = 1; for (let y = 0; y < h; y += 43) { g.fillStyle = "rgba(30,22,10,.28)"; g.fillRect(0, y, w, 4); g.fillStyle = "rgba(200,180,130,.12)"; g.fillRect(0, y + 4, w, 3); }
+    for (let k = 0; k < 18; k++) { g.fillStyle = "rgba(70,84,40,.18)"; g.beginPath(); g.arc(rnd() * w, rnd() * h, 6 + rnd() * 18, 0, 6.283); g.fill(); } }, 2),
+  shingle: GT(256, 256, (g, w, h) => { g.fillStyle = "#5e564a"; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 16) for (let x = ((y / 16) % 2) * 12; x < w; x += 24) {   // riven oak shingles, 15 x 20 cm courses
+      g.fillStyle = ["#7e7466", "#6e665a", "#8a8070", "#746a5c", "#686054"][(rnd() * 5) | 0]; g.fillRect(x + 1, y, 22, 15); g.fillStyle = "rgba(0,0,0,.4)"; g.fillRect(x, y + 14, 24, 2); } }, 2),
+  rubble: GT(256, 256, (g, w, h) => { g.fillStyle = "#9a9282"; g.fillRect(0, 0, w, h); for (let k = 0; k < 700; k++) { g.fillStyle = ["#a8a090", "#888070", "#b0a898", "#7a7466", "#9c8a78", "#8a5a44"][(rnd() * 6) | 0]; const x = rnd() * w, y = rnd() * h, sw = 8 + rnd() * 14, sh = 5 + rnd() * 7; g.fillRect(x, y, sw, sh); g.fillStyle = "rgba(0,0,0,.2)"; g.fillRect(x, y + sh, sw, 1); } }, 2),   // ragstone rubble with reused Roman tile, lime mortar
+  stave: GT(256, 256, (g, w, h) => { for (let x = 0; x < w; x += 40) { const gr = g.createLinearGradient(x, 0, x + 40, 0); gr.addColorStop(0, "#2e2418"); gr.addColorStop(0.5, "#6a5642"); gr.addColorStop(1, "#2e2418"); g.fillStyle = gr; g.fillRect(x, 0, 40, h);   // split logs set upright, round side out (as at Greensted)
+      for (let k = 0; k < 10; k++) { g.fillStyle = "rgba(20,14,8,.3)"; g.fillRect(x + 6 + rnd() * 28, rnd() * h, 1, 20 + rnd() * 40); } } }, 2),
+  char: GT(128, 128, speckle("#201a16", 1500, ["#2c2420", "#141010", "#3e3028", "#4a3a2a", "#5a5048"], 4, 6), 2),
+  hang: GT(128, 256, (g, w, h) => { g.fillStyle = "#7a2a24"; g.fillRect(0, 0, w, h); g.fillStyle = "#c89a3a"; g.fillRect(0, 10, w, 10); g.fillRect(0, h - 20, w, 10);   // a hall hanging: woollen cloth with an embroidered border
+    for (let x = 6; x < w; x += 24) { g.fillStyle = "#2a3a5a"; g.beginPath(); g.moveTo(x, 30); g.lineTo(x + 10, 44); g.lineTo(x, 58); g.lineTo(x - 10, 44); g.fill(); } g.fillStyle = "rgba(0,0,0,.15)"; for (let x = 0; x < w; x += 16) g.fillRect(x, 0, 2, h); }, 2),
+  rush: GT(256, 256, (g, w, h) => { speckle("#5e5038", 3000, ["#7a6a44", "#4a3e2a", "#8a7a52", "#6a5a3a"], 6, 1.5)(g, w, h); }, 2) };
+const G_MAT = {}; for (const k in G_TEX) G_MAT[k] = new THREE.MeshStandardMaterial({ map: G_TEX[k], vertexColors: true, roughness: k === "oak" ? 0.85 : 0.95 });
+G_MAT.dark = new THREE.MeshStandardMaterial({ color: 0x0e0a06, vertexColors: true, roughness: 1 });
+G_MAT.plain = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
+const GCOL = new Map(), GCHUNK = 500;
+function gcol(key) { if (!GCOL.has(key)) GCOL.set(key, { pos: [], nor: [], uv: [], col: [], mat: key.split("|")[1] }); return GCOL.get(key); }
+// a frame: where a building stands; local x across, z along its length, y up from its base
+const FR = (x, z, ry, gy, chunkKey) => ({ x, z, gy, c: Math.cos(ry), s: Math.sin(ry), key: chunkKey ?? `${Math.floor(x / GCHUNK)},${Math.floor(z / GCHUNK)}` });
+const _gp = [0, 0, 0];
+function gw(F, lx, ly, lz) { return [F.x + lx * F.c + lz * F.s, F.gy + ly, F.z - lx * F.s + lz * F.c]; }
+let GTINT = [1, 1, 1];
+// a polygon of 3 or 4 local points, uvs given; if `out` (a local direction) is given, the winding is turned to face it
+function gpoly(F, mat, P, UV, out) { const C = gcol(F.key + "|" + mat), W = P.map(p => gw(F, ...p));
+  const ax = W[1][0] - W[0][0], ay = W[1][1] - W[0][1], az = W[1][2] - W[0][2], bx = W[2][0] - W[0][0], by = W[2][1] - W[0][1], bz = W[2][2] - W[0][2];
+  let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+  if (out) { const ox = out[0] * F.c + out[2] * F.s, oy = out[1], oz = -out[0] * F.s + out[2] * F.c; if (nx * ox + ny * oy + nz * oz < 0) { W.reverse(); UV = UV.slice().reverse(); nx = -nx; ny = -ny; nz = -nz; } }
+  const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+  const idx = W.length === 4 ? [0, 1, 2, 0, 2, 3] : [0, 1, 2];
+  for (const i of idx) { C.pos.push(...W[i]); C.nor.push(nx, ny, nz); C.uv.push(...UV[i]); C.col.push(...GTINT); } }
+// an axis-aligned box in the frame, centre (cx, cy, cz), sizes; skip faces with skip = "b" bottom, "t" top
+function gbox(F, mat, cx, cy, cz, sx, sy, sz, skip = "b") { const hx = sx / 2, hy = sy / 2, hz = sz / 2;
+  const f = (n, P, U) => gpoly(F, mat, P, U, n);
+  f([1, 0, 0], [[cx + hx, cy - hy, cz + hz], [cx + hx, cy - hy, cz - hz], [cx + hx, cy + hy, cz - hz], [cx + hx, cy + hy, cz + hz]], [[0, cy - hy], [sz, cy - hy], [sz, cy + hy], [0, cy + hy]]);
+  f([-1, 0, 0], [[cx - hx, cy - hy, cz - hz], [cx - hx, cy - hy, cz + hz], [cx - hx, cy + hy, cz + hz], [cx - hx, cy + hy, cz - hz]], [[0, cy - hy], [sz, cy - hy], [sz, cy + hy], [0, cy + hy]]);
+  f([0, 0, 1], [[cx - hx, cy - hy, cz + hz], [cx + hx, cy - hy, cz + hz], [cx + hx, cy + hy, cz + hz], [cx - hx, cy + hy, cz + hz]], [[0, cy - hy], [sx, cy - hy], [sx, cy + hy], [0, cy + hy]]);
+  f([0, 0, -1], [[cx + hx, cy - hy, cz - hz], [cx - hx, cy - hy, cz - hz], [cx - hx, cy + hy, cz - hz], [cx + hx, cy + hy, cz - hz]], [[0, cy - hy], [sx, cy - hy], [sx, cy + hy], [0, cy + hy]]);
+  if (!skip.includes("t")) f([0, 1, 0], [[cx - hx, cy + hy, cz + hz], [cx + hx, cy + hy, cz + hz], [cx + hx, cy + hy, cz - hz], [cx - hx, cy + hy, cz - hz]], [[0, 0], [sx, 0], [sx, sz], [0, sz]]);
+  if (!skip.includes("b")) f([0, -1, 0], [[cx - hx, cy - hy, cz - hz], [cx + hx, cy - hy, cz - hz], [cx + hx, cy - hy, cz + hz], [cx - hx, cy - hy, cz + hz]], [[0, 0], [sx, 0], [sx, sz], [0, sz]]); }
+// a round-headed opening (dark), facing `out`, centred at (cx, cz) on a wall, sill at y0, width w, height h to the top of the arch
+function garch(F, mat, cx, y0, cz, w, h, out) { const r = w / 2, ys = y0 + h - r, N = 6, along = out[0] ? [0, 0, 1] : [1, 0, 0], P = (u, y) => [cx + along[0] * u + out[0] * 0.03, y, cz + along[2] * u + out[2] * 0.03];
+  gpoly(F, mat, [P(-r, y0), P(r, y0), P(r, ys), P(-r, ys)], [[0, 0], [1, 0], [1, 1], [0, 1]], out);
+  for (let k = 0; k < N; k++) { const a0 = Math.PI * k / N, a1 = Math.PI * (k + 1) / N; gpoly(F, mat, [P(0, ys), P(r * Math.cos(a0), ys + r * Math.sin(a0)), P(r * Math.cos(a1), ys + r * Math.sin(a1))], [[0, 0], [1, 0], [1, 1]], out); } }
+// a thatched or shingled roof with real thickness: gabled (ridge along z) or hipped; eaves overhang e, verge overhang g
+function groof(F, mat, w, d, wh, rh, o = {}) { const t = o.t ?? (mat === "thatch" ? 0.38 : 0.16), e = o.e ?? (mat === "thatch" ? 0.5 : 0.35), g = o.g ?? 0.3, k = rh / (w / 2), W2 = w / 2 + e, ye = wh - e * k, yr = wh + rh, tv = t * Math.hypot(1, k), under = o.under || mat;
+  const sl = Math.hypot(W2, yr - ye);
+  if (!o.hip) { const L = d / 2 + g;
+    for (const sx of [-1, 1]) { const A = [sx * W2, ye + tv, -L], B = [sx * W2, ye + tv, L], C = [0, yr + tv, L], D = [0, yr + tv, -L], uv = [[0, 0], [2 * L, 0], [2 * L, sl], [0, sl]];
+      gpoly(F, mat, [A, B, C, D], uv, [sx, 1, 0]);
+      gpoly(F, under, [[sx * W2, ye, -L], [sx * W2, ye, L], [0, yr, L], [0, yr, -L]], uv, [-sx * 0.3, -1, 0]);
+      gpoly(F, mat, [[sx * W2, ye, -L], [sx * W2, ye, L], B, A], [[0, 0], [2 * L, 0], [2 * L, t], [0, t]], [sx, 0, 0]);
+      for (const sz of [-1, 1]) gpoly(F, mat, [[sx * W2, ye, sz * L], [0, yr, sz * L], [0, yr + tv, sz * L], [sx * W2, ye + tv, sz * L]], [[0, 0], [sl, 0], [sl, t], [0, t]], [0, 0, sz]); }
+    if (mat === "thatch") for (let q = 0; q < 6; q++) { const a0 = Math.PI * q / 6, a1 = Math.PI * (q + 1) / 6, r = 0.3, y0 = yr + tv - 0.12; gpoly(F, "thatch", [[r * Math.cos(a0), y0 + r * Math.sin(a0) * 0.8, -L - 0.05], [r * Math.cos(a0), y0 + r * Math.sin(a0) * 0.8, L + 0.05], [r * Math.cos(a1), y0 + r * Math.sin(a1) * 0.8, L + 0.05], [r * Math.cos(a1), y0 + r * Math.sin(a1) * 0.8, -L - 0.05]], [[0, 0], [2 * L, 0], [2 * L, 0.3], [0, 0.3]], [Math.cos((a0 + a1) / 2), Math.sin((a0 + a1) / 2), 0]); }
+    else gbox(F, "oak", 0, yr + tv + 0.04, 0, 0.22, 0.12, 2 * L + 0.1); }
+  else { const Le = d / 2 + e, Rz = Math.max(0.25, d / 2 - w / 2), slz = Math.hypot(Le - Rz, yr - ye);
+    for (const sx of [-1, 1]) { gpoly(F, mat, [[sx * W2, ye + tv, -Le], [sx * W2, ye + tv, Le], [0, yr + tv, Rz], [0, yr + tv, -Rz]], [[0, 0], [2 * Le, 0], [Le + Rz, sl], [Le - Rz, sl]], [sx, 1, 0]);
+      gpoly(F, under, [[sx * W2, ye, -Le], [sx * W2, ye, Le], [0, yr, Rz], [0, yr, -Rz]], [[0, 0], [2 * Le, 0], [Le + Rz, sl], [Le - Rz, sl]], [-sx * 0.3, -1, 0]);
+      gpoly(F, mat, [[sx * W2, ye, -Le], [sx * W2, ye, Le], [sx * W2, ye + tv, Le], [sx * W2, ye + tv, -Le]], [[0, 0], [2 * Le, 0], [2 * Le, t], [0, t]], [sx, 0, 0]); }
+    for (const sz of [-1, 1]) { gpoly(F, mat, [[-W2, ye + tv, sz * Le], [W2, ye + tv, sz * Le], [0, yr + tv, sz * Rz]], [[0, 0], [2 * W2, 0], [W2, slz]], [0, 1, sz]);
+      gpoly(F, under, [[-W2, ye, sz * Le], [W2, ye, sz * Le], [0, yr, sz * Rz]], [[0, 0], [2 * W2, 0], [W2, slz]], [0, -1, -sz * 0.3]);
+      gpoly(F, mat, [[-W2, ye, sz * Le], [W2, ye, sz * Le], [W2, ye + tv, sz * Le], [-W2, ye + tv, sz * Le]], [[0, 0], [2 * W2, 0], [2 * W2, t], [0, t]], [0, 0, sz]);
+      if (mat === "thatch") { const ys = yr + tv - (yr - ye) * 0.12 / (Le - Rz) * 4, zz = sz * (Rz + 0.48); gpoly(F, "dark", [[-0.3, ys - 0.02, zz], [0.3, ys - 0.02, zz], [0, yr + tv - 0.05, sz * (Rz + 0.05)]], [[0, 0], [1, 0], [0.5, 1]], [0, 1, sz]); }   // a smoke hole near the top of the hip
+    }
+    if (mat === "thatch") gbox(F, "thatch", 0, yr + tv - 0.05, 0, 0.5, 0.25, 2 * Rz + 0.4); } }
+// the timber house: low walls on earth-fast oak posts, wattle-and-daub or planks; door in a frame; shuttered window openings
+function gHouse(H) { const F = FR(H.x, H.z, H.ry, H.gy, H.chunkKey), w = H.w, d = H.d, wh = H.wh, rh = H.rh, R = seeded((H.x * 7 + H.z * 13) | 0);
+  const bw = 0.85 + R() * 0.25, br = 0.8 + R() * 0.3, tintW = H.wall === "daub" ? (R() < 0.3 ? [1.3, 1.3, 1.27] : [bw, bw * 0.98, bw * 0.95]) : [bw, bw * 0.97, bw * 0.94];   // some daub limewashed
+  const tintR = H.roof === "thatch" ? (R() < 0.25 ? [1.15, 1.1, 0.95] : [br, br * 0.98, br * 0.93]) : [br, br, br];   // a few roofs new-thatched, most weathered
+  GTINT = tintW; gbox(F, H.wall, 0, wh / 2 - 0.15, 0, w, wh + 0.3, d);
+  if (!H.hip) for (const sz of [-1, 1]) gpoly(F, H.wall, [[-w / 2, wh, sz * d / 2], [w / 2, wh, sz * d / 2], [0, wh + rh, sz * d / 2]], [[0, wh], [w, wh], [w / 2, wh + rh]], [0, 0, sz]);   // the gable ends
+  GTINT = [0.9 + R() * 0.2, 0.9, 0.9]; const post = (x, z) => gbox(F, "oak", x, wh / 2 - 0.1, z, 0.22, wh + 0.2, 0.22, "b");
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) post(sx * w / 2, sz * d / 2);
+  if (H.wall === "daub" && !IS_HEADSET) { const nz = Math.max(1, Math.round(d / 1.3)), nx = Math.max(1, Math.round(w / 1.3));
+    for (let i = 1; i < nz; i++) for (const sx of [-1, 1]) gbox(F, "oak", sx * (w / 2 + 0.02), wh / 2 - 0.1, -d / 2 + d * i / nz, 0.05, wh + 0.2, 0.16, "bt");
+    for (let i = 1; i < nx; i++) for (const sz of [-1, 1]) gbox(F, "oak", -w / 2 + w * i / nx, wh / 2 - 0.1, sz * (d / 2 + 0.02), 0.16, wh + 0.2, 0.05, "bt"); }
+  for (const sx of [-1, 1]) gbox(F, "oak", sx * w / 2, wh - 0.08, 0, 0.26, 0.2, d + 0.1, "b");   // wall plates
+  // the doorway: oak jambs and lintel, a plank door
+  const dr = H.door, onX = dr === "+x" || dr === "-x", sg = dr[0] === "+" ? 1 : -1, n = onX ? [sg, 0, 0] : [0, 0, sg], ox = onX ? sg * (w / 2 + 0.04) : 0, oz = onX ? 0 : sg * (d / 2 + 0.04), dw = 0.95, dh = Math.min(1.8, wh - 0.2);
+  const at = (u, y) => onX ? [ox, y, u] : [u, y, oz];
+  GTINT = [1.05, 1, 0.95]; gpoly(F, "plank", [at(-dw / 2, 0), at(dw / 2, 0), at(dw / 2, dh), at(-dw / 2, dh)], [[0, 0], [dw, 0], [dw, dh], [0, dh]], n);
+  GTINT = [1, 1, 1]; for (const u of [-dw / 2 - 0.09, dw / 2 + 0.09]) { const [px, , pz] = at(u, 0); gbox(F, "oak", px, dh / 2, pz, onX ? 0.12 : 0.16, dh, onX ? 0.16 : 0.12); }
+  { const [px, , pz] = at(0, 0); gbox(F, "oak", px, dh + 0.08, pz, onX ? 0.12 : dw + 0.4, 0.16, onX ? dw + 0.4 : 0.12); }
+  // window openings with a shutter, one on each long wall
+  for (const sx of [-1, 1]) { if (onX && sx === sg) continue; const z = (R() - 0.5) * d * 0.4, wy = Math.min(1.3, wh - 0.75); GTINT = [1, 1, 1];
+    gpoly(F, "dark", [[sx * (w / 2 + 0.03), wy, z - 0.28], [sx * (w / 2 + 0.03), wy, z + 0.28], [sx * (w / 2 + 0.03), wy + 0.42, z + 0.28], [sx * (w / 2 + 0.03), wy + 0.42, z - 0.28]], [[0, 0], [1, 0], [1, 1], [0, 1]], [sx, 0, 0]);
+    gbox(F, "plank", sx * (w / 2 + 0.06), wy - 0.24, z, 0.04, 0.42, 0.56, ""); }
+  // a lean-to on some
+  if (H.lean) { const lw = 1.8, lh = wh * 0.7, sx = H.lean, lz = d * 0.25; GTINT = tintW; gbox(F, "plank", sx * (w / 2 + lw / 2), lh / 2 - 0.1, lz, lw, lh + 0.2, d * 0.45);
+    GTINT = tintR; const x0 = sx * (w / 2 + lw + 0.3), x1 = sx * w / 2, y0 = lh - 0.1, y1 = wh - 0.05, L = d * 0.45 / 2 + 0.2, rm = H.roof;
+    gpoly(F, rm, [[x0, y0 + 0.2, lz - L], [x0, y0 + 0.2, lz + L], [x1, y1 + 0.2, lz + L], [x1, y1 + 0.2, lz - L]], [[0, 0], [2 * L, 0], [2 * L, 2], [0, 2]], [sx, 1, 0]);
+    gpoly(F, rm, [[x0, y0, lz - L], [x0, y0, lz + L], [x1, y1, lz + L], [x1, y1, lz - L]], [[0, 0], [2 * L, 0], [2 * L, 2], [0, 2]], [0, -1, 0]); }
+  GTINT = tintR; groof(F, H.roof, w, d, wh, rh, { hip: H.hip });
+  GTINT = [1, 1, 1]; }
+// a burnt house in Southwark: stumps of charred posts and wall, fallen timbers, a black floor
+function gBurnt(H) { const F = FR(H.x, H.z, H.ry, H.gy), R = seeded((H.x * 5 + H.z * 3) | 0), w = H.w, d = H.d; GTINT = [1, 1, 1];
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) gbox(F, "char", sx * w / 2, 0.6 + R() * 0.6, sz * d / 2, 0.24, 1.2 + R() * 1.8, 0.24);
+  for (const sx of [-1, 1]) gbox(F, "char", sx * w / 2, 0.25, 0, 0.18, 0.2 + R() * 0.7, d * (0.4 + R() * 0.5));
+  for (let k = 0; k < 4; k++) { const L = 2 + R() * 3; gbox(F, "char", (R() - 0.5) * w, 0.12, (R() - 0.5) * d, 0.2, 0.2, L); }
+  gpoly(F, "char", [[-w / 2, 0.05, -d / 2], [w / 2, 0.05, -d / 2], [w / 2, 0.05, d / 2], [-w / 2, 0.05, d / 2]], [[0, 0], [w, 0], [w, d], [0, d]], [0, 1, 0]);
+  if (R() < 0.25) { gbox(F, "oak", -w / 2, 1.3, -d / 2, 0.22, 2.6, 0.22); gbox(F, "oak", w / 2, 1.3, -d / 2, 0.22, 2.6, 0.22); gbox(F, "oak", 0, 2.5, -d / 2, w, 0.2, 0.22); } }   // new posts going up
+// the Late Saxon parish church: nave and chancel, rubble or split-log walls, small round-headed windows, a bellcote, shingles
+function gChurch(x, z, o) { const gy = groundH(x, z) - 0.3, F = FR(x, z, 0, gy), nl = o.nl, nw = o.nw, cl = o.cl, cw = o.cw, wh = o.wh, wm = o.mat === "plank" ? "stave" : "rubble", rf = o.roof;
+  const NF = FR(x, z, Math.PI / 2, gy, F.key), CF = FR(x + nl / 2 + cl / 2, z, Math.PI / 2, gy, F.key);   // frames with the ridge running east-west
+  GTINT = wm === "rubble" ? [1.05, 1.03, 1.0] : [1, 1, 1];
+  gbox(NF, wm, 0, wh / 2, 0, nw, wh, nl); for (const sz of [-1, 1]) gpoly(NF, wm, [[-nw / 2, wh, sz * nl / 2], [nw / 2, wh, sz * nl / 2], [0, wh + nw * 0.6, sz * nl / 2]], [[0, wh], [nw, wh], [nw / 2, wh + nw * 0.6]], [0, 0, sz]);
+  gbox(CF, wm, 0, wh * 0.4, 0, cw, wh * 0.8, cl); gpoly(CF, wm, [[-cw / 2, wh * 0.8, cl / 2], [cw / 2, wh * 0.8, cl / 2], [0, wh * 0.8 + cw * 0.6, cl / 2]], [[0, 0], [cw, 0], [cw / 2, 1]], [0, 0, 1]);
+  if (wm === "rubble") { GTINT = [1.25, 1.2, 1.1]; for (const sx of [-1, 1]) for (const sz of [-1, 1]) gbox(NF, "rubble", sx * nw / 2, wh / 2, sz * nl / 2, 0.45, wh, 0.45); }   // dressed quoins at the corners
+  GTINT = [1, 1, 1]; for (const sx of [-1, 1]) for (const f of [0.25, 0.7]) garch(NF, "dark", sx * nw / 2, wh * 0.45, -nl / 2 + nl * f, 0.4, 1.1, [sx, 0, 0]);
+  garch(CF, "dark", 0, wh * 0.35, cl / 2, 0.4, 1.0, [0, 0, 1]); garch(NF, "dark", 0, 0, -nl / 2, 1.2, 2.5, [0, 0, -1]);
+  GTINT = [1, 1, 1]; groof(NF, rf, nw, nl, wh, nw * 0.6, { e: 0.3, g: 0.25 }); groof(CF, rf, cw, cl, wh * 0.8, cw * 0.6, { e: 0.3, g: 0.2 });
+  const by = wh + nw * 0.6; gbox(NF, wm, 0, by + 0.7, -nl / 2 + 0.3, 1.3, 1.4, 0.6, "b"); garch(NF, "dark", 0, by + 0.2, -nl / 2, 0.55, 0.9, [0, 0, -1]); groof(FR(x - nl / 2 + 0.3, z, Math.PI / 2, gy + by + 1.4, F.key), "shingle", 1.5, 0.8, 0, 0.6, { e: 0.1, g: 0.1 });   // the bellcote
+  gbox(NF, "oak", 0, by + 2.4, -nl / 2 + 0.3, 0.1, 0.9, 0.1); gbox(NF, "oak", 0, by + 2.55, -nl / 2 + 0.3, 0.5, 0.1, 0.1); }
+// flush everything into meshes, one per material per square
+function gFlush(target) { const out = [];
+  for (const [key, C] of GCOL) { if (!C.pos.length) continue; const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(C.pos, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(C.nor, 3));
+    g.setAttribute("uv", new THREE.Float32BufferAttribute(C.uv, 2)); g.setAttribute("color", new THREE.Float32BufferAttribute(C.col.map(v => clampN(v, 0, 1.6)), 3)); g.computeBoundingSphere();
+    const m = new THREE.Mesh(g, G_MAT[C.mat]); m.userData.key = key; (target || scene).add(m); out.push(m); }
+  GCOL.clear(); return out; }
+
 // ---------- materials ----------
 const thatchT = tex(256, 256, (g, w, h) => { g.fillStyle = "#8a7448"; g.fillRect(0, 0, w, h);
   for (let k = 0; k < 2600; k++) { const x = rnd() * w, y = rnd() * h, l = 6 + rnd() * 18; g.strokeStyle = ["#a88e5a", "#6e5a34", "#94784a", "#5a4a2c", "#7a7458"][(rnd() * 5) | 0]; g.globalAlpha = 0.5; g.lineWidth = 1 + rnd(); g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - 0.5) * 2, y + l); g.stroke(); }
@@ -354,15 +485,28 @@ function pushOut(p, rad = 0.3) { const L = COLL.get(Math.floor(p.x / CC) * 10000
 // (shingles on better buildings). They stood a little back from the street, often gable-end on, on long narrow plots with yards,
 // cesspits and wells behind. No stone houses are known in London before about 1100.
 const HOUSES = [];
-function addHouse(x, z, w, d, ry, o = {}) { const gy = o.gy ?? groundH(x, z), wh = o.wh ?? 2.4 + hash(x | 0, z | 0) * 0.8, rh = o.rh ?? w * 0.75, wall = o.wall ?? (hash(z | 0, x | 0) < 0.55 ? "daub" : "plank"), roof = o.roof ?? (hash((x * 3) | 0, z | 0) < 0.88 ? "thatch" : "shingle");
-  const H = { x, z, w, d, ry, gy, wh, rh, wall, roof, kind: o.kind || "house", burnt: !!o.burnt, door: o.door ?? "+z" };
-  if (H.burnt) { const left = 0.6 + hash(x | 0, 7) * 1.4; H.wi = put("w:char", BOX_G, MAT.char, x, gy - 0.3, z, w, left, d, ry); H.coll = solid(x, z, w, d, ry, H); HOUSES.push(H); return H; }
-  H.wi = put("w:" + wall, BOX_G, MAT[wall], x, gy - 0.4, z, w, wh + 0.4, d, ry); H.ri = put("r:" + roof, GABLE_G, MAT[roof], x, gy + wh, z, w + 0.8, rh, d + 0.7, ry);
-  const s = Math.sin(ry), c = Math.cos(ry), dr = H.door;   // the doorway: "+z"/"-z" a gable end, "+x"/"-x" a long side
-  H.dp = dr === "+z" ? [x + s * (d / 2 + 0.03), z + c * (d / 2 + 0.03), ry] : dr === "-z" ? [x - s * (d / 2 + 0.03), z - c * (d / 2 + 0.03), ry + Math.PI] :
-    dr === "+x" ? [x + c * (w / 2 + 0.03), z - s * (w / 2 + 0.03), ry + Math.PI / 2] : [x - c * (w / 2 + 0.03), z + s * (w / 2 + 0.03), ry - Math.PI / 2];
-  H.di = put("door", PLANE_G, MAT.dark, H.dp[0], gy, H.dp[1], 1.0, 1.75, 1, H.dp[2]);
-  H.coll = solid(x, z, w, d, ry, H); HOUSES.push(H); return H; }
+function addHouse(x, z, w, d, ry, o = {}) { const gy = o.gy ?? groundH(x, z), R = seeded((x * 31 + z * 17) | 0), wall = o.wall ?? (R() < 0.55 ? "daub" : "plank"), roof = o.roof ?? (R() < 0.88 ? "thatch" : "shingle");
+  const H = { x, z, w, d, ry, gy, wh: o.wh ?? 2.0 + R() * 0.6, rh: o.rh ?? w * (roof === "thatch" ? 0.62 + R() * 0.14 : 0.5), wall, roof, hip: o.hip ?? (roof === "thatch" && R() < 0.5), kind: o.kind || "house", burnt: !!o.burnt, door: o.door ?? "+z" };
+  H.lean = !H.burnt && R() < 0.2 ? (H.door === "+x" ? -1 : 1) : 0;
+  if (!H.burnt) { const s = Math.sin(ry), c = Math.cos(ry), dr = H.door;   // the doorway: "+z"/"-z" a gable end, "+x"/"-x" a long side
+    H.dp = dr === "+z" ? [x + s * (d / 2 + 0.03), z + c * (d / 2 + 0.03), ry] : dr === "-z" ? [x - s * (d / 2 + 0.03), z - c * (d / 2 + 0.03), ry + Math.PI] :
+      dr === "+x" ? [x + c * (w / 2 + 0.03), z - s * (w / 2 + 0.03), ry + Math.PI / 2] : [x - c * (w / 2 + 0.03), z + s * (w / 2 + 0.03), ry - Math.PI / 2]; }
+  H.coll = solid(x, z, w + 0.1, d + 0.1, ry, H); if (H.lean) { const lx = H.lean * (w / 2 + 0.9); solid(x + Math.cos(ry) * lx, z - Math.sin(ry) * lx, 1.8, d * 0.45, ry); }
+  HOUSES.push(H); return H; }
+function buildHouses(fireSet) { for (const H of HOUSES) { if (fireSet.has(H)) continue; if (H.burnt) gBurnt(H); else gHouse(H); }
+  let k = 0; for (const H of fireSet) { H.chunkKey = "fire" + k++; gHouse(H); }
+  for (const m of gFlush()) { const key = m.userData.key; if (!key.startsWith("fire")) continue; const H = [...fireSet][+key.slice(4).split("|")[0]]; (H.fx || (H.fx = [])).push(m); m.userData.mat0 = m.material; } }
+// yard things: woodpiles, barrels, wells, wattle fences
+const wattleT = tex(256, 128, (g, w, h) => { g.fillStyle = "#3a2e20"; g.fillRect(0, 0, w, h); for (let y = 4; y < h; y += 9) { g.fillStyle = ["#7a6446", "#6a5638", "#8a7452"][(y / 9 | 0) % 3]; for (let x = 0; x < w; x += 32) { g.beginPath(); g.ellipse(x + 16 + ((y / 9 | 0) % 2) * 16, y, 17, 4, 0, 0, 6.283); g.fill(); } }
+  g.fillStyle = "#4a3a28"; for (let x = 0; x < w; x += 32) g.fillRect(x + 14, 0, 5, h); }, [8, 1]);
+MAT.wattle = new THREE.MeshStandardMaterial({ map: wattleT, roughness: 1 });
+const logEndT = tex(128, 128, (g, w, h) => { g.fillStyle = "#3a2e22"; g.fillRect(0, 0, w, h); for (let k = 0; k < 60; k++) { const x = rnd() * w, y = rnd() * h, r = 5 + rnd() * 6; g.fillStyle = "#a88a5a"; g.beginPath(); g.arc(x, y, r, 0, 6.283); g.fill(); g.strokeStyle = "#6a5032"; g.beginPath(); g.arc(x, y, r * 0.5, 0, 6.283); g.stroke(); } }, [1, 1]);
+MAT.woodpile = new THREE.MeshStandardMaterial({ map: logEndT, roughness: 1 });
+function yardThings(x, z, ry, R) { const c = Math.cos(ry), s = Math.sin(ry), at = (u, v) => [x + u * c + v * s, z - u * s + v * c], r = R();
+  if (r < 0.35) { const [px, pz] = at((R() - 0.5) * 3, 0); put("woodpile", BOX_G, MAT.woodpile, px, groundH(px, pz), pz, 1.6, 0.9, 0.6, ry); }
+  else if (r < 0.55) { const [px, pz] = at((R() - 0.5) * 3, 0); put("barrel", CYL_G, MAT.wood, px, groundH(px, pz), pz, 0.6, 0.85, 0.6); }
+  else if (r < 0.68) { const [px, pz] = at((R() - 0.5) * 3, 1); put("well", CYL_G, MAT.wattle, px, groundH(px, pz), pz, 1.2, 0.7, 1.2); put("wellpost", BOX_G, MAT.wood, px + 0.5, groundH(px, pz), pz, 0.12, 1.6, 0.12); put("wellpost", BOX_G, MAT.wood, px - 0.5, groundH(px, pz), pz, 0.12, 1.6, 0.12); put("wellbar", BOX_G, MAT.wood, px, groundH(px, pz) + 1.55, pz, 1.2, 0.1, 0.1); }
+  else if (r < 0.78) { const [px, pz] = at((R() - 0.5) * 3, 2); put("stack", new THREE.ConeGeometry(0.5, 1, 10).translate(0, 0.5, 0), MAT.thatch, px, groundH(px, pz), pz, 2.2, 2.4, 2.2); } }
 // one side of a street: plots one after another, gable-end on or broadside, set back a little; a back building on some
 function lineStreet(S, dens, opts = {}) { const R = seeded(S.name.length * 977 + (opts.seed || 0));
   for (const sg of opts.sides || [-1, 1]) { let s = R() * 4;
@@ -379,7 +523,8 @@ function lineStreet(S, dens, opts = {}) { const R = seeded(S.name.length * 977 +
       if (opts.yards !== false && R() < 0.35) { const bx = cx + nx * (along / 2 + 9 + R() * 4), bz = cz + nz * (along / 2 + 9 + R() * 4), bw = 3.5 + R() * 2, bd = 5 + R() * 3;
         if (baseH(bx, bz) > 1 && rRect(bx, bz, bw + 1, bd + 1, Math.atan2(nx, nz), 0, true)) { const B = addHouse(bx, bz, bw, bd, Math.atan2(nx, nz) + Math.PI, { burnt: opts.burnt && R() < 0.8, door: "+z", kind: opts.kind }); rRect(bx, bz, bw, bd, B.ry, 2); } }
       if (opts.yards !== false && R() < 0.5) { const fx = cx + nx * (along / 2 + 7) + tx * (front / 2 + 0.3), fz = cz + nz * (along / 2 + 7) + tz * (front / 2 + 0.3);   // a wattle fence between plots
-        put("fence", BOX_G, MAT.wood, fx, groundH(fx, fz) - 0.2, fz, 0.12, 1.4, 13, Math.atan2(nx, nz)); }
+        put("fence", BOX_G, MAT.wattle, fx, groundH(fx, fz) - 0.15, fz, 0.1, 1.25, 13, Math.atan2(nx, nz)); }
+      if (opts.yards !== false && !opts.burnt) yardThings(yx, yz, Math.atan2(nx, nz), R);
     } } }
 
 // ---------- churches ----------
@@ -387,12 +532,8 @@ function lineStreet(S, dens, opts = {}) { const R = seeded(S.name.length * 977 +
 // The typical Late Saxon parish church was small, of two cells: a nave about 6-8 m by 12-18 m and a smaller square chancel,
 // in stone rubble or timber. All Hallows by the Tower keeps a 7th-century arch; St Bride's was excavated after the Blitz.
 const CHURCHES = [];
-function addChurch(x, z, o = {}) { const ry = Math.PI / 2, gy = groundH(x, z) - 0.3, nw = o.nw || 6.5, nl = o.nl || 14, cw = o.cw || 4.5, cl = o.cl || 5, wh = o.wh || 6, mat = o.mat || "rag", roof = o.roof || "shingle";
-  put("w:" + mat, BOX_G, MAT[mat === "rag" ? "rag" : mat], x, gy, z, nw, wh + 0.3, nl, ry); put("r:" + roof, GABLE_G, MAT[roof], x, gy + wh + 0.3, z, nw + 0.6, nw * 0.7, nl + 0.5, ry);
-  const cx = x + nl / 2 + cl / 2; put("w:" + mat, BOX_G, MAT[mat], cx, gy, z, cw, wh * 0.8 + 0.3, cl, ry); put("r:" + roof, GABLE_G, MAT[roof], cx, gy + wh * 0.8 + 0.3, z, cw + 0.5, cw * 0.7, cl + 0.3, ry);
-  put("door", PLANE_G, MAT.dark, x - nl / 2 - 0.03, gy + 0.3, z, 1.3, 2.3, 1, -Math.PI / 2);
-  put("cross", BOX_G, MAT.wood, x - nl / 2 - 0.1, gy + wh + 0.3 + nw * 0.7, z, 0.12, 1.2, 0.12); put("cross", BOX_G, MAT.wood, x - nl / 2 - 0.1, gy + wh + 0.65 + nw * 0.7, z, 0.12, 0.12, 0.7);
-  if (o.tower) { const tx = x - nl / 2 - 2.5; put("w:" + mat, BOX_G, MAT[mat], tx, gy, z, 5, wh * 2.2, 5); put("cap", CONE4_G, MAT[roof], tx, gy + wh * 2.2, z, 5.6, 3, 5.6); solid(tx, z, 5, 5, 0); }
+function addChurch(x, z, o = {}) { const nw = o.nw || 6.5, nl = o.nl || 14, cw = o.cw || 4.5, cl = o.cl || 5, wh = o.wh || 5.5, mat = o.mat || "rag", roof = o.roof || "shingle";
+  gChurch(x, z, { nl, nw, cl, cw, wh, mat, roof }); const cx = x + nl / 2 + cl / 2;
   solid(x, z, nl, nw, 0); solid(cx, z, cl, cw, 0); rRect(x + 3, z, nl + cl + 18, nw + 16, 0, 4);
   const C = { x, z, nl, ...o }; CHURCHES.push(C); return C; }
 
@@ -576,17 +717,110 @@ const abbeyLight = new THREE.PointLight(0xffd0a0, 0, 70, 1.0); abbeyLight.positi
   for (const [x, z, w, d] of [[-19.7, 13.4, 26.6, 2.6], [-19.7, 34.4, 26.6, 2.6], [-31.4, 23.9, 2.6, 18.4], [-8, 23.9, 2.6, 18.4]]) { slab("wood", x, Y + 2.6, z, w, 0.15, d); }   // the cloister walks' pentice roofs
 }
 flushAG();
-// Edward's palace stood by the river east of the abbey. Nothing of it is known before Westminster Hall (1097); a timber hall, a chamber
-// block, a kitchen and a fence are what a royal residence of the time had.
+// Edward's palace stood by the river east of the abbey (its buildings: see the palace section); a palisade round it.
 const PALACE = LL(51.4990, -0.1250);
-addHouse(PALACE[0], PALACE[1], 11, 28, Math.PI / 2, { wall: "plank", roof: "shingle", wh: 5, rh: 6, door: "-x", kind: "hall" });
-addHouse(PALACE[0] + 22, PALACE[1] - 6, 8, 12, 0, { wall: "plank", roof: "shingle", wh: 5.5, rh: 5, door: "-z", kind: "chamber" });
-addHouse(PALACE[0] - 6, PALACE[1] + 18, 6, 8, 0, { wall: "daub", roof: "thatch", door: "-z", kind: "kitchen" });
 rRect(PALACE[0] + 5, PALACE[1], 80, 60, 0, 4);
-{ const R = seeded(61); for (let a = 0; a < Math.PI * 2; a += 0.06) { const x = PALACE[0] + 5 + Math.cos(a) * 42, z = PALACE[1] + Math.sin(a) * 32; if (Math.abs(a - Math.PI) < 0.12) continue; put("fence", BOX_G, MAT.wood, x, groundH(x, z) - 0.2, z, 0.25, 2.4, 2.4, -a); } }
+{ const R = seeded(61); for (let a = 0; a < Math.PI * 2; a += 0.06) { const x = PALACE[0] + 5 + Math.cos(a) * 42, z = PALACE[1] + Math.sin(a) * 32; if (Math.abs(a - Math.PI) < 0.12) continue; put("pale", BOX_G, MAT.paleWood || (MAT.paleWood = M(0x8a7a64)), x, groundH(x, z) - 0.2, z, 0.25, 2.4, 2.4, -a); solid(x, z, 0.3, 2.4, -a); } }
 // the wharf on the Thames side of Thorney, where barges brought Caen stone, shipped across the Channel and up the river
 { const [wx, wz] = LL(51.4993, -0.1243); put("deck", BOX_G, MAT.wood, wx + 18, 0.8, wz, 36, 0.4, 5, 0); for (let k = 0; k < 4; k++) addBoat(wx + 26 + k * 4, wz + (k % 2 ? 6 : -6), Math.PI / 2, 13, k === 0);
   for (let n = 0; n < 14; n++) put("block", BOX_G, AMAT.ashlar, wx + 2 + (n % 3) * 1.1, 1.0, wz - 8 + Math.floor(n / 3) * 1.1, 0.8, 0.5, 0.6, 0); }
+
+// ---------- Edward's palace, which you can walk into ----------
+// Nothing of Edward the Confessor's palace survives or has been excavated: it lay under the later Palace of Westminster, between the
+// abbey and the river. What is shown is what an English royal residence of the time had, after the excavated royal halls at Cheddar
+// (Somerset), Yeavering and Goltho and the written sources: a great aisled timber hall with a central hearth and a dais for the high
+// table, walls hung with embroidered hangings (wills of the period bequeath 'hall-hangings'); a two-storey chamber block (the Bayeux
+// Tapestry shows Edward dying in an upper room, his body laid out below) with an outside stair; a separate kitchen, for fear of fire.
+// Today William is staying here; after the crowning the king and the bishops go back for the coronation feast (customary; this one is
+// not described).
+const SURF = [];   // raised surfaces you can walk on: stairs, landings, upper floors
+const surfRect = (F, x0, x1, z0, z1, y0, y1 = y0, alongZ = true) => SURF.push({ F, x0, x1, z0, z1, y0, y1, alongZ });
+function surfAt(x, z) { let best = -1e9; for (const S of SURF) { const dx = x - S.F.x, dz = z - S.F.z, lx = dx * S.F.c - dz * S.F.s, lz = dx * S.F.s + dz * S.F.c;
+  if (lx < Math.min(S.x0, S.x1) || lx > Math.max(S.x0, S.x1) || lz < Math.min(S.z0, S.z1) || lz > Math.max(S.z0, S.z1)) continue;
+  const f = S.alongZ ? (lz - S.z0) / (S.z1 - S.z0 || 1) : (lx - S.x0) / (S.x1 - S.x0 || 1), h = S.F.gy + S.y0 + (S.y1 - S.y0) * clampN(f, 0, 1); if (h > best) best = h; } return best; }
+const ZONES = [];   // rooms: for light and for who you can see
+function zoneOf(x, z) { if (inAbbey(x, z)) return "abbey"; for (const Z of ZONES) { const dx = x - Z.F.x, dz = z - Z.F.z, lx = dx * Z.F.c - dz * Z.F.s, lz = dx * Z.F.s + dz * Z.F.c; if (Math.abs(lx) < Z.w / 2 && Math.abs(lz) < Z.d / 2) return Z.name; } return null; }
+// walls with doorways, solid both sides; doors = [[side, u (centre along the wall), width, height]]; extra = [y0, y1] spans kept within a door gap
+function gWalls(F, mat, w, d, h, th, doors = [], keep = []) { const ry = Math.atan2(F.s, F.c);
+  for (const side of ["+x", "-x", "+z", "-z"]) { const onX = side[1] === "x", sg = side[0] === "+" ? 1 : -1, L = onX ? d : w, gaps = doors.filter(D => D[0] === side).sort((a, b) => a[1] - b[1]);
+    const seg = (u0, u1, y0, y1) => { if (u1 - u0 < 0.01 || y1 - y0 < 0.01) return; const um = (u0 + u1) / 2, cx = onX ? sg * w / 2 : um, cz = onX ? um : sg * d / 2;
+      gbox(F, mat, cx, (y0 + y1) / 2, cz, onX ? th : u1 - u0 + (onX ? 0 : th), y1 - y0, onX ? u1 - u0 + th : th, y0 > 0.1 ? "" : "b");
+      if (y0 < 0.1) { const [X, , Z] = gw(F, cx, 0, cz); solid(X, Z, onX ? th : u1 - u0, onX ? u1 - u0 : th, ry); } };
+    let a = -L / 2; for (const D of gaps) { seg(a, D[1] - D[2] / 2, 0, h); for (const [y0, y1] of (D[4] || [[D[3], h]])) seg(D[1] - D[2] / 2, D[1] + D[2] / 2, y0, y1); a = D[1] + D[2] / 2; } seg(a, L / 2, 0, h); } }
+function gGableBoth(F, mat, w, d, wh, rh) { for (const sz of [-1, 1]) for (const io of [1, -1]) gpoly(F, mat, [[-w / 2, wh, sz * (d / 2 - 0.15 * (io < 0))], [w / 2, wh, sz * (d / 2 - 0.15 * (io < 0))], [0, wh + rh, sz * (d / 2 - 0.15 * (io < 0))]], [[0, wh], [w, wh], [w / 2, wh + rh]], [0, 0, sz * io]); }
+const PAL = {}, hearthFireM = new THREE.MeshBasicMaterial({ color: 0xff9a3a, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }), HFIRE_G = new THREE.ConeGeometry(0.16, 0.55, 6).translate(0, 0.27, 0);
+{ // the great hall: 30 x 12 m, aisled, long axis east-west
+  const F = FR(PALACE[0], PALACE[1], Math.PI / 2, groundH(PALACE[0], PALACE[1]) - 0.1, "palace"), w = 12, d = 30, wh = 4.2, rh = 6.2; PAL.hall = F;
+  ZONES.push({ name: "hall", F, w: w - 0.3, d: d - 0.3, light: [0, 2.5, -2], doors: [[w / 2, -11], [-w / 2, -11]] });
+  GTINT = [0.95, 0.92, 0.9]; gWalls(F, "plank", w, d, wh, 0.3, [["+x", -11, 1.8, 2.8], ["-x", -11, 1.8, 2.8]]);
+  for (const sx of [-1, 1]) for (let z = -15; z <= 15.01; z += 2.5) gbox(F, "oak", sx * (w / 2 + 0.17), wh / 2, z, 0.14, wh, 0.22, "b");
+  gGableBoth(F, "plank", w, d, wh, rh); GTINT = [0.9, 0.9, 0.9]; groof(F, "shingle", w, d, wh, rh, { under: "plank", e: 0.6, t: 0.25 });
+  GTINT = [1, 1, 1]; for (const sx of [-1, 1]) for (let z = -12; z <= 12.01; z += 3) { gbox(F, "oak", sx * 3.5, (wh + 1.6) / 2, z, 0.38, wh + 1.6, 0.38); }   // the aisle posts
+  for (let z = -12; z <= 12.01; z += 3) { gbox(F, "oak", 0, wh + 1.6, z, 7.4, 0.3, 0.3, ""); for (const sx of [-1, 1]) gbox(F, "oak", sx * 4.8, wh - 0.05, z, 2.6, 0.25, 0.25, ""); }   // tie-beams over the nave and aisles
+  for (const sx of [-1, 1]) gbox(F, "oak", sx * 3.5, wh + 1.6, 0, 0.32, 0.3, 24.5, "");
+  gpoly(F, "rush", [[-w / 2, 0.04, -d / 2], [w / 2, 0.04, -d / 2], [w / 2, 0.04, d / 2], [-w / 2, 0.04, d / 2]], [[0, 0], [w, 0], [w, d], [0, d]], [0, 1, 0]);   // an earth floor strewn with rushes
+  GTINT = [0.8, 0.78, 0.75]; gbox(F, "rubble", 0, 0.1, -2, 1.6, 0.2, 4.2, "b"); GTINT = [0.25, 0.2, 0.18]; gbox(F, "rubble", 0, 0.12, -2, 1.1, 0.16, 3.6, "b");   // the long hearth
+  GTINT = [1, 1, 1]; gbox(F, "plank", 0, 0.225, 13, w - 0.3, 0.45, 3.7, "b");   // the dais
+  gbox(F, "oak", 0, 0.45 + 0.72, 12.2, 7.2, 0.08, 0.95, ""); GTINT = [1.3, 1.28, 1.2]; gbox(F, "plain", 0, 0.45 + 0.765, 12.2, 7.4, 0.02, 1.05, "b"); GTINT = [1, 1, 1];   // the high table and its cloth
+  for (const x of [-3, 3]) gbox(F, "oak", x, 0.45 + 0.36, 12.2, 0.1, 0.72, 0.8, "b");
+  gbox(F, "oak", 0, 0.45 + 0.6, 13.6, 0.9, 1.2, 0.7, "b"); gbox(F, "oak", 0, 0.45 + 1.15, 13.95, 0.9, 1.3, 0.12, "b"); GTINT = [1.1, 0.3, 0.3]; gbox(F, "plain", 0, 0.45 + 1.21, 13.55, 0.8, 0.06, 0.6, "b"); GTINT = [1, 1, 1];   // the king's chair
+  gbox(F, "oak", 0, 0.45 + 0.23, 13.4, 7, 0.06, 0.45, "b");   // a bench behind the high table for the others
+  for (const sx of [-1, 1]) { gbox(F, "oak", sx * 4.7, 0.74, -1, 0.85, 0.06, 18, ""); for (let z = -9; z <= 7.01; z += 4) gbox(F, "oak", sx * 4.7, 0.36, z, 0.6, 0.72, 0.08, "b");   // trestle tables and benches in the aisles
+    for (const bx of [3.95, 5.45]) gbox(F, "oak", sx * bx, 0.22, -1, 0.32, 0.44, 18, "b"); }
+  for (const sx of [-1, 1]) for (const [z0, z1] of [[-9.6, 14.6]]) { const x = sx * (w / 2 - 0.17); gpoly(F, "hang", [[x, 1.0, z0], [x, 1.0, z1], [x, 3.6, z1], [x, 3.6, z0]], [[0, 0], [z1 - z0, 0], [z1 - z0, 2.6], [0, 2.6]], [-sx, 0, 0]); }   // hangings on the walls
+  gpoly(F, "hang", [[-5.6, 1.0, d / 2 - 0.17], [5.6, 1.0, d / 2 - 0.17], [5.6, 3.8, d / 2 - 0.17], [-5.6, 3.8, d / 2 - 0.17]], [[0, 0], [11.2, 0], [11.2, 2.8], [0, 2.8]], [0, 0, -1]);
+  for (let k = 0; k < 7; k++) { const [x, , z] = gw(F, (k - 3) * 1.1, 0, 12.0); put("flame", FLAME_G, flameM, x, F.gy + 1.31, z, 1.3, 1.3, 1.3); put("candle", CYL_G, M(0xe8e0c8), x, F.gy + 1.22, z, 0.035, 0.1, 0.035); }
+  PAL.hearth = gw(F, 0, 0.2, -2); for (let k = 0; k < 5; k++) { const [x, , z] = gw(F, (k % 2 - 0.5) * 0.4, 0, -3.5 + k * 0.8); put("hfire", HFIRE_G, hearthFireM, x, F.gy + 0.2, z, 1, 0.8 + (k % 3) * 0.25, 1); }
+  PAL.northDoor = gw(F, w / 2 + 1.6, 0, -11); PAL.southDoor = gw(F, -w / 2 - 1.6, 0, -11); PAL.inNorth = gw(F, w / 2 - 1.5, 0, -11); PAL.inSouth = gw(F, -w / 2 + 1.5, 0, -11);
+  PAL.seat = (lx, lz) => gw(F, lx, 0, lz);
+}
+{ // the chamber block: two storeys, the king's chamber upstairs, an outside stair on its west side
+  const F = FR(PALACE[0] + 23, PALACE[1] - 2, 0, groundH(PALACE[0] + 23, PALACE[1] - 2) - 0.1, "palace"), w = 8, d = 12, h = 6.4, uf = 3.2, rh = 4.6; PAL.chamber = F;
+  ZONES.push({ name: "chamber", F, w: w - 0.3, d: d - 0.3, light: [0, uf + 2, 2], light0: [0, 1.6, 2], doors: [[-w / 2, -0.5]] });
+  GTINT = [0.92, 0.9, 0.88]; gWalls(F, "plank", w, d, h, 0.3, [["-x", -0.5, 1.2, 2.1, [[2.1 + 0.01, uf + 0.0], [uf + 2.2, h]]]]);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) gbox(F, "oak", sx * (w / 2 + 0.1), h / 2, sz * (d / 2 + 0.1), 0.3, h, 0.3, "b");
+  for (const sz of [-1, 1]) gbox(F, "oak", 0, uf, sz * (d / 2 + 0.17), w + 0.3, 0.22, 0.12, "");
+  gGableBoth(F, "plank", w, d, h, rh); GTINT = [0.9, 0.9, 0.9]; groof(F, "shingle", w, d, h, rh, { under: "plank", e: 0.5, t: 0.22 });
+  GTINT = [1, 1, 1]; gbox(F, "plank", 0, uf - 0.1, 0, w - 0.3, 0.2, d - 0.3, ""); for (let z = -5; z <= 5.01; z += 2) gbox(F, "oak", 0, uf - 0.3, z, w - 0.3, 0.2, 0.22, "");   // the upper floor on its joists
+  surfRect(F, -3.85, 3.85, -5.85, 5.85, uf + 0.1);
+  for (const [x, z, out] of [[w / 2, 3, [1, 0, 0]], [w / 2, -3, [1, 0, 0]], [0, d / 2, [0, 0, 1]]]) { const ox = out[0] * 0.18, oz = out[2] * 0.18;   // upper windows, shutters open
+    const P = (u, y) => out[0] ? [x + ox, y, z + u] : [x + u, y, z + oz]; for (const io of [1, -1]) gpoly(F, "dark", [P(-0.35, uf + 1.3), P(0.35, uf + 1.3), P(0.35, uf + 2.0), P(-0.35, uf + 2.0)], [[0, 0], [1, 0], [1, 1], [0, 1]], [out[0] * io, 0, out[2] * io]); }
+  // the stair: steps rising northward along the west wall to a landing at the door
+  const sx0 = -w / 2 - 1.35, sx1 = -w / 2 - 0.15, z0 = 7.6, z1 = 0.7, N = 16;
+  for (let k = 0; k < N; k++) { const z = z0 + (z1 - z0) * (k + 0.5) / N, y = uf * (k + 1) / N + 0.1; gbox(F, "oak", (sx0 + sx1) / 2, y - 0.06, z, 1.2, 0.12, Math.abs(z1 - z0) / N + 0.02, ""); gbox(F, "oak", sx0 - 0.03, y / 2, z, 0.08, y, 0.1, "b"); }
+  gbox(F, "oak", (sx0 + sx1) / 2, uf + 0.04, -0.2, 1.2, 0.12, 1.9, ""); for (const z of [-1.1, 0.7]) gbox(F, "oak", sx0 + 0.1, uf / 2, z, 0.18, uf, 0.18, "b");
+  for (let k = 0; k <= 8; k++) { const z = z0 + (z1 - z0) * k / 8, y = uf * k / 8; gbox(F, "oak", sx0 - 0.03, y + 0.95, z, 0.06, 0.06, Math.abs(z1 - z0) / 8 + 0.05, ""); }
+  surfRect(F, sx0, sx1, z0, z1, 0.1, uf + 0.1); surfRect(F, sx0, -3.7, -1.15, z1, uf + 0.1);
+  // upstairs: the bed with its curtains, a chest, a stool, hangings
+  const Y = uf + 0.1; gbox(F, "oak", 1.6, Y + 0.25, -3.6, 1.5, 0.5, 2.2, "b"); GTINT = [1.2, 1.15, 1.05]; gbox(F, "plain", 1.6, Y + 0.56, -3.6, 1.4, 0.14, 2.1, "b"); GTINT = [0.7, 0.18, 0.2]; gbox(F, "plain", 1.6, Y + 0.65, -3.3, 1.45, 0.06, 1.5, "b");
+  GTINT = [1, 1, 1]; for (const px of [0.85, 2.35]) for (const pz of [-4.7, -2.5]) gbox(F, "oak", px, Y + 1.1, pz, 0.1, 2.2, 0.1, "b"); gbox(F, "oak", 1.6, Y + 2.2, -3.6, 1.6, 0.06, 2.3, "");
+  for (const io of [1, -1]) { gpoly(F, "hang", [[0.85, Y + 0.7, -4.7], [0.85, Y + 0.7, -2.5], [0.85, Y + 2.15, -2.5], [0.85, Y + 2.15, -4.7]], [[0, 0], [2.2, 0], [2.2, 1.45], [0, 1.45]], [-io, 0, 0]); gpoly(F, "hang", [[0.85, Y + 0.7, -4.75], [2.35, Y + 0.7, -4.75], [2.35, Y + 2.15, -4.75], [0.85, Y + 2.15, -4.75]], [[0, 0], [1.5, 0], [1.5, 1.45], [0, 1.45]], [0, 0, io]); }
+  gbox(F, "oak", -2.6, Y + 0.3, -4.8, 1.2, 0.6, 0.6, "b"); gbox(F, "oak", -0.8, Y + 0.25, 1.5, 0.45, 0.5, 0.45, "b");
+  for (const sz of [-1, 1]) gpoly(F, "hang", [[-3.7, Y + 0.6, sz * 5.82], [3.7, Y + 0.6, sz * 5.82], [3.7, Y + 2.6, sz * 5.82], [-3.7, Y + 2.6, sz * 5.82]], [[0, 0], [7.4, 0], [7.4, 2], [0, 2]], [0, 0, -sz]);
+  { const [x, , z] = gw(F, 0.2, 0, -2); put("candle", CYL_G, MAT.iron, x, Y, z, 0.05, 1.3, 0.05); put("flame", FLAME_G, flameM, x, Y + 1.32, z, 1.5, 1.5, 1.5); }
+  // downstairs: stores
+  for (let k = 0; k < 6; k++) { const [x, , z] = gw(F, 2.6 - (k % 3) * 0.75, 0, 4.6 - Math.floor(k / 3) * 0.8); put("barrel", CYL_G, MAT.wood, x, F.gy, z, 0.6, 0.85, 0.6); }
+  gbox(F, "oak", -2.8, 0.35, 4.6, 1.2, 0.7, 0.7, "b"); gbox(F, "oak", -2.8, 0.35, 3.4, 1.2, 0.7, 0.7, "b");
+  PAL.chamberDoor = gw(F, -w / 2 - 0.8, 0, -0.5); PAL.bed = gw(F, 1.6, 0, -3.6); PAL.stairFoot = gw(F, (sx0 + sx1) / 2, 0, z0 + 1);
+}
+{ // the kitchen, apart from the hall for fear of fire: a central fire, a spit, a cauldron, a clay oven
+  const F = FR(PALACE[0] - 6, PALACE[1] + 19, 0, groundH(PALACE[0] - 6, PALACE[1] + 19) - 0.1, "palace"), w = 6.5, d = 8, wh = 2.6, rh = 4.2; PAL.kitchen = F;
+  ZONES.push({ name: "kitchen", F, w: w - 0.3, d: d - 0.3, light: [0, 1.2, 0.5], doors: [[0, -d / 2]] });
+  GTINT = [0.95, 0.9, 0.85]; gWalls(F, "daub", w, d, wh, 0.3, [["-z", 0, 1.3, 2.0]]); for (const sx of [-1, 1]) for (const sz of [-1, 1]) gbox(F, "oak", sx * w / 2, wh / 2, sz * d / 2, 0.24, wh, 0.24, "b");
+  GTINT = [0.8, 0.8, 0.8]; groof(F, "thatch", w, d, wh, rh, { hip: true }); GTINT = [0.6, 0.55, 0.5];
+  GTINT = [1, 1, 1];
+  GTINT = [1, 1, 1]; gpoly(F, "rush", [[-w / 2, 0.04, -d / 2], [w / 2, 0.04, -d / 2], [w / 2, 0.04, d / 2], [-w / 2, 0.04, d / 2]], [[0, 0], [w, 0], [w, d], [0, d]], [0, 1, 0]);
+  GTINT = [0.6, 0.55, 0.5]; gbox(F, "rubble", 0, 0.08, 0.5, 1.6, 0.16, 1.6, "b");
+  for (const sx of [-1, 1]) gbox(F, "oak", sx * 1.1, 0.6, 0.5, 0.1, 1.2, 0.1, "b"); gbox(F, "oak", 0, 1.15, 0.5, 2.4, 0.04, 0.04, "");   // the spit
+  { const [x, , z] = gw(F, 0, 0, 0.5); const pig = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 8).scale(1.7, 0.85, 0.9), M(0xa8683a, { roughness: 0.5 })); pig.position.set(x, F.gy + 1.08, z); pig.rotation.y = 0; scene.add(pig); PAL.pig = pig; }
+  for (let k = 0; k < 4; k++) { const [x, , z] = gw(F, (k - 1.5) * 0.4, 0, 0.5); put("hfire", HFIRE_G, hearthFireM, x, F.gy + 0.15, z, 1, 0.7 + (k % 2) * 0.3, 1); }
+  { const [x, , z] = gw(F, -2.2, 0, 2.6); const oven = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), M(0x8a6a4a)); oven.position.set(x, F.gy, z); scene.add(oven); }
+  gbox(F, "oak", 2.3, 0.8, 1.5, 1.0, 0.06, 2.6, ""); for (const z of [0.5, 2.5]) gbox(F, "oak", 2.3, 0.4, z, 0.8, 0.8, 0.08, "b");
+  for (let k = 0; k < 6; k++) { const [x, , z] = gw(F, 2.2 + (k % 2) * 0.3, 0, 0.6 + k * 0.35); put("loaf", new THREE.SphereGeometry(0.14, 8, 5).scale(1, 0.55, 1), M(0xb07a3a), x, F.gy + 0.88, z, 1, 1, 1); }
+  for (let k = 0; k < 3; k++) { const [x, , z] = gw(F, 0.8, 0, -1.8 + k * 0.6); put("ham", new THREE.SphereGeometry(0.16, 8, 5).scale(0.8, 1.4, 0.8), M(0x8a5a3a), x, F.gy + wh - 0.75, z, 1, 1, 1); put("hamcord", CYL_G, M(0x6a5a40), x, F.gy + wh - 0.55, z, 0.02, 0.6, 0.02); }
+  PAL.kitchenDoor = gw(F, 0, 0, -d / 2 - 1.5); PAL.inKitchen = gw(F, 0, 0, -d / 2 + 1.5); PAL.cookSpots = [gw(F, 1.2, 0, -0.8), gw(F, -1.3, 0, 1.6), gw(F, 1.6, 0, 2.2)];
+}
+const HALL_IN = (x, z) => zoneOf(x, z) === "hall";
 
 // ---------- markers: what things are, and how well we know them ----------
 // tag: "known" (from excavation or written record), "inferred" (the place is known, the form is a reasoned guess),
@@ -599,10 +833,9 @@ const markLL = (name, lat, lon, tag, text, o) => { const [x, z] = LL(lat, lon); 
 function findFree(x, z, w, d, ry = 0) { for (let r = 0; r < 60; r += 3) for (let a = 0; a < 6.28; a += r ? 0.7 : 7) { const X = x + Math.cos(a) * r, Z = z + Math.sin(a) * r; if (rRect(X, Z, w, d, ry, 0, true)) return [X, Z]; } return [x, z]; }
 { // St Paul's: its site on Ludgate Hill is certain, its form unknown
   const [x, z] = LL(51.5138, -0.0985), gy = groundH(x, z) - 0.3; rRect(x, z, 150, 96, 0, 4);
-  put("w:rag", BOX_G, MAT.rag, x, gy, z, 46, 11, 18, 0); put("r:shingle", GABLE_G, MAT.shingle, x, gy + 11, z, 19, 8, 47, Math.PI / 2); solid(x, z, 46, 18, 0);
-  put("w:rag", BOX_G, MAT.rag, x + 30, gy, z, 14, 9, 10, 0); put("r:shingle", GABLE_G, MAT.shingle, x + 30, gy + 9, z, 11, 6, 14.5, Math.PI / 2); solid(x + 30, z, 14, 10, 0);
-  put("w:rag", BOX_G, MAT.rag, x - 27.5, gy, z, 9, 26, 9, 0); put("cap", CONE4_G, MAT.shingle, x - 27.5, gy + 26, z, 10, 6, 10); solid(x - 27.5, z, 9, 9, 0);
-  put("door", PLANE_G, MAT.dark, x - 32.04, gy + 0.3, z, 2.2, 3.6, 1, -Math.PI / 2);
+  gChurch(x - 4, z, { nl: 44, nw: 17, cl: 14, cw: 10, wh: 11, mat: "rag", roof: "shingle" }); solid(x - 4, z, 44, 17, 0); solid(x + 25, z, 14, 10, 0);
+  { const F = FR(x - 30.5, z, 0, gy); GTINT = [1.05, 1.03, 1]; gbox(F, "rubble", 0, 13, 0, 9, 26, 9); GTINT = [1, 1, 1]; for (const [ox, oz, o] of [[4.5, 0, [1, 0, 0]], [-4.5, 0, [-1, 0, 0]], [0, 4.5, [0, 0, 1]], [0, -4.5, [0, 0, -1]]]) { garch(F, "dark", ox, 21, oz, 0.9, 2.6, o); }
+    garch(F, "dark", -4.5, 0, 0, 1.8, 3.4, [-1, 0, 0]); put("cap", CONE4_G, MAT.shingle, x - 30.5, gy + 26, z, 10, 6, 10); solid(x - 30.5, z, 9, 9, 0); }
   for (const [dx, dz] of [[-10, 26], [6, 28], [22, -24], [-16, -26]]) addHouse(x + dx, z + dz, 6, 10, 0, { wall: "plank", roof: "shingle", door: "-z" });   // canons' houses
   mark("St Paul's Cathedral", x, z, "inferred", "London's cathedral since Bishop Mellitus founded it in 604, on the top of Ludgate Hill. The church that stood here in 1066 was rebuilt after a fire in 962 and burned down in 1087, when the great Norman cathedral (Old St Paul's) was begun. No trace of the Saxon building has been found, so its form here is a guess: a large stone church with a west tower, in a precinct with the canons' houses. The bishop of London in 1066 was William, a Norman appointed by Edward the Confessor in 1051.", { big: true, range: 3000, y: 34, r: 45 });
 }
@@ -674,8 +907,8 @@ markLL("Billingsgate", 51.5096, -0.0832, "known", "The other main hithe, below t
 markLL("London Bridge", 51.5080, -0.0875, "known", "A timber bridge on piles: timbers from its Southwark end have tree-ring dates of about 987-1032. The Norse sagas tell of Olaf pulling an earlier bridge down in 1014. The Londoners held it against William's army in November. No houses stood on it until the stone bridge of 1176-1209.", { big: true, range: 2500, y: 10 });
 markLL("No Tower of London", 51.5081, -0.0765, "absent", "The Tower does not exist yet. Soon after the coronation William had 'fortifications' built in the City 'against the fickleness of the huge and fierce population' (William of Poitiers): a ditch and rampart in this south-east corner of the Roman wall, where the White Tower was built about 1075-1100.", { range: 1500 });
 markLL("No Guildhall, no castles", 51.5155, -0.0920, "absent", "Not yet built: the Guildhall (first recorded about 1128), Baynard's and Montfichet castles in the west of the City (after 1066), and Moorgate (1415). Saxon London was governed by its folkmoot, which met in the open air by St Paul's, and by the husting court.", { range: 500 });
-markLL("Westminster Hall: not yet", 51.4994, -0.1253, "absent", "Westminster Hall was built by William's son William Rufus in 1097-99. Edward's palace stood about here; nothing of it is known, so its hall, chamber and kitchen are typical buildings of a royal residence, in timber.", { range: 400 });
-markLL("Edward's palace", 51.4990, -0.1252, "inferred", "Edward the Confessor moved his main residence here from the City to watch his abbey being built. He died in the palace on 5 January 1066; Harold was crowned the next day. William is staying here.", { range: 1500, y: 18 });
+markLL("Westminster Hall: not yet", 51.4986, -0.1246, "absent", "Westminster Hall was built by William's son William Rufus in 1097-99. Edward's palace stood about here; nothing of it is known, so its hall, chamber and kitchen are typical buildings of a royal residence, in timber.", { range: 400 });
+markLL("Edward's palace", 51.4994, -0.1252, "inferred", "Edward the Confessor moved his main residence here from the City to watch his abbey being built. He died in the palace on 5 January 1066; Harold was crowned the next day. William is staying here. Nothing of it has been found, so its buildings follow what royal residences of the time had: a great hall, a two-storey chamber block, a kitchen, inside a palisade. Walk in: the hall's doors are on its long sides near the west end; the chamber has an outside stair.", { range: 1500, y: 14 });
 markLL("The monastery", 51.4990, -0.1280, "inferred", "Edward refounded the abbey for a larger community of Benedictine monks (perhaps about 70 by 1100) under Abbot Edwin. The new stone buildings south of the church were under way (part of the dormitory's undercroft of about 1070-1100 survives); older buildings were timber. Layout inferred.", { range: 600 });
 markLL("The wharf", 51.4993, -0.1237, "inferred", "Barges brought Caen stone, quarried in Normandy and shipped across the Channel and up the Thames, for the abbey.", { range: 500 });
 
@@ -747,8 +980,8 @@ function routeAt(P, s) { let i = 1; for (; i < P.length; i++) { const l = Math.h
   const n = P.length - 1; return [P[n][0], P[n][1], n ? Math.atan2(P[n][0] - P[n - 1][0], P[n][1] - P[n - 1][1]) : 0, true]; }
 const face = (x, z, tx, tz) => Math.atan2(tx - x, tz - z);
 const ND = [0, -27.7], WD = [NAVE_DONE - 0.3, 0];   // the north transept door and the temporary west door
-const PAL_DOOR = [PALACE[0] - 15, PALACE[1]];
-const PROC_PATH = [PAL_DOOR, [PALACE[0] - 40, PALACE[1] - 30], [90, -45], [30, -45], [0, -40], ND, [0, -12], [0, -2]];
+const PAL_DOOR = [PAL.northDoor[0], PAL.northDoor[2]], PAL_IN = [PAL.inNorth[0], PAL.inNorth[2]];
+const PROC_PATH = [PAL_DOOR, [PAL_DOOR[0] - 13, PAL_DOOR[1] + 4], [PALACE[0] - 47, PALACE[1]], [110, 10], [90, -45], [30, -45], [0, -40], ND, [0, -12], [0, -2]];   // out of the hall, through the palisade gate, round to the north door
 // the procession and the principals
 const PRIN = {};
 { const order = [["cleric", "cross"], ["cleric", "candle"], ["cleric", "candle"], ["cleric", "book"], ["cleric"], ["cleric"], ["monk", "edwin"], ["bishop", "geoffrey"], ["bishop", "ealdred"], ["norman", "william"],
@@ -757,7 +990,10 @@ const PRIN = {};
   let ci = 0, li = 0;
   order.forEach(([role, key], k) => { const A = agent(role, { proc: true, delay: k * 2.4, key }); let st = stations[key];
     if (key === "candle") st = [19.5, ci++ ? -2.2 : 2.2, -Math.PI / 2]; if (!key) st = [16 + (k % 2) * 2, (k % 2 ? 3.5 : -3.5), k % 2 ? -Math.PI : 0]; if (key === "lord") { st = [-2.5 + (li % 3) * 2.4, -8 - Math.floor(li / 3) * 1.8, Math.PI]; li++; }
-    A.station = st; A.path = [...PROC_PATH, [st[0], st[1]]]; if (key) PRIN[key] = A; }); }
+    const wt = PAL.seat(2.2 + (k % 3) * 1.2, -13.5 + Math.floor(k / 3) * 1.4); A.wait = [wt[0], wt[2]];   // waiting in the hall beforehand
+    const hs = { william: [0, 13.6, 1], ealdred: [1.3, 13.4, 1], geoffrey: [-1.3, 13.4, 1], edwin: [2.6, 13.4, 1] }[key] || [k % 2 ? 4.1 : -4.1, -8 + k * 1.1, 0], hw = PAL.seat(hs[0], hs[1]);   // and where they sit at the feast afterwards
+    A.feast = [hw[0], hw[2], hs[2] ? -Math.PI / 2 : hs[0] > 0 ? Math.PI : 0, hs[2]];
+    A.station = st; A.path = [A.wait, PAL_IN, ...PROC_PATH, [st[0], st[1]]]; if (key) PRIN[key] = A; }); }
 // monks in the choir stalls, singing
 for (let k = 0; k < 18; k++) { const zs = k % 2 ? 1 : -1, x = -12.5 + Math.floor(k / 2) * 1.6; agent("monk", { fixed: [x, 3.0 * zs, zs > 0 ? Math.PI : 0], kind: "stand", monk: true }); }
 // the congregation: Normans on the north side, English on the south (the arrangement is not recorded)
@@ -778,6 +1014,12 @@ const GUARDS = [];
   for (let k = 0; k < 14; k++) { const s = 12 + k * 18, [x, z, a] = routeAt(PROC_PATH, s); posts.push([x + Math.cos(a) * 2.6 * (k % 2 ? 1 : -1), z - Math.sin(a) * 2.6 * (k % 2 ? 1 : -1)]); }
   for (const [x, z] of [[-6, -31], [6, -31], [-40, 14], [-40, -14], [30, -15], [30, 15], [-20, -16], [10, -36], [-70, 0], [-30, -30], [45, 0], [20, -30]]) posts.push([x, z]);
   for (const [x, z] of posts) { const A = agent("soldier", { fixed: [x, z, face(x, z, 0, 0) + Math.PI], kind: "guard" }); GUARDS.push(A); } }
+// the palace household: cooks, servants carrying food from the kitchen to the hall, people laying the high table, guards at the gate
+{ const KD = [PAL.kitchenDoor[0], PAL.kitchenDoor[2]], KI = [PAL.inKitchen[0], PAL.inKitchen[2]], SD = [PAL.southDoor[0], PAL.southDoor[2]], SI = [PAL.inSouth[0], PAL.inSouth[2]];
+  PAL.cookSpots.forEach(([x, , z], k) => agent(k === 1 ? "woman" : "eng", { fixed: [x, z, face(x, z, PAL.kitchen.x, PAL.kitchen.z + 0.5)], kind: k === 1 ? "sell" : "hammer", palace: true }));
+  for (let k = 0; k < 8; k++) { const t = PAL.seat(k % 2 ? 4.0 : -4.0, -7 + k * 2), path = [KI, KD, SD, SI, [t[0], t[2]]]; agent(k % 3 === 1 ? "woman" : "eng", { loop: path, phase: k * 23, speed: 1.0 + (k % 3) * 0.15, palace: true }); }
+  for (let k = 0; k < 3; k++) { const [x, , z] = PAL.seat(-2 + k * 2, 11.4); agent(k === 1 ? "woman" : "eng", { fixed: [x, z, Math.PI / 2], kind: "sell", palace: true }); }
+  const [gx, gz] = [PALACE[0] - 44, PALACE[1]]; for (const o of [-3, 3]) { const A = agent("soldier", { fixed: [gx, gz + o, -Math.PI / 2], kind: "guard" }); GUARDS.push(A); } }
 // the houses that burn: the nearest of the Westminster vill
 const FIRE_H = HOUSES.filter(H => H.kind === "vill" && !H.burnt).sort((a, b) => Math.hypot(a.x, a.z + 40) - Math.hypot(b.x, b.z + 40)).slice(0, 7);
 FIRE_H.forEach((H, k) => { H.ignite = T.fire + k * 45; H.state = 0; const G = GUARDS[k * 2 + 1] || GUARDS[k]; if (G) { G.torch = H; G.torchAt = H.ignite; } });
@@ -794,6 +1036,10 @@ mark("William, duke of Normandy", 0, 0, "person", "William, 38 years old, duke o
 mark("Ealdred, archbishop of York", 0, 0, "person", "Ealdred, archbishop of York since 1061, an experienced churchman and diplomat who had travelled to Rome and Jerusalem. He probably crowned Harold in January, and crowns William today: the archbishop of Canterbury, Stigand, was not recognised by the pope.", { follow: PRIN.ealdred, r: 6, range: 120 });
 mark("Geoffrey, bishop of Coutances", 0, 0, "person", "Geoffrey de Montbray, bishop of Coutances in Normandy, who fought at Hastings and became one of the greatest landholders in England. He puts the question to the Normans, in French.", { follow: PRIN.geoffrey, r: 6, range: 120 });
 mark("Abbot Edwin", 0, 0, "person", "Edwin, abbot of Westminster under Edward the Confessor and now under William, head of the community of Benedictine monks who serve the abbey.", { follow: PRIN.edwin, r: 5, range: 80 });
+mark("The great hall", ...(([x, , z]) => [x, z])(PAL.seat(0, 0)), "inferred", "The king's hall: the heart of any royal residence, where the king ate, held court and gave feasts. Edward's has not been found; this one follows excavated royal halls (Cheddar, Goltho): an aisled timber hall about 30 by 12 m, earth floor strewn with rushes, a long central hearth with no chimney, benches and trestle tables in the aisles, and the high table on a dais at the far end. Embroidered hangings on the walls: wills of the time leave 'hall-hangings'. Today the household is preparing the coronation feast.", { y: 3.2, r: 10, range: 60 });
+mark("The high table", ...(([x, , z]) => [x, z])(PAL.seat(0, 12.6)), "inferred", "On the dais, across the end of the hall: the king's chair in the middle, the greatest guests beside him, everyone else at the tables below. After the crowning King William comes back here with the bishops for the feast (a coronation feast was customary; this one is not described).", { y: 1.9, r: 4, range: 30 });
+mark("The king's chamber", ...(([x, , z]) => [x, z])(gw(PAL.chamber, 1, 0, -2)), "inferred", "Upstairs in the chamber block, reached by the outside stair: the king's private room. Here, the Life of King Edward says, Edward died on 5 January 1066, with Queen Edith warming his feet, Earl Harold, Archbishop Stigand and the steward Robert fitzWimarc at his bedside; the Bayeux Tapestry shows the deathbed in an upper room and his body being prepared below. The room's form is inferred.", { y: 5.3, r: 6, range: 40 });
+mark("The kitchen", ...(([x, , z]) => [x, z])(gw(PAL.kitchen, 0, 0, 0)), "inferred", "A separate kitchen, apart from the hall in case of fire: a central fire with a spit (a pig roasting for the feast), a cauldron, a clay bread oven, a table of loaves, hams hanging from the rafters.", { y: 2.6, r: 5, range: 40 });
 mark("Monks of Westminster", -9, 0, "person", "Benedictine monks in black habits, singing the office and the coronation chants from the choir stalls.", { y: 4, r: 8, range: 60 });
 mark("Norman lords and knights", 0, -18, "person", "The Norman nobles and knights, on the north side here (where each group stood is not recorded). Mail-shirted soldiers guard the church outside.", { y: 4, r: 10, range: 80 });
 mark("The English", 0, 18, "person", "English thegns, churchmen and Londoners. English men wore their hair long, with moustaches; women covered their hair with a headrail.", { y: 4, r: 10, range: 80 });
@@ -807,7 +1053,8 @@ const DRESS = { eng: "An Englishman: knee-length woollen tunic, belted, hose or 
   noble: "An English thegn, a landholder of rank: a better-dyed tunic and cloak, a fine brooch.", king: "The king, crowned, in rich robes." };
 
 // ---------- moving everyone, by the clock ----------
-function personY(x, z) { if (inAbbey(x, z)) return AB_F; return Math.max(groundH(x, z), spanY(x, z), WATER - 1.0); }
+function personY(x, z) { if (inAbbey(x, z)) return AB_F; const F = PAL.hall, dx = x - F.x, dz = z - F.z, lx = dx * F.c - dz * F.s, lz = dx * F.s + dz * F.c; if (Math.abs(lx) < 5.85 && lz > 11.15 && lz < 14.9) return F.gy + 0.45;   // the dais
+  return Math.max(groundH(x, z), spanY(x, z), WATER - 1.0); }
 const _aseed = A => hash(A.i, 5);
 function stationPose(A) { const S = SIM, k = A.key, [sx, sz, sh] = A.station; let x = sx, z = sz, h = sh, kind = "stand";
   const shouting = S > T.shout && S < T.shout + 25;
@@ -821,7 +1068,8 @@ function stationPose(A) { const S = SIM, k = A.key, [sx, sz, sh] = A.station; le
   return [x, z, h, kind]; }
 function agentState(A) { const S = SIM;
   if (A.proc) { if (A.key === "lord" && S > T.flee + A.delay * 8) { const s = (S - T.flee - A.delay * 8) * 1.6, P = A.lordOut || (A.lordOut = [[A.station[0], A.station[1]], ND, [0, -34], [-20 + A.delay * 5, -70 - A.delay * 2]]), [x, z, h, done] = routeAt(P, s); return [x, z, done ? face(x, z, 40, -150) : h, done ? "talk" : "walk", !done]; }
-    if (S < T.proc + A.delay) return null; if (S > T.leave + (16 - A.delay / 2.4) * 2.4) { const s = (S - T.leave - (16 - A.delay / 2.4) * 2.4) * 0.9, P = A.back || (A.back = [[A.station[0], A.station[1]], ...PROC_PATH.slice().reverse()]), [x, z, h, done] = routeAt(P, s); return done ? null : [x, z, h, "walk", true]; }
+    if (S < T.proc + A.delay) return [A.wait[0], A.wait[1], face(A.wait[0], A.wait[1], PAL_IN[0], PAL_IN[1]), A.key === "william" ? "talk" : "stand"];   // gathered in the hall
+    if (S > T.leave + (16 - A.delay / 2.4) * 2.4) { const s = (S - T.leave - (16 - A.delay / 2.4) * 2.4) * 0.9, P = A.back || (A.back = [[A.station[0], A.station[1]], ...PROC_PATH.slice().reverse(), PAL_IN, [A.feast[0], A.feast[1]]]), [x, z, h, done] = routeAt(P, s); return done ? [A.feast[0], A.feast[1], A.feast[2], "sit"] : [x, z, h, "walk", true]; }   // back to the hall for the feast
     const s = (S - T.proc - A.delay) * 0.9, [x, z, h, done] = routeAt(A.path, s); if (!done) return [x, z, h, A.key === "candle" || A.key === "cross" || A.key === "book" ? "carry" : "walk", true]; return stationPose(A); }
   if (A.cong) { if (S < A.leaveAt) return [A.seat[0], A.seat[1], A.faceSeat, S > T.shout && S < T.shout + 25 ? "cheer" : "stand"];
     const s = (S - A.leaveAt) * A.speed, [x, z, h, done] = routeAt(A.out, s); if (!done) return [x, z, h, "walk", true, A.speed];
@@ -832,12 +1080,15 @@ function agentState(A) { const S = SIM;
     return done ? [x, z, fight && F ? face(x, z, F.x, F.z) : h, fight ? "hammer" : "talk"] : [x, z, h, "walk", true, A.speed]; }
   if (A.torch && S > T.shout + 15) { const H = A.torch, P = [[A.fixed[0], A.fixed[1]], [H.dp[0] + Math.sin(H.dp[2]) * 2, H.dp[1] + Math.cos(H.dp[2]) * 2]], s = (S - T.shout - 15) * Math.max(0.6, Math.hypot(P[1][0] - P[0][0], P[1][1] - P[0][1]) / Math.max(10, A.torchAt - T.shout - 15)), [x, z, h, done] = routeAt(P, s);
     return done ? [x, z, face(x, z, H.x, H.z), "guard"] : [x, z, h, "carry", true]; }
+  if (A.loop) { const P = A.loop, L = A.loopL || (A.loopL = P.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - P[i][0], p[1] - P[i][1]), 0)), u = (S * A.speed + A.phase * 7) % (2 * L + 16);   // to the hall and back, a pause at each end
+    if (u < L) { const [x, z, h] = routeAt(P, u); return [x, z, h, "carry", true]; } if (u < L + 8) { const [x, z, h] = routeAt(P, L); return [x, z, h, "sell"]; }
+    if (u < 2 * L + 8) { const [x, z, h] = routeAt(P, 2 * L + 8 - u); return [x, z, h + Math.PI, "walk", true]; } const [x, z, h] = routeAt(P, 0); return [x, z, h + Math.PI, "stand"]; }
   if (A.fixed) return [...A.fixed, A.kind];
   return null; }
 let frameN = 0;
-const ABBEY_DOORS = [ND, WD]; let youIn = false, nearDoor = false;
-function seen(x, z, d) { if (d > 260) return false; if (INSIDE_H) return d < 60; const pin = inAbbey(x, z); if (pin === youIn) return true; return nearDoor ? d < 120 : false; }
-function lifeStep(dt, t) { frameN++; const px = P_.x, pz = P_.z, rate = Math.min(timeRate, 8); youIn = inAbbey(px, pz); nearDoor = ABBEY_DOORS.some(([x, z]) => Math.hypot(x - px, z - pz) < 14);
+let youZone = null, nearDoor = false;
+function seen(x, z, d) { if (d > 260) return false; if (INSIDE_H) return d < 60; if (zoneOf(x, z) === youZone) return true; return nearDoor ? d < 120 : false; }   // people in another room or building only through a doorway
+function lifeStep(dt, t) { frameN++; const px = P_.x, pz = P_.z, rate = Math.min(timeRate, 8); youZone = zoneOf(px, pz); nearDoor = ALL_DOORS.some(([x, z]) => Math.hypot(x - px, z - pz) < 14);
   for (const A of AG2) {
     if (A.amb) { if (A.mode === "off" || Math.hypot(A.x - px, A.z - pz) > 400) { if ((frameN + A.i) % 30 === 0) placeAmbient(A, px, pz); if (A.mode === "off" || Math.hypot(A.x - px, A.z - pz) > 400) { if (A.shown) { crowd.hide(A.i); A.shown = false; } continue; } }
       if (A.mode === "walk") { A.s += A.dir * A.v * dt * rate; if (A.s < 0 || A.s > A.S.L.L) { A.dir *= -1; A.s = clampN(A.s, 0, A.S.L.L); }
@@ -871,7 +1122,7 @@ let smokeHouses = [], smokeT = 0;
 const charCol = new THREE.Color(0x2a2420), wallCol = new THREE.Color(0xe8e0d8);
 function fireStep(dt, t) { let sum = 0, cx = 0, cz = 0, k = 0;
   for (const H of FIRE_H) { const age = SIM - H.ignite, f = age < 0 ? 0 : age < 150 ? age / 150 : age < 1200 ? 1 : age < 3000 ? 1 - 0.85 * (age - 1200) / 1800 : Math.max(0, 0.15 * (1 - (age - 3000) / 4000));
-    const collapsed = age > 1200; if (collapsed !== (H.state === 2)) { H.state = collapsed ? 2 : 0; const W = KIT["w:" + H.wall]; if (collapsed) kitHide("r:" + H.roof, H.ri); else kitShow("r:" + H.roof, H.ri); if (W?.im) { W.im.setColorAt(H.wi, collapsed ? charCol : wallCol); W.im.instanceColor.needsUpdate = true; } }
+    const collapsed = age > 1200; if (collapsed !== (H.state === 2)) { H.state = collapsed ? 2 : 0; for (const m of H.fx || []) { const roofy = /\|(thatch|shingle)$/.test(m.userData.key); if (roofy) m.visible = !collapsed; else m.material = collapsed ? G_MAT.char : m.userData.mat0; } }
     for (let q = 0; q < 7; q++) { const idx = k * 7 + q; if (f <= 0.01) { FIRE_IM.setMatrixAt(idx, ZEROM); continue; } const u = (q / 6 - 0.5) * H.d * 0.8, c = Math.cos(H.ry), s = Math.sin(H.ry), x = H.x + s * u, z = H.z + c * u, top = collapsed ? H.gy + 0.4 : H.gy + H.wh + H.rh * 0.4;
       const sc = f * (0.7 + 0.35 * Math.sin(t * (9 + q) + q * 1.7)) * (collapsed ? 0.8 : 1.4); O3.position.set(x, top, z); O3.rotation.set(0, t + q, 0); O3.scale.set(sc * 1.2, sc * (1.2 + 0.3 * Math.sin(t * 13 + q)), sc * 1.2); O3.updateMatrix(); FIRE_IM.setMatrixAt(idx, O3.matrix); }
     if (f > 0.01) { sum += f; cx += H.x * f; cz += H.z * f; if (Math.random() < f * dt * 14) fireSmoke.emit(H.x, H.gy + H.wh + H.rh, H.z, 2.2, 22, 4); }
@@ -897,11 +1148,15 @@ const ITEMS_TXT = { hearth: "The hearth, in the middle of the floor: a bed of cl
   table: "The Christmas feast on a trestle board: bread, a pottage of beans or peas, pork or beef, cheese, and ale. Christmas was one of the great feasts of the year; the Twelve Days were a holiday by law under King Alfred.",
   cellar: "A trapdoor to the cellar, lined with planks: many Late Saxon London houses had one, for storage, found by archaeologists as rectangular pits with timber linings.",
   cauldron: "An iron cauldron hung from a chain over the fire, for the pottage." };
-function makeInterior(H) { const g = new THREE.Group(), Y = H.gy, iw = H.w - 0.25, id = H.d - 0.25, items = [];
+function makeInterior(H) { const g = new THREE.Group(), Y = H.gy, iw = H.w - 0.25, id = H.d - 0.25, items = [], gr = [];
   const wallT = (H.wall === "daub" ? daubT : plankT).clone(); wallT.repeat.set(2, 1); wallT.needsUpdate = true;
   const box = new THREE.Mesh(new THREE.BoxGeometry(iw, H.wh, id).translate(0, H.wh / 2, 0), new THREE.MeshStandardMaterial({ map: wallT, side: THREE.BackSide, roughness: 0.95 })); g.add(box);
   const fl = new THREE.Mesh(new THREE.PlaneGeometry(iw, id).rotateX(-Math.PI / 2), M(0x4a3e30, { roughness: 1 })); fl.position.y = 0.02; g.add(fl);
-  const rf = new THREE.Mesh(GABLE_G, new THREE.MeshStandardMaterial({ map: thatchT, side: THREE.BackSide, roughness: 1, color: 0x6a5a48 })); rf.scale.set(iw, H.rh * 0.95, id); rf.position.y = H.wh; g.add(rf);
+  if (!H.hip) for (const sz of [-1, 1]) { const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute([-iw / 2, H.wh, sz * id / 2, iw / 2, H.wh, sz * id / 2, 0, H.wh + H.rh * 0.96, sz * id / 2], 3)); g.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, iw / 2, 0, iw / 4, H.rh / 2], 2)); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: wallT, side: THREE.DoubleSide, roughness: 0.95 })); g.computeVertexNormals(); gr.push(m); }
+  for (const m of gr) g.add(m);
+  { const [dx, dz] = toLocal(H, H.dp[0], H.dp[1]), onX = Math.abs(dx) > Math.abs(dz), dm = new THREE.Mesh(new THREE.PlaneGeometry(0.95, Math.min(1.8, H.wh - 0.2)), new THREE.MeshStandardMaterial({ map: plankT, roughness: 0.9 }));
+    dm.position.set(onX ? Math.sign(dx) * (iw / 2 - 0.02) : 0, Math.min(1.8, H.wh - 0.2) / 2, onX ? 0 : Math.sign(dz) * (id / 2 - 0.02)); dm.rotation.y = onX ? -Math.sign(dx) * Math.PI / 2 : dz > 0 ? Math.PI : 0; g.add(dm); }
   for (let k = 1; k < Math.floor(id / 1.6); k++) { const r = new THREE.Mesh(new THREE.BoxGeometry(iw, 0.14, 0.14), M(0x2a2018)); r.position.set(0, H.wh, -id / 2 + k * 1.6); g.add(r); }   // tie-beams, sooty
   const it = (key, x, z, obj) => { obj.position.set(x, obj.position.y, z); g.add(obj); items.push({ key, x, z }); };
   const hearth = new THREE.Group(); hearth.add(new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.8, 0.08, 10), M(0x6a5448))); const fl2 = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.6, 6).translate(0, 0.3, 0), flameM); hearth.add(fl2);
@@ -925,10 +1180,10 @@ function makeInterior(H) { const g = new THREE.Group(), Y = H.gy, iw = H.w - 0.2
   g.position.set(H.x, Y, H.z); g.rotation.y = H.ry; scene.add(g); return { g, items, fam, flame: fl2 }; }
 function toLocal(H, x, z) { const dx = x - H.x, dz = z - H.z, c = Math.cos(H.ry), s = Math.sin(H.ry); return [dx * c - dz * s, dx * s + dz * c]; }
 function toWorld(H, lx, lz) { const c = Math.cos(H.ry), s = Math.sin(H.ry); return [H.x + lx * c + lz * s, H.z - lx * s + lz * c]; }
-function enterHouse(H) { INSIDE_H = H; IN = makeInterior(H); kitHide("w:" + H.wall, H.wi); kitHide("r:" + H.roof, H.ri); kitHide("door", H.di); H.coll.on = false;
+function enterHouse(H) { INSIDE_H = H; IN = makeInterior(H); H.coll.on = false;
   const [lx, lz] = toLocal(H, H.dp[0], H.dp[1]), f = 0.75; [P_.x, P_.z] = toWorld(H, lx * f, lz * f); yaw = Math.atan2(-(H.x - P_.x), -(H.z - P_.z)); if (renderer.xr.isPresenting) vrTurn = yaw;
   say("<b>Inside a house</b> · Press E near things to learn about them, or near a person; E at the doorway to go out.", 10); }
-function leaveHouse() { const H = INSIDE_H; if (!H) return; scene.remove(IN.g); IN.g.traverse(o => { o.geometry?.dispose?.(); }); kitShow("w:" + H.wall, H.wi); kitShow("r:" + H.roof, H.ri); kitShow("door", H.di); H.coll.on = true;
+function leaveHouse() { const H = INSIDE_H; if (!H) return; scene.remove(IN.g); IN.g.traverse(o => { o.geometry?.dispose?.(); }); H.coll.on = true;
   const s = Math.sin(H.dp[2]), c = Math.cos(H.dp[2]); P_.x = H.dp[0] + s * 1.2; P_.z = H.dp[1] + c * 1.2; INSIDE_H = null; IN = null; houseLight.intensity = 0; }
 function insideStep(t) { const H = INSIDE_H, [lx, lz] = toLocal(H, P_.x, P_.z), hw = H.w / 2 - 0.45, hd = H.d / 2 - 0.45; let X = clampN(lx, -hw, hw), Z = clampN(lz, -hd, hd);
   if (Math.hypot(X, Z) < 0.95) { const a = Math.atan2(Z, X); X = Math.cos(a) * 0.95; Z = Math.sin(a) * 0.95; }   // not into the fire
@@ -940,7 +1195,7 @@ function insideInteract() { const H = INSIDE_H, [lx, lz] = toLocal(H, P_.x, P_.z
   if (best?.fam) return say(DRESS[best.fam.role] + " The family is at its Christmas meal.", 14); if (best) return say(ITEMS_TXT[best.key], 16);
   say("Walk closer to something to read about it; E at the doorway to go out.", 5); }
 function nearDoorHouse() { let best = null, bd = 2.2; const L = []; for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) L.push(...(COLL.get((Math.floor(P_.x / CC) + i) * 100003 + Math.floor(P_.z / CC) + j) || []));
-  for (const r of L) { const H = r.tag; if (!H || !H.dp || H.burnt || !H.wi && H.wi !== 0) continue; const d = Math.hypot(H.dp[0] - P_.x, H.dp[1] - P_.z); if (d < bd) { bd = d; best = H; } } return best; }
+  for (const r of L) { const H = r.tag; if (!H || !H.dp || H.burnt || H.state === 2) continue; const d = Math.hypot(H.dp[0] - P_.x, H.dp[1] - P_.z); if (d < bd) { bd = d; best = H; } } return best; }
 
 // ---------- the abbey's own markers ----------
 mark("Westminster Abbey", -14, -14, "known", "Edward the Confessor's abbey church of St Peter: the first Romanesque church in England, built in the new Norman manner from about 1050, consecrated on 28 December 1065. Edward was buried here on 6 January; Harold was probably crowned here the same day; today William. The plan is known from foundations found under the present church (rebuilt by Henry III from 1245); the look of it from the Bayeux Tapestry (with a crossing tower and a man fixing the weathercock) and the Life of King Edward. The crossing tower, transepts and east end were finished; the nave was still being built.", { big: true, range: 5000, y: 46, r: 45 });
@@ -981,14 +1236,15 @@ renderer.domElement.addEventListener("pointerdown", () => { dragging = true; sta
 addEventListener("pointermove", e => { if (!dragging) return; yaw -= e.movementX * 0.004; pitch = clampN(pitch - e.movementY * 0.004, -1.5, 1.5); });
 intro?.addEventListener("click", start);
 const RATES = [1, 10, 60]; function cycleRate() { timeRate = RATES[(RATES.indexOf(timeRate) + 1) % RATES.length]; say(`Time runs ${timeRate === 1 ? "at its real pace" : timeRate + " times faster"}.`, 4); drawGuide(); }
-function groundAt(x, z) { if (INSIDE_H) return INSIDE_H.gy + 0.02; if (inAbbey(x, z)) return AB_F; return Math.max(groundH(x, z), spanY(x, z)); }
+function groundAt(x, z) { if (INSIDE_H) return INSIDE_H.gy + 0.02; const base = inAbbey(x, z) ? AB_F : Math.max(groundH(x, z), spanY(x, z)), s = surfAt(x, z); return s > base && s <= P_.y + 0.7 ? s : base; }   // stairs and upper floors: only if you can step onto them
 function standSpot(x, z, avoidAbbey = true) { for (let r = 0; r < 80; r += 4) for (let a = 0; a < 6.28; a += r ? 0.5 : 7) { const X = x + Math.cos(a) * (r + 10), Z = z + Math.sin(a) * (r + 10), v = rGet(X, Z);
   if (groundAt(X, Z) < 0.3 || v === 2 || v === 7 || (avoidAbbey && inAbbey(X, Z))) continue; const p = { x: X, z: Z }; pushOut(p); if (Math.hypot(p.x - X, p.z - Z) < 0.01) return [X, Z]; } return [x + 12, z + 12]; }
-function teleport(x, z, lx, lz) { if (INSIDE_H) leaveHouse(); P_.x = x; P_.z = z; P_.y = groundAt(x, z); yaw = Math.atan2(-(lx - x), -(lz - z)); if (renderer.xr.isPresenting) vrTurn = yaw; flying = false; updateGround(x, z, 99); }
+function teleport(x, z, lx, lz, high = false) { if (INSIDE_H) leaveHouse(); P_.x = x; P_.z = z; P_.y = high ? 1e9 : -1e9; P_.y = groundAt(x, z); yaw = Math.atan2(-(lx - x), -(lz - z)); if (renderer.xr.isPresenting) vrTurn = yaw; flying = false; updateGround(x, z, 99); }
 // places: everything named, all open from the start; and the moments of the coronation
 const PLACES = [{ name: "Outside the abbey (start)", at: [START.x, START.z], look: START.look }, { name: "Inside the abbey: south transept", at: [2.5, 15], look: [15, 0] }, { name: "Inside the abbey: the nave", at: [-28, 2.5], look: [10, 0] }];
 for (const m of MARKS) if (m.tag !== "person" && m.tag !== "typical" && !m.hidden && !["The high altar", "King Edward's tomb", "The throne", "The arcades", "The north door"].includes(m.name)) PLACES.push({ name: m.name, m });
-function goPlace(p) { start(); if (p.at) { teleport(p.at[0], p.at[1], p.look[0], p.look[1]); say(`<b>${p.name}</b>`, 5); return; } const [x, z] = standSpot(p.m.x, p.m.z + 20); teleport(x, z, p.m.x, p.m.z); say(`<b>${p.m.name}</b> · <span style="color:${TAGC[p.m.tag]}">${TAGN[p.m.tag]}</span> · ${p.m.text}`, 24); }
+function goPlace(p) { start(); if (p.at) { teleport(p.at[0], p.at[1], p.look[0], p.look[1]); say(`<b>${p.name}</b>`, 5); return; } const zn = zoneOf(p.m.x, p.m.z) && !inAbbey(p.m.x, p.m.z);
+  if (zn) teleport(p.m.x - 2, p.m.z + 1.5, p.m.x, p.m.z, (p.m.y || 0) > 4); else { const [x, z] = standSpot(p.m.x, p.m.z + 20); teleport(x, z, p.m.x, p.m.z); } say(`<b>${p.m.name}</b> · <span style="color:${TAGC[p.m.tag]}">${TAGN[p.m.tag]}</span> · ${p.m.text}`, 24); }
 function goMoment(k) { start(); const [name, tm] = MOMENTS[k]; SIM = tm; narrI = -1; momentI = k;
   const view = k <= 1 ? [[46, -78], [0, -20]] : k === 3 || k === 4 ? (Math.hypot(P_.x, P_.z) > 300 || inAbbey(P_.x, P_.z) ? [[34, -64], [60, -170]] : null) : k === 9 ? [[60, -50], [0, -27]] : (inAbbey(P_.x, P_.z) ? null : [[2.5, 15], [15, 0]]);
   if (view && (Math.hypot(P_.x - view[0][0], P_.z - view[0][1]) > 40)) teleport(view[0][0], view[0][1], view[1][0], view[1][1]); drawGuide(); }
@@ -1010,17 +1266,38 @@ function interact() { if (!started) return start(); if (INSIDE_H) return insideI
   say("Nothing to read right here. Walk up to a marker (or a person) and press E; at a house doorway, E goes in.", 6); }
 
 // ---------- floating markers ----------
+// A small tag hangs on a thin pin over each thing; the colour bar says how well it is known. Nearer and more important ones win
+// when tags would overlap; the one you can read now (within reach) is lit and says "E to read".
 const LBL = new THREE.Group(); scene.add(LBL);
-function labelSprite(m) { const c = document.createElement("canvas"); c.width = 512; c.height = 112; const g = c.getContext("2d");
-  g.font = "600 40px -apple-system, Helvetica, sans-serif"; const w = Math.min(500, Math.max(g.measureText(m.name).width, 200) + 36);
-  g.fillStyle = "rgba(30,24,18,.78)"; g.beginPath(); g.roundRect((512 - w) / 2, 4, w, 104, 16); g.fill(); g.fillStyle = TAGC[m.tag]; g.fillRect((512 - w) / 2 + 12, 16, 8, 80);
-  g.fillStyle = "#fff4e0"; g.textAlign = "center"; g.fillText(m.name, 256 + 6, 52, w - 40); g.font = "28px -apple-system, Helvetica, sans-serif"; g.fillStyle = TAGC[m.tag]; g.fillText(TAGN[m.tag].split(":")[0] + (m.tag === "person" ? "" : " · E to read"), 256 + 6, 92, w - 40);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: true, fog: false, transparent: true })); s.renderOrder = 10; LBL.add(s); return s; }
-function updateLabels() { const cx = P_.x, cz = P_.z, cy = P_.y + 1.6;
-  for (const m of MARKS) { let x = m.x, z = m.z, y; if (m.follow) { if (!m.follow.shown) { if (m.spr) m.spr.visible = false; continue; } x = m.follow.x; z = m.follow.z; y = personY(x, z) + 2.4; }
-    const d = Math.hypot(x - cx, z - cz), vis = labelsOn && !m.hidden && d < m.range && !INSIDE_H && (inAbbey(cx, cz) === inAbbey(x, z) || d > 60 || m.big);
-    if (!vis) { if (m.spr) m.spr.visible = false; continue; } if (!m.spr) m.spr = labelSprite(m);
-    if (y === undefined) y = (inAbbey(x, z) ? AB_F : groundH(x, z)) + (m.y ?? 8); const D = Math.hypot(d, y - cy), h = clampN(D * 0.04, 0.35, 90); m.spr.position.set(x, y + h * 0.3, z); m.spr.scale.set(h * 4.57, h, 1); m.spr.visible = true; } }
+const PIN_N = 256, pinGeo = new THREE.BufferGeometry(); pinGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(PIN_N * 6), 3));
+const pins = new THREE.LineSegments(pinGeo, new THREE.LineBasicMaterial({ color: 0xf2e8d6, transparent: true, opacity: 0.6, fog: false })); pins.frustumCulled = false; scene.add(pins);
+const dotGeo = new THREE.BufferGeometry(); dotGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(PIN_N * 3), 3)); dotGeo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(PIN_N * 3), 3));
+const dots = new THREE.Points(dotGeo, new THREE.PointsMaterial({ size: 7, sizeAttenuation: false, vertexColors: true, fog: false })); dots.frustumCulled = false; scene.add(dots);
+function labelTex(m, active) { const c = document.createElement("canvas"); c.width = 512; c.height = 128; const g = c.getContext("2d"), name = m.name, sub = m.tag === "person" ? "person" : TAGN[m.tag].split(":")[0];
+  g.font = "600 44px -apple-system, Helvetica, sans-serif"; const w = Math.min(500, Math.max(g.measureText(name).width + 56, 180));
+  g.fillStyle = active ? "rgba(58,44,26,.92)" : "rgba(26,20,14,.72)"; g.beginPath(); g.roundRect((512 - w) / 2, 6, w, 110, 22); g.fill();
+  if (active) { g.strokeStyle = "#ffe9a8"; g.lineWidth = 4; g.stroke(); }
+  g.fillStyle = TAGC[m.tag]; g.beginPath(); g.roundRect((512 - w) / 2 + 12, 22, 9, 78, 4); g.fill();
+  g.fillStyle = "#fff6e4"; g.textAlign = "center"; g.fillText(name, 256 + 8, 60, w - 46); g.font = "29px -apple-system, Helvetica, sans-serif"; g.fillStyle = active ? "#ffe9a8" : TAGC[m.tag]; g.fillText(active ? sub + "  ·  press E to read" : sub, 256 + 8, 98, w - 46);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
+function labelSprite(m) { m.tex = [labelTex(m, false), null]; const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: m.tex[0], depthTest: true, fog: false, transparent: true })); s.center.set(0.5, 0); s.renderOrder = 10; LBL.add(s); return s; }
+let ACTIVE_M = null; const _v = V3(0, 0, 0), _tc = new THREE.Color();
+function readableMark() { let best = null, bd = 1e9; for (const m of MARKS) { const [x, z] = m.follow ? [m.follow.x, m.follow.z] : [m.x, m.z], d = Math.hypot(x - P_.x, z - P_.z); if (d < m.r && d / m.r < bd && (!m.follow || m.follow.shown)) { bd = d / m.r; best = m; } } return best; }
+function updateLabels() { const cx = P_.x, cz = P_.z, cy = P_.y + 1.6, myZone = zoneOf(cx, cz), tanH = Math.tan(camera.fov * Math.PI / 360), asp = camera.aspect || 1.6, placed = [], cand = [];
+  ACTIVE_M = readableMark();
+  for (const m of MARKS) { let x = m.x, z = m.z, ay; if (m.follow) { if (!m.follow.shown) { if (m.spr) m.spr.visible = false; continue; } x = m.follow.x; z = m.follow.z; ay = personY(x, z) + 1.95; }
+    const d = Math.hypot(x - cx, z - cz), mz = zoneOf(x, z), vis = labelsOn && !m.hidden && d < m.range && !INSIDE_H && (mz === myZone || d > 60 || m.big);
+    if (!vis) { if (m.spr) m.spr.visible = false; continue; } if (ay === undefined) ay = (inAbbey(x, z) ? AB_F : groundH(x, z)) + (m.y ?? 8);
+    cand.push({ m, x, z, ay, d, pri: (m === ACTIVE_M ? 1e6 : 0) + (m.big ? 1e4 : 0) - d }); }
+  cand.sort((a, b) => b.pri - a.pri); let n = 0; const pp = pinGeo.attributes.position.array, dp = dotGeo.attributes.position.array, dc = dotGeo.attributes.color.array;
+  for (const c of cand) { const m = c.m, D = Math.max(1, Math.hypot(c.d, c.ay - cy)), h = clampN(D * 0.033, 0.22, 46), pin = Math.min(h * 1.1, 6), ly = c.ay + pin;
+    _v.set(c.x, ly + h / 2, c.z).project(camera); const hn = h / (D * tanH), wn = hn * 4 / asp, box = [_v.x - wn / 2, _v.y - hn / 2, _v.x + wn / 2, _v.y + hn / 2];
+    const onScreen = _v.z < 1 && Math.abs(_v.x) < 1.3 && Math.abs(_v.y) < 1.3; if (onScreen && placed.some(b => b[0] < box[2] && b[2] > box[0] && b[1] < box[3] && b[3] > box[1])) { if (m.spr) m.spr.visible = false; continue; }
+    if (onScreen) placed.push(box); if (!m.spr) m.spr = labelSprite(m); const act = m === ACTIVE_M; if (act && !m.tex[1]) m.tex[1] = labelTex(m, true);
+    const want = m.tex[act ? 1 : 0]; if (m.spr.material.map !== want) { m.spr.material.map = want; m.spr.material.needsUpdate = true; }
+    m.spr.material.opacity = act ? 1 : clampN(1.25 - c.d / m.range, 0.45, 1); m.spr.position.set(c.x, ly, c.z); m.spr.scale.set(h * 4, h, 1); m.spr.visible = true;
+    if (n < PIN_N) { pp.set([c.x, c.ay, c.z, c.x, ly + h * 0.05, c.z], n * 6); dp.set([c.x, c.ay, c.z], n * 3); _tc.set(TAGC[m.tag]); dc.set([_tc.r, _tc.g, _tc.b], n * 3); n++; } }
+  pinGeo.setDrawRange(0, n * 2); dotGeo.setDrawRange(0, n); pinGeo.attributes.position.needsUpdate = true; dotGeo.attributes.position.needsUpdate = true; dotGeo.attributes.color.needsUpdate = true; }
 
 // ---------- the map ----------
 const MX0 = RX0, MZ0 = RZ0, MW = RW * RC, MH = RH * RC, MPX = 6, MAPBASE = document.createElement("canvas"); MAPBASE.width = Math.ceil(MW / MPX); MAPBASE.height = Math.ceil(MH / MPX);
@@ -1068,7 +1345,8 @@ if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { i
 const clock = new THREE.Clock(), fwd = V3(0, 0, 0), side = V3(0, 0, 0), UP = V3(0, 1, 0);
 let hudT = 0, mapT = 0, lblT = 0, loopErrs = 0;
 const dayUp = new THREE.Color(), dayHor = new THREE.Color();
-buildKit(scene);
+buildHouses(new Set(FIRE_H)); buildKit(scene);
+const ALL_DOORS = [ND, WD, ...ZONES.flatMap(Z => Z.doors.map(([a, b]) => { const p = gw(Z.F, a, 0, b); return [p[0], p[2]]; }))];
 P_.y = groundAt(P_.x, P_.z); updateGround(P_.x, P_.z, 99);
 renderer.setAnimationLoop(() => { try { frame(); } catch (e) { if (loopErrs++ < 5) console.error(e); renderer.render(scene, camera); } });
 function frame() {
@@ -1099,9 +1377,10 @@ function frame() {
   // the sun, low in the south all day; sky and light
   const hour = SIM / 3600, S = sunAt(hour), el = S.el, day = clampN(el * 7 + 0.35, 0, 1), dusk = clampN(1 - el * 9, 0, 1) * (el > -0.12 ? 1 : 0);
   sun.position.copy(rig.position).addScaledVector(S.dir, 800); sun.target.position.copy(rig.position);
-  sun.intensity = 2.2 * clampN(el * 6, 0, 1); sun.color.setRGB(1, 0.88 - 0.25 * dusk, 0.74 - 0.4 * dusk); hemi.intensity = 0.12 + 1.15 * day;
-  const inA = inAbbey(P_.x, P_.z) && !flying;
-  hemi.groundColor.setHex(inA ? 0x9a8c78 : 0x5a5444); if (INSIDE_H) { sun.intensity *= 0.1; hemi.intensity *= 0.12; } else if (inA) { sun.intensity *= 0.12; hemi.intensity *= 0.75; }
+  sun.intensity = 2.2 * clampN(el * 6, 0, 1); sun.color.setRGB(1, 0.88 - 0.25 * dusk, 0.74 - 0.4 * dusk); hemi.intensity = 0.2 + 1.45 * day;
+  const inA = inAbbey(P_.x, P_.z) && !flying, zn = flying ? null : zoneOf(P_.x, P_.z), Z = zn && zn !== "abbey" ? ZONES.find(q => q.name === zn) : null;
+  hemi.groundColor.setHex(inA ? 0x9a8c78 : 0x7a7060); if (INSIDE_H) { sun.intensity *= 0.1; hemi.intensity *= 0.12; } else if (inA) { sun.intensity *= 0.12; hemi.intensity *= 0.75; } else if (Z) { sun.intensity *= 0.1; hemi.intensity *= 0.3; }
+  if (Z) { const up = Z.light0 && P_.y < Z.F.gy + 2.5, lp = gw(Z.F, ...(up ? Z.light0 : Z.light)); houseLight.position.set(...lp); houseLight.distance = Z.name === "hall" ? 34 : 14; houseLight.intensity = (Z.name === "hall" ? 65 : 16) * (0.88 + 0.08 * Math.sin(t * 13) + 0.04 * Math.sin(t * 29)); } else if (!INSIDE_H) houseLight.intensity = 0;
   abbeyLight.intensity = Math.hypot(P_.x, P_.z) < 90 ? (inA ? 260 : 30) * (0.9 + 0.1 * Math.sin(t * 7)) : 0;
   dayUp.setRGB(0.55, 0.62, 0.72).multiplyScalar(0.05 + 0.95 * day); dayHor.setRGB(0.80, 0.80, 0.80).multiplyScalar(0.06 + 0.94 * day).lerp(_c1.setRGB(0.95, 0.62, 0.40), dusk * 0.5);
   skyMat.uniforms.up.value.copy(dayUp); skyMat.uniforms.hor.value.copy(dayHor); scene.fog.color.copy(dayHor); sky.position.copy(rig.position);
@@ -1113,7 +1392,8 @@ function frame() {
   hudT -= dt; if (hudT <= 0) { hudT = 0.3;
     const hh = Math.floor(SIM / 3600), mi = Math.floor(SIM / 60) % 60, DH = INSIDE_H ? null : nearDoorHouse();
     let nearM = null, nd = 1e9; for (const m of MARKS) { if (m.follow || m.hidden) continue; const d = Math.hypot(m.x - P_.x, m.z - P_.z); if (d < m.r && d < nd) { nd = d; nearM = m; } }
-    const where = INSIDE_H ? "inside a house · E near things to read; E at the doorway to go out" : DH ? "at a doorway · <b>E: go inside</b>" : nearM ? `at <b>${nearM.name}</b> · E to read` : inA ? "inside Westminster Abbey" : CITY.inside(P_.x, P_.z) ? "inside the walls of London" : "";
+    const room = { hall: "in the great hall of Edward's palace", chamber: P_.y > PAL.chamber.gy + 2 ? "upstairs in the king's chamber" : "in the chamber block's ground floor (the stair is outside)", kitchen: "in the palace kitchen" }[zoneOf(P_.x, P_.z)];
+    const where = INSIDE_H ? "inside a house · E near things to read; E at the doorway to go out" : DH ? "at a doorway · <b>E: go inside</b>" : nearM ? `at <b>${nearM.name}</b> · E to read` : inA ? "inside Westminster Abbey" : room || (CITY.inside(P_.x, P_.z) ? "inside the walls of London" : "");
     HUD.innerHTML = `<b>London and Westminster, Christmas Day 1066</b> · ${hh}:${String(mi).padStart(2, "0")}${timeRate > 1 ? ` (time ×${timeRate})` : ""} · ${flying ? "flying" : SPEEDS[speedI][1] + (run > 1 ? ", running" : "")}<br>${where}<br>
       <span style="color:#c8b898;font-size:12.5px">WASD walk · drag to look · shift run · − / = pace · E read / go in · N next moment · T time speed · L markers · F fly · M map</span>`;
     if (vr && (vrDirty || ((t * 3) | 0) % 3 === 0)) { drawVR(`${hh}:${String(mi).padStart(2, "0")} · ${where.replace(/<[^>]+>/g, "")}`, msgText || "Left stick walk · right stick turn · trigger run · A read / go in · B next place · X next moment of the coronation · Y time speed"); vrDirty = false; } }
