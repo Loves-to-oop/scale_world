@@ -257,8 +257,9 @@ function baseH(x, z) { const s = THAMES.side(x, z), d = Math.abs(s); let h;
     h = lerpN(1.0, h, sstepN(d, RIVER_HW, RIVER_HW + 150)); }                                                                                                          // the foreshore
   if (d < RIVER_HW + 30) h = lerpN(-4, h, sstepN(d, RIVER_HW - 50, RIVER_HW + (s > 0 ? 10 : 30)));
   const carve = (L, w, dep, bank) => { if (!L.near(x, z, w + bank)) return; const dd = L.d(x, z); if (dd < w + bank) h = Math.min(h, lerpN(dep, h, sstepN(dd, w * 0.5, w + bank))); };
-  if (FLEET.near(x, z, 60)) { const fw = clampN(26 - (-z - 1270) / 560 * 18, 5, 26), dd = FLEET.d(x, z); if (dd < fw + 22) { if (z > -2150) h = Math.min(h, lerpN(-2.2, h, sstepN(dd, fw * 0.6, fw + 22))); else h -= 1.6 * (1 - sstepN(dd, fw * 0.5, fw + 30)); } }   // tidal to Holborn, a brook in its valley above
-  for (const B of BROOKS) if (B.near(x, z, 30)) { const dd = B.d(x, z); if (dd < 30) h -= (h > 1.2 ? 1.2 : 0.4) * (1 - sstepN(dd, 2, 30)); }   // the Fleet: about 50 m across at its mouth, 15 m by Fleet Street carve(WALBROOK, 3, -0.4, 30); carve(TYB_N, 7, -1.2, 10); carve(TYB_S, 7, -1.2, 10); carve(TYB_W, 6, -1.0, 10);
+  if (FLEET.near(x, z, 60)) { const fw = clampN(26 - (-z - 1270) / 560 * 18, 5, 26), dd = FLEET.d(x, z); if (dd < fw + 22) { if (z > -2150) h = Math.min(h, lerpN(-2.2, h, sstepN(dd, fw * 0.6, fw + 22))); else h -= 1.6 * (1 - sstepN(dd, fw * 0.5, fw + 30)); } }   // the Fleet: about 50 m across at its mouth, 15 m by Fleet Street; tidal to Holborn, a brook above   // tidal to Holborn, a brook in its valley above
+  for (const B of BROOKS) if (B.near(x, z, 30)) { const dd = B.d(x, z); if (dd < 30) h -= (h > 1.2 ? 1.2 : 0.4) * (1 - sstepN(dd, 2, 30)); }   // brooks in their valleys
+  carve(WALBROOK, 3, -0.4, 30); carve(TYB_N, 7, -1.2, 10); carve(TYB_S, 7, -1.2, 10); carve(TYB_W, 6, -1.0, 10);
   if (WALL.near(x, z, 30) && !CITY.inside(x, z)) { const wd = WALL.d(x, z); if (wd > 3 && wd < 18) h -= 2.4 * Math.sin((wd - 3) / 15 * Math.PI); }                     // the city ditch outside the wall
   return h; }
 const groundH = baseH;
@@ -380,6 +381,9 @@ function groundColor(x, z, h, c) {
   else if (v === 6) c.setRGB(0.14 + 0.05 * n1, 0.12 + 0.04 * n1, 0.10);                                                     // burnt: Southwark, fired by William in late November
   else if (v === 7) c.lerp(_c1.setRGB(0.40, 0.38, 0.32), 0.8);
   else if (v === 4) c.lerp(_c1.setRGB(0.34, 0.38, 0.24), 0.5);
+  else if (v === 8) { const yard = x < -40 && x > -125 && Math.abs(z) < 55, m = clampN(0.35 + 0.9 * (fbm(x / 9, z / 9, 3) - 0.5) + (yard ? 0.35 : 0) + 0.4 * (1 - sstepN(Math.hypot(x + 10, z * 1.3), 20, 90)), 0.1, 1);   // trampled mud in patches, worn grass between
+    c.lerp(_c1.setRGB(0.34 + 0.06 * n1, 0.28 + 0.04 * n1, 0.2), m); if (yard && fbm(x / 4, z / 4, 2) > 0.55) c.lerp(_c1.setRGB(0.62, 0.58, 0.48), 0.4); }   // stone chips and mortar in the masons' yard   // trampled mud; stone chips and mortar in the masons' yard
+  else if (v === 9) c.setRGB(0.3 + 0.04 * Math.sin(z * 2.1), 0.25, 0.18);   // dug garden beds
   if (v === 0) ruralColor(x, z, h, c, n1);
   for (const B of BROOKS) if (B.near(x, z, 6) && B.d(x, z) < 3.2) c.setRGB(0.26, 0.31, 0.32);   // brook water
   if (FLEET.near(x, z, 8) && z < -2150 && FLEET.d(x, z) < 4) c.setRGB(0.26, 0.31, 0.32);
@@ -818,7 +822,14 @@ function wallZ(z0, z1, x, th, y0, h, gaps = [], mat = "ashlar") { let a = z0; fo
   // small apses at the east ends of the choir aisles
   for (const zs of [-1, 1]) { const cz = 7.85 * zs, cx = CHOIR_E + 1.4; for (let k = 0; k < 6; k++) { const a = -Math.PI / 2 + (k + 0.5) / 6 * Math.PI; slab("ashlar", cx + Math.cos(a) * 2.6, Y, cz + Math.sin(a) * 2.6, 0.9, 11.5, 1.5, -a, 0, true); }
     windowAt(cx + 3.1, Y + 4, cz, 0.8, 2.0, "x", 1, 0.9); const g = new THREE.ConeGeometry(3.2, 2.6, 10, 1, true, 0, Math.PI); AG.lead.push([g, new THREE.Matrix4().makeTranslation(cx, Y + 11.5 + 1.3, cz)]); }
-  flushAG(HS); rRect(-20, 30, 160, 140, 0, 4);
+  flushAG(HS); rRect(-25, -5, 190, 150, 0, 8); rRect(-36, -50, 48, 22, 0, 4); rRect(28, 44, 26, 30, 0, 4); rRect(62, 70, 46, 50, 0, 9);   // worksite and trodden ground; the lay cemetery north of the church, the monks' cemetery; the monks' garden
+  // the masons' yard west of the unfinished nave: lodges, stacks of Caen stone, timber, a lime pit, a sawpit, handcarts
+  { const R = seeded(77); for (const [x, z] of [[-84, -22], [-84, 20]]) { addHouse(x, z, 6, 12, 0, { wall: "plank", roof: "thatch", wh: 2.4, door: "+x", kind: "lodge" }).noEnter = true; }
+    for (let k = 0; k < 6; k++) { const bx = -70 - (k % 3) * 5, bz = (k < 3 ? -1 : 1) * (28 + R() * 6); for (let q = 0; q < 9; q++) put("block", BOX_G, AMAT.ashlar, bx + (q % 3) * 0.9, AB_Y - 0.1 + Math.floor(q / 3) * 0.45, bz + (R() - 0.5) * 0.4, 0.8, 0.42, 0.55, R() * 0.2); }
+    for (let k = 0; k < 10; k++) put("log", CYL_G, MAT.wood, -96, AB_Y + 0.2 + (k % 3) * 0.38, -6 + k * 0.45, 0.36, 7, 0.36, Math.PI / 2, Math.PI / 2);
+    put("limepit", CYL_G, M(0xd8d4c8), -98, AB_Y - 0.2, 24, 4, 0.3, 4); put("limepit", CYL_G, M(0x8a8478), -98, AB_Y - 0.25, 24, 4.6, 0.3, 4.6);
+    put("sawtrestle", BOX_G, MAT.wood, -104, AB_Y, 6, 0.3, 1.6, 0.3); put("sawtrestle", BOX_G, MAT.wood, -104, AB_Y, 1, 0.3, 1.6, 0.3); put("log", CYL_G, MAT.wood, -104, AB_Y + 1.7, 3.5, 0.5, 6, 0.5, 0, Math.PI / 2);
+    for (const [x, z] of [[-62, -40], [-58, 38]]) { put("cart", BOX_G, MAT.wood, x, AB_Y + 0.5, z, 1.3, 0.35, 2.4); for (const s of [-1, 1]) put("cartwheel", CYL_G, MAT.wood, x + s * 0.75, AB_Y + 0.55, z, 1.1, 0.12, 1.1, 0, Math.PI / 2); } }
 }
 function inAbbey(x, z) { return (x > NAVE_DONE && x < CHOIR_E && Math.abs(z) < 11.2) || (Math.abs(x) < 6.4 && Math.abs(z) < 27.7) || (x >= CHOIR_E && Math.hypot(x - CHOIR_E, z) < 5.7); }
 // lamps: candles on the altar and lamps hung in the crossing
@@ -1256,10 +1267,10 @@ const WHEEL_G = (() => { const parts = [[new THREE.TorusGeometry(1.6, 0.08, 5, 2
   return mergeG(parts); })();
 const wheelM = new THREE.MeshStandardMaterial({ color: 0x5a4632, roughness: 0.9, vertexColors: true });
 function addMill(lat, lon, L, name, tag, text) { let [x, z] = LL(lat, lon); let best = 0, bd = 1e9; for (let s = 0; s <= L.L; s += 2) { const [px, pz] = L.at(s), d = Math.hypot(px - x, pz - z); if (d < bd) { bd = d; best = s; } }
-  const [px, pz, a] = L.at(best), nx = Math.cos(a), nz = -Math.sin(a), mx = px + nx * 5, mz = pz + nz * 5;
-  addHouse(mx, mz, 5, 7, a + Math.PI / 2, { door: "-z", wall: "plank", roof: "thatch", kind: "mill", wh: 3 }).noEnter = true;
-  const w = new THREE.Mesh(WHEEL_G, wheelM); w.position.set(px + nx * 1.2, groundH(px, pz) + 0.9, pz + nz * 1.2); w.rotation.y = a + Math.PI / 2; scene.add(w);
-  put("leat", BOX_G, MAT.wood, px, groundH(px, pz) - 0.5, pz, 2.2, 0.8, 6, a);   // the timber trough guiding water under the wheel
+  const [px, pz, a] = L.at(best), nx = Math.cos(a), nz = -Math.sin(a), mx = px + nx * 7.5, mz = pz + nz * 7.5, bed = groundH(px, pz), wy = bed < WATER - 0.2 ? WATER : bed + 0.12;   // the water surface: the tidal level, or the brook's own
+  addHouse(mx, mz, 5, 7, a + Math.PI / 2, { door: "+z", wall: "plank", roof: "thatch", kind: "mill", wh: 3 }).noEnter = true;   // the door faces away from the wheel
+  const w = new THREE.Mesh(WHEEL_G, wheelM); w.position.set(px + nx * 2.2, wy + 1.25, pz + nz * 2.2); w.rotation.y = a + Math.PI / 2; scene.add(w);   // the paddles dip into the stream
+  put("leat", BOX_G, MAT.wood, px + nx * 2.2, wy - 0.6, pz + nz * 2.2, 2.0, 0.55, 5, a); put("leat", BOX_G, MAT.wood, px + nx * 4.6, wy - 0.6, pz + nz * 4.6, 0.25, 1.6, 6, a); put("axle", CYL_G, MAT.wood, px + nx * 3.4, wy + 1.25, pz + nz * 3.4, 0.22, 2.6, 0.22, a + Math.PI / 2, Math.PI / 2);   // the timber trough guiding water under the wheel
   MILLS.push({ w, x: px, z: pz }); mark(name, mx, mz, tag, text, { y: 6, r: 12, range: 700 }); }
 addMill(51.4962, -0.1300, line([[51.4975, -0.1345], [51.4968, -0.1300], [51.4955, -0.1238]]), "The abbey's mill", "inferred", "Westminster Abbey's water mill on the Tyburn: Millbank, just south, is named after it (recorded later in the Middle Ages). A vertical undershot wheel turns a shaft and gears driving the millstones inside; the abbey's tenants had to grind their corn here and pay a share.");
 addMill(51.5220, -0.1082, FLEET, "A mill on the Fleet", "inferred", "Mills stood on the Fleet above Holborn (recorded from the 12th century); this one is placed where the stream runs down its valley. The miller took a toll of the flour, a sixteenth or so.");
@@ -1320,6 +1331,7 @@ const RIVER_BOATS = [];
   for (let k = 0; k < n; k++) { const r = R(), type = r < 0.28 ? "ship" : r < 0.6 ? "barge" : r < 0.88 ? "rowboat" : "fisher";
     const s0 = type === "ship" ? BRIDGE_S + 120 : 300, s1 = type === "ship" ? THAMES.L - 200 : THAMES.L - 300;   // ships stay below the bridge
     const len = type === "ship" ? 15 + R() * 6 : type === "barge" ? 11 + R() * 4 : type === "rowboat" ? 5.5 + R() * 1.5 : 6, speed = type === "ship" ? 1.4 : type === "barge" ? 0.9 : type === "rowboat" ? 1.8 : 0.15;
+    if (type === "ship" && k % 4 === 1) { RIVER_BOATS.push({ type, len, speed: 1.1, s0: BRIDGE_S - 640, s1: THAMES.L - 300, s: BRIDGE_S - 300 + R() * 900, dir: R() < 0.5 ? 1 : -1, lane: (R() - 0.5) * 120, ph: R() * 10, crew: 8, cargo: null, sail: sailM, through: true }); continue; }   // ships that lower their masts to pass the bridge
     RIVER_BOATS.push({ type, len, speed: speed * (0.8 + R() * 0.4), s0, s1, s: s0 + R() * (s1 - s0), dir: R() < 0.5 ? 1 : -1, lane: (R() - 0.5) * 220, ph: R() * 10, crew: type === "ship" ? 6 : type === "barge" ? 3 : type === "rowboat" ? 2 : 2, cargo: type === "barge" ? ["stone", "grain", "wood", "barrels"][(R() * 4) | 0] : null, sail: type === "ship" && R() < 0.6 ? sailM : sailPlainM }); } }
 const RB = { hull: new THREE.InstancedMesh(BOAT_G, MAT.tar, RIVER_BOATS.length), crew: new THREE.InstancedMesh(CREW_G, M(0x6a5444, { vertexColors: true }), RIVER_BOATS.reduce((a, b) => a + b.crew, 0)), oar: new THREE.InstancedMesh(BOX_G, MAT.wood, RIVER_BOATS.reduce((a, b) => a + b.crew * 2, 0)),
   mast: new THREE.InstancedMesh(CYL_G, MAT.wood, RIVER_BOATS.length), sailS: new THREE.InstancedMesh(SAIL_G, sailM, RIVER_BOATS.length), sailP: new THREE.InstancedMesh(SAIL_G, sailPlainM, RIVER_BOATS.length), cargo: new THREE.InstancedMesh(BOX_G, M(0x8a7a62), RIVER_BOATS.length * 4), post: new THREE.InstancedMesh(BOX_G, MAT.tar, RIVER_BOATS.length * 2) };
@@ -1333,10 +1345,12 @@ function boatsStep(t, dt) { let ci = 0, oi = 0, gi = 0, si = 0, pi = 0, pj = 0;
     const sc = far ? 0 : 1, beam = B.len * (B.type === "ship" ? 0.24 : B.type === "barge" ? 0.33 : 0.3), depth = B.type === "ship" ? 1.7 : 0.8, y = WATER - depth * 0.55 + bob;
     setI(RB.hull, i, x, y, z, h, beam * sc, depth * sc, B.len * sc, Math.sin(t * 0.9 + B.ph) * 0.02, Math.sin(t * 0.7 + B.ph) * 0.03);
     for (const e of [-1, 1]) { const [px, py, pz] = local(x, y, z, h, 0, depth * 0.9, e * B.len * 0.48); setI(RB.post, pi++, px, py, pz, h, 0.18 * sc, (B.type === "ship" ? 1.4 : 0.6) * sc, 0.25 * sc, -e * 0.4); }   // stem and stern posts
-    const sailing = B.type === "ship"; if (sailing) { const [mx, , mz] = local(x, y, z, h, 0, 0, 0); setI(RB.mast, i, mx, y + 0.5, mz, h, 0.25 * sc, B.len * 0.6 * sc, 0.25 * sc); const [sx, sy, sz] = local(x, y, z, h, 0, B.len * 0.38, 0.2);
+    const struck = B.through && Math.abs(B.s - BRIDGE_S) < 110, sailing = B.type === "ship" && !struck;
+    if (struck) { const [mx, , mz] = local(x, y, z, h, 0, 0, -B.len * 0.1); setI(RB.mast, i, mx, y + depth * 0.95, mz, h, 0.25 * sc, B.len * 0.6 * sc, 0.25 * sc, Math.PI / 2); setI(RB.sailS, i, 0, -999, 0, 0, 0, 0, 0); setI(RB.sailP, i, 0, -999, 0, 0, 0, 0, 0); }   // mast lowered onto its crutch
+    else if (sailing) { const [mx, , mz] = local(x, y, z, h, 0, 0, 0); setI(RB.mast, i, mx, y + 0.5, mz, h, 0.25 * sc, B.len * 0.6 * sc, 0.25 * sc); const [sx, sy, sz] = local(x, y, z, h, 0, B.len * 0.38, 0.2);
       setI(B.sail === sailM ? RB.sailS : RB.sailP, i, sx, y + 0.5 + B.len * 0.35, sz, h + Math.PI, B.len * 0.45 * sc, B.len * 0.38 * sc, 1); setI(B.sail === sailM ? RB.sailP : RB.sailS, i, 0, -999, 0, 0, 0, 0, 0); }
     else { setI(RB.mast, i, 0, -999, 0, 0, 0, 0, 0); setI(RB.sailS, i, 0, -999, 0, 0, 0, 0, 0); setI(RB.sailP, i, 0, -999, 0, 0, 0, 0, 0); }
-    const rowing = B.type !== "ship" && B.type !== "fisher", stroke = Math.sin(t * 2.2 + B.ph);
+    const rowing = (B.type !== "ship" || struck) && B.type !== "fisher", stroke = Math.sin(t * 2.2 + B.ph);
     for (let k = 0; k < B.crew; k++) { const lz = (k - (B.crew - 1) / 2) * (B.len * 0.7 / Math.max(1, B.crew)); const [px, py, pz] = local(x, y, z, h, 0, depth * 0.45, lz); setI(RB.crew, ci++, px, py, pz, h + (rowing ? Math.PI : 0), sc, sc, sc, rowing ? 0.25 * stroke : 0);
       for (const e of [-1, 1]) { const [ox, oy, oz] = local(x, y, z, h, e * beam * 0.55, depth * 0.55, lz); setI(RB.oar, oi++, ox, oy, oz, h + e * (rowing ? 0.4 * stroke : 0) + Math.PI / 2, (rowing || B.type === "ship" && k < 2 ? 2.6 : 0) * sc, 0.06 * sc, 0.06 * sc, 0, e * 0.25); } }
     for (let k = 0; k < 4; k++) { if (!B.cargo) { setI(RB.cargo, gi++, 0, -999, 0, 0, 0, 0, 0); continue; } const [px, py, pz] = local(x, y, z, h, (k % 2 - 0.5) * beam * 0.4, depth * 0.55, (Math.floor(k / 2) - 0.5) * B.len * 0.3);
@@ -1344,6 +1358,7 @@ function boatsStep(t, dt) { let ci = 0, oi = 0, gi = 0, si = 0, pi = 0, pj = 0;
   for (const k in RB) RB[k].instanceMatrix.needsUpdate = true; }
 mark("Ships below the bridge", ...THAMES.at(BRIDGE_S + 260).slice(0, 2), "known", "Seagoing ships could not pass the low timber bridge: they moored and unloaded at Billingsgate and along the shore below it. The tolls of about 1000 list wine ships from Rouen, ships from Flanders, Ponthieu, Normandy and France, and the emperor's men from Germany, who paid in pepper, gloves and vinegar at Christmas and Easter. Their sails were striped, as the Bayeux Tapestry shows.", { y: 8, range: 1500, r: 80 });
 mark("River traffic", ...THAMES.at(BRIDGE_S - 700).slice(0, 2), "typical", "Above the bridge: barges rowed and poled with grain, stone (Caen stone for the abbey, Kentish rag), timber and firewood; ferries and passenger boats; fishermen at their weirs. " + (MARKET ? "A busy market day." : "Christmas Day, a holy day: few boats are out."), { y: 6, range: 1500, r: 80 });
+mark("Passing the bridge", ...THAMES.at(BRIDGE_S - 60).slice(0, 2), "inferred", "The timber bridge stood on rows of trestles a few metres apart, its deck only a few metres above high water. Barges and boats rowed through the gaps (at the turn of the tide, when the current was slack). How seagoing ships reached Queenhithe above the bridge is not known: ships of the Scandinavian kind could lower the mast and row through, and the bridge may have had a section that could be raised, as the stone bridge later had a drawbridge. Most unloaded below it, at Billingsgate.", { y: 6, range: 800, r: 40 });
 
 // ---------- the day's clock ----------
 // The hour of the coronation is not recorded. Mass on a great feast was in the morning; here the procession sets out at 10:00 and
@@ -1427,6 +1442,7 @@ FIRE_H.forEach((H, k) => { H.ignite = T.fire + k * 45; H.state = 0; const G = GU
 // the stallholders, and a boatman for hire
 for (const S of STALLS) { const [x, z, h] = S.seller; S.agent = agent(S.kind === "butcher" || S.kind === "iron" ? "eng" : hash(x | 0, z | 0) < 0.45 ? "woman" : "eng", { fixed: [x, z, h], kind: S.kind === "butcher" ? "hammer" : "sell", seller: true }); }
 const ROWER = agent("eng", { rower: true });
+if (MARKET) for (const [x, z, h] of [[-68, -27, 0], [-73, 29, Math.PI], [-63, 31, Math.PI], [-102, 4.5, Math.PI / 2], [-106, 2.5, -Math.PI / 2], [-50, 10, -Math.PI / 2]]) agent("eng", { fixed: [x, z, h], kind: "hammer", farm: true });   // masons dressing stone, sawyers at the sawpit
 // farm folk at their winter work: threshing with flails in the barn doorways, in the yards, herding, and the ploughman behind his team
 for (const F of [...FARM_SPOTS.filter(f => f.plough), ...FARM_SPOTS.filter(f => !f.plough).filter((f, i) => i % 2 === 0)].slice(0, 64)) agent(F.role, F.plough ? { plough: F.plough, farm: true } : { fixed: [F.x, F.z, F.h], kind: F.kind, farm: true });
 const AMB = []; { const N = NC - nextI - 8; for (let k = 0; k < N; k++) { const A = agent(null, { amb: true }); if (A) AMB.push(A); } }
@@ -1624,6 +1640,7 @@ function nearDoorHouse() { let best = null, bd = 2.2; const L = []; for (let i =
 
 // ---------- the abbey's own markers ----------
 mark("Westminster Abbey", -14, -14, "known", "Edward the Confessor's abbey church of St Peter: the first Romanesque church in England, built in the new Norman manner from about 1050, consecrated on 28 December 1065. Edward was buried here on 6 January; Harold was probably crowned here the same day; today William. The plan is known from foundations found under the present church (rebuilt by Henry III from 1245); the look of it from the Bayeux Tapestry (with a crossing tower and a man fixing the weathercock) and the Life of King Edward. The crossing tower, transepts and east end were finished; the nave was still being built. Finished, it was about 98 m long, longer than any other church in England, with an aisled nave about 22 m wide. Its heights are not known; they are shown in the proportions of Jumièges in Normandy, its model: nave walls about 23 m, the crossing tower about 45 m to its cap.", { big: true, range: 5000, y: 58, r: 45 });
+mark("The building site", -82, 0, "inferred", "The abbey was still being built. West of the church, the masons' yard: their timber lodges, where they cut and dressed the stone; stacks of Caen stone shipped from Normandy (and Reigate stone from Surrey); timber and scaffold poles; a pit of slaked lime for mortar; a sawpit. The ground round the church is trampled mud, not lawn: the grass is in the burial grounds, the lay cemetery north of the church and the monks' cemetery to the south-east. The monks' garden lies beyond." + (MARKET ? " Today the masons are at work." : " Today, a holy day, the site is still."), { y: 6, r: 25, range: 400 });
 mark("The unfinished nave", -48, 0, "inferred", "Most historians (Gem, Fernie) think the nave was completed only in the 1080s or later, and the two western towers later still. So here the western bays stand at arcade and gallery height in scaffolding, and a timber wall closes the finished part. How far the work had got in 1066 is not known.", { y: 14, r: 18, range: 400 });
 mark("The north door", 0, -30, "inferred", "With the nave unfinished, the way in was probably by a transept door. The north transept front became the abbey's main entrance in the 13th-century church.", { y: 6, r: 8, range: 250 });
 mark("The high altar", 18.5, 0, "known", "The high altar of St Peter, in the presbytery before the apse. The coronation was performed here: the oath, the anointing, the crowning.", { y: 3.2, r: 4, range: 60 });
