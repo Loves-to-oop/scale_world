@@ -37,6 +37,15 @@ const speckle = (base, n, cols, sw = 2, sh = 2) => (g, w, h) => { g.fillStyle = 
   for (let k = 0; k < n; k++) { g.fillStyle = cols[(rnd() * cols.length) | 0]; g.globalAlpha = 0.25 + rnd() * 0.4; g.fillRect(rnd() * w, rnd() * h, sw * (0.5 + rnd()), sh * (0.5 + rnd())); } g.globalAlpha = 1; };
 
 
+// ---------- who you are (chosen on the start card) ----------
+const LIVES = {
+  traveller: { title: "a time traveller from a university", short: "Time traveller", rank: "unseen", intro: "No one here can see or hear you: you are an observer. The markers are your field notes." },
+  comb: { title: "a comb-maker of Bread Street, London", short: "Comb-maker", rank: "common", intro: "You make combs of red-deer antler in your house on Bread Street, with your wife and children. London is crowded with William's men; tomorrow (or today) the duke is crowned." },
+  ale: { title: "an alewife of Eastcheap, London", short: "Alewife", rank: "common", woman: true, intro: "You brew ale and sell it from your house in Eastcheap; your husband is a carter. Brewing, spinning, cooking and the children fill your day." },
+  south: { title: "a fisherman of Southwark", short: "Southwark fisherman", rank: "common", intro: "A month ago William's knights burned Southwark. Your house is a black shell; your family shelters in a lean-to beside it. You fish the Thames for eels and are rebuilding." },
+  thegn: { title: "an English thegn with a town house in London", short: "Thegn", rank: "noble", intro: "You hold land in Middlesex and a 'haw', a town house, in the City, with servants. You submitted to William with the other English leaders at Berkhamsted. A thegn is expected at the crowning." } };
+const WHO = LIVES[Q.get("who")] ? Q.get("who") : "traveller", LIFE = LIVES[WHO], UNSEEN = LIFE.rank === "unseen";
+
 // ---------- people of 1066 ----------
 // Dress after the Bayeux Tapestry and the archaeology of Anglo-Saxon and Norman England: men in knee-length tunics, hose or leg
 // wrappings, cloaks fastened with a brooch; Englishmen with long hair and moustaches, Normans with the back of the head shaved;
@@ -167,6 +176,7 @@ function poseOf(kind, t, ph, walkAmt = 1) { const c = t * 7 + ph, w = Math.sin(c
     case "bless": Object.assign(P, { aL: -0.25, eL: -0.7, aR: -1.0 - 0.15 * Math.sin(t * 1.5), eR: -1.25 }); break;
     case "hammer": { const q = (t * 1.6 + ph) % 1, up = q < 0.6 ? q / 0.6 : 1 - (q - 0.6) / 0.4; Object.assign(P, { lean: 0.22, lL: -0.1, lR: 0.12, kL: 0.15, kR: 0.1, aL: -0.55, eL: -0.9, aR: -0.5 - 1.9 * up, eR: -0.4 - 0.6 * up }); break; }
     case "talk": Object.assign(P, { aL: 0.05, eL: -0.25, aR: -0.35 - 0.3 * Math.max(0, Math.sin(t * 1.3 + ph)), eR: -1.0 - 0.3 * Math.sin(t * 2.1 + ph) }); break;
+    case "bow": Object.assign(P, { lean: 0.38, aL: -0.15, aR: -0.15, eL: -0.3, eR: -0.3 }); break;
     case "sell": Object.assign(P, { lean: 0.1, aL: -0.45, eL: -0.8, aR: -0.5 - 0.25 * Math.sin(t * 2 + ph), eR: -0.9 }); break; }
   return P; }
 const _b = new THREE.Matrix4(), _hm = new THREE.Matrix4(), _sk = new THREE.Matrix4(), _j = new THREE.Matrix4(), _tmp = new THREE.Matrix4(), _q2 = new THREE.Quaternion(), _e2 = new THREE.Euler(), ZEROM = new THREE.Matrix4().makeScale(0, 0, 0), _p = V3(0, 0, 0), _s = V3(1, 1, 1);
@@ -279,7 +289,7 @@ const STREETS = [
   ["Borough High Street", 7, [[51.5062, -0.0878], [51.5045, -0.0890], [51.5025, -0.0905], [51.5000, -0.0920], [51.4975, -0.0930]]],
   ["the road to Lambeth", 4, [[51.5000, -0.0920], [51.4985, -0.1000], [51.4965, -0.1100], [51.4952, -0.1185]]],
 ].map(([name, w, pts]) => ({ name, w, L: line(pts) }));
-const BRIDGE = line([[51.5097, -0.0872], [51.5062, -0.0878]]), BRIDGE_Y = 2.6;   // London Bridge, timber, on the line of Fish Street Hill
+const BRIDGE = line([[51.5097, -0.0872], [51.5062, -0.0878]]), BRIDGE_Y = 2.4;   // London Bridge, timber, on the line of Fish Street Hill
 
 // ---------- the land-use raster: 2 m cells over the whole map, for ground colour, placing buildings without overlaps, and walking ----------
 // 0 open ground, 1 street, 2 building, 3 yard, 4 churchyard / precinct, 5 ploughed field, 6 burnt ground, 7 wall
@@ -533,10 +543,10 @@ const PLANE_G = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);
 const KIT = {}; const kit = (key, geo, mat) => KIT[key] || (KIT[key] = { geo, mat, list: [] });
 const put = (key, geo, mat, x, y, z, sx, sy, sz, ry = 0, rx = 0, rz = 0) => { kit(key, geo, mat).list.push([x, y, z, sx, sy, sz, ry, rx, rz]); return KIT[key].list.length - 1; };
 function buildKit(group) { for (const k in KIT) { const K = KIT[k]; if (!K.list.length || K.im) continue; const im = new THREE.InstancedMesh(K.geo, K.mat, K.list.length), c = new THREE.Color();
-  K.list.forEach(([x, y, z, sx, sy, sz, ry, rx, rz], i) => { O3.position.set(x, y, z); O3.rotation.set(rx || 0, ry, rz || 0); O3.scale.set(sx, sy, sz); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); c.setHSL(0.08, 0.1 + 0.15 * hash(i, 3), 0.78 + 0.22 * hash(i, 5)); im.setColorAt(i, c); });
+  K.list.forEach(([x, y, z, sx, sy, sz, ry, rx, rz], i) => { O3.position.set(x, y, z); O3.rotation.set(rx || 0, ry, rz || 0, "YXZ"); O3.scale.set(sx, sy, sz); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); c.setHSL(0.08, 0.1 + 0.15 * hash(i, 3), 0.78 + 0.22 * hash(i, 5)); im.setColorAt(i, c); });
   im.frustumCulled = false; K.im = im; group.add(im); } }
 function kitHide(key, i) { const K = KIT[key]; if (!K?.im) return; K.im.setMatrixAt(i, ZEROM); K.im.instanceMatrix.needsUpdate = true; }
-function kitShow(key, i) { const K = KIT[key]; if (!K?.im) return; const [x, y, z, sx, sy, sz, ry, rx, rz] = K.list[i]; O3.position.set(x, y, z); O3.rotation.set(rx || 0, ry, rz || 0); O3.scale.set(sx, sy, sz); O3.updateMatrix(); K.im.setMatrixAt(i, O3.matrix); K.im.instanceMatrix.needsUpdate = true; }
+function kitShow(key, i) { const K = KIT[key]; if (!K?.im) return; const [x, y, z, sx, sy, sz, ry, rx, rz] = K.list[i]; O3.position.set(x, y, z); O3.rotation.set(rx || 0, ry, rz || 0, "YXZ"); O3.scale.set(sx, sy, sz); O3.updateMatrix(); K.im.setMatrixAt(i, O3.matrix); K.im.instanceMatrix.needsUpdate = true; }
 
 // ---------- solid things: rectangles you cannot walk through, in a 16 m hash ----------
 const COLL = new Map(), CC = 16;
@@ -631,12 +641,18 @@ function addChurch(x, z, o = {}) { const nw = o.nw || 6.5, nl = o.nl || 14, cw =
 // Roughly 300 m of trestles carrying a plank deck about 4-6 m wide, with no houses on it (those came with the stone bridge after 1176).
 const SPANS = [{ L: BRIDGE, y: BRIDGE_Y, hw: 2.6, name: "London Bridge" }, { L: line([[51.5140, -0.1036], [51.5140, -0.1050]]), y: 4.5, hw: 2.8, name: "Fleet Bridge" },
   { L: line([[51.5028, -0.1266], [51.5017, -0.1266]]), y: 2.4, hw: 2, name: "the bridge over the Tyburn" }];
-for (const B of SPANS) { const [ax, az, bx, bz] = [B.L.P[0][0], B.L.P[0][1], B.L.P[1][0], B.L.P[1][1]], len = Math.hypot(bx - ax, bz - az), ry = Math.atan2(bx - ax, bz - az), n = Math.ceil(len / 6);
-  for (let k = 0; k < n; k++) { const x = ax + (bx - ax) * (k + 0.5) / n, z = az + (bz - az) * (k + 0.5) / n; put("deck", BOX_G, MAT.wood, x, B.y - 0.35, z, B.hw * 2, 0.35, len / n + 0.05, ry);
-    for (const sg of [-1, 1]) { const ox = Math.cos(ry) * B.hw * sg, oz = -Math.sin(ry) * B.hw * sg; put("rail", BOX_G, MAT.wood, x + ox, B.y + 0.9, z + oz, 0.12, 0.12, len / n + 0.05, ry); put("rail", BOX_G, MAT.wood, x + ox, B.y, z + oz, 0.14, 1.0, 0.14, ry);
-      const gy = baseH(x + ox, z + oz); if (gy < B.y - 0.5) put("pile", CYL_G, MAT.wood, x + ox * 0.9, Math.min(gy, -3) - 1, z + oz * 0.9, 0.38, B.y - Math.min(gy, -3) + 0.6, 0.38); } } }
-function spanY(x, z) { for (const B of SPANS) { if (!B.L.near(x, z, B.hw + 20)) continue; const [ax, az, bx, bz] = B.L.S[0], dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz, t = ((x - ax) * dx + (z - az) * dz) / l2, len = Math.sqrt(l2);
-  const px = ax + clampN(t, 0, 1) * dx, pz = az + clampN(t, 0, 1) * dz; if (Math.hypot(x - px, z - pz) > B.hw) continue; const out = t < 0 ? -t * len : t > 1 ? (t - 1) * len : 0; if (out > 12) continue; return B.y - out * 0.2; } return -1e9; }
+// each bridge runs on past its ends onto dry land, its deck ramping down to the ground on either bank (timber approaches on earth banks)
+for (const B of SPANS) { const [ax0, az0, bx0, bz0] = B.L.S[0], len0 = Math.hypot(bx0 - ax0, bz0 - az0), ux = (bx0 - ax0) / len0, uz = (bz0 - az0) / len0;
+  let ea = 4, eb = 4; while (ea < 60 && baseH(ax0 - ux * ea, az0 - uz * ea) < B.y - 1.1) ea += 3; while (eb < 60 && baseH(bx0 + ux * eb, bz0 + uz * eb) < B.y - 1.1) eb += 3;   // walk out until the bank is near deck height
+  B.ax = ax0 - ux * ea; B.az = az0 - uz * ea; B.ux = ux; B.uz = uz; B.len = len0 + ea + eb; B.gA = baseH(B.ax, B.az); B.gB = baseH(B.ax + ux * B.len, B.az + uz * B.len); B.R = Math.max(10, Math.min(ea, eb) + 6);
+  B.yAt = s => { const ra = Math.max(0, 1 - s / B.R), rb = Math.max(0, 1 - (B.len - s) / B.R); return B.y + (B.gA + 0.15 - B.y) * ra * ra * (3 - 2 * ra) + (B.gB + 0.15 - B.y) * rb * rb * (3 - 2 * rb); };
+  const ry = Math.atan2(ux, uz), n = Math.ceil(B.len / 3);
+  for (let k = 0; k < n; k++) { const s0 = B.len * k / n, s1 = B.len * (k + 1) / n, sm = (s0 + s1) / 2, x = B.ax + ux * sm, z = B.az + uz * sm, y0 = B.yAt(s0), y1 = B.yAt(s1), ym = (y0 + y1) / 2, seg = Math.hypot(s1 - s0, y1 - y0);
+    put("deck", BOX_G, MAT.wood, x, ym - 0.35, z, B.hw * 2, 0.35, seg + 0.05, ry, Math.atan2(y0 - y1, s1 - s0));
+    const gm = baseH(x, z); if (ym - gm > 0.4 && gm > B.y - 2.5 && gm > -0.5) put("bank", BOX_G, MAT.wood, x, gm - 0.3, z, B.hw * 2 - 0.2, ym - gm - 0.05, seg + 0.05, ry);   // timber-faced earth approach
+    for (const sg of [-1, 1]) { const ox = Math.cos(ry) * B.hw * sg, oz = -Math.sin(ry) * B.hw * sg; put("rail", BOX_G, MAT.wood, x + ox, ym + 0.9, z + oz, 0.12, 0.12, seg + 0.05, ry, Math.atan2(y0 - y1, s1 - s0)); if (k % 2 === 0) put("rail", BOX_G, MAT.wood, x + ox, ym, z + oz, 0.14, 1.0, 0.14, ry);
+      const gy = baseH(x + ox, z + oz); if (gy < ym - 0.5 && k % 2 === 0) put("pile", CYL_G, MAT.wood, x + ox * 0.9, Math.min(gy, -3) - 1, z + oz * 0.9, 0.38, ym - Math.min(gy, -3) + 0.6, 0.38); } } }
+function spanY(x, z) { for (const B of SPANS) { const dx = x - B.ax, dz = z - B.az, s = dx * B.ux + dz * B.uz; if (s < 0 || s > B.len) continue; const off = Math.abs(dx * B.uz - dz * B.ux); if (off > B.hw) continue; return B.yAt(s); } return -1e9; }
 
 // ---------- boats at the hithes ----------
 // Queenhithe (Æthelred's hithe) and Billingsgate were the trading shores, where boats were run up on the foreshore against timber
@@ -1162,7 +1178,7 @@ if (MKT_ON) { markLL("The Shambles", 51.5152, -0.0990, "inferred", "London's mea
 // The hour of the coronation is not recorded. Mass on a great feast was in the morning; here the procession sets out at 10:00 and
 // the events the chroniclers describe follow in their order, at a plausible pace. SIM is seconds after midnight.
 const hms = (h, m = 0, s = 0) => h * 3600 + m * 60 + s;
-let SIM = MARKET ? hms(9, 0) : hms(9, 55), timeRate = 1;
+let SIM = (Q.get("who") || "traveller") !== "traveller" ? hms(7, 40) : MARKET ? hms(9, 0) : hms(9, 55), timeRate = 1;   // a life starts before dawn
 const T = { proc: hms(10, 0), enter: hms(10, 4, 30), prostrate: hms(10, 5), ask1: hms(10, 10), ask2: hms(10, 11, 30), shout: hms(10, 12, 40), fire: hms(10, 13, 30), flee: hms(10, 14, 10),
   oath: hms(10, 20), anoint: hms(10, 24), crown: hms(10, 28), throne: hms(10, 31), mass: hms(10, 34), leave: hms(11, 20) };
 const MOMENTS = [["Before the coronation", hms(9, 55)], ["The procession", T.proc - 10], ["The questions", T.ask1 - 15], ["The shout and the fire", T.shout - 20], ["The flight from the church", T.flee - 10],
@@ -1240,7 +1256,7 @@ FIRE_H.forEach((H, k) => { H.ignite = T.fire + k * 45; H.state = 0; const G = GU
 // the stallholders, and a boatman for hire
 for (const S of STALLS) { const [x, z, h] = S.seller; S.agent = agent(S.kind === "butcher" || S.kind === "iron" ? "eng" : hash(x | 0, z | 0) < 0.45 ? "woman" : "eng", { fixed: [x, z, h], kind: S.kind === "butcher" ? "hammer" : "sell", seller: true }); }
 const ROWER = agent("eng", { rower: true });
-const AMB = []; { const N = NC - nextI; for (let k = 0; k < N; k++) { const A = agent(null, { amb: true }); if (A) AMB.push(A); } }
+const AMB = []; { const N = NC - nextI - 8; for (let k = 0; k < N; k++) { const A = agent(null, { amb: true }); if (A) AMB.push(A); } }
 function placeAmbient(A, px, pz) { const R = Math.random;
   for (let t = 0; t < 25; t++) { if (R() < 0.3 && HOUSES.length) { const H = HOUSES[(R() * HOUSES.length) | 0]; if (H.burnt && R() < 0.6) continue; if (!H.dp || Math.hypot(H.dp[0] - px, H.dp[1] - pz) > 320) continue;   // talking at a doorway
       const ox = Math.sin(H.dp[2]) * 1.4, oz = Math.cos(H.dp[2]) * 1.4; A.mode = "talk"; A.x = H.dp[0] + ox + (R() - 0.5) * 2; A.z = H.dp[1] + oz + (R() - 0.5) * 2; A.h = R() * 6.28; A.kind = R() < 0.15 ? "carry" : "talk"; return true; }
@@ -1322,13 +1338,14 @@ function seen(x, z, d) { if (d > 260) return false; if (INSIDE_H) return d < 60;
 function lifeStep(dt, t) { frameN++; const px = P_.x, pz = P_.z, rate = Math.min(timeRate, 8); youZone = zoneOf(px, pz); nearDoor = ALL_DOORS.some(([x, z]) => Math.hypot(x - px, z - pz) < 14);
   for (const A of AG2) {
     if (A.amb) { if (A.mode === "off" || Math.hypot(A.x - px, A.z - pz) > 400) { if ((frameN + A.i) % 30 === 0) placeAmbient(A, px, pz); if (A.mode === "off" || Math.hypot(A.x - px, A.z - pz) > 400) { if (A.shown) { crowd.hide(A.i); A.shown = false; } continue; } }
-      if (A.mode === "walk") { A.s += A.dir * A.v * dt * rate; if (A.s < 0 || A.s > A.S.L.L) { A.dir *= -1; A.s = clampN(A.s, 0, A.S.L.L); }
+      const rx = A.react && t < A.react.until;
+      if (A.mode === "walk" && !rx) { A.s += A.dir * A.v * dt * rate; if (A.s < 0 || A.s > A.S.L.L) { A.dir *= -1; A.s = clampN(A.s, 0, A.S.L.L); }
         const [x, z, a] = A.S.L.at(A.s); A.x = x + Math.cos(a) * A.lane; A.z = z - Math.sin(a) * A.lane; A.h = A.dir > 0 ? a : a + Math.PI; }
       const d = Math.hypot(A.x - px, A.z - pz), step = d < 35 ? 1 : d < 120 ? 3 : 8; if ((frameN + A.i) % step && A.shown) continue;
       if (!seen(A.x, A.z, d)) { if (A.shown) { crowd.hide(A.i); A.shown = false; } continue; }
-      crowd.set(A.i, A.x, personY(A.x, A.z), A.z, A.h, A.mode === "walk" ? A.kind : A.kind, t, A.mode === "walk" ? A.v * rate : 1); A.shown = true; continue; }
+      crowd.set(A.i, A.x, personY(A.x, A.z), A.z, rx ? A.react.h : A.h, rx ? (A.react.bow ? "bow" : "talk") : A.kind, t, A.mode === "walk" ? A.v * rate : 1); A.shown = true; continue; }
     const st = agentState(A); if (!st) { if (A.shown) { crowd.hide(A.i); A.shown = false; } continue; }
-    const [x, z, h, kind, moving, sp] = st; A.x = x; A.z = z; A.h = h; A.kind = kind; const d = Math.hypot(x - px, z - pz);
+    let [x, z, h, kind, moving, sp] = st; if (A.react && t < A.react.until && !moving && kind !== "sit") { h = A.react.h; kind = A.react.bow ? "bow" : "talk"; } A.x = x; A.z = z; A.h = h; A.kind = kind; const d = Math.hypot(x - px, z - pz);
     if (!seen(x, z, d)) { if (A.shown) { crowd.hide(A.i); A.shown = false; } continue; }
     const step = d < 35 ? 1 : d < 120 ? 3 : 8; if ((frameN + A.i) % step && A.shown) continue;
     if (A.key === "william") { const crowned = SIM > T.crown + 20; if (crowned !== !!A.crowned) { A.crowned = crowned; A.L = looks(A.i, crowned ? "king" : "duke"); crowd.look(A.i, A.L); } }
@@ -1414,7 +1431,7 @@ function makeInterior(H) { const g = new THREE.Group(), Y = H.gy, iw = H.w - 0.2
   g.position.set(H.x, Y, H.z); g.rotation.y = H.ry; scene.add(g); return { g, items, fam, flame: fl2 }; }
 function toLocal(H, x, z) { const dx = x - H.x, dz = z - H.z, c = Math.cos(H.ry), s = Math.sin(H.ry); return [dx * c - dz * s, dx * s + dz * c]; }
 function toWorld(H, lx, lz) { const c = Math.cos(H.ry), s = Math.sin(H.ry); return [H.x + lx * c + lz * s, H.z - lx * s + lz * c]; }
-function enterHouse(H) { INSIDE_H = H; IN = makeInterior(H); H.coll.on = false;
+function enterHouse(H) { INSIDE_H = H; IN = makeInterior(H); H.coll.on = false; setTimeout(() => houseWelcome(H), 50);
   const [lx, lz] = toLocal(H, H.dp[0], H.dp[1]), f = 0.75; [P_.x, P_.z] = toWorld(H, lx * f, lz * f); yaw = Math.atan2(-(H.x - P_.x), -(H.z - P_.z)); if (renderer.xr.isPresenting) vrTurn = yaw;
   say("<b>Inside a house</b> · Press E near things to learn about them, or near a person; E at the doorway to go out.", 10); }
 function leaveHouse() { const H = INSIDE_H; if (!H) return; scene.remove(IN.g); IN.g.traverse(o => { o.geometry?.dispose?.(); }); H.coll.on = true;
@@ -1451,7 +1468,10 @@ let SITTING = localStorage.getItem("vrPosture") === "sitting";
   const paint = () => row.querySelectorAll("button").forEach(b => { b.style.cssText = "font:600 14px -apple-system,sans-serif;padding:6px 12px;margin:0 4px;border-radius:8px;cursor:pointer;border:2px solid #5a3a1e;" + ((b.dataset.p === "sitting") === SITTING ? "background:#5a3a1e;color:#fff" : "background:#fff;color:#5a3a1e"); });
   { const dr = document.createElement("p"); dr.innerHTML = 'Which day? <button data-d="xmas">👑 Christmas Day: the coronation</button> <button data-d="market">🧺 A market day before Christmas</button>';
     const pd = () => dr.querySelectorAll("button").forEach(b => { b.style.cssText = "font:600 14px -apple-system,sans-serif;padding:6px 12px;margin:2px 4px;border-radius:8px;cursor:pointer;border:2px solid #5a3a1e;" + ((b.dataset.d === "market") === MARKET ? "background:#5a3a1e;color:#fff" : "background:#fff;color:#5a3a1e"); });
-    dr.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); if ((b.dataset.d === "market") !== MARKET) location.search = b.dataset.d === "market" ? "?day=market" : ""; }); pd(); card?.insertBefore(dr, card.lastElementChild); }
+    dr.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); if ((b.dataset.d === "market") !== MARKET) { const q = new URLSearchParams(location.search); if (b.dataset.d === "market") q.set("day", "market"); else q.delete("day"); location.search = q.toString(); } }); pd(); card?.insertBefore(dr, card.lastElementChild); }
+  { const wr = document.createElement("p"), cur = new URLSearchParams(location.search).get("who") || "traveller"; wr.innerHTML = "Who are you? " + [["traveller", "🎓 Time traveller (unseen)"], ["comb", "🦌 London comb-maker"], ["ale", "🍺 London alewife"], ["south", "🎣 Southwark fisherman"], ["thegn", "🛡 English thegn"]].map(([k, n]) => `<button data-w="${k}">${n}</button>`).join(" ");
+    wr.querySelectorAll("button").forEach(b => b.style.cssText = "font:600 13.5px -apple-system,sans-serif;padding:5px 10px;margin:2px 3px;border-radius:8px;cursor:pointer;border:2px solid #5a3a1e;" + (b.dataset.w === cur ? "background:#5a3a1e;color:#fff" : "background:#fff;color:#5a3a1e"));
+    wr.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); if (b.dataset.w !== cur) { const q = new URLSearchParams(location.search); if (b.dataset.w === "traveller") q.delete("who"); else q.set("who", b.dataset.w); location.search = q.toString(); } }); card?.insertBefore(wr, card.lastElementChild); }
   row.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); SITTING = b.dataset.p === "sitting"; localStorage.setItem("vrPosture", b.dataset.p); paint(); }); paint(); card?.insertBefore(row, card.lastElementChild); }
 const CSS = "background:rgba(30,24,18,.78);color:#f2e8d6;border-radius:10px;font:13.5px/1.5 -apple-system,Helvetica,sans-serif";
 const HUD = document.createElement("div"); HUD.style.cssText = `position:fixed;left:14px;top:12px;z-index:2;padding:10px 14px;max-width:620px;${CSS}`;
@@ -1461,7 +1481,7 @@ const MAPC = document.createElement("canvas"); MAPC.width = MAPC.height = 240; M
 document.body.append(HUD, MSG, GUIDE, MAPC);
 let msgT = 0, msgText = "", vrDirty = true;
 function say(t, secs = 12) { msgText = t; msgT = secs; MSG.innerHTML = t; MSG.style.display = "block"; vrDirty = true; }
-function start() { if (started) return; started = true; intro?.classList.add("gone");
+function start() { if (started) return; started = true; intro?.classList.add("gone"); if (!UNSEEN) return roleStart();
   if (MARKET) return say("A market day a few days before Christmas 1066, at Westminster. The City is about 3 km east, along the Strand (or take a boat from the wharf, or use the guide's 'Things to do'). In the City: stalls on Cheapside, butchers at the Shambles and in Eastcheap, fish by the hithes. You carry 30 silver pennies: press E at a stall to buy.", 22);
   say("Westminster, Christmas morning 1066. Before you, Edward the Confessor's new abbey; to your right, the houses of the little vill. At 10:00 William's procession comes from the palace (to the south-east) to the north door. Walk anywhere: into the abbey, along the Strand to the City, across London Bridge. Markers name things and say how well we know them: press E near one to read it.", 22); }
 addEventListener("keydown", e => { keys[e.code] = true; start();
@@ -1490,13 +1510,16 @@ let momentI = 0; function nextMoment() { if (MARKET) { momentI = (momentI + 1) %
 const TAGC = { known: "#9ad87a", inferred: "#f0c060", typical: "#8ab8f0", absent: "#e08a8a", person: "#d8a8f0" }, TAGN = { known: "known", inferred: "inferred: place known, form guessed", typical: "typical: a stand-in", absent: "not there in 1066", person: "person" };
 function drawGuide() { const TD = self.TODO_LIST || []; GUIDE.innerHTML = (MARKET ? `<b>A market day, December 1066</b>` : `<b>Coronation</b> <span style="color:#c8b898">· click to go to the moment</span>` + MOMENTS.map(([n, tm], i) => `<div data-m="${i}" style="cursor:pointer;padding:1px 4px">${String(Math.floor(tm / 3600)).padStart(2, "0")}:${String(Math.floor(tm / 60) % 60).padStart(2, "0")} ${n}</div>`).join("")) +
   `<div style="margin:4px 0"><span data-day="1" style="cursor:pointer;color:#ffe9a8;text-decoration:underline">switch to ${MARKET ? "Christmas Day (the coronation)" : "the market day"}</span></div>` +
+  (UNSEEN || !self.ROLES_READY ? "" : `<b>Your day</b> <span style="color:#c8b898">· ${LIFE.short} · E where you are to do these</span>` + MY_TASKS.map(t => `<div style="padding:1px 4px">${DIARY.some(d => d[1] === t.name) ? "✓" : "·"} ${t.name} <span style="color:#c8b898">(${t.when}, ${t.where})</span></div>`).join("") + `<div data-home="1" style="cursor:pointer;padding:1px 4px;color:#ffe9a8">⌂ go home</div>`) +
   `<b>Things to do</b> <span style="color:#c8b898">· click to go</span>` + TD.map(([n], i) => `<div data-t="${i}" style="cursor:pointer;padding:1px 4px">✦ ${n}</div>`).join("") +
   `<div style="margin:6px 0 2px"><span data-r="1" style="cursor:pointer;padding:2px 8px;border-radius:6px;background:rgba(200,160,80,.25)">time ×${timeRate} (T)</span> <span data-l="1" style="cursor:pointer;padding:2px 8px;border-radius:6px;background:rgba(200,160,80,.25)">markers ${labelsOn ? "on" : "off"} (L)</span></div>` +
   `<b>Places</b> <span style="color:#c8b898">· click to go</span>` + PLACES.map((p, i) => `<div data-i="${i}" style="cursor:pointer;padding:1px 4px">${p.m ? `<span style="color:${TAGC[p.m.tag]}">●</span> ` : "◆ "}${p.name}</div>`).join("") +
   `<div style="color:#c8b898;font-size:11.5px;margin-top:6px"><span style="color:${TAGC.known}">●</span> known &nbsp;<span style="color:${TAGC.inferred}">●</span> inferred &nbsp;<span style="color:${TAGC.typical}">●</span> typical &nbsp;<span style="color:${TAGC.absent}">●</span> not yet built &nbsp;<span style="color:${TAGC.person}">●</span> people</div>`; }
-GUIDE.addEventListener("click", e => { e.stopPropagation(); const d = e.target.closest("[data-i],[data-m],[data-r],[data-l],[data-t],[data-day]"); if (!d) return; if (d.dataset.day) { location.search = MARKET ? "" : "?day=market"; return; } if (d.dataset.t) return goTodo(+d.dataset.t); if (d.dataset.i) goPlace(PLACES[+d.dataset.i]); else if (d.dataset.m) goMoment(+d.dataset.m); else if (d.dataset.r) cycleRate(); else { labelsOn = !labelsOn; drawGuide(); } });
+GUIDE.addEventListener("click", e => { e.stopPropagation(); const d = e.target.closest("[data-i],[data-m],[data-r],[data-l],[data-t],[data-day],[data-home]"); if (!d) return; if (d.dataset.home) { start(); const p = homeDoor(); if (p) teleport(p[0], p[1], HOME ? HOME.x : SHELTER.fire[0], HOME ? HOME.z : SHELTER.fire[1]); return; } if (d.dataset.day) { const q = new URLSearchParams(location.search); if (MARKET) q.delete("day"); else q.set("day", "market"); location.search = q.toString(); return; } if (d.dataset.t) return goTodo(+d.dataset.t); if (d.dataset.i) goPlace(PLACES[+d.dataset.i]); else if (d.dataset.m) goMoment(+d.dataset.m); else if (d.dataset.r) cycleRate(); else { labelsOn = !labelsOn; drawGuide(); } });
 drawGuide();
-function interact() { if (!started) return start(); if (RIDE) return; if (MENU) return closeMenu(); if (INSIDE_H) return insideInteract();
+function interact(skipTasks) { if (!started) return start(); if (RIDE || busy) return; if (MENU) return closeMenu();
+  if (!skipTasks) { const avail = MY_TASKS.filter(t => t.test()); if (avail.length) return tasksMenu(avail, () => interact(true)); }
+  if (INSIDE_H) return insideInteract();
   const PR = nearPier(); if (PR) return boatMenu(PR); const ST = nearStall(); if (ST) return stallMenu(ST);
   if (zoneOf(P_.x, P_.z) === "hall" && hallSeat()) { SITTING_DOWN = true; return say(FEAST_TXT() + " Walk to stand up.", 18); }
   const DH = nearDoorHouse(); if (DH) return enterHouse(DH);
@@ -1614,13 +1637,14 @@ function frame() {
   if ((mx || my) && SITTING_DOWN) SITTING_DOWN = false;
   if (mx || my) { const ox = P_.x, oz = P_.z; P_.x += (fwd.x * -my + side.x * mx) * sp * dt; P_.z += (fwd.z * -my + side.z * mx) * sp * dt;
     const high = flying && P_.y > groundAt(P_.x, P_.z) + 6; if (!high && !INSIDE_H) pushOut(P_);
-    if (!flying && !INSIDE_H && groundAt(P_.x, P_.z) < -0.7) { P_.x = ox; P_.z = oz; } }   // the river is too deep to wade: use the bridge
+    if (!flying && !INSIDE_H && groundAt(P_.x, P_.z) < -0.7) { P_.x = ox; P_.z = oz; }
+    if (!flying && !allowedAt(P_.x, P_.z) && allowedAt(ox, oz)) { P_.x = ox; P_.z = oz; } }   // the river is too deep to wade: use the bridge
   if (INSIDE_H) { flying = false; insideStep(t); }
   const g = RIDE ? P_.y : groundAt(P_.x, P_.z);
   if (RIDE) { } else if (flying) P_.y = Math.max(g, P_.y + up * Math.max(4, sp) * dt); else P_.y = g > P_.y ? Math.min(g, P_.y + Math.max(3.2, sp * 1.2) * dt) : Math.max(g, P_.y - Math.max(7, sp) * dt);
   rig.position.set(P_.x, P_.y + (vr && SITTING ? 0.45 : 0) - (SITTING_DOWN || RIDE ? 0.65 : 0), P_.z);
   updateGround(P_.x, P_.z);
-  lifeStep(dt, t); fireStep(dt, t); beastStep(t);
+  lifeStep(dt, t); fireStep(dt, t); beastStep(t); reactStep(t);
   // the sun, low in the south all day; sky and light
   const hour = SIM / 3600, S = sunAt(hour), el = S.el, day = clampN(el * 7 + 0.35, 0, 1), dusk = clampN(1 - el * 9, 0, 1) * (el > -0.12 ? 1 : 0);
   sun.position.copy(rig.position).addScaledVector(S.dir, 800); sun.target.position.copy(rig.position);
@@ -1642,7 +1666,7 @@ function frame() {
     const room = { hall: "in the great hall of Edward's palace", chamber: P_.y > PAL.chamber.gy + 2 ? "upstairs in the king's chamber" : "in the chamber block's ground floor (the stair is outside)", kitchen: "in the palace kitchen" }[zoneOf(P_.x, P_.z)];
     const where = INSIDE_H ? "inside a house · E near things to read; E at the doorway to go out" : DH ? "at a doorway · <b>E: go inside</b>" : nearM ? `at <b>${nearM.name}</b> · E to read` : inA ? "inside Westminster Abbey" : room || (CITY.inside(P_.x, P_.z) ? "inside the walls of London" : "");
     HUD.innerHTML = `<b>London and Westminster, ${MARKET ? "a market day, December" : "Christmas Day"} 1066</b> · ${hh}:${String(mi).padStart(2, "0")}${timeRate > 1 ? ` (time ×${timeRate})` : ""} · ${flying ? "flying" : SPEEDS[speedI][1] + (run > 1 ? ", running" : "")}<br>${where}<br>
-      <span style="color:#e8dcc0">purse ${fmtD(PURSE)}${BASKET.length ? " · basket: " + BASKET.slice(-6).join(", ") + (BASKET.length > 6 ? " …" : "") : ""}${RIDE ? " · in the boat to " + RIDE.Q.name : ""}</span><br><span style="color:#c8b898;font-size:12.5px">WASD walk · drag to look · shift run · − / = pace · E read / go in · N next moment · T time speed · L markers · F fly · M map</span>`;
+      <span style="color:#e8dcc0">${UNSEEN ? "time traveller (unseen)" : "you: " + LIFE.short}${combs ? " · combs " + combs : ""}${eels ? " · eels " + eels : ""}${ale ? " · ale brewed" : ""} · purse ${fmtD(PURSE)}${BASKET.length ? " · basket: " + BASKET.slice(-6).join(", ") + (BASKET.length > 6 ? " …" : "") : ""}${RIDE ? " · in the boat to " + RIDE.Q.name : ""}</span><br><span style="color:#c8b898;font-size:12.5px">WASD walk · drag to look · shift run · − / = pace · E read / go in · N next moment · T time speed · L markers · F fly · M map</span>`;
     if (vr && (vrDirty || ((t * 3) | 0) % 3 === 0)) { drawVR(`${hh}:${String(mi).padStart(2, "0")} · ${where.replace(/<[^>]+>/g, "")}`, msgText || "Left stick walk · right stick turn · trigger run · A read / go in · B next place · X next moment of the coronation · Y time speed"); vrDirty = false; } }
   renderer.render(scene, camera);
 }
@@ -1673,7 +1697,7 @@ function startRide(P, Q) { if (INSIDE_H) leaveHouse(); const path = riverRoute(P
   say(`You step into the boat at ${P.name}. The boatman pushes off for ${Q.name}. Look around: the river was London's main road.`, 10); }
 function rideStep(dt) { const R = RIDE; R.s += dt * 9; const [x, z, h, done] = routeAt(R.path, R.s); const sx = Math.sin(h), sz = Math.cos(h);
   rideBoat.position.set(x, WATER - 0.35, z); rideBoat.rotation.set(0, h, 0); P_.x = x - sx * 1.0; P_.z = z - sz * 1.0; P_.y = WATER - 0.25; R.rx = x + sx * 1.3; R.rz = z + sz * 1.3; R.rh = h + Math.PI;
-  if (done) { RIDE = null; rideBoat.visible = false; P_.x = R.Q.land[0]; P_.z = R.Q.land[1]; P_.y = groundAt(P_.x, P_.z); say(`You step ashore at ${R.Q.name}.`, 6); } }
+  if (done) { RIDE = null; rideBoat.visible = false; P_.x = R.Q.land[0]; P_.z = R.Q.land[1]; P_.y = groundAt(P_.x, P_.z); if (R.eels) { eels += 6; DIARY.push([SIM, "Checked the eel traps"]); SIM += 3600; say("Six fat eels in the traps, and the traps re-baited. Back at the landing an hour later.", 10); } else say(`You step ashore at ${R.Q.name}.`, 6); } }
 // sitting at the tables in the palace hall
 function hallSeat() { const F = PAL.hall, dx = P_.x - F.x, dz = P_.z - F.z, lx = dx * F.c - dz * F.s, lz = dx * F.s + dz * F.c; return Math.abs(Math.abs(lx) - 4.7) < 1.4 && lz > -10 && lz < 8; }
 const FEAST_TXT = () => MARKET ? "You sit at a trestle table in the king's hall. Servants are about; there is bread and ale for the household." :
@@ -1689,3 +1713,110 @@ function nearStall() { let best = null, bd = 2.6; for (const S of STALLS) { cons
 function nearPier() { for (const P of PIERS) if (Math.hypot(P.land[0] - P_.x, P.land[1] - P_.z) < 6) return P; return null; }
 
 self.TODO_LIST = TODO; drawGuide();
+
+// ---------- who you are: a life to live ----------
+// Chosen on the start card. Each life has a home, a household and a day of ordinary tasks of the time (all optional: the world is open).
+// People react to you as they would have: by your rank, whether you are English or not, and where you go.
+// home: a house chosen for each life
+let HOME = null, SHELTER = null;
+const nearestHouse = (lat, lon, test = H => !H.burnt) => { const [x, z] = LL(lat, lon); let best = null, bd = 1e9; for (const H of HOUSES) { if (!test(H)) continue; const d = Math.hypot(H.x - x, H.z - z); if (d < bd) { bd = d; best = H; } } return best; };
+if (WHO === "comb") HOME = nearestHouse(51.5122, -0.0950, H => !H.burnt && !H.ale && H.dp);
+if (WHO === "ale") HOME = ALEHOUSES[1] || ALEHOUSES[0];
+if (WHO === "thegn") { const [x, z] = LL(51.5160, -0.0925); HOME = HOUSES.filter(H => !H.burnt && !H.ale && H.dp && Math.hypot(H.x - x, H.z - z) < 220).sort((a, b) => b.w * b.d - a.w * a.d)[0]; }
+if (WHO === "south") { HOME = nearestHouse(51.5040, -0.0895, H => H.burnt); if (HOME) { const c = Math.cos(HOME.ry), s = Math.sin(HOME.ry), ox = HOME.w / 2 + 2.2, sx = HOME.x + c * ox, sz = HOME.z - s * ox, gy = groundH(sx, sz);
+    SHELTER = { x: sx, z: sz, gy }; for (const [u, v] of [[-1, -1.6], [-1, 1.6], [1, -1.6], [1, 1.6]]) put("hutpost", CYL_G, MAT.wood, sx + c * u + s * v, gy, sz - s * u + c * v, 0.14, u < 0 ? 2.2 : 1.2, 0.14);   // a lean-to of poles and old thatch
+    put("hutroof", BOX_G, MAT.thatch, sx, gy + 1.6, sz, 2.6, 0.2, 3.6, HOME.ry, 0, 0.42); put("shfire", HFIRE_G, hearthFireM, sx + c * 2.4, gy, sz - s * 2.4, 1.2, 1.2, 1.2); SHELTER.fire = [sx + c * 2.4, sz - s * 2.4]; } }
+if (HOME) HOME.home = true;
+// the household
+const HOUSEHOLD = { comb: ["woman", "child", "child"], ale: ["eng", "child", "child", "woman"], thegn: ["woman", "eng", "eng", "woman"], south: ["woman", "child", "child"] }[WHO] || [];
+if (SHELTER) HOUSEHOLD.forEach((r, k) => { const a = k / HOUSEHOLD.length * 6.28, x = SHELTER.fire[0] + Math.cos(a) * 1.3, z = SHELTER.fire[1] + Math.sin(a) * 1.3; agent(r, { fixed: [x, z, face(x, z, ...SHELTER.fire)], kind: k ? "sit" : "sell", family: true }); });
+// the day: tasks with a place, a test and what doing them means; doing one passes time
+const DIARY = [];
+const fade = document.createElement("div"); fade.style.cssText = "position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .8s;z-index:6"; document.body.appendChild(fade);
+let busy = false;
+function spend(mins, text, after) { if (busy) return; busy = true; fade.style.opacity = 1; setTimeout(() => { SIM += mins * 60; narrI = -1; if (after) after(); fade.style.opacity = 0; busy = false; say(text, 22); drawGuide(); }, 900); }
+const homeDoor = () => HOME?.dp ? [HOME.dp[0] + Math.sin(HOME.dp[2]) * 1.5, HOME.dp[1] + Math.cos(HOME.dp[2]) * 1.5] : SHELTER ? [SHELTER.x, SHELTER.z] : null;
+const atHome = () => (HOME && INSIDE_H === HOME) || (SHELTER && Math.hypot(P_.x - SHELTER.x, P_.z - SHELTER.z) < 6);
+const nearChurch = () => CHURCHES.find(C => Math.hypot(C.x - P_.x - C.nl / 2, C.z - P_.z) < 12 || Math.hypot(C.x - P_.x, C.z - P_.z) < 14);
+const hh = () => SIM / 3600;
+let combs = 0, eels = 0, ale = 0;
+const T_ = (id, name, when, where, test, run) => ({ id, name, when, where, test, run });
+const TASKS = {
+  common: [
+    T_("fire", "Rake up the fire", "dawn", "at home", () => atHome(), () => spend(15, "You rake back the ashes: the fire was banked overnight and the embers are still alive, so there is no need for flint and steel. A handful of kindling, a log; the smoke finds its way up through the thatch. It is still dark: in midwinter people rose before the sun (8:05) and used the light.")),
+    T_("water", "Fetch water from the well", "morning", "the yard well, or the river", () => atHome() || BASKET.length >= 0 && STALLS && false, () => spend(20, "You carry two wooden pails to the well in the yard: a timber-lined shaft like those excavated behind Late Saxon houses. Water for drinking (mostly ale was drunk), cooking, washing. Many Londoners used the Thames or the Walbrook."))],
+  church: T_("mass", "Hear mass at the parish church", "Christmas morning", "any parish church", () => !MARKET && !!nearChurch(), () => spend(60, "Christmas mass. You stand in the nave with your neighbours (there are no pews); beyond the chancel arch the priest says the mass in Latin at the altar, candles burning. At Christmas there were three masses: at midnight, at dawn and in the day. The church is cold; your breath shows.")),
+  comb: [
+    T_("work", "Make combs at your bench", "morning", "at home", () => atHome(), () => spend(150, "You work at your bench by the door for the light. Shed antlers of red deer, bought from the country: you saw them into plates and side-strips, rivet the plates between the strips with small iron rivets, then cut the teeth with a fine saw, and finish with a file and a polish. Antler offcuts like yours are found all over Late Saxon London. Three combs done.", () => { combs += 3; })),
+    T_("sell", "Sell combs at a stall on Cheapside", "market day", "Cheapside", () => MARKET && combs > 0 && STALLS.some(S => S.kind === "comb" && Math.hypot(S.x - P_.x, S.z - P_.z) < 6), () => { const n = combs, p = n * 4; spend(90, `You set out your combs on the trestle and call your wares. Women and men try them; you haggle. ${n} sold for ${fmtD(p)} in silver pennies and cut halfpennies.`, () => { PURSE += p; combs = 0; }); }),
+    T_("eat", "Eat with your family", "midday", "at home", () => atHome(), () => spend(45, MARKET ? "Pottage of beans and leeks from the pot on the fire, dark bread, cheese, ale. Two meals a day was usual: a light one in the morning and dinner around midday." : "Christmas dinner, the feast after the Advent fast: pork, a goose if you can afford one, white bread, ale, and honey cakes for the children.")),
+    T_("tafl", "Play tafl by the fire", "evening", "at home", () => atHome() && hh() > 15, () => spend(60, "Tafl: the king's game, a board game played in England and Scandinavia. The king and his men break out to the edge of the board; the attackers try to trap him. A board is found at Coppergate in York.")),
+    T_("sleep", "Go to bed", "night", "at home", () => atHome() && hh() > 16, () => endDay())],
+  ale: [
+    T_("brew", "Brew a batch of ale", "morning", "at home, at the cauldron", () => atHome(), () => spend(180, "You heat water in the great pot, steep the malted barley in it (the mash), run off the sweet liquor, boil it, cool it in tubs and pitch in yeast from the last brew. No hops (they came in the 15th century): unhopped ale goes sour in a few days, so brewing never stops. Brewing was mostly women's work.", () => { ale += 20; })),
+    T_("spin", "Spin wool with your spindle", "any time", "at home", () => atHome(), () => spend(60, "Distaff under your arm, a spindle with a clay or bone whorl dropping and turning: every woman spun whenever her hands were free. Spindle whorls are among the commonest finds in London. A day's spinning makes enough yarn for a few hand-breadths of cloth.")),
+    T_("serve", "Serve your customers", "afternoon", "at home", () => atHome() && ale > 0, () => spend(120, `Carters, porters, a sailor from Rouen. You draw ale from the cask into jugs; they drink on the benches. ${MARKET ? "" : "Holy day or not, the alehouse is full. "}You take ${fmtD(10)}.`, () => { PURSE += 10; ale = Math.max(0, ale - 10); })),
+    T_("eat", "Cook and eat with your family", "midday", "at home", () => atHome(), () => spend(60, "Pottage, the everyday food: grain, peas or beans and leeks, with a little bacon, simmered all morning in the pot on the fire. Bread, ale, cheese.")),
+    T_("sleep", "Go to bed", "night", "at home", () => atHome() && hh() > 16, () => endDay())],
+  south: [
+    T_("rebuild", "Work on rebuilding your house", "morning", "your burnt house", () => HOME && Math.hypot(HOME.x - P_.x, HOME.z - P_.z) < 10, () => spend(150, "You dig out the burnt post stumps and set new oak posts in the holes, your neighbour helping. Earth-fast posts, then wattle panels, daub, rafters, thatch: a house like this took a few weeks to build with family and neighbours.")),
+    T_("eels", "Check your eel traps from the boat", "morning", "the Southwark landing", () => { const P = PIERS.find(p => p.name === "Southwark"); return P && Math.hypot(P.land[0] - P_.x, P.land[1] - P_.z) < 8; }, () => { const P = PIERS.find(p => p.name === "Southwark"); startEelRun(P); }),
+    T_("selleels", "Sell eels at Billingsgate", "market day", "Billingsgate", () => MARKET && eels > 0 && STALLS.some(S => S.kind === "fish" && Math.hypot(S.x - P_.x, S.z - P_.z) < 8), () => { const p = eels * 2; spend(60, `You sell your eels to the fishmongers at Billingsgate: ${fmtD(p)}.`, () => { PURSE += p; eels = 0; }); }),
+    T_("eat", "Eat by the fire with your family", "midday", "the shelter", () => atHome(), () => spend(40, eels ? "Eels stewed in the pot, bread, small ale. The children are cold; the lean-to keeps off the rain but not the wind." : "Bread, a little cheese, small ale. The burning took your stores; neighbours across the river have helped.")),
+    T_("sleep", "Sleep in the shelter", "night", "the shelter", () => atHome() && hh() > 16, () => endDay())],
+  thegn: [
+    T_("dress", "Dress in your best", "dawn", "at home", () => atHome(), () => spend(20, "Your servants bring your best: a fine linen shirt, a tunic of madder-red wool with a tablet-woven border, a cloak of blue with a gilt brooch at the right shoulder, your sword-belt. A thegn showed his rank by his dress and his weapons.")),
+    T_("walk", "Go out to Westminster with your men", "Christmas morning", "from your house", () => !MARKET && atHome() || !MARKET && CITY.inside(P_.x, P_.z), () => spend(45, "Out by Ludgate, over the Fleet bridge, along Fleet Street and the Strand past the fields, through Charing and down King Street: about 3 km to Westminster. Norman patrols on the road.", () => { if (INSIDE_H) leaveHouse(); teleport(40, -60, 0, -27); })),
+    T_("abbey", "Take your place in the abbey", "before 10:00", "the north door", () => !MARKET && Math.hypot(P_.x, P_.z + 30) < 25 && SIM < T.shout, () => { teleport(2.5, 15, 15, 0); say("You stand with the English thegns in the south transept. Across the crossing the Norman lords; before the altar the bishops. The procession is coming.", 14); }),
+    T_("feast", "Sit at the king's feast", "after the crowning", "the king's hall", () => !MARKET && SIM > T.leave + 240 && zoneOf(P_.x, P_.z) === "hall", () => { SITTING_DOWN = true; say(FEAST_TXT() + " You sit among the English thegns at the trestles; the new king and the bishops at the high table. Who would keep his lands under the new king was on every mind.", 20); }),
+    T_("rents", "Receive your tenants' rents", "market day", "at home", () => MARKET && atHome(), () => spend(90, "Your tenants come in with their dues for the Christmas term: silver pennies, a few hens, a cheese. Your reeve tallies it on a notched stick.", () => { PURSE += 40; })),
+    T_("husting", "Attend the husting court", "market day", "by St Paul's", () => MARKET && Math.hypot(...((([x, z]) => [x - P_.x, z - P_.z])(LL(51.5138, -0.0985)))) < 90, () => spend(90, "London's husting, the city court, met weekly: disputes over debts, property and trade, settled before the aldermen and the bishop's men. The folkmoot of all the citizens met in the open by St Paul's a few times a year.")),
+    T_("sleep", "Go to bed", "night", "at home", () => atHome() && hh() > 16, () => endDay())] };
+const MY_TASKS = UNSEEN ? [] : [...(TASKS[WHO] || []), ...(WHO !== "thegn" && WHO !== "south" ? TASKS.common : WHO === "south" ? [TASKS.common[0]] : []), ...(MARKET ? [] : [TASKS.church])];
+function doTask(t) { DIARY.push([SIM, t.name]); t.run(); }
+function taskHere() { if (busy) return null; for (const t of MY_TASKS) if (t.test()) return t; return null; }
+function startEelRun(P) { const [bx, bz] = P.boat, [cx, cz] = THAMES.at(0), path = [P.boat]; let best = 0, bd = 1e9; for (let s = 0; s < THAMES.L; s += 20) { const [x, z] = THAMES.at(s), d = Math.hypot(x - bx, z - bz); if (d < bd) { bd = d; best = s; } }
+  for (const ds of [0, -120, -260, -120, 0]) { const [x, z] = THAMES.at(best + ds); path.push([x + (bx - x) * 0.5, z + (bz - z) * 0.5]); } path.push(P.boat);
+  RIDE = { P, Q: P, path, len: path.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - path[i][0], p[1] - path[i][1]), 0), s: 0, rx: 0, rz: 0, rh: 0, eels: true }; rideBoat.visible = true;
+  say("You row out to your traps: wicker eel-traps (grigs) staked in the shallows upstream, and a weir of hurdles. Eels were caught in huge numbers; rents were paid in them.", 12); }
+function endDay() { spend(30, `<b>The end of your day.</b> ${DIARY.length ? "You " + DIARY.map(([t, n]) => `${n.toLowerCase()} (${Math.floor(t / 3600)}:${String(Math.floor(t / 60) % 60).padStart(2, "0")})`).join("; ") + "." : ""} Sleep: on a straw-filled bed along the wall, the household round the banked fire. In winter people slept long. Walk on to begin again in the morning.`, () => { SIM = hms(7, 30); DIARY.length = 0; combs = eels = ale = 0; }); }
+// how people speak to you (a little Old English or French, translated)
+const GREET = {
+  common: ["“Wes þū hāl!” (Good health to you!)", "“God's blessing on you, neighbour.”", "“Have you heard? They say the duke will be crowned at Westminster.”", "“Bread is dear since the Normans came.”", "“Southwark is still black from the burning.”", "“Mind the mud by the conduit.”", "“My cousin saw the duke's knights at Ludgate.”"],
+  toNoble: ["(bows) “Hlāford.” (My lord.)", "(bows) “God keep you, lord.”", "(steps aside, head down)"],
+  norman: ["“Arrière!” (Back!) a Norman soldier waves you off.", "(a Norman stares at you and says something in French to his fellows)", "“Anglais...” (he mutters)"],
+  normanToNoble: ["(a Norman nods) “Sire.”", "(a Norman knight looks you over and lets you pass)"],
+  clergy: ["“Pax vobiscum.” (Peace be with you.)", "“Benedicite.” (Bless you.)"],
+  child: ["(children run past, shrieking, chasing a pig's bladder ball)", "(a child stares at you, then runs off)"] };
+const BUBBLES = [0, 1, 2].map(() => { const c = document.createElement("canvas"); c.width = 512; c.height = 96; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false, fog: false })); s.renderOrder = 15; s.visible = false; s.scale.set(1.9, 0.36, 1); scene.add(s); return { s, c, t, A: null, until: 0 }; });
+function bubble(A, text) { const B = BUBBLES.find(b => !b.A) || BUBBLES[0], g = B.c.getContext("2d"); g.clearRect(0, 0, 512, 96); g.font = "30px -apple-system, Helvetica, sans-serif"; const w = Math.min(500, g.measureText(text).width + 30);
+  g.fillStyle = "rgba(255,250,236,.94)"; g.beginPath(); g.roundRect((512 - w) / 2, 8, w, 64, 16); g.fill(); g.beginPath(); g.moveTo(240, 72); g.lineTo(256, 92); g.lineTo(272, 72); g.fill(); g.fillStyle = "#2a2018"; g.textAlign = "center"; g.fillText(text, 256, 52, w - 24);
+  B.t.needsUpdate = true; B.A = A; B.until = clock.elapsedTime + 4; B.s.visible = true; }
+let reactT = 0;
+function reactStep(t) { for (const B of BUBBLES) { if (!B.A) continue; if (t > B.until || !B.A.shown) { B.A = null; B.s.visible = false; continue; } B.s.position.set(B.A.x, personY(B.A.x, B.A.z) + 2.25, B.A.z); }
+  if (UNSEEN || busy || RIDE) return; reactT -= 1 / 60; if (reactT > 0) return; reactT = 0.3;
+  for (const A of AG2) { if (!A.shown || A.family || A.rower || A.proc) continue; const d = Math.hypot(A.x - P_.x, A.z - P_.z); if (d > 2.6 || (A.greetT && t - A.greetT < 50)) continue;
+    A.greetT = t; A.react = { until: t + 4, h: face(A.x, A.z, P_.x, P_.z), bow: LIFE.rank === "noble" && A.L.role !== "norman" && A.L.role !== "soldier" && A.L.role !== "bishop" };
+    const r = A.L.role, nor = r === "norman" || r === "soldier", cler = r === "monk" || r === "cleric" || r === "bishop" || r === "archbishop", pool = r === "child" ? GREET.child : cler ? GREET.clergy : nor ? (LIFE.rank === "noble" ? GREET.normanToNoble : GREET.norman) : LIFE.rank === "noble" ? GREET.toNoble : GREET.common;
+    const line = pool[Math.floor(Math.random() * pool.length)]; bubble(A, line.length > 46 ? line.slice(0, line.indexOf("”") + 1 || 46) : line); if (d < 2) say(line, 6); break; } }
+// where you may not go
+let blockT = 0;
+function allowedAt(x, z) { if (UNSEEN) return true; const zn = zoneOf(x, z), t = clock.elapsedTime;
+  const no = msg => { if (t - blockT > 4) { blockT = t; say(msg, 7); } return false; };
+  if (zn === "abbey" && !MARKET && LIFE.rank === "common" && SIM > T.proc - 900 && SIM < T.flee) return no("A Norman guard bars the door with his spear: “Arrière!” The church is full of the great men of both peoples; ordinary folk watch from outside.");
+  if ((zn === "hall" || zn === "chamber" || zn === "kitchen") && LIFE.rank === "common") return no("A royal servant blocks the doorway: “Not here: this is the king's hall.”");
+  if (zn === "chamber" && LIFE.rank === "noble") return no("A chamberlain stops you: the king's chamber is private.");
+  return true; }
+// going into someone else's house
+function houseWelcome(H) { if (UNSEEN || H === HOME || H.ale) return; if (LIFE.rank === "noble") return say("The household stands up as you come in. “Lord? How may we serve you?”", 7);
+  say("“Hey! Who are you? This isn't your house: out!” The householder stands up to see you off.", 6); setTimeout(() => { if (INSIDE_H === H) leaveHouse(); }, 2600); }
+
+// starting your day; your house marked; the day's list in the guide
+if (HOME && !UNSEEN) mark("Your house", HOME.x, HOME.z, "person", "Your home. Press E at the door to go in; inside, press E for the day's tasks.", { y: 6, r: 6, range: 3000, big: true });
+if (SHELTER && !UNSEEN) mark("Your family's shelter", SHELTER.x, SHELTER.z, "person", "Your family's lean-to by the burnt house. Press E here for the day's tasks.", { y: 4, r: 6, range: 3000, big: true });
+buildKit(scene);
+function roleStart() { const p = homeDoor(); if (p) { teleport(p[0], p[1], HOME ? HOME.x : SHELTER.fire[0], HOME ? HOME.z : SHELTER.fire[1]); if (HOME && !SHELTER && HOME.dp) enterHouse(HOME); }
+  say(`<b>You are ${LIFE.title}.</b> ${LIFE.intro} ${MARKET ? "Today is a market day." : "Today is Christmas Day, 1066."} Press E at home for the day's tasks (all optional: go anywhere). The guide on the right lists your day.`, 26); }
+function tasksMenu(avail, fallback) { showMenu(`What will you do? (${Math.floor(SIM / 3600)}:${String(Math.floor(SIM / 60) % 60).padStart(2, "0")})`, [...avail.map(t => ({ label: t.name, fn: () => doTask(t) })), ...(fallback ? [{ label: "something else: look around here", fn: fallback }] : [])]); }
+
+self.ROLES_READY = true; drawGuide();

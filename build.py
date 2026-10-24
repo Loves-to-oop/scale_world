@@ -427,6 +427,9 @@ LN = LN[:i0] + """<div id="intro"><div class="card">
   <p>Or choose <b>a market day</b> a few days earlier (Christmas Day was a holy day, when trading was forbidden): stalls along Cheapside, butchers at the
   Shambles and in Eastcheap, fish at the hithes, pigs and sheep driven in. Carry a purse of silver pennies and buy at the stalls; on either day,
   drink at an alehouse, sit in the king's hall, or hire a boatman on the river.</p>
+  <p><b>Choose who you are</b>: a time traveller (unseen, with field notes), a comb-maker of Bread Street, an alewife of Eastcheap, a Southwark fisherman whose
+  house was burned last month, or an English thegn. Each has a home, a household and a day of the time's ordinary work (press <kbd>E</kbd> at home), and people
+  treat you by your rank: greetings, bows, Norman guards, doors closed to you. The world stays open: go anywhere.</p>
   <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>E</kbd> read a marker, a person, or go into a house &nbsp;&middot;&nbsp;
   <kbd>N</kbd> next moment &nbsp;&middot;&nbsp; <kbd>T</kbd> time speed &nbsp;&middot;&nbsp; <kbd>L</kbd> markers &nbsp;&middot;&nbsp; <kbd>F</kbd> fly<br>
   In VR: left stick walk, right stick turn, <b>A</b> read / go in, <b>B</b> next place, <b>X</b> next moment, <b>Y</b> time speed</p>
