@@ -424,6 +424,9 @@ LN = LN[:i0] + """<div id="intro"><div class="card">
   London Bridge, and burnt Southwark. Go into the houses.</p>
   <p>From 10:00 the coronation unfolds as the chroniclers tell it: the procession, the questions in French and English, the great shout,
   the guards setting fire to the houses outside, the congregation fleeing, and the crowning by Archbishop Ealdred.</p>
+  <p>Or choose <b>a market day</b> a few days earlier (Christmas Day was a holy day, when trading was forbidden): stalls along Cheapside, butchers at the
+  Shambles and in Eastcheap, fish at the hithes, pigs and sheep driven in. Carry a purse of silver pennies and buy at the stalls; on either day,
+  drink at an alehouse, sit in the king's hall, or hire a boatman on the river.</p>
   <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>E</kbd> read a marker, a person, or go into a house &nbsp;&middot;&nbsp;
   <kbd>N</kbd> next moment &nbsp;&middot;&nbsp; <kbd>T</kbd> time speed &nbsp;&middot;&nbsp; <kbd>L</kbd> markers &nbsp;&middot;&nbsp; <kbd>F</kbd> fly<br>
   In VR: left stick walk, right stick turn, <b>A</b> read / go in, <b>B</b> next place, <b>X</b> next moment, <b>Y</b> time speed</p>

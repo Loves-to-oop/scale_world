@@ -20,6 +20,9 @@
   London Bridge, and burnt Southwark. Go into the houses.</p>
   <p>From 10:00 the coronation unfolds as the chroniclers tell it: the procession, the questions in French and English, the great shout,
   the guards setting fire to the houses outside, the congregation fleeing, and the crowning by Archbishop Ealdred.</p>
+  <p>Or choose <b>a market day</b> a few days earlier (Christmas Day was a holy day, when trading was forbidden): stalls along Cheapside, butchers at the
+  Shambles and in Eastcheap, fish at the hithes, pigs and sheep driven in. Carry a purse of silver pennies and buy at the stalls; on either day,
+  drink at an alehouse, sit in the king's hall, or hire a boatman on the river.</p>
   <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>E</kbd> read a marker, a person, or go into a house &nbsp;&middot;&nbsp;
   <kbd>N</kbd> next moment &nbsp;&middot;&nbsp; <kbd>T</kbd> time speed &nbsp;&middot;&nbsp; <kbd>L</kbd> markers &nbsp;&middot;&nbsp; <kbd>F</kbd> fly<br>
   In VR: left stick walk, right stick turn, <b>A</b> read / go in, <b>B</b> next place, <b>X</b> next moment, <b>Y</b> time speed</p>
@@ -53084,6 +53087,7 @@ const THREE = {ACESFilmicToneMapping, AddEquation, AddOperation, AdditiveAnimati
 // typical buildings of the time, and every marker says whether a thing is known, inferred, or typical.
 const IS_HEADSET = /OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent);
 const Q = new URLSearchParams(location.search), SEED = Math.max(1, Number(Q.get("seed") || 1) | 0);
+const MARKET = Q.get("day") === "market";   // which day: Christmas Day (the coronation) or a market day a few days before
 const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: !IS_HEADSET });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0; renderer.xr.enabled = true;
@@ -53215,6 +53219,7 @@ function poseOf(kind, t, ph, walkAmt = 1) { const w = Math.sin(t * 7 + ph);
     case "hammer": { const p2 = (t * 1.6 + ph) % 1; return { drop: 0, lean: 0.2, lL: 0.1, lR: -0.1, aL: -0.9, aR: p2 < 0.6 ? -1 - p2 * 2.8 : -2.7 + (p2 - 0.6) * 4.7 }; }
     case "carry": return { drop: 0, lean: 0.06, lL: 0.4 * w * walkAmt, lR: -0.4 * w * walkAmt, aL: -1.0, aR: -1.0 };
     case "talk": return { drop: 0, lean: 0, lL: 0.05, lR: -0.05, aL: 0.05, aR: -0.3 - 0.3 * Math.max(0, Math.sin(t * 1.3 + ph)) };
+    case "row": { const r = Math.sin(t * 2.4); return { drop: HIPY - 0.45, lean: 0.2 * r, lL: -1.45, lR: -1.45, aL: -1.25 - 0.45 * r, aR: -1.25 - 0.45 * r }; }
     case "sell": return { drop: 0, lean: 0.1, lL: 0, lR: 0, aL: -0.8, aR: -0.9 - 0.3 * Math.sin(t * 2 + ph) };
     default: return { drop: 0, lean: 0, lL: 0, lR: 0, aL: 0.03 * Math.sin(t * 0.8 + ph), aR: -0.03 * Math.sin(t * 0.8 + ph) }; } }
 const _b = new THREE.Matrix4(), _hm = new THREE.Matrix4(), _j = new THREE.Matrix4(), _tmp = new THREE.Matrix4(), _q2 = new THREE.Quaternion(), _e2 = new THREE.Euler(), ZEROM = new THREE.Matrix4().makeScale(0, 0, 0), _p = V3(0, 0, 0), _s = V3(1, 1, 1);
@@ -53969,7 +53974,7 @@ const HALL_IN = (x, z) => zoneOf(x, z) === "hall";
 // tag: "known" (from excavation or written record), "inferred" (the place is known, the form is a reasoned guess),
 // "typical" (a stand-in for the kind of thing that stood there), "absent" (famous things that do not exist yet), "person".
 const MARKS = [];
-const mark = (name, x, z, tag, text, o = {}) => { const m = { name, x, z, tag, text, y: o.y, r: o.r || 25, range: o.range || 700, big: !!o.big, follow: o.follow, hidden: !!o.hidden }; MARKS.push(m); return m; };
+const mark = (name, x, z, tag, text, o = {}) => { if (MARKET && o.coronation) return null; const m = { name, x, z, tag, text, y: o.y, r: o.r || 25, range: o.range || 700, big: !!o.big, follow: o.follow, hidden: !!o.hidden }; MARKS.push(m); return m; };
 const markLL = (name, lat, lon, tag, text, o) => { const [x, z] = LL(lat, lon); return mark(name, x, z, tag, text, o); };
 
 // ---------- churches ----------
@@ -54111,11 +54116,104 @@ mark("Boats on the foreshore", ...bankPoint(51.5112, -0.0948, 0), "typical", "Bo
 function fieldAt(x, z, h) { if (h < 4 || THAMES.side(x, z) > 0 || CITY.inside(x, z)) return 0; if (WALL.near(x, z, 160) && WALL.d(x, z) < 160) return 0; const v = vnoise(x / 260 + 40, z / 260); return v > 0.52 ? 1 : 0; }
 const [moorX, moorZ] = LL(51.5198, -0.0885);
 
+// ---------- things to do: markets (on a market day), alehouses, boatmen ----------
+// Trading was forbidden on Sundays and feast days (laws of Edgar, Æthelred and Cnut), so on Christmas Day the markets are shut.
+// On the market day (a weekday a few days before Christmas) the City trades: Cheapside ('ceap', market) with its stalls; the meat market
+// by St Nicholas Shambles on Newgate Street (the 'shambles' were the butchers' benches); Eastcheap; fish at Billingsgate and Queenhithe.
+// Stall goods follow what excavation finds in Late Saxon London (pottery, bone and antler combs, leather shoes, ironwork, fish and meat
+// bones, oyster shells); prices are guesses, as no prices survive for London in 1066.
+const GOODS = {
+  butcher: { name: "A butcher's stall", tag: "inferred", items: [["a joint of pork", 4, "Pork was the commonest town meat: pig bones fill Late Saxon rubbish pits."], ["a joint of mutton", 3, "From old sheep: they were kept for wool first."], ["a piece of salt beef", 3, "Beef salted in autumn, when cattle were slaughtered before winter."], ["pig's trotters", 1, "Nothing was wasted."]] },
+  fish: { name: "A fishmonger", tag: "inferred", items: [["a dozen salt herrings", 1, "Herring, salted or smoked, the great food of fasting days: from about 1000 sea fish appear in English town deposits (the 'fish event horizon')."], ["a fresh Thames eel", 2, "Eels were caught in weirs and traps all along the Thames; rents were often paid in eels."], ["a dozen oysters", 1, "Oyster shells are everywhere in London excavations."], ["a salmon", 8, "Salmon still ran up the Thames."]] },
+  bread: { name: "A bread stall", tag: "typical", items: [["a loaf of wheat bread", 1, "White wheat bread for those who could afford it."], ["a big loaf of rye and barley", 1, "Coarse dark bread, the everyday loaf."]] },
+  dairy: { name: "Cheese, butter and eggs", tag: "typical", items: [["a small cheese", 2, "Mostly made from sheep's milk."], ["a pat of butter", 2, "Salted to keep."], ["a dozen eggs", 1, "Hens were kept in town yards."]] },
+  veg: { name: "Winter vegetables", tag: "typical", items: [["a bunch of leeks", 1, "Leeks were the Anglo-Saxon vegetable: 'leac-tun', leek-garden, was the word for a garden."], ["a string of onions", 1, "Stored from the autumn."], ["a cabbage", 1, "Grown in town yards."], ["a dozen stored apples", 1, "Kept through the winter."]] },
+  pots: { name: "A potter's stall", tag: "inferred", items: [["a cooking pot", 2, "London's own Late Saxon Shelly ware, hand-made, the clay tempered with crushed shell."], ["a glazed Stamford ware pitcher", 6, "Wheel-thrown and glazed, brought from Stamford in Lincolnshire: one of the finest wares of the time."]] },
+  cloth: { name: "A cloth seller", tag: "typical", items: [["an ell of undyed wool", 4, "Grey-brown 'russet', the common cloth."], ["an ell of madder-red wool", 12, "Dyed red with madder root: dearer."], ["a linen headrail", 8, "For a married woman's head-covering."]] },
+  iron: { name: "Ironwork", tag: "typical", items: [["a knife", 4, "Everyone carried a knife at the belt."], ["a handful of nails", 2, "Iron nails for clench-built boats and doors."], ["a pair of shears", 6, "For cloth, wool and hair."]] },
+  leather: { name: "A shoemaker", tag: "inferred", items: [["a pair of turnshoes", 12, "Sewn inside out and turned: hundreds of Late Saxon shoes have been found in waterlogged London ground."], ["a leather belt", 4, ""]] },
+  comb: { name: "A comb-maker", tag: "inferred", items: [["an antler comb", 4, "Combs of red-deer antler, riveted between bone side-plates: comb-making waste is a common Late Saxon London find."], ["a bone pin", 1, "For fastening clothes or hair."]] },
+  poultry: { name: "Poultry", tag: "typical", items: [["a hen", 4, ""], ["a goose", 8, "A Christmas goose."]] },
+  salt: { name: "Salt and corn", tag: "typical", items: [["a measure of salt", 2, "Salt from the Droitwich brine springs or the coastal salterns, for keeping meat and fish."], ["a sack of malt", 10, "For brewing ale."]] } };
+const STALLS = [], MKT_ON = MARKET;
+const STALL_G = { board: BOX_G, carcass: mergeG([[new THREE.SphereGeometry(0.2, 8, 6), MT(0, 0, 0, 1.15, 2.0, 0.7)], [new THREE.CylinderGeometry(0.05, 0.06, 0.35, 5), MT(0.1, 0.48, 0, 1, 1, 1, 0, 0.2)], [new THREE.CylinderGeometry(0.05, 0.06, 0.35, 5), MT(-0.1, 0.48, 0, 1, 1, 1, 0, -0.2)]]), joint: new THREE.SphereGeometry(0.12, 6, 4).scale(1.4, 0.7, 1), fish: new THREE.SphereGeometry(0.05, 6, 3).scale(1, 0.45, 3.4),
+  loaf: new THREE.SphereGeometry(0.13, 8, 5).scale(1, 0.55, 1.2), pot: new THREE.LatheGeometry([[0, 0], [0.1, 0.01], [0.15, 0.1], [0.14, 0.22], [0.1, 0.27], [0.11, 0.3]].map(([r, y]) => new THREE.Vector2(r, y)), 10),
+  bolt: new THREE.CylinderGeometry(0.08, 0.08, 0.7, 8).rotateX(Math.PI / 2), cheese: new THREE.CylinderGeometry(0.13, 0.13, 0.08, 10), basket: new THREE.CylinderGeometry(0.24, 0.2, 0.28, 10).translate(0, 0.14, 0),
+  sack: new THREE.SphereGeometry(0.24, 6, 4).scale(1, 1.3, 1).translate(0, 0.3, 0), veg: new THREE.SphereGeometry(0.07, 6, 4), small: new THREE.BoxGeometry(0.16, 0.04, 0.05), shoe: new THREE.BoxGeometry(0.1, 0.07, 0.25), bird: new THREE.SphereGeometry(0.12, 6, 4).scale(1, 0.9, 1.4) };
+const SMAT = { meat: M(0xc07868, { roughness: 0.55 }), joint: M(0x9a3a32, { roughness: 0.55 }), fat: M(0xe0c8b0), fish: M(0xa8b0b8, { roughness: 0.4, metalness: 0.2 }), bread: M(0xb07a3a), pot: M(0x5a4a3e), glaze: M(0x8a7a2a, { roughness: 0.35 }), bolt: M(0x8a7a62), red: M(0x8a2a24), linen: M(0xe6e0d0),
+  cheese: M(0xe0c070), basket: MAT.wattle, sack: M(0xb8a888), leek: M(0x5a7a3a), onion: M(0xb08a4a), apple: M(0x9a4a2a), iron: MAT.iron, leather: M(0x5a3a22), bone: M(0xe0d4b8), bird: M(0x8a7a6a), awning: M(0xc8bca0, { side: THREE.DoubleSide }) };
+function addStall(x, z, a, side, kind) { const G = GOODS[kind], c = Math.cos(a), s = Math.sin(a), at = (u, v, y = 0) => [x + c * u + s * v, z - s * u + c * v], gy = groundH(x, z);   // u across the street, v along it
+  const P = (key, geo, mat, u, v, y, sx = 1, sy = 1, sz = 1, ry = 0) => { const [px, pz] = at(u, v); put("st:" + key, geo, mat, px, gy + y, pz, sx, sy, sz, a + ry); };
+  P("board", BOX_G, MAT.wood, 0, 0, 0.78, 0.8, 0.06, 2.2); for (const v of [-0.85, 0.85]) P("trestle", BOX_G, MAT.wood, 0, v, 0, 0.6, 0.78, 0.08);
+  for (const v of [-1.1, 1.1]) P("pole", BOX_G, MAT.wood, side * 0.5, v, 0, 0.08, 2.3, 0.08); P("awn", BOX_G, SMAT.awning, side * 0.15, 0, 2.1, 1.3, 0.03, 2.4);
+  const R = seeded((x * 13 + z * 7) | 0), top = 0.84;
+  if (kind === "butcher") { P("bar", BOX_G, MAT.wood, side * 0.45, 0, 2.0, 0.08, 0.08, 2.2); for (const v of [-0.6, 0.1, 0.7]) { P("carcass", STALL_G.carcass, SMAT.meat, side * 0.45, v, 1.3); P("hook", BOX_G, MAT.iron, side * 0.45, v, 1.72, 0.02, 0.28, 0.02); } for (let k = 0; k < 6; k++) P("joint", STALL_G.joint, SMAT.joint, (R() - 0.5) * 0.4, -0.9 + k * 0.35, top); }
+  else if (kind === "fish") { for (let k = 0; k < 14; k++) P("fish", STALL_G.fish, SMAT.fish, (R() - 0.5) * 0.5, -0.95 + k * 0.14, top + 0.02, 1, 1, 1, R() * 0.6); for (const v of [-1.5, 1.5]) P("basket", STALL_G.basket, SMAT.basket, -side * 0.3, v, 0); }
+  else if (kind === "bread") for (let k = 0; k < 10; k++) P("loaf", STALL_G.loaf, SMAT.bread, (k % 2 - 0.5) * 0.35, -0.9 + Math.floor(k / 2) * 0.45, top + 0.04);
+  else if (kind === "dairy") { for (let k = 0; k < 6; k++) P("cheese", STALL_G.cheese, SMAT.cheese, (k % 2 - 0.5) * 0.35, -0.8 + Math.floor(k / 2) * 0.5, top + 0.04); P("basket", STALL_G.basket, SMAT.basket, 0, 0.75, top); }
+  else if (kind === "veg") for (let k = 0; k < 24; k++) P("veg", STALL_G.veg, [SMAT.leek, SMAT.onion, SMAT.apple][k % 3], (R() - 0.5) * 0.55, -1 + R() * 2, top + 0.05, 1, k % 3 ? 1 : 2.5, 1);
+  else if (kind === "pots") for (let k = 0; k < 8; k++) P("pot", STALL_G.pot, k % 4 ? SMAT.pot : SMAT.glaze, (k % 2 - 0.5) * 0.4, -0.9 + Math.floor(k / 2) * 0.55, top);
+  else if (kind === "cloth") for (let k = 0; k < 6; k++) P("bolt", STALL_G.bolt, [SMAT.bolt, SMAT.red, SMAT.linen][k % 3], (k % 2 - 0.5) * 0.36, -0.7 + Math.floor(k / 2) * 0.7, top + 0.08);
+  else if (kind === "iron") for (let k = 0; k < 10; k++) P("small", STALL_G.small, SMAT.iron, (R() - 0.5) * 0.5, -0.9 + k * 0.2, top + 0.02, 1, 1, 1, R());
+  else if (kind === "leather") for (let k = 0; k < 8; k++) P("shoe", STALL_G.shoe, SMAT.leather, (k % 2 - 0.5) * 0.3, -0.9 + Math.floor(k / 2) * 0.5, top + 0.04);
+  else if (kind === "comb") for (let k = 0; k < 12; k++) P("comb", STALL_G.small, SMAT.bone, (R() - 0.5) * 0.5, -0.95 + k * 0.17, top + 0.02);
+  else if (kind === "poultry") { for (let k = 0; k < 3; k++) P("basket", STALL_G.basket, SMAT.basket, -side * 0.2, -0.8 + k * 0.8, 0); for (let k = 0; k < 5; k++) P("bird", STALL_G.bird, SMAT.bird, (R() - 0.5) * 0.4, -0.9 + k * 0.45, top + 0.1); }
+  else if (kind === "salt") for (let k = 0; k < 5; k++) P("sack", STALL_G.sack, SMAT.sack, -side * 0.2 + (R() - 0.5) * 0.3, -1 + k * 0.5, 0);
+  solid(x, z, 0.9, 2.3, a); const [sx, sz] = at(side * 0.75, 0); const S = { x, z, a, side, kind, G, seller: [sx, sz, Math.atan2(-c * side, s * side)], front: at(-side * 0.8, 0) }; STALLS.push(S); return S; }
+// lines of stalls along a street between two longitudes, both sides, keeping the middle clear
+function stallsAlong(name, lon0, lon1, kinds, gap = 6.5) { const S = STREETS.find(q => q.name === name), R = seeded(name.length * 31 + lon0 * 1e4 | 0); if (!S) return;
+  for (let s = 3; s < S.L.L; s += gap) { const [x, z, a] = S.L.at(s), lon = x / KX + LON0; if (lon < Math.min(lon0, lon1) || lon > Math.max(lon0, lon1)) continue;
+    for (const side of [-1, 1]) { if (R() < 0.3) continue; const off = side * (S.w / 2 - 1.1), px = x + Math.cos(a) * off, pz = z - Math.sin(a) * off; if (rGet(px, pz) !== 1) continue; addStall(px, pz, a, side, kinds[(R() * kinds.length) | 0]); } } }
+if (MKT_ON) {
+  stallsAlong("Cheapside", -0.0995, -0.0980, ["butcher", "butcher", "butcher", "poultry"], 5);   // the Shambles, by St Nicholas
+  stallsAlong("Cheapside", -0.0975, -0.0905, ["bread", "dairy", "veg", "pots", "cloth", "iron", "leather", "comb", "poultry", "veg", "bread", "salt"], 7.5);
+  stallsAlong("Eastcheap", -0.0890, -0.0845, ["butcher", "butcher", "poultry", "veg", "bread"], 8);
+  stallsAlong("Thames Street", -0.0845, -0.0822, ["fish", "fish", "fish", "salt"], 5); stallsAlong("Thames Street", -0.0958, -0.0935, ["fish", "fish", "salt", "salt"], 5);
+}
+// alehouses (on both days): ordinary houses where the alewife sold her brew, with benches and casks; which houses, unknown
+const ALEHOUSES = [];
+{ for (const [lat, lon] of [[51.5130, -0.0950], [51.5112, -0.0858], [51.5136, -0.1060], [51.5010, -0.1262]]) { const [x, z] = LL(lat, lon); let best = null, bd = 1e9; for (const H of HOUSES) { if (H.burnt || H.kind === "vill" && lat < 51.502 && false) continue; const d = Math.hypot(H.x - x, H.z - z); if (d < bd && H.w * H.d > 35) { bd = d; best = H; } }
+    if (best) { best.ale = true; ALEHOUSES.push(best); mark("An alehouse", best.x, best.z, "typical", "An alehouse: an ordinary house where the alewife sold the ale she brewed (brewing was mostly women's work). Ale was the everyday drink, made from malted barley, unhopped, sweetish and not strong. Go in (E at the door) for a jug.", { y: 6, r: 8, range: 250 }); } } }
+// boatmen: hire a boat from the hithes and landing places
+const PIERS = [["Westminster wharf", 51.4994, -0.1240, -1], ["Lambeth", 51.4958, -0.1212, 1], ["Queenhithe", 51.5108, -0.0947, -1], ["Billingsgate", 51.5097, -0.0838, -1], ["Southwark", 51.5060, -0.0905, 1]].map(([name, lat, lon, sg]) => {
+  let [x, z] = LL(lat, lon), k = 0; const tx = THAMES.side(x, z); let px = x, pz = z;   // walk toward the river until the water; the pier is just ashore, the boat just out
+  const step = () => { let best = null, bd = 1e9; for (let a = 0; a < 6.28; a += 0.4) { const qx = px + Math.cos(a) * 2, qz = pz + Math.sin(a) * 2, d = Math.abs(THAMES.side(qx, qz)); if (d < bd) { bd = d; best = [qx, qz]; } } [px, pz] = best; };
+  while (baseH(px, pz) > 0.2 && k++ < 200) step(); const wx = px, wz = pz; for (let q = 0; q < 6; q++) step(); const [bx, bz] = [px, pz];
+  let ax = wx, az = wz, j = 0; while (baseH(ax, az) < 0.6 && j++ < 40) { ax += (wx - bx) * 0.5; az += (wz - bz) * 0.5; }
+  put("jetty", BOX_G, MAT.wood, (ax + bx) / 2, 0.5, (az + bz) / 2, 1.6, 0.25, Math.hypot(bx - ax, bz - az) + 2, Math.atan2(bx - ax, bz - az));
+  addBoat(bx, bz, Math.atan2(bx - ax, bz - az) + Math.PI / 2, 6, false);
+  mark("Boatman: " + name, ax, az, "typical", "A boatman waits to row passengers along or across the river: the Thames was London's main road (the bridge was the only crossing). Press E to hire him.", { y: 3, r: 6, range: 200 });
+  return { name, land: [ax, az], boat: [bx, bz] }; });
+// a river route between two piers: out to midstream, along the centre line, in to the other pier
+function riverRoute(A, B) { const sOf = (x, z) => { let best = 0, bd = 1e9; for (let s = 0; s <= THAMES.L; s += 20) { const [px, pz] = THAMES.at(s), d = Math.hypot(px - x, pz - z); if (d < bd) { bd = d; best = s; } } return best; };
+  const sA = sOf(...A.boat), sB = sOf(...B.boat), P = [A.boat], n = Math.max(2, Math.ceil(Math.abs(sB - sA) / 40)); for (let k = 0; k <= n; k++) { const [x, z] = THAMES.at(sA + (sB - sA) * k / n); P.push([x, z]); } P.push(B.boat); return P; }
+// pigs and sheep: driven in to the Shambles on market days; pigs root in yards on any day. Medieval pigs were hairy, dark and long-legged,
+// sheep small, horned, many brown or dark-faced.
+const PIG_G = mergeG([[new THREE.SphereGeometry(0.3, 8, 6), MT(0, 0.5, 0, 0.75, 0.75, 1.5)], [new THREE.SphereGeometry(0.15, 6, 4), MT(0, 0.55, 0.48, 1, 0.9, 1.2)], [new THREE.CylinderGeometry(0.06, 0.07, 0.08, 6).rotateX(Math.PI / 2), MT(0, 0.52, 0.66)],
+  ...[[0.13, 0.3], [-0.13, 0.3], [0.13, -0.3], [-0.13, -0.3]].map(([x, z]) => [new THREE.CylinderGeometry(0.04, 0.035, 0.32, 5), MT(x, 0.16, z)]), [new THREE.ConeGeometry(0.05, 0.1, 4), MT(0.08, 0.7, 0.42)], [new THREE.ConeGeometry(0.05, 0.1, 4), MT(-0.08, 0.7, 0.42)]]);
+const SHEEP_G = mergeG([[new THREE.SphereGeometry(0.3, 8, 6), MT(0, 0.5, 0, 0.8, 0.75, 1.25)], [new THREE.SphereGeometry(0.11, 6, 4), MT(0, 0.6, 0.42, 0.8, 1, 1.3)], ...[[0.12, 0.22], [-0.12, 0.22], [0.12, -0.22], [-0.12, -0.22]].map(([x, z]) => [new THREE.CylinderGeometry(0.03, 0.025, 0.32, 5), MT(x, 0.16, z)]),
+  [new THREE.TorusGeometry(0.05, 0.018, 4, 8, Math.PI * 1.4), MT(0.08, 0.66, 0.36)], [new THREE.TorusGeometry(0.05, 0.018, 4, 8, Math.PI * 1.4), MT(-0.08, 0.66, 0.36)]]);
+const BEASTS = [], beastIM = {};
+{ const R = seeded(301), pigM = M(0x4e4038), sheepM = M(0xc8bca4);
+  const S = STREETS.find(q => q.name === "Cheapside"), NG = [GATES[1].x, GATES[1].z], SH = LL(51.5151, -0.0990);
+  for (let k = 0; k < 22; k++) { const H = HOUSES[(R() * HOUSES.length) | 0]; if (H.burnt || !CITY.inside(H.x, H.z)) continue; const c = Math.cos(H.ry), s = Math.sin(H.ry), back = H.d / 2 + 4; BEASTS.push({ sp: "pig", home: [H.x - s * back, H.z - c * back], ph: R() * 100, x: 0, z: 0, h: 0 }); }   // pigs rooting in back yards
+  if (MKT_ON) { for (let k = 0; k < 14; k++) BEASTS.push({ sp: "sheep", path: [[NG[0] - 60, NG[1] - 30], NG, SH], ph: k * 2.2 + R(), x: 0, z: 0, h: 0, off: [(R() - 0.5) * 3, (R() - 0.5) * 3] });   // a flock driven in by Newgate
+    for (let k = 0; k < 6; k++) BEASTS.push({ sp: "pig", path: [[NG[0] - 40, NG[1] - 50], NG, SH], ph: 40 + k * 2.6, x: 0, z: 0, h: 0, off: [(R() - 0.5) * 3, (R() - 0.5) * 3] }); }
+  for (const [sp, geo, mat] of [["pig", PIG_G, pigM], ["sheep", SHEEP_G, sheepM]]) { const n = BEASTS.filter(b => b.sp === sp).length; const im = new THREE.InstancedMesh(geo, mat, Math.max(1, n)); im.frustumCulled = false; im.count = n; scene.add(im); beastIM[sp] = im; } }
+function beastStep(t) { const cnt = { pig: 0, sheep: 0 };
+  for (const B of BEASTS) { if (B.path) { const L = 160, s = ((SIM * 0.7 + B.ph * 10) % (L + 120)); const [x, z, h, done] = routeAt(B.path, Math.min(s, L)); B.x = x + B.off[0]; B.z = z + B.off[1]; B.h = done ? h + Math.sin(t * 0.3 + B.ph) * 2 : h; B.walk = !done; }
+    else { const a = t * 0.05 + B.ph, r = 2.5; B.x = B.home[0] + Math.cos(a) * r; B.z = B.home[1] + Math.sin(a * 1.3) * r; B.h = a + Math.PI / 2; B.walk = true; }
+    const d = Math.hypot(B.x - P_.x, B.z - P_.z), im = beastIM[B.sp], i = cnt[B.sp]++; if (d > 200) { im.setMatrixAt(i, ZEROM); continue; }
+    O3.position.set(B.x, groundH(B.x, B.z) + (B.walk ? Math.abs(Math.sin(t * 6 + B.ph)) * 0.03 : 0), B.z); O3.rotation.set(0, B.h, 0); O3.scale.set(1, 1, 1); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); }
+  for (const k in beastIM) beastIM[k].instanceMatrix.needsUpdate = true; }
+if (MKT_ON) { markLL("The Shambles", 51.5152, -0.0990, "inferred", "London's meat market, on Newgate Street by the church of St Nicholas 'at the Shambles' (the butchers' benches, Old English 'scamel'). Butchers killed and cut up beasts here, and the rubbish pits nearby are full of their bones. Animals were driven in on the hoof through Newgate. First recorded by name in the 12th century; trading here before 1066 is likely but not certain.", { y: 4, r: 30, range: 500 });
+  markLL("The market day", 51.5141, -0.0935, "typical", "A weekday a few days before Christmas 1066. Cheapside is full of stalls on trestles; butchers on Newgate Street and in Eastcheap; fish by the hithes. William's army is camped round London, and Norman soldiers are in the town. Prices here are guesses: the few prices that survive are livestock values in King Æthelstan's laws (about 930): an ox 30 pence, a cow 20, a pig about 10, a sheep a shilling.", { y: 5, r: 25, range: 400 }); }
+
 // ---------- the day's clock ----------
 // The hour of the coronation is not recorded. Mass on a great feast was in the morning; here the procession sets out at 10:00 and
 // the events the chroniclers describe follow in their order, at a plausible pace. SIM is seconds after midnight.
 const hms = (h, m = 0, s = 0) => h * 3600 + m * 60 + s;
-let SIM = hms(9, 55), timeRate = 1;
+let SIM = MARKET ? hms(9, 0) : hms(9, 55), timeRate = 1;
 const T = { proc: hms(10, 0), enter: hms(10, 4, 30), prostrate: hms(10, 5), ask1: hms(10, 10), ask2: hms(10, 11, 30), shout: hms(10, 12, 40), fire: hms(10, 13, 30), flee: hms(10, 14, 10),
   oath: hms(10, 20), anoint: hms(10, 24), crown: hms(10, 28), throne: hms(10, 31), mass: hms(10, 34), leave: hms(11, 20) };
 const MOMENTS = [["Before the coronation", hms(9, 55)], ["The procession", T.proc - 10], ["The questions", T.ask1 - 15], ["The shout and the fire", T.shout - 20], ["The flight from the church", T.flee - 10],
@@ -54134,6 +54232,7 @@ const NARR = [
   [T.crown, "Ealdred sets the crown on his head (one source describes a crown with twelve gems), and gives him the sceptre and rod. The Anglo-Saxon Chronicle: 'and Archbishop Ealdred consecrated him king at Westminster'."],
   [T.throne, "King William is enthroned. Mass continues. Outside the houses of Westminster burn. Orderic, writing later, says the English never trusted the Normans after this day."],
   [T.leave, "The king and the bishops leave the church and go back to the palace. The smoke of the burnt houses drifts across Thorney."]];
+if (MARKET) { NARR.length = 0; NARR.push([hms(9, 0), "A market day a few days before Christmas 1066. William has come to London to be crowned on Christmas Day; his army is camped round the City. The streets are busy: stalls along Cheapside, butchers at the Shambles on Newgate Street and in Eastcheap, fish by the hithes. You have a purse of silver pennies: walk up to a stall and press E to buy. Boatmen wait at the hithes."]); }
 let narrI = -1;
 
 // ---------- the people ----------
@@ -54149,7 +54248,7 @@ const PAL_DOOR = [PAL.northDoor[0], PAL.northDoor[2]], PAL_IN = [PAL.inNorth[0],
 const PROC_PATH = [PAL_DOOR, [PAL_DOOR[0] - 13, PAL_DOOR[1] + 4], [PALACE[0] - 47, PALACE[1]], [110, 10], [90, -45], [30, -45], [0, -40], ND, [0, -12], [0, -2]];   // out of the hall, through the palisade gate, round to the north door
 // the procession and the principals
 const PRIN = {};
-{ const order = [["cleric", "cross"], ["cleric", "candle"], ["cleric", "candle"], ["cleric", "book"], ["cleric"], ["cleric"], ["monk", "edwin"], ["bishop", "geoffrey"], ["archbishop", "ealdred"], ["duke", "william"],
+if (!MARKET) { const order = [["cleric", "cross"], ["cleric", "candle"], ["cleric", "candle"], ["cleric", "book"], ["cleric"], ["cleric"], ["monk", "edwin"], ["bishop", "geoffrey"], ["archbishop", "ealdred"], ["duke", "william"],
     ["norman", "lord"], ["norman", "lord"], ["norman", "lord"], ["norman", "lord"], ["norman", "lord"], ["norman", "lord"]];
   const stations = { cross: [21.5, 0, -Math.PI / 2], candle: [19.5, 2.2, -Math.PI / 2], book: [17.2, -1.4, Math.PI / 2], edwin: [17.4, 2.6, -Math.PI / 2], geoffrey: [-0.5, -3.5, -Math.PI / 2], ealdred: [17.0, 0, -Math.PI / 2], william: [15.5, 0, Math.PI / 2] };
   let ci = 0, li = 0;
@@ -54162,7 +54261,7 @@ const PRIN = {};
 // monks in the choir stalls, singing
 for (let k = 0; k < 18; k++) { const zs = k % 2 ? 1 : -1, x = -12.5 + Math.floor(k / 2) * 1.6; agent("monk", { fixed: [x, 3.0 * zs, zs > 0 ? Math.PI : 0], kind: "stand", monk: true }); }
 // the congregation: Normans on the north side, English on the south (the arrangement is not recorded)
-{ const R = seeded(91), spots = [];
+if (!MARKET) { const R = seeded(91), spots = [];
   for (let x = -31.5; x < -15; x += 1.15) for (let z = -9.6; z <= 9.6; z += 1.1) { if (Math.abs(z) > 4.3 && Math.abs(z) < 5.9 && Math.abs(((x + 5) / BAY) - Math.round((x + 5) / BAY)) < 0.25) continue; spots.push([x + (R() - 0.5) * 0.3, z + (R() - 0.5) * 0.3, "nave"]); }
   for (let x = -14.5; x < -6.5; x += 1.15) for (const z of [6.4, 7.5, 8.6, 9.6, -6.4, -7.5, -8.6, -9.6]) spots.push([x + (R() - 0.5) * 0.3, z, "nave"]);
   for (let x = -4.2; x <= 4.2; x += 1.1) for (let z = 11; z < 25.5; z += 1.1) { spots.push([x + (R() - 0.5) * 0.3, z, "s"]); if (z > 11.5) spots.push([x + (R() - 0.5) * 0.3, -z, "n"]); }
@@ -54173,7 +54272,7 @@ for (let k = 0; k < 18; k++) { const zs = k % 2 ? 1 : -1, x = -12.5 + Math.floor
     A.faceSeat = face(sp[0], sp[1], 10, sp[1] * 0.2); } }
 // outside: English onlookers by the north door, Norman guards round the church and along the way
 const GUARDS = [];
-{ const R = seeded(93); for (let k = 0; k < 70; k++) { const a = R() * Math.PI, r = 14 + R() * 30, x = -10 + Math.cos(a) * r * 1.6, z = -40 - Math.sin(a) * r;
+{ const R = seeded(93); for (let k = 0; k < (MARKET ? 0 : 70); k++) { const a = R() * Math.PI, r = 14 + R() * 30, x = -10 + Math.cos(a) * r * 1.6, z = -40 - Math.sin(a) * r;
     agent(R() < 0.35 ? "woman" : R() < 0.15 ? "child" : "eng", { fixed: [x, z, face(x, z, 0, -27)], kind: "stand", onlooker: true, fleeTo: [x + (R() - 0.5) * 60, z - 40 - R() * 80], speed: 1.2 + R() }); }
   const posts = [];
   for (let k = 0; k < 14; k++) { const s = 12 + k * 18, [x, z, a] = routeAt(PROC_PATH, s); posts.push([x + Math.cos(a) * 2.6 * (k % 2 ? 1 : -1), z - Math.sin(a) * 2.6 * (k % 2 ? 1 : -1)]); }
@@ -54186,9 +54285,12 @@ const GUARDS = [];
   for (let k = 0; k < 3; k++) { const [x, , z] = PAL.seat(-2 + k * 2, 11.4); agent(k === 1 ? "woman" : "eng", { fixed: [x, z, Math.PI / 2], kind: "sell", palace: true }); }
   const [gx, gz] = [PALACE[0] - 44, PALACE[1]]; for (const o of [-3, 3]) { const A = agent("soldier", { fixed: [gx, gz + o, -Math.PI / 2], kind: "guard" }); GUARDS.push(A); } }
 // the houses that burn: the nearest of the Westminster vill
-const FIRE_H = HOUSES.filter(H => H.kind === "vill" && !H.burnt).sort((a, b) => Math.hypot(a.x, a.z + 40) - Math.hypot(b.x, b.z + 40)).slice(0, 7);
+const FIRE_H = MARKET ? [] : HOUSES.filter(H => H.kind === "vill" && !H.burnt).sort((a, b) => Math.hypot(a.x, a.z + 40) - Math.hypot(b.x, b.z + 40)).slice(0, 7);
 FIRE_H.forEach((H, k) => { H.ignite = T.fire + k * 45; H.state = 0; const G = GUARDS[k * 2 + 1] || GUARDS[k]; if (G) { G.torch = H; G.torchAt = H.ignite; } });
 // people about the streets: placed near you as you go, walking the streets, talking at doors
+// the stallholders, and a boatman for hire
+for (const S of STALLS) { const [x, z, h] = S.seller; S.agent = agent(S.kind === "butcher" || S.kind === "iron" ? "eng" : hash(x | 0, z | 0) < 0.45 ? "woman" : "eng", { fixed: [x, z, h], kind: S.kind === "butcher" ? "hammer" : "sell", seller: true }); }
+const ROWER = agent("eng", { rower: true });
 const AMB = []; { const N = NC - nextI; for (let k = 0; k < N; k++) { const A = agent(null, { amb: true }); if (A) AMB.push(A); } }
 function placeAmbient(A, px, pz) { const R = Math.random;
   for (let t = 0; t < 25; t++) { if (R() < 0.3 && HOUSES.length) { const H = HOUSES[(R() * HOUSES.length) | 0]; if (H.burnt && R() < 0.6) continue; if (!H.dp || Math.hypot(H.dp[0] - px, H.dp[1] - pz) > 320) continue;   // talking at a doorway
@@ -54197,17 +54299,17 @@ function placeAmbient(A, px, pz) { const R = Math.random;
     A.mode = "walk"; A.S = S; A.s = s; A.dir = R() < 0.5 ? 1 : -1; A.lane = (R() - 0.5) * S.w * 0.7; A.v = 1.0 + R() * 0.5; A.kind = R() < 0.12 ? "carry" : "walk"; return true; }
   A.mode = "off"; return false; }
 for (const A of AMB) A.mode = "off";
-mark("William, duke of Normandy", 0, 0, "person", "William, 38 years old, duke of Normandy since he was about seven; Edward the Confessor's cousin once removed, who claimed Edward had promised him the throne. He won at Hastings on 14 October; today he becomes king of the English. In the Bayeux Tapestry Normans wear their hair cropped, the back of the head shaved.", { follow: PRIN.william, r: 6, range: 120 });
-mark("Ealdred, archbishop of York", 0, 0, "person", "Ealdred, archbishop of York since 1061, an experienced churchman and diplomat who had travelled to Rome and Jerusalem. He probably crowned Harold in January, and crowns William today: the archbishop of Canterbury, Stigand, was not recognised by the pope.", { follow: PRIN.ealdred, r: 6, range: 120 });
-mark("Geoffrey, bishop of Coutances", 0, 0, "person", "Geoffrey de Montbray, bishop of Coutances in Normandy, who fought at Hastings and became one of the greatest landholders in England. He puts the question to the Normans, in French.", { follow: PRIN.geoffrey, r: 6, range: 120 });
-mark("Abbot Edwin", 0, 0, "person", "Edwin, abbot of Westminster under Edward the Confessor and now under William, head of the community of Benedictine monks who serve the abbey.", { follow: PRIN.edwin, r: 5, range: 80 });
+mark("William, duke of Normandy", 0, 0, "person", "William, 38 years old, duke of Normandy since he was about seven; Edward the Confessor's cousin once removed, who claimed Edward had promised him the throne. He won at Hastings on 14 October; today he becomes king of the English. In the Bayeux Tapestry Normans wear their hair cropped, the back of the head shaved.", { follow: PRIN.william, r: 6, range: 120 , coronation: true });
+mark("Ealdred, archbishop of York", 0, 0, "person", "Ealdred, archbishop of York since 1061, an experienced churchman and diplomat who had travelled to Rome and Jerusalem. He probably crowned Harold in January, and crowns William today: the archbishop of Canterbury, Stigand, was not recognised by the pope.", { follow: PRIN.ealdred, r: 6, range: 120 , coronation: true });
+mark("Geoffrey, bishop of Coutances", 0, 0, "person", "Geoffrey de Montbray, bishop of Coutances in Normandy, who fought at Hastings and became one of the greatest landholders in England. He puts the question to the Normans, in French.", { follow: PRIN.geoffrey, r: 6, range: 120 , coronation: true });
+mark("Abbot Edwin", 0, 0, "person", "Edwin, abbot of Westminster under Edward the Confessor and now under William, head of the community of Benedictine monks who serve the abbey.", { follow: PRIN.edwin, r: 5, range: 80 , coronation: true });
 mark("The great hall", ...(([x, , z]) => [x, z])(PAL.seat(0, 0)), "inferred", "The king's hall: the heart of any royal residence, where the king ate, held court and gave feasts. Edward's has not been found; this one follows excavated royal halls (Cheddar, Goltho): an aisled timber hall about 30 by 12 m, earth floor strewn with rushes, a long central hearth with no chimney, benches and trestle tables in the aisles, and the high table on a dais at the far end. Embroidered hangings on the walls: wills of the time leave 'hall-hangings'. Today the household is preparing the coronation feast.", { y: 3.2, r: 10, range: 60 });
 mark("The high table", ...(([x, , z]) => [x, z])(PAL.seat(0, 12.6)), "inferred", "On the dais, across the end of the hall: the king's chair in the middle, the greatest guests beside him, everyone else at the tables below. After the crowning King William comes back here with the bishops for the feast (a coronation feast was customary; this one is not described).", { y: 1.9, r: 4, range: 30 });
 mark("The king's chamber", ...(([x, , z]) => [x, z])(gw(PAL.chamber, 1, 0, -2)), "inferred", "Upstairs in the chamber block, reached by the outside stair: the king's private room. Here, the Life of King Edward says, Edward died on 5 January 1066, with Queen Edith warming his feet, Earl Harold, Archbishop Stigand and the steward Robert fitzWimarc at his bedside; the Bayeux Tapestry shows the deathbed in an upper room and his body being prepared below. The room's form is inferred.", { y: 5.3, r: 6, range: 40 });
 mark("The kitchen", ...(([x, , z]) => [x, z])(gw(PAL.kitchen, 0, 0, 0)), "inferred", "A separate kitchen, apart from the hall in case of fire: a central fire with a spit (a pig roasting for the feast), a cauldron, a clay bread oven, a table of loaves, hams hanging from the rafters.", { y: 2.6, r: 5, range: 40 });
 mark("Monks of Westminster", -9, 0, "person", "Benedictine monks in black habits, singing the office and the coronation chants from the choir stalls.", { y: 4, r: 8, range: 60 });
-mark("Norman lords and knights", 0, -18, "person", "The Norman nobles and knights, on the north side here (where each group stood is not recorded). Mail-shirted soldiers guard the church outside.", { y: 4, r: 10, range: 80 });
-mark("The English", 0, 18, "person", "English thegns, churchmen and Londoners. English men wore their hair long, with moustaches; women covered their hair with a headrail.", { y: 4, r: 10, range: 80 });
+mark("Norman lords and knights", 0, -18, "person", "The Norman nobles and knights, on the north side here (where each group stood is not recorded). Mail-shirted soldiers guard the church outside.", { y: 4, r: 10, range: 80 , coronation: true });
+mark("The English", 0, 18, "person", "English thegns, churchmen and Londoners. English men wore their hair long, with moustaches; women covered their hair with a headrail.", { y: 4, r: 10, range: 80 , coronation: true });
 mark("Norman guards", -10, -48, "person", "Armed Norman knights and soldiers posted round the abbey and in the town: mail hauberks, conical helmets with a nose-guard, kite-shaped shields and spears, as in the Bayeux Tapestry.", { y: 4, r: 14, range: 200 });
 // what each kind of person is wearing (E near anyone)
 const DRESS0 = { eng: "An Englishman: knee-length woollen tunic, belted, hose or leg wrappings, a cloak pinned at the shoulder with a brooch; long hair and a moustache (the Tapestry draws the English so, unlike the Normans).",
@@ -54262,6 +54364,7 @@ function agentState(A) { const S = SIM;
   if (A.loop) { const P = A.loop, L = A.loopL || (A.loopL = P.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - P[i][0], p[1] - P[i][1]), 0)), u = (S * A.speed + A.phase * 7) % (2 * L + 16);   // to the hall and back, a pause at each end
     if (u < L) { const [x, z, h] = routeAt(P, u); return [x, z, h, "carry", true]; } if (u < L + 8) { const [x, z, h] = routeAt(P, L); return [x, z, h, "sell"]; }
     if (u < 2 * L + 8) { const [x, z, h] = routeAt(P, 2 * L + 8 - u); return [x, z, h + Math.PI, "walk", true]; } const [x, z, h] = routeAt(P, 0); return [x, z, h + Math.PI, "stand"]; }
+  if (A.rower) { if (!RIDE) return null; return [RIDE.rx, RIDE.rz, RIDE.rh, "row"]; }
   if (A.fixed) return [...A.fixed, A.kind];
   return null; }
 let frameN = 0;
@@ -54280,13 +54383,13 @@ function lifeStep(dt, t) { frameN++; const px = P_.x, pz = P_.z, rate = Math.min
     if (!seen(x, z, d)) { if (A.shown) { crowd.hide(A.i); A.shown = false; } continue; }
     const step = d < 35 ? 1 : d < 120 ? 3 : 8; if ((frameN + A.i) % step && A.shown) continue;
     if (A.key === "william") { const crowned = SIM > T.crown + 20; if (crowned !== !!A.crowned) { A.crowned = crowned; A.L = looks(A.i, crowned ? "king" : "duke"); crowd.look(A.i, A.L); } }
-    let y = personY(x, z); if (A.key === "william" && kind === "sit") y = AB_Y + 0.76;
+    let y = personY(x, z); if (A.key === "william" && kind === "sit") y = AB_Y + 0.76; if (A.rower) y = WATER + 0.05;
     crowd.set(A.i, x, y, z, h, kind, t, moving ? Math.min(2, (sp || 0.9) / 1.2) * Math.min(rate, 3) : 1); A.shown = true; }
   crowd.done(); }
 
 // ---------- fire and smoke ----------
 const fireM = new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
-const FIRE_IM = new THREE.InstancedMesh(new THREE.ConeGeometry(0.9, 3, 6).translate(0, 1.5, 0), fireM, FIRE_H.length * 7); FIRE_IM.frustumCulled = false; scene.add(FIRE_IM);
+const FIRE_IM = new THREE.InstancedMesh(new THREE.ConeGeometry(0.9, 3, 6).translate(0, 1.5, 0), fireM, Math.max(1, FIRE_H.length * 7)); FIRE_IM.frustumCulled = false; scene.add(FIRE_IM);
 for (let k = 0; k < FIRE_IM.count; k++) FIRE_IM.setMatrixAt(k, ZEROM);
 const fireLight = new THREE.PointLight(0xff8030, 0, 120, 1.4); scene.add(fireLight);
 class Smoke { constructor(n, size, col, op) { this.n = n; this.P = []; const pos = new Float32Array(n * 3).fill(-9999); this.geo = new THREE.BufferGeometry(); this.geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
@@ -54325,6 +54428,7 @@ const ITEMS_TXT = { hearth: "The hearth, in the middle of the floor: a bed of cl
   beds: "Bed platforms along the walls, with straw or bracken, woollen blankets and sheepskins. The household slept round the fire.",
   chest: "A wooden chest with an iron lock for what was valuable: cloth, a brooch, a few silver pennies. London had more moneyers than any other English mint; this year's coins carry Harold's head, and soon William's.",
   table: "The Christmas feast on a trestle board: bread, a pottage of beans or peas, pork or beef, cheese, and ale. Christmas was one of the great feasts of the year; the Twelve Days were a holiday by law under King Alfred.",
+  ale: "Casks of the alewife's ale.",
   cellar: "A trapdoor to the cellar, lined with planks: many Late Saxon London houses had one, for storage, found by archaeologists as rectangular pits with timber linings.",
   cauldron: "An iron cauldron hung from a chain over the fire, for the pottage." };
 function makeInterior(H) { const g = new THREE.Group(), Y = H.gy, iw = H.w - 0.25, id = H.d - 0.25, items = [], gr = [];
@@ -54356,6 +54460,8 @@ function makeInterior(H) { const g = new THREE.Group(), Y = H.gy, iw = H.w - 0.2
   const fam = [], R = seeded(H.x | 0), roles = ["eng", "woman", "child", "woman", "eng", "child"], n = 3 + Math.floor(R() * 3);
   for (let k = 0; k < n; k++) { const sx = k % 2 ? 1 : -1, z = -id * 0.28 - 0.7 + Math.floor(k / 2) * 0.7, p = personMesh(9000 + (H.x | 0) * 7 + k, roles[k], "sit", sx * 0.75, 0.0, z, sx > 0 ? -Math.PI / 2 : Math.PI / 2); p.position.y = -0.0; g.add(p); fam.push({ role: roles[k], x: sx * 0.75, z }); }
   const bench = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.42, 2.0).translate(0, 0.21, 0), M(0x5a4430)); for (const sx of [-1, 1]) { const b = bench.clone(); b.position.set(sx * 0.85, 0, -id * 0.28); g.add(b); }
+  if (H.ale) { for (let k = 0; k < 3; k++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.8, 10).translate(0, 0.4, 0), M(0x6a4e32)); b.position.set(side - 0.1, 0, -id * 0.42 + k * 0.7); g.add(b); } items.push({ key: "ale", x: side - 0.1, z: -id * 0.42 + 0.7 });
+    const w = personMesh(7000 + (H.x | 0), "woman", "sell", side - 0.8, 0, -id * 0.2, Math.PI / 2); g.add(w); fam.push({ role: "woman", x: side - 0.8, z: -id * 0.2, ale: true }); }
   g.position.set(H.x, Y, H.z); g.rotation.y = H.ry; scene.add(g); return { g, items, fam, flame: fl2 }; }
 function toLocal(H, x, z) { const dx = x - H.x, dz = z - H.z, c = Math.cos(H.ry), s = Math.sin(H.ry); return [dx * c - dz * s, dx * s + dz * c]; }
 function toWorld(H, lx, lz) { const c = Math.cos(H.ry), s = Math.sin(H.ry); return [H.x + lx * c + lz * s, H.z - lx * s + lz * c]; }
@@ -54371,7 +54477,7 @@ function insideInteract() { const H = INSIDE_H, [lx, lz] = toLocal(H, P_.x, P_.z
   if (Math.hypot(lx - dx, lz - dz) < 1.8) return leaveHouse();
   let best = null, bd = 1.9; for (const I of IN.items) { const d = Math.hypot(I.x - lx, I.z - lz); if (d < bd) { bd = d; best = I; } }
   for (const F of IN.fam) { const d = Math.hypot(F.x - lx, F.z - lz); if (d < bd - 0.3) { bd = d; best = { fam: F }; } }
-  if (best?.fam) return say(DRESS[best.fam.role] + " The family is at its Christmas meal.", 14); if (best) return say(ITEMS_TXT[best.key], 16);
+  if (best?.fam?.ale || best?.key === "ale") return aleMenu(); if (best?.fam) return say(DRESS[best.fam.role] + (H.ale ? " Drinking in the alehouse." : MARKET ? " At home." : " The family is at its Christmas meal."), 14); if (best) return say(ITEMS_TXT[best.key], 16);
   say("Walk closer to something to read about it; E at the doorway to go out.", 5); }
 function nearDoorHouse() { let best = null, bd = 2.2; const L = []; for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) L.push(...(COLL.get((Math.floor(P_.x / CC) + i) * 100003 + Math.floor(P_.z / CC) + j) || []));
   for (const r of L) { const H = r.tag; if (!H || !H.dp || H.burnt || H.state === 2) continue; const d = Math.hypot(H.dp[0] - P_.x, H.dp[1] - P_.z); if (d < bd) { bd = d; best = H; } } return best; }
@@ -54394,6 +54500,9 @@ const intro = document.getElementById("intro");
 let SITTING = localStorage.getItem("vrPosture") === "sitting";
 { const card = intro?.querySelector(".card"), row = document.createElement("p"); row.innerHTML = 'In VR, are you <button data-p="standing">🧍 standing</button> or <button data-p="sitting">🪑 sitting</button>?';
   const paint = () => row.querySelectorAll("button").forEach(b => { b.style.cssText = "font:600 14px -apple-system,sans-serif;padding:6px 12px;margin:0 4px;border-radius:8px;cursor:pointer;border:2px solid #5a3a1e;" + ((b.dataset.p === "sitting") === SITTING ? "background:#5a3a1e;color:#fff" : "background:#fff;color:#5a3a1e"); });
+  { const dr = document.createElement("p"); dr.innerHTML = 'Which day? <button data-d="xmas">👑 Christmas Day: the coronation</button> <button data-d="market">🧺 A market day before Christmas</button>';
+    const pd = () => dr.querySelectorAll("button").forEach(b => { b.style.cssText = "font:600 14px -apple-system,sans-serif;padding:6px 12px;margin:2px 4px;border-radius:8px;cursor:pointer;border:2px solid #5a3a1e;" + ((b.dataset.d === "market") === MARKET ? "background:#5a3a1e;color:#fff" : "background:#fff;color:#5a3a1e"); });
+    dr.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); if ((b.dataset.d === "market") !== MARKET) location.search = b.dataset.d === "market" ? "?day=market" : ""; }); pd(); card?.insertBefore(dr, card.lastElementChild); }
   row.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); SITTING = b.dataset.p === "sitting"; localStorage.setItem("vrPosture", b.dataset.p); paint(); }); paint(); card?.insertBefore(row, card.lastElementChild); }
 const CSS = "background:rgba(30,24,18,.78);color:#f2e8d6;border-radius:10px;font:13.5px/1.5 -apple-system,Helvetica,sans-serif";
 const HUD = document.createElement("div"); HUD.style.cssText = `position:fixed;left:14px;top:12px;z-index:2;padding:10px 14px;max-width:620px;${CSS}`;
@@ -54404,6 +54513,7 @@ document.body.append(HUD, MSG, GUIDE, MAPC);
 let msgT = 0, msgText = "", vrDirty = true;
 function say(t, secs = 12) { msgText = t; msgT = secs; MSG.innerHTML = t; MSG.style.display = "block"; vrDirty = true; }
 function start() { if (started) return; started = true; intro?.classList.add("gone");
+  if (MARKET) return say("A market day a few days before Christmas 1066, at Westminster. The City is about 3 km east, along the Strand (or take a boat from the wharf, or use the guide's 'Things to do'). In the City: stalls on Cheapside, butchers at the Shambles and in Eastcheap, fish by the hithes. You carry 30 silver pennies: press E at a stall to buy.", 22);
   say("Westminster, Christmas morning 1066. Before you, Edward the Confessor's new abbey; to your right, the houses of the little vill. At 10:00 William's procession comes from the palace (to the south-east) to the north door. Walk anywhere: into the abbey, along the Strand to the City, across London Bridge. Markers name things and say how well we know them: press E near one to read it.", 22); }
 addEventListener("keydown", e => { keys[e.code] = true; start();
   if (e.code === "Equal") speedI = Math.min(SPEEDS.length - 1, speedI + 1); if (e.code === "Minus") speedI = Math.max(0, speedI - 1);
@@ -54427,15 +54537,20 @@ function goPlace(p) { start(); if (p.at) { teleport(p.at[0], p.at[1], p.look[0],
 function goMoment(k) { start(); const [name, tm] = MOMENTS[k]; SIM = tm; narrI = -1; momentI = k;
   const view = k <= 1 ? [[46, -78], [0, -20]] : k === 3 || k === 4 ? (Math.hypot(P_.x, P_.z) > 300 || inAbbey(P_.x, P_.z) ? [[34, -64], [60, -170]] : null) : k === 9 ? [[60, -50], [0, -27]] : (inAbbey(P_.x, P_.z) ? null : [[2.5, 15], [15, 0]]);
   if (view && (Math.hypot(P_.x - view[0][0], P_.z - view[0][1]) > 40)) teleport(view[0][0], view[0][1], view[1][0], view[1][1]); drawGuide(); }
-let momentI = 0; function nextMoment() { goMoment((momentI + 1) % MOMENTS.length); }
+let momentI = 0; function nextMoment() { if (MARKET) { momentI = (momentI + 1) % TODO.length; return goTodo(momentI); } goMoment((momentI + 1) % MOMENTS.length); }
 const TAGC = { known: "#9ad87a", inferred: "#f0c060", typical: "#8ab8f0", absent: "#e08a8a", person: "#d8a8f0" }, TAGN = { known: "known", inferred: "inferred: place known, form guessed", typical: "typical: a stand-in", absent: "not there in 1066", person: "person" };
-function drawGuide() { GUIDE.innerHTML = `<b>Coronation</b> <span style="color:#c8b898">· click to go to the moment</span>` + MOMENTS.map(([n, tm], i) => `<div data-m="${i}" style="cursor:pointer;padding:1px 4px">${String(Math.floor(tm / 3600)).padStart(2, "0")}:${String(Math.floor(tm / 60) % 60).padStart(2, "0")} ${n}</div>`).join("") +
+function drawGuide() { const TD = self.TODO_LIST || []; GUIDE.innerHTML = (MARKET ? `<b>A market day, December 1066</b>` : `<b>Coronation</b> <span style="color:#c8b898">· click to go to the moment</span>` + MOMENTS.map(([n, tm], i) => `<div data-m="${i}" style="cursor:pointer;padding:1px 4px">${String(Math.floor(tm / 3600)).padStart(2, "0")}:${String(Math.floor(tm / 60) % 60).padStart(2, "0")} ${n}</div>`).join("")) +
+  `<div style="margin:4px 0"><span data-day="1" style="cursor:pointer;color:#ffe9a8;text-decoration:underline">switch to ${MARKET ? "Christmas Day (the coronation)" : "the market day"}</span></div>` +
+  `<b>Things to do</b> <span style="color:#c8b898">· click to go</span>` + TD.map(([n], i) => `<div data-t="${i}" style="cursor:pointer;padding:1px 4px">✦ ${n}</div>`).join("") +
   `<div style="margin:6px 0 2px"><span data-r="1" style="cursor:pointer;padding:2px 8px;border-radius:6px;background:rgba(200,160,80,.25)">time ×${timeRate} (T)</span> <span data-l="1" style="cursor:pointer;padding:2px 8px;border-radius:6px;background:rgba(200,160,80,.25)">markers ${labelsOn ? "on" : "off"} (L)</span></div>` +
   `<b>Places</b> <span style="color:#c8b898">· click to go</span>` + PLACES.map((p, i) => `<div data-i="${i}" style="cursor:pointer;padding:1px 4px">${p.m ? `<span style="color:${TAGC[p.m.tag]}">●</span> ` : "◆ "}${p.name}</div>`).join("") +
   `<div style="color:#c8b898;font-size:11.5px;margin-top:6px"><span style="color:${TAGC.known}">●</span> known &nbsp;<span style="color:${TAGC.inferred}">●</span> inferred &nbsp;<span style="color:${TAGC.typical}">●</span> typical &nbsp;<span style="color:${TAGC.absent}">●</span> not yet built &nbsp;<span style="color:${TAGC.person}">●</span> people</div>`; }
-GUIDE.addEventListener("click", e => { e.stopPropagation(); const d = e.target.closest("[data-i],[data-m],[data-r],[data-l]"); if (!d) return; if (d.dataset.i) goPlace(PLACES[+d.dataset.i]); else if (d.dataset.m) goMoment(+d.dataset.m); else if (d.dataset.r) cycleRate(); else { labelsOn = !labelsOn; drawGuide(); } });
+GUIDE.addEventListener("click", e => { e.stopPropagation(); const d = e.target.closest("[data-i],[data-m],[data-r],[data-l],[data-t],[data-day]"); if (!d) return; if (d.dataset.day) { location.search = MARKET ? "" : "?day=market"; return; } if (d.dataset.t) return goTodo(+d.dataset.t); if (d.dataset.i) goPlace(PLACES[+d.dataset.i]); else if (d.dataset.m) goMoment(+d.dataset.m); else if (d.dataset.r) cycleRate(); else { labelsOn = !labelsOn; drawGuide(); } });
 drawGuide();
-function interact() { if (!started) return start(); if (INSIDE_H) return insideInteract(); const DH = nearDoorHouse(); if (DH) return enterHouse(DH);
+function interact() { if (!started) return start(); if (RIDE) return; if (MENU) return closeMenu(); if (INSIDE_H) return insideInteract();
+  const PR = nearPier(); if (PR) return boatMenu(PR); const ST = nearStall(); if (ST) return stallMenu(ST);
+  if (zoneOf(P_.x, P_.z) === "hall" && hallSeat()) { SITTING_DOWN = true; return say(FEAST_TXT() + " Walk to stand up.", 18); }
+  const DH = nearDoorHouse(); if (DH) return enterHouse(DH);
   let best = null, bd = 1e9; for (const m of MARKS) { const [x, z] = m.follow ? [m.follow.x, m.follow.z] : [m.x, m.z], d = Math.hypot(x - P_.x, z - P_.z); if (d < m.r && d / m.r < bd) { bd = d / m.r; best = m; } }
   let pa = null, pd = 3; for (const A of AG2) { if (!A.shown) continue; const d = Math.hypot(A.x - P_.x, A.z - P_.z); if (d < pd) { pd = d; pa = A; } }
   const named = pa && MARKS.find(m => m.follow === pa); if (named) best = named;
@@ -54537,22 +54652,26 @@ function frame() {
   if (vr) { const s = renderer.xr.getSession();
     for (const src of s?.inputSources || []) { const gp = src.gamepad; if (!gp) continue; const [ax, ay] = stick(gp.axes);
       if (src.handedness === "left") { mx += ax; my += ay; if (tap("L", gp, 4)) nextMoment(); if (tap("L", gp, 5)) cycleRate(); }
-      else { if (gp.buttons[0]?.value > 0.3) run = 3; if (tap("R", gp, 4)) interact(); if (tap("R", gp, 5)) { placeI = (placeI + 1) % PLACES.length; goPlace(PLACES[placeI]); }
-        if (Math.abs(ax) > 0.7 && snap) { vrTurn -= Math.sign(ax) * Math.PI / 6; snap = false; } else if (Math.abs(ax) < 0.3) snap = true; } }
+      else { if (gp.buttons[0]?.value > 0.3) run = 3;
+        if (MENU) { if (Math.abs(ay) > 0.7 && snap) { MENU.sel = (MENU.sel + (ay > 0 ? 1 : MENU.opts.length - 1)) % MENU.opts.length; snap = false; drawMenu(); } if (tap("R", gp, 4)) { const o = MENU.opts[MENU.sel]; closeMenu(); o.fn(); } if (tap("R", gp, 5)) closeMenu(); }
+        else { if (tap("R", gp, 4)) interact(); if (tap("R", gp, 5)) { placeI = (placeI + 1) % PLACES.length; goPlace(PLACES[placeI]); } }
+        if (Math.abs(ax) > 0.7 && snap) { vrTurn -= Math.sign(ax) * Math.PI / 6; snap = false; } else if (Math.abs(ax) < 0.3 && Math.abs(ay) < 0.3) snap = true; } }
     rig.rotation.y = vrTurn; fwd.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(rig.quaternion); }
   else { camera.rotation.set(pitch, yaw, 0, "YXZ"); camera.getWorldDirection(fwd); if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD) mx += 1; if (keys.KeyA) mx -= 1;
     if (keys.ShiftLeft || keys.ShiftRight) run = 3; if (keys.ArrowLeft) yaw += 1.6 * dt; if (keys.ArrowRight) yaw -= 1.6 * dt; if (flying) up = (keys.Space ? 1 : 0) - (keys.KeyC ? 1 : 0); }
   fwd.y = 0; fwd.normalize(); side.crossVectors(fwd, UP).normalize();
   const sp = (INSIDE_H || inAbbey(P_.x, P_.z) ? Math.min(SPEEDS[speedI][0], 1.4) : SPEEDS[speedI][0]) * run;
+  if (RIDE) { mx = my = 0; rideStep(dt); }
+  if ((mx || my) && SITTING_DOWN) SITTING_DOWN = false;
   if (mx || my) { const ox = P_.x, oz = P_.z; P_.x += (fwd.x * -my + side.x * mx) * sp * dt; P_.z += (fwd.z * -my + side.z * mx) * sp * dt;
     const high = flying && P_.y > groundAt(P_.x, P_.z) + 6; if (!high && !INSIDE_H) pushOut(P_);
     if (!flying && !INSIDE_H && groundAt(P_.x, P_.z) < -0.7) { P_.x = ox; P_.z = oz; } }   // the river is too deep to wade: use the bridge
   if (INSIDE_H) { flying = false; insideStep(t); }
-  const g = groundAt(P_.x, P_.z);
-  if (flying) P_.y = Math.max(g, P_.y + up * Math.max(4, sp) * dt); else P_.y = g > P_.y ? Math.min(g, P_.y + Math.max(3.2, sp * 1.2) * dt) : Math.max(g, P_.y - Math.max(7, sp) * dt);
-  rig.position.set(P_.x, P_.y + (vr && SITTING ? 0.45 : 0), P_.z);
+  const g = RIDE ? P_.y : groundAt(P_.x, P_.z);
+  if (RIDE) { } else if (flying) P_.y = Math.max(g, P_.y + up * Math.max(4, sp) * dt); else P_.y = g > P_.y ? Math.min(g, P_.y + Math.max(3.2, sp * 1.2) * dt) : Math.max(g, P_.y - Math.max(7, sp) * dt);
+  rig.position.set(P_.x, P_.y + (vr && SITTING ? 0.45 : 0) - (SITTING_DOWN || RIDE ? 0.65 : 0), P_.z);
   updateGround(P_.x, P_.z);
-  lifeStep(dt, t); fireStep(dt, t);
+  lifeStep(dt, t); fireStep(dt, t); beastStep(t);
   // the sun, low in the south all day; sky and light
   const hour = SIM / 3600, S = sunAt(hour), el = S.el, day = clampN(el * 7 + 0.35, 0, 1), dusk = clampN(1 - el * 9, 0, 1) * (el > -0.12 ? 1 : 0);
   sun.position.copy(rig.position).addScaledVector(S.dir, 800); sun.target.position.copy(rig.position);
@@ -54573,10 +54692,53 @@ function frame() {
     let nearM = null, nd = 1e9; for (const m of MARKS) { if (m.follow || m.hidden) continue; const d = Math.hypot(m.x - P_.x, m.z - P_.z); if (d < m.r && d < nd) { nd = d; nearM = m; } }
     const room = { hall: "in the great hall of Edward's palace", chamber: P_.y > PAL.chamber.gy + 2 ? "upstairs in the king's chamber" : "in the chamber block's ground floor (the stair is outside)", kitchen: "in the palace kitchen" }[zoneOf(P_.x, P_.z)];
     const where = INSIDE_H ? "inside a house · E near things to read; E at the doorway to go out" : DH ? "at a doorway · <b>E: go inside</b>" : nearM ? `at <b>${nearM.name}</b> · E to read` : inA ? "inside Westminster Abbey" : room || (CITY.inside(P_.x, P_.z) ? "inside the walls of London" : "");
-    HUD.innerHTML = `<b>London and Westminster, Christmas Day 1066</b> · ${hh}:${String(mi).padStart(2, "0")}${timeRate > 1 ? ` (time ×${timeRate})` : ""} · ${flying ? "flying" : SPEEDS[speedI][1] + (run > 1 ? ", running" : "")}<br>${where}<br>
-      <span style="color:#c8b898;font-size:12.5px">WASD walk · drag to look · shift run · − / = pace · E read / go in · N next moment · T time speed · L markers · F fly · M map</span>`;
+    HUD.innerHTML = `<b>London and Westminster, ${MARKET ? "a market day, December" : "Christmas Day"} 1066</b> · ${hh}:${String(mi).padStart(2, "0")}${timeRate > 1 ? ` (time ×${timeRate})` : ""} · ${flying ? "flying" : SPEEDS[speedI][1] + (run > 1 ? ", running" : "")}<br>${where}<br>
+      <span style="color:#e8dcc0">purse ${fmtD(PURSE)}${BASKET.length ? " · basket: " + BASKET.slice(-6).join(", ") + (BASKET.length > 6 ? " …" : "") : ""}${RIDE ? " · in the boat to " + RIDE.Q.name : ""}</span><br><span style="color:#c8b898;font-size:12.5px">WASD walk · drag to look · shift run · − / = pace · E read / go in · N next moment · T time speed · L markers · F fly · M map</span>`;
     if (vr && (vrDirty || ((t * 3) | 0) % 3 === 0)) { drawVR(`${hh}:${String(mi).padStart(2, "0")} · ${where.replace(/<[^>]+>/g, "")}`, msgText || "Left stick walk · right stick turn · trigger run · A read / go in · B next place · X next moment of the coronation · Y time speed"); vrDirty = false; } }
   renderer.render(scene, camera);
 }
+
+// ---------- doing things: your purse, buying, drinking, sitting, boats ----------
+// Money was the silver penny, struck by London's moneyers; there were no smaller coins, so a penny was cut in half for a halfpenny
+// or in quarters for a farthing. Your purse holds 30 pence: about a month's pay for a labourer later in the Middle Ages.
+let PURSE = 120; const BASKET = [];   // in farthings
+const fmtD = f => { const d = Math.floor(f / 4), q = f % 4; return (d ? d : q ? "" : "0") + ["", "¼", "½", "¾"][q] + "d"; };
+const coinWords = f => f === 1 ? "a farthing (a quarter of a silver penny, cut from a whole one)" : f === 2 ? "a halfpenny (a penny cut in half)" : f % 4 === 0 ? `${f / 4} silver penn${f === 4 ? "y" : "ies"}` : `${fmtD(f)} in silver, some of it cut`;
+let MENU = null, SITTING_DOWN = false, RIDE = null;
+function showMenu(title, opts, note = "") { MENU = { title, opts, sel: 0, note }; drawMenu(); }
+function drawMenu() { if (!MENU) return; msgText = MENU.title + " · " + MENU.opts.map((o, i) => `${i + 1}. ${o.label}`).join(" · ");
+  MSG.innerHTML = `<b>${MENU.title}</b>${MENU.note ? `<br><span style="color:#c8b898">${MENU.note}</span>` : ""}` + MENU.opts.map((o, i) => `<div data-o="${i}" style="cursor:pointer;padding:3px 6px;margin-top:3px;border-radius:6px;${i === MENU.sel ? "background:rgba(255,233,168,.22)" : ""}"><b>${i + 1}</b> · ${o.label}</div>`).join("") +
+    `<div style="color:#c8b898;font-size:12.5px;margin-top:6px">press a number or click · E or Esc to close · your purse: ${fmtD(PURSE)}</div>`; MSG.style.display = "block"; msgT = 1e9; vrDirty = true; }
+function closeMenu() { MENU = null; msgT = 0.01; }
+MSG.addEventListener("click", e => { const d = e.target.closest("[data-o]"); if (!d || !MENU) return; e.stopPropagation(); const o = MENU.opts[+d.dataset.o]; closeMenu(); o.fn(); });
+addEventListener("keydown", e => { if (!MENU) return; if (e.code === "Escape") closeMenu(); const n = e.code.startsWith("Digit") ? +e.code.slice(5) - 1 : -1; if (n >= 0 && n < MENU.opts.length) { const o = MENU.opts[n]; closeMenu(); o.fn(); } });
+function buy(name, price, about, then) { if (PURSE < price) return say(`You haven't enough left: ${name} costs ${fmtD(price)} and your purse holds ${fmtD(PURSE)}.`, 8);
+  PURSE -= price; if (!then) BASKET.push(name); say(`You buy ${name} for ${coinWords(price)}. ${about || ""} <span style="color:#c8b898">(Prices are guesses: none survive for London in 1066.)</span>`, 14); if (then) then(); }
+function stallMenu(S) { const G = S.G; showMenu(`${G.name}`, G.items.map(([n, p, about]) => ({ label: `${n} · ${fmtD(p)}`, fn: () => buy(n, p, about) })), S.kind === "butcher" ? "The butcher cuts what you point at from the carcasses hanging behind." : S.kind === "fish" ? "Fresh from the river and salted from the sea." : ""); }
+function aleMenu() { showMenu("The alewife", [{ label: `a jug of ale · ${fmtD(2)}`, fn: () => buy("a jug of ale", 2, "You sit on the bench and drink: thick, sweetish, cloudy and not strong. Unhopped: hops came to England in the 15th century.", () => sitDown("Sitting in the alehouse with your ale. Walk to stand up.")) }, { label: "a cup of mead (honey wine, dearer) · " + fmtD(4), fn: () => buy("a cup of mead", 4, "Mead, made from honey: a drink for feasts.", () => sitDown("Sitting with your mead. Walk to stand up.")) }]); }
+function sitDown(txt) { SITTING_DOWN = true; say(txt, 10); }
+// boats
+function boatMenu(P) { showMenu(`Hire a boat at ${P.name}`, PIERS.filter(Q => Q !== P).map(Q => ({ label: `to ${Q.name} · ${fmtD(2)}`, fn: () => buy(`a boat to ${Q.name}`, 2, "", () => startRide(P, Q)) })), "The boatman rows you along the river; the trip is sped up."); }
+const rideBoat = new THREE.Mesh(BOAT_G, MAT.tar); rideBoat.scale.set(1.5, 0.6, 6); rideBoat.visible = false; scene.add(rideBoat);
+function startRide(P, Q) { if (INSIDE_H) leaveHouse(); const path = riverRoute(P, Q), len = path.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - path[i][0], p[1] - path[i][1]), 0); RIDE = { P, Q, path, len, s: 0, rx: 0, rz: 0, rh: 0 }; rideBoat.visible = true; flying = false; SITTING_DOWN = false;
+  say(`You step into the boat at ${P.name}. The boatman pushes off for ${Q.name}. Look around: the river was London's main road.`, 10); }
+function rideStep(dt) { const R = RIDE; R.s += dt * 9; const [x, z, h, done] = routeAt(R.path, R.s); const sx = Math.sin(h), sz = Math.cos(h);
+  rideBoat.position.set(x, WATER - 0.35, z); rideBoat.rotation.set(0, h, 0); P_.x = x - sx * 1.0; P_.z = z - sz * 1.0; P_.y = WATER - 0.25; R.rx = x + sx * 1.3; R.rz = z + sz * 1.3; R.rh = h + Math.PI;
+  if (done) { RIDE = null; rideBoat.visible = false; P_.x = R.Q.land[0]; P_.z = R.Q.land[1]; P_.y = groundAt(P_.x, P_.z); say(`You step ashore at ${R.Q.name}.`, 6); } }
+// sitting at the tables in the palace hall
+function hallSeat() { const F = PAL.hall, dx = P_.x - F.x, dz = P_.z - F.z, lx = dx * F.c - dz * F.s, lz = dx * F.s + dz * F.c; return Math.abs(Math.abs(lx) - 4.7) < 1.4 && lz > -10 && lz < 8; }
+const FEAST_TXT = () => MARKET ? "You sit at a trestle table in the king's hall. Servants are about; there is bread and ale for the household." :
+  SIM > T.leave + 300 ? "You sit at the coronation feast: bread, roast pork and beef, game birds, salmon, cheeses, spiced dishes for the high table, ale and wine from Normandy. Harpers and gleemen sing. (What was served at William's feast is not recorded; this is what a great Late Saxon feast had.)" :
+  "You sit at a trestle table. The servants are laying the hall for the coronation feast.";
+// where you can do things: for the guide
+const TODO = [];
+if (MARKET) TODO.push(["The Shambles (butchers)", 51.5150, -0.0994], ["Cheapside stalls", 51.5143, -0.0952], ["Eastcheap", 51.5110, -0.0862], ["Fish at Billingsgate", 51.5099, -0.0834], ["Fish and salt at Queenhithe", 51.5109, -0.0950]);
+for (const P of PIERS) TODO.push(["A boat from " + P.name, P.land]); ALEHOUSES.forEach((H, i) => TODO.push(["An alehouse" + ["", " (Eastcheap)", " (Fleet Street)", " (Westminster)"][i], [H.dp[0] + Math.sin(H.dp[2]) * 2, H.dp[1] + Math.cos(H.dp[2]) * 2]]));
+TODO.push(["Sit in the king's hall", [PAL.seat(4.0, -2)[0], PAL.seat(4.0, -2)[2]]]);
+function goTodo(k) { const [n, a, b] = TODO[k]; let x, z; if (Array.isArray(a)) [x, z] = a; else { [x, z] = LL(a, b); const p = { x, z }; pushOut(p); x = p.x; z = p.z; } start(); teleport(x, z, x + 10, z + 3); say(`<b>${n}</b>`, 5); }
+function nearStall() { let best = null, bd = 2.6; for (const S of STALLS) { const d = Math.min(Math.hypot(S.front[0] - P_.x, S.front[1] - P_.z), Math.hypot(S.x - P_.x, S.z - P_.z) + 0.4); if (d < bd) { bd = d; best = S; } } return best; }
+function nearPier() { for (const P of PIERS) if (Math.hypot(P.land[0] - P_.x, P.land[1] - P_.z) < 6) return P; return null; }
+
+self.TODO_LIST = TODO; drawGuide();
 
 </script></body></html>
