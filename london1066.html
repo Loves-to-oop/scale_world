@@ -53265,6 +53265,7 @@ function poseOf(kind, t, ph, walkAmt = 1) { const c = t * 7 + ph, w = Math.sin(c
     case "hammer": { const q = (t * 1.6 + ph) % 1, up = q < 0.6 ? q / 0.6 : 1 - (q - 0.6) / 0.4; Object.assign(P, { lean: 0.22, lL: -0.1, lR: 0.12, kL: 0.15, kR: 0.1, aL: -0.55, eL: -0.9, aR: -0.5 - 1.9 * up, eR: -0.4 - 0.6 * up }); break; }
     case "talk": Object.assign(P, { aL: 0.05, eL: -0.25, aR: -0.35 - 0.3 * Math.max(0, Math.sin(t * 1.3 + ph)), eR: -1.0 - 0.3 * Math.sin(t * 2.1 + ph) }); break;
     case "ride": Object.assign(P, { drop: HIPY - 0.5, lL: -0.4, lR: -0.4, kL: 0.95, kR: 0.95, spr: 0.42, aL: -0.45, aR: -0.45, eL: -0.95, eR: -0.95, lean: 0.05 }); break;
+    case "spin": Object.assign(P, { aL: -0.55, eL: -1.55, aR: -0.35, eR: -0.75 - 0.25 * Math.sin(t * 3 + ph) }); break;   // distaff in the crook of the left arm, drawing out the thread
     case "bow": Object.assign(P, { lean: 0.38, aL: -0.15, aR: -0.15, eL: -0.3, eR: -0.3 }); break;
     case "sell": Object.assign(P, { lean: 0.1, aL: -0.45, eL: -0.8, aR: -0.5 - 0.25 * Math.sin(t * 2 + ph), eR: -0.9 }); break; }
   return P; }
@@ -53336,7 +53337,7 @@ const WALL_PTS = [[51.5081, -0.0759], [51.5110, -0.0752], [51.5135, -0.0770], [5
   [51.5168, -0.0970], [51.5162, -0.0988], [51.5155, -0.1003], [51.5147, -0.1018], [51.5139, -0.1026], [51.5128, -0.1031], [51.5114, -0.1034]];
 const WALL = line(WALL_PTS), CITY = poly([...WALL_PTS, [51.5100, -0.1034], [51.5103, -0.0960], [51.5100, -0.0880], [51.5094, -0.0800], [51.5087, -0.0760]]);
 const GATES = [["Ludgate", 51.5139, -0.1026], ["Newgate", 51.5155, -0.1003], ["Aldersgate", 51.5168, -0.0970], ["Cripplegate", 51.5178, -0.0935], ["Bishopsgate", 51.5163, -0.0815], ["Aldgate", 51.5135, -0.0770]].map(([n, a, b]) => { const [x, z] = LL(a, b); return { n, x, z }; });
-function baseH(x, z) { const s = THAMES.side(x, z), d = Math.abs(s); let h;
+function baseHL(x, z) { const s = THAMES.side(x, z), d = Math.abs(s); let h;
   if (s > 0) { h = 0.7 + 0.6 * fbm(x / 180, z / 180, 3); const up = sstepN(d, 900, 2600); const pond = fbm(x / 260 + 9, z / 260, 3); if (pond < 0.36) h = lerpN(h, -0.6, sstepN(0.36 - pond, 0, 0.05));   // the southern marshes, with pools and channels
     const [ex, ez] = LL(51.5045, -0.0905); h = Math.max(h, 2.2 - Math.hypot(x - ex, (z - ez) * 1.6) / 300);                                                            // the Southwark eyot at the bridgehead
     const [lx, lz] = LL(51.4950, -0.1195); h = Math.max(h, 2.0 - Math.hypot(x - lx, z - lz) / 200);
@@ -53352,6 +53353,22 @@ function baseH(x, z) { const s = THAMES.side(x, z), d = Math.abs(s); let h;
   carve(WALBROOK, 3, -0.4, 30); carve(TYB_N, 7, -1.2, 10); carve(TYB_S, 7, -1.2, 10); carve(TYB_W, 6, -1.0, 10);
   if (WALL.near(x, z, 30) && !CITY.inside(x, z)) { const wd = WALL.d(x, z); if (wd > 3 && wd < 18) h -= 2.4 * Math.sin((wd - 3) / 15 * Math.PI); }                     // the city ditch outside the wall
   return h; }
+// ---------- the lower Thames, from Limehouse to the sea ----------
+// Its course follows the river's real line past the Isle of Dogs, Greenwich, Woolwich, Erith, Dartford, Gravesend and Tilbury into the estuary.
+// It widens from about 350 m to kilometres; marshes line it (the Essex and Kent marshes, grazed by sheep), chalk and gravel hills rise behind.
+const LOWER = line([[51.5060, -0.0260], [51.5020, -0.0190], [51.4950, -0.0215], [51.4880, -0.0170], [51.4845, -0.0080], [51.4860, 0.0030], [51.4930, 0.0070], [51.5010, 0.0060], [51.5060, 0.0120], [51.5030, 0.0280], [51.4985, 0.0450],
+  [51.4960, 0.0650], [51.5000, 0.0850], [51.5080, 0.1050], [51.5050, 0.1300], [51.4950, 0.1550], [51.4840, 0.1760], [51.4790, 0.2050], [51.4790, 0.2350], [51.4700, 0.2550], [51.4580, 0.2750], [51.4560, 0.3000], [51.4650, 0.3250],
+  [51.4560, 0.3450], [51.4500, 0.3700], [51.4580, 0.4000], [51.4650, 0.4400], [51.4820, 0.4750], [51.4950, 0.5100], [51.5000, 0.5600], [51.4950, 0.6200], [51.4950, 0.7000], [51.4900, 0.8000], [51.4850, 0.9500]]);
+const LOWER_HILLS = [[...LL(51.4770, -0.0010), 30, 500], [...LL(51.4690, 0.0700), 105, 1300], [...LL(51.4820, 0.2380), 22, 700], [...LL(51.4380, 0.3700), 35, 1800], [...LL(51.4300, 0.2300), 45, 2500], [...LL(51.5550, 0.6000), 35, 2500]];
+function lowerInfo(x, z) { let best = 1e18, sg = 1, sAt = 0; for (let k = 0; k < LOWER.S.length; k++) { const [ax, az, bx, bz] = LOWER.S[k], dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz, t = clampN(((x - ax) * dx + (z - az) * dz) / l2, 0, 1), ex = x - (ax + t * dx), ez = z - (az + t * dz), d2 = ex * ex + ez * ez;
+  if (d2 < best) { best = d2; sg = Math.sign(dx * ez - dz * ex) || 1; sAt = LOWER.cum[k] + t * Math.sqrt(l2); } } return { d: Math.sqrt(best), side: sg, s: sAt }; }
+const lowerHW = s => 175 + clampN(s / 12000, 0, 1) * 90 + clampN((s - 12000) / 26000, 0, 1) * 260 + clampN((s - 38000) / 14000, 0, 1) * 1400 + clampN((s - 52000) / 14000, 0, 1) * 4500;   // the river's half-width, widening to the sea
+function baseHE(x, z) { const R = lowerInfo(x, z), hw = lowerHW(R.s), north = R.side < 0, mw = north ? 1700 : 1000;
+  let land = north ? 4 + 16 * fbm(x / 2600 + 3, z / 2600, 3) : 9 + 40 * fbm(x / 3000 + 9, z / 3000, 3); for (const [hx, hz, a, r] of LOWER_HILLS) land += a * Math.exp(-((x - hx) ** 2 + (z - hz) ** 2) / (r * r));
+  let marsh = 0.6 + 0.8 * fbm(x / 320, z / 320, 3); const pond = fbm(x / 280 + 17, z / 280, 3); if (pond < 0.37) marsh = lerpN(marsh, -0.5, sstepN(0.37 - pond, 0, 0.05));   // marsh with pools and creeks
+  let h = lerpN(marsh, land, sstepN(R.d, hw + mw * 0.5, hw + mw * 1.4)); if (R.d < hw + 40) h = lerpN(-4.5, h, sstepN(R.d, hw - 60, hw + 25)); return h; }
+function baseH(x, z) { if (x < 6200) return baseHL(x, z); const e = baseHE(x, z); if (x > 7200) return e; return lerpN(baseHL(x, z), e, (x - 6200) / 1000); }
+const riverSide = (x, z) => x < 6700 ? THAMES.side(x, z) : lowerInfo(x, z).side;
 const groundH = baseH;
 
 // ---------- streets of 1066 ----------
@@ -53462,7 +53479,7 @@ function updateGround(x, z, budget = 3) { const moved = [];
 function groundColor(x, z, h, c) {
   const n1 = fbm(x / 40, z / 40, 3), n2 = fbm(x / 600 + 5, z / 600, 3);
   c.setRGB(0.36 + 0.10 * n2, 0.37 + 0.08 * n1, 0.22 + 0.04 * n1);                                                           // winter pasture
-  if (h < 1.6 && THAMES.side(x, z) > 0) c.lerp(_c1.setRGB(0.48 + 0.08 * n1, 0.42 + 0.06 * n1, 0.28), 0.7);                    // dead reeds and sedge on the southern marsh
+  if (h < 1.6 && (x > 6700 || riverSide(x, z) > 0)) c.lerp(_c1.setRGB(0.48 + 0.08 * n1, 0.42 + 0.06 * n1, 0.28), 0.7);                    // dead reeds and sedge on the southern marsh
   if (h < WATER + 0.5) c.lerp(_c1.setRGB(0.30, 0.27, 0.22), clampN((WATER + 0.5 - h) * 1.5, 0, 0.9));                       // mud at the water's edge
   const v = rGet(x, z);
   if (v === 1) c.setRGB(0.52 + 0.07 * n1, 0.45 + 0.06 * n1, 0.34 + 0.03 * n1);                                                          // gravel streets, churned to mud
@@ -54362,7 +54379,7 @@ const PIERS = [["Westminster wharf", 51.4994, -0.1240, -1], ["Lambeth", 51.4958,
   while (baseH(px, pz) > 0.2 && k++ < 200) step(); const wx = px, wz = pz; for (let q = 0; q < 6; q++) step(); const [bx, bz] = [px, pz];
   let ax = wx, az = wz, j = 0; while (baseH(ax, az) < 0.6 && j++ < 40) { ax += (wx - bx) * 0.5; az += (wz - bz) * 0.5; }
   put("jetty", BOX_G, MAT.wood, (ax + bx) / 2, 0.5, (az + bz) / 2, 1.6, 0.25, Math.hypot(bx - ax, bz - az) + 2, Math.atan2(bx - ax, bz - az));
-  addBoat(bx, bz, Math.atan2(bx - ax, bz - az) + Math.PI / 2, 6, false);
+  { const ux = (bx - ax) / Math.hypot(bx - ax, bz - az), uz = (bz - az) / Math.hypot(bx - ax, bz - az); addBoat(bx - ux * 2 + uz * 2.6, bz - uz * 2 - ux * 2.6, Math.atan2(bx - ax, bz - az), 6, false); }   // the boatman's own boat, moored alongside the jetty
   mark("Boatman: " + name, ax, az, "typical", "A boatman waits to row passengers along or across the river: the Thames was London's main road (the bridge was the only crossing). Press E to hire him.", { y: 3, r: 6, range: 200 });
   return { name, land: [ax, az], boat: [bx, bz] }; });
 // a river route between two piers: out to midstream, along the centre line, in to the other pier
@@ -54410,7 +54427,26 @@ const VILLS = [
   ["Bermondsey", 51.4975, -0.0780, 6, true, "known", "Bermundesye in Domesday: the king's manor, with a 'new and handsome church' and fisheries; on an island of gravel in the marsh."],
   ["Rotherhithe", 51.5000, -0.0520, 4, false, "inferred", "Riverside farms and fishermen's houses on the marsh east of Bermondsey."],
   ["Camberwell", 51.4740, -0.0930, 5, true, "known", "Cambrewelle in Domesday, with a church: farms on the rising ground south of the marsh."],
-  ["Clapham", 51.4620, -0.1380, 4, false, "known", "Clopeham in Domesday: a small manor on the Surrey gravels."]].map(([name, lat, lon, n, church, tag, text]) => { const [x, z] = LL(lat, lon); return { name, x, z, n, church, tag, text, rot: hash(x | 0, z | 0) * Math.PI }; });
+  ["Clapham", 51.4620, -0.1380, 4, false, "known", "Clopeham in Domesday: a small manor on the Surrey gravels."],
+  // down the river
+  ["Deptford (West Greenwich)", 51.4795, -0.0245, 5, false, "known", "West Greenwich in Domesday, where the Ravensbourne meets the Thames; the 'deep ford' that later named it."],
+  ["Greenwich", 51.4810, -0.0060, 5, true, "known", "Here the Danish army camped with its fleet from 1011 to 1014, and here in 1012 they killed Ælfheah (St Alphege), archbishop of Canterbury, pelting him with bones at a feast when he refused to be ransomed. His church later stood on the spot."],
+  ["Woolwich", 51.4925, 0.0650, 4, false, "known", "Hulviz in Domesday: a small riverside settlement; the name means a trading place for wool."],
+  ["Barking Abbey", 51.5355, 0.0760, 6, true, "known", "Up the Roding: the great nunnery founded about 666 by Erkenwald for his sister Æthelburh, one of the richest in England. After the coronation William withdrew to Barking while fortifications were built in London, and there Earls Edwin and Morcar and other English leaders came to submit to him."],
+  ["Rainham", 51.5180, 0.1900, 3, false, "known", "Renaham in Domesday: farms on the Essex marsh edge."],
+  ["Erith", 51.4810, 0.1780, 5, true, "known", "Erhede in Domesday ('gravelly landing place'): a riverside manor with a church; a landing place for ships waiting on the tide."],
+  ["Dartford", 51.4460, 0.2160, 6, true, "known", "Tarentefort in Domesday, the ford of the Darent on Watling Street from London to Canterbury; mills on the river."],
+  ["Thurrock (Grays)", 51.4770, 0.3240, 4, false, "known", "Turruc in Domesday, on the Essex shore: the name may mean the bilge of a ship, for the hollow of the land."],
+  ["Northfleet", 51.4440, 0.3300, 5, true, "known", "Norfluet in Domesday: a large manor of the archbishop of Canterbury, with mills and a fishery."],
+  ["Gravesend", 51.4430, 0.3680, 4, false, "known", "Gravesham in Domesday: a small landing place, later the place where ships for London waited for the tide and pilots."],
+  ["East Tilbury", 51.4710, 0.4280, 4, true, "known", "Tilaburg, where St Cedd founded a church and community about 653 to convert the East Saxons (Bede)."],
+  ["Mucking", 51.4960, 0.4330, 2, false, "known", "On the gravel terrace above: the great excavated Anglo-Saxon settlement of the 5th-7th centuries, over 200 sunken-floored buildings and cemeteries; long abandoned by 1066, now farmland. A few farms."],
+  ["Cliffe", 51.4630, 0.4970, 4, true, "known", "Clive in Domesday, on the chalk above the Kent marshes; church councils (Clofesho) may have met near here in the 8th century."],
+  ["Canvey", 51.5150, 0.5800, 2, false, "known", "Marsh islands grazed by sheep: Essex flocks on the coastal marshes were famous, and cheese was made from their milk."],
+  ["Benfleet", 51.5470, 0.5600, 4, true, "known", "Here in 893 the English stormed the Viking leader Haesten's fortress and captured his ships, wives and children (the Anglo-Saxon Chronicle); burnt timbers and skeletons were found in the 19th century."],
+  ["Prittlewell", 51.5520, 0.7100, 5, true, "known", "Pritteuuella in Domesday. In 2003 a richly furnished 7th-century royal burial chamber was found here, perhaps of Sæxa, brother of King Sæberht of the East Saxons."],
+  ["Shoebury", 51.5300, 0.7900, 3, false, "known", "Where the Danes built a fortified camp in 894 (the Chronicle); the bank of their camp survived into modern times."],
+  ["Minster in Sheppey", 51.4220, 0.8100, 5, true, "known", "On the Isle of Sheppey, the nunnery founded about 670 by Queen Seaxburh; Viking fleets wintered on Sheppey in 855. Across the estuary's mouth, the sea."]].map(([name, lat, lon, n, church, tag, text]) => { const [x, z] = LL(lat, lon); return { name, x, z, n, church, tag, text, rot: hash(x | 0, z | 0) * Math.PI }; });
 // the Roman and old roads out of London, beyond the streets
 for (const [name, w, pts] of [["Oxford Street (the Roman road west)", 6, [[51.5172, -0.1150], [51.5163, -0.1300], [51.5150, -0.1450], [51.5133, -0.1590], [51.5110, -0.1800], [51.5080, -0.2000]]],
   ["Watling Street (Edgware Road)", 6, [[51.5133, -0.1590], [51.5250, -0.1750], [51.5400, -0.1930], [51.5500, -0.2050]]], ["Watling Street (Old Kent Road)", 6, [[51.4975, -0.0930], [51.4930, -0.0850], [51.4860, -0.0700], [51.4790, -0.0560], [51.4720, -0.0400]]],
@@ -54484,6 +54520,10 @@ const WOOD_G = mergeG([[new THREE.CylinderGeometry(0.15, 0.3, 5, 5), MT(0, 2.5, 
     const h = baseH(px, pz); if (h < 0.7) continue; const u = landUse(px, pz, h), p = u === 3 ? 0.55 : u === 4 ? 0.04 : u === 2 ? 0.02 : u === 5 ? 0.03 : u === 1 ? 0.006 : 0; if (!p || R() > p) continue;
     const key = Math.floor(px / 2000) + "," + Math.floor(pz / 2000); if (!tiles.has(key)) tiles.set(key, []); tiles.get(key).push([px, h - 0.3, pz, 0.7 + R() * 0.6]); n++; }
   for (const [, list] of tiles) { const im = new THREE.InstancedMesh(WOOD_G, woodM, list.length); list.forEach(([x, y, z, s], i) => { O3.position.set(x, y, z); O3.rotation.set(0, s * 9, 0); O3.scale.set(s, s, s); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); }); im.computeBoundingSphere(); scene.add(im); } }
+// trees round the villages down the river, beyond the generated countryside
+{ const R = seeded(907), list = []; for (const V of VILLS) { if (V.x < 8500) continue; for (let q = 0; q < 160; q++) { const a = R() * 6.283, r = 300 + R() * 1500, x = V.x + Math.cos(a) * r, z = V.z + Math.sin(a) * r, h = baseH(x, z); if (h < 1.2) continue; const u = landUse(x, z, h); if (u === 1 && R() < 0.85) continue; list.push([x, h - 0.3, z, 0.7 + R() * 0.6]); } }
+  const tiles = new Map(); for (const t of list) { const k = Math.floor(t[0] / 4000) + "," + Math.floor(t[2] / 4000); if (!tiles.has(k)) tiles.set(k, []); tiles.get(k).push(t); }
+  for (const [, L] of tiles) { const im = new THREE.InstancedMesh(WOOD_G, woodM, L.length); L.forEach(([x, y, z, s], i) => { O3.position.set(x, y, z); O3.rotation.set(0, s * 9, 0); O3.scale.set(s, s, s); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); }); im.computeBoundingSphere(); scene.add(im); } }
 // animals in the fields: sheep on the pastures, cattle on the meadows, pigs in the woods; on the market day a plough team of eight oxen
 const COW_G = mergeG([[new THREE.CapsuleGeometry(0.38, 0.95, 4, 10).rotateX(Math.PI / 2), MT(0, 0.98, 0, 0.92, 1, 1)], [new THREE.CylinderGeometry(0.16, 0.22, 0.45, 8).rotateX(-1.0), MT(0, 1.05, 0.72)], [new THREE.CapsuleGeometry(0.15, 0.25, 3, 8).rotateX(Math.PI / 2 + 0.5), MT(0, 0.92, 1.0)],   // body, neck, head
   ...[[0.2, 0.5], [-0.2, 0.5], [0.2, -0.5], [-0.2, -0.5]].map(([x, z]) => [new THREE.CylinderGeometry(0.095, 0.075, 0.7, 7), MT(x, 0.35, z)]),
@@ -54500,11 +54540,12 @@ const PLOUGHS = FARM_SPOTS.filter(f => f.plough).map(f => f.plough), ploughIM = 
 const fieldIM = {}; for (const [sp, geo, col] of [["cow", COW_G, 0x6a4a34], ["ox", COW_G, 0x8a6a4a], ["sheep", SHEEP_G, 0xc8bca4], ["pig", PIG_G, 0x4e4038]]) { const n = FIELD_BEASTS.filter(b => b.sp === sp).length; if (!n) continue; const im = new THREE.InstancedMesh(geo, M(col, { vertexColors: geo.attributes.color ? true : false }), n); im.frustumCulled = false; scene.add(im); fieldIM[sp] = im; }
 const ploughAt = (P, t) => { const L = 180, s = (t * 0.6) % (2 * L), back = s > L, u = back ? 2 * L - s : s, lane = Math.floor(t * 0.6 / (2 * L)) % 6, dx = Math.cos(P.a) * (back ? -1 : 1), dz = Math.sin(P.a) * (back ? -1 : 1);   // up and down the furlong, a furrow over each turn
   return [P.cx + Math.cos(P.a) * (u - L / 2) - Math.sin(P.a) * lane * 4, P.cz + Math.sin(P.a) * (u - L / 2) + Math.cos(P.a) * lane * 4, Math.atan2(dx, dz)]; };
-function countryStep(t) { const cnt = {}; for (const B of FIELD_BEASTS) { const im = fieldIM[B.sp], i = cnt[B.sp] = (cnt[B.sp] ?? -1) + 1;
+function countryStep(t) { const cnt = {}; for (const k in fieldIM) cnt[k] = 0; for (const B of FIELD_BEASTS) { const im = fieldIM[B.sp];
     if (B.team) { const [x, z, h] = ploughAt(B.team, SIM), fx = Math.sin(h), fz = Math.cos(h), row = Math.floor(B.team.k / 2), side = B.team.k % 2 ? 0.7 : -0.7; B.x = x + fx * (3 + row * 2.4) + fz * side; B.z = z + fz * (3 + row * 2.4) - fx * side; B.h = h; }   // four yoke-pairs ahead of the plough
     else { const a = t * 0.02 + B.ph; B.x = B.cx + Math.cos(a) * 6 + Math.sin(a * 0.37) * 4; B.z = B.cz + Math.sin(a * 1.1) * 6; B.h = a + Math.PI / 2 + Math.sin(t * 0.3 + B.ph); }
-    if (Math.abs(B.x - P_.x) > 500 || Math.abs(B.z - P_.z) > 500) { im.setMatrixAt(i, ZEROM); continue; }
-    O3.position.set(B.x, groundH(B.x, B.z), B.z); O3.rotation.set(0, B.h, 0); O3.scale.set(1, 1, 1); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); }
+    if (Math.abs(B.x - P_.x) > 500 || Math.abs(B.z - P_.z) > 500) continue;   // only the animals near you are drawn
+    O3.position.set(B.x, groundH(B.x, B.z), B.z); O3.rotation.set(0, B.h, 0); O3.scale.set(1, 1, 1); O3.updateMatrix(); im.setMatrixAt(cnt[B.sp]++, O3.matrix); }
+  for (const k in fieldIM) fieldIM[k].count = cnt[k];
   PLOUGHS.forEach((P, i) => { const [x, z, h] = ploughAt(P, SIM), fx = Math.sin(h), fz = Math.cos(h); O3.position.set(x + fx * 1.2, groundH(x, z), z + fz * 1.2); O3.rotation.set(0, h, 0); O3.updateMatrix(); ploughIM.setMatrixAt(i, O3.matrix);
     for (let r = 0; r < 4; r++) { const d = 3 + r * 2.4; O3.position.set(x + fx * d, groundH(x + fx * d, z + fz * d), z + fz * d); O3.updateMatrix(); yokeIM.setMatrixAt(i * 4 + r, O3.matrix); } });
   ploughIM.instanceMatrix.needsUpdate = yokeIM.instanceMatrix.needsUpdate = true;
@@ -54523,23 +54564,24 @@ const CREW_G = mergeG([[new THREE.CylinderGeometry(0.14, 0.2, 0.55, 7), MT(0, 0.
 const SAIL_G = (() => { const g = new THREE.PlaneGeometry(1, 1, 4, 4), p = g.attributes.position; for (let i = 0; i < p.count; i++) p.setZ(i, 0.12 * (1 - Math.pow(p.getX(i) * 2, 2)) * (0.5 - p.getY(i))); g.computeVertexNormals(); return g; })();   // bellied by the wind
 const BRIDGE_S = (() => { let best = 0, bd = 1e9; for (let s = 0; s < THAMES.L; s += 10) { const [x, z] = THAMES.at(s), d = Math.hypot(x - BRIDGE.P[0][0], z - BRIDGE.P[0][1]); if (d < bd) { bd = d; best = s; } } return best; })();
 const RIVER_BOATS = [];
-{ const R = seeded(707), n = MARKET ? 30 : 9;
+{ const R = seeded(707), n = MARKET ? 42 : 14;
   for (let k = 0; k < n; k++) { const r = R(), type = r < 0.28 ? "ship" : r < 0.6 ? "barge" : r < 0.88 ? "rowboat" : "fisher";
     const s0 = type === "ship" ? BRIDGE_S + 120 : 300, s1 = type === "ship" ? THAMES.L - 200 : THAMES.L - 300;   // ships stay below the bridge
     const len = type === "ship" ? 15 + R() * 6 : type === "barge" ? 11 + R() * 4 : type === "rowboat" ? 5.5 + R() * 1.5 : 6, speed = type === "ship" ? 1.4 : type === "barge" ? 0.9 : type === "rowboat" ? 1.8 : 0.15;
     if (type === "ship" && k % 4 === 1) { RIVER_BOATS.push({ type, len, speed: 1.1, s0: BRIDGE_S - 640, s1: THAMES.L - 300, s: BRIDGE_S - 300 + R() * 900, dir: R() < 0.5 ? 1 : -1, lane: (R() - 0.5) * 120, ph: R() * 10, crew: 8, cargo: null, sail: sailM, through: true }); continue; }   // ships that lower their masts to pass the bridge
+    if (k % 3 === 2) { RIVER_BOATS.push({ type, len, speed: speed * (0.8 + R() * 0.4), s0: 300, s1: LOWER.L - 2000, s: 300 + R() * (LOWER.L - 2300), dir: R() < 0.5 ? 1 : -1, lane: (R() - 0.5) * 300, ph: R() * 10, crew: type === "ship" ? 6 : 2, cargo: type === "barge" ? "grain" : null, sail: sailM, lower: true }); continue; }   // traffic on the lower river
     RIVER_BOATS.push({ type, len, speed: speed * (0.8 + R() * 0.4), s0, s1, s: s0 + R() * (s1 - s0), dir: R() < 0.5 ? 1 : -1, lane: (R() - 0.5) * 220, ph: R() * 10, crew: type === "ship" ? 6 : type === "barge" ? 3 : type === "rowboat" ? 2 : 2, cargo: type === "barge" ? ["stone", "grain", "wood", "barrels"][(R() * 4) | 0] : null, sail: type === "ship" && R() < 0.6 ? sailM : sailPlainM }); } }
 const RB = { hull: new THREE.InstancedMesh(BOAT_G, MAT.tar, RIVER_BOATS.length), crew: new THREE.InstancedMesh(CREW_G, M(0x6a5444, { vertexColors: true }), RIVER_BOATS.reduce((a, b) => a + b.crew, 0)), oar: new THREE.InstancedMesh(BOX_G, MAT.wood, RIVER_BOATS.reduce((a, b) => a + b.crew * 2, 0)),
-  mast: new THREE.InstancedMesh(CYL_G, MAT.wood, RIVER_BOATS.length), sailS: new THREE.InstancedMesh(SAIL_G, sailM, RIVER_BOATS.length), sailP: new THREE.InstancedMesh(SAIL_G, sailPlainM, RIVER_BOATS.length), cargo: new THREE.InstancedMesh(BOX_G, M(0x8a7a62), RIVER_BOATS.length * 4), post: new THREE.InstancedMesh(BOX_G, MAT.tar, RIVER_BOATS.length * 2) };
+  mast: new THREE.InstancedMesh(CYL_G, MAT.wood, RIVER_BOATS.length), sailS: new THREE.InstancedMesh(SAIL_G, sailM, RIVER_BOATS.length), sailP: new THREE.InstancedMesh(SAIL_G, sailPlainM, RIVER_BOATS.length), cargo: new THREE.InstancedMesh(BOX_G, M(0x8a7a62), RIVER_BOATS.length * 4), post: new THREE.InstancedMesh(BOX_G, MAT.tar, RIVER_BOATS.length * 2), floor: new THREE.InstancedMesh(BOX_G, MAT.wood, RIVER_BOATS.length) };
 for (const k in RB) { RB[k].frustumCulled = false; RB[k].instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(RB[k]); }
 const _bm = new THREE.Matrix4(), _bq = new THREE.Quaternion(), _bv = V3(0, 0, 0), _bs = V3(1, 1, 1), _be = new THREE.Euler();
 const local = (x, y, z, h, lx, ly, lz) => [x + Math.cos(h) * lx + Math.sin(h) * lz, y + ly, z - Math.sin(h) * lx + Math.cos(h) * lz];
 function setI(im, i, x, y, z, h, sx, sy, sz, rx = 0, rz = 0) { _be.set(rx, h, rz, "YXZ"); _bq.setFromEuler(_be); _bm.compose(_bv.set(x, y, z), _bq, _bs.set(sx, sy, sz)); im.setMatrixAt(i, _bm); }
 function boatsStep(t, dt) { let ci = 0, oi = 0, gi = 0, si = 0, pi = 0, pj = 0;
   RIVER_BOATS.forEach((B, i) => { if (B.type !== "fisher") { B.s += B.dir * B.speed * dt; if (B.s > B.s1 || B.s < B.s0) { B.dir *= -1; B.s = clampN(B.s, B.s0, B.s1); } } else B.s += Math.sin(t * 0.05 + B.ph) * 0.05 * dt;
-    const [cx, cz, a] = THAMES.at(B.s), nx = Math.cos(a), nz = -Math.sin(a), x = cx + nx * B.lane, z = cz + nz * B.lane, h = a + (B.dir < 0 ? Math.PI : 0), bob = Math.sin(t * 1.3 + B.ph) * 0.05, far = Math.abs(x - P_.x) > 1600 || Math.abs(z - P_.z) > 1600;
+    const [cx, cz, a] = (B.lower ? LOWER : THAMES).at(B.s), nx = Math.cos(a), nz = -Math.sin(a), x = cx + nx * B.lane, z = cz + nz * B.lane, h = a + (B.dir < 0 ? Math.PI : 0), bob = Math.sin(t * 1.3 + B.ph) * 0.05, far = Math.abs(x - P_.x) > 1600 || Math.abs(z - P_.z) > 1600;
     const sc = far ? 0 : 1, beam = B.len * (B.type === "ship" ? 0.24 : B.type === "barge" ? 0.33 : 0.3), depth = B.type === "ship" ? 1.7 : 0.8, y = WATER - depth * 0.55 + bob;
-    setI(RB.hull, i, x, y, z, h, beam * sc, depth * sc, B.len * sc, Math.sin(t * 0.9 + B.ph) * 0.02, Math.sin(t * 0.7 + B.ph) * 0.03);
+    setI(RB.hull, i, x, y, z, h, beam * sc, depth * sc, B.len * sc, Math.sin(t * 0.9 + B.ph) * 0.02, Math.sin(t * 0.7 + B.ph) * 0.03); setI(RB.floor, i, x, WATER + 0.03 + bob, z, h, beam * 0.72 * sc, 0.05 * sc, B.len * 0.78 * sc);   // bottom boards, over the water
     for (const e of [-1, 1]) { const [px, py, pz] = local(x, y, z, h, 0, depth * 0.9, e * B.len * 0.48); setI(RB.post, pi++, px, py, pz, h, 0.18 * sc, (B.type === "ship" ? 1.4 : 0.6) * sc, 0.25 * sc, -e * 0.4); }   // stem and stern posts
     const struck = B.through && Math.abs(B.s - BRIDGE_S) < 110, sailing = B.type === "ship" && !struck;
     if (struck) { const [mx, , mz] = local(x, y, z, h, 0, 0, -B.len * 0.1); setI(RB.mast, i, mx, y + depth * 0.95, mz, h, 0.25 * sc, B.len * 0.6 * sc, 0.25 * sc, Math.PI / 2); setI(RB.sailS, i, 0, -999, 0, 0, 0, 0, 0); setI(RB.sailP, i, 0, -999, 0, 0, 0, 0, 0); }   // mast lowered onto its crutch
@@ -54596,6 +54638,74 @@ function vehStep(t, dt) { const counts = { horse: 0, ox: 0, cart: 0, wheel: 0, p
   for (const k in VIM) VIM[k].instanceMatrix.needsUpdate = true; }
 // where the driver walks (beside the beasts' heads) or the rider sits
 function driverAt(V) { const fx = Math.sin(V.h), fz = Math.cos(V.h); if (V.type === "rider") return [V.x + fx * 0.25, V.z + fz * 0.25, V.h, "ride"]; const d = V.type === "oxcart" ? 4.2 : V.type === "horsecart" ? 3.4 : 1.4; return [V.x + fx * d - fz * 0.9, V.z + fz * d + fx * 0.9, V.h, "walk"]; }
+
+// ---------- daily work: what Londoners were doing ----------
+// Water was fetched from wells in the yards (timber-lined wells are common finds behind Late Saxon houses) or from the Thames and the
+// Walbrook, carried in wooden pails on a shoulder-yoke; firewood was carried in on the back; women spun whenever their hands were free;
+// children played in the streets. On working days the crafts were done at the house door for the light: smiths, carpenters, coopers,
+// shoemakers, wheelwrights, weavers, bakers; on the shore, boatbuilders and fishermen mending nets; porters carried goods up from the
+// hithes. Christmas Day was a holy day: the work stops, but water, fire and food do not.
+const WELLS = (KIT.well?.list || []).map(([x, , z]) => [x, z]);
+const PROP_G = { yoke: mergeG([[new THREE.BoxGeometry(1.25, 0.05, 0.06), MT(0, 1.47, -0.02)], [new THREE.CylinderGeometry(0.14, 0.12, 0.32, 9), MT(0.6, 0.72, 0)], [new THREE.CylinderGeometry(0.14, 0.12, 0.32, 9), MT(-0.6, 0.72, 0)], [new THREE.CylinderGeometry(0.006, 0.006, 0.6, 3), MT(0.6, 1.17, 0)], [new THREE.CylinderGeometry(0.006, 0.006, 0.6, 3), MT(-0.6, 1.17, 0)]]),   // a shoulder-yoke with two pails
+  faggot: mergeG(Array.from({ length: 9 }, (_, k) => [new THREE.CylinderGeometry(0.035, 0.035, 1.2, 4), MT((k % 3 - 1) * 0.08, 1.15 + Math.floor(k / 3) * 0.07, -0.2, 1, 1, 1, 0.2, 0.15 * (k % 3 - 1))])),   // a bundle of firewood on the back
+  distaff: mergeG([[new THREE.CylinderGeometry(0.012, 0.012, 0.75, 4), MT(0.2, 1.25, 0.12, 1, 1, 1, 0.25, -0.3)], [new THREE.SphereGeometry(0.07, 6, 4), MT(0.3, 1.58, 0.2, 1, 1.6, 1)], [new THREE.CylinderGeometry(0.008, 0.008, 0.25, 3), MT(-0.12, 0.85, 0.2)], [new THREE.CylinderGeometry(0.035, 0.035, 0.03, 8), MT(-0.12, 0.74, 0.2)]]),   // distaff with wool, spindle and whorl
+  basket: mergeG([[new THREE.CylinderGeometry(0.22, 0.17, 0.28, 10, 1, true), MT(0.3, 0.98, 0.05)], [new THREE.CylinderGeometry(0.17, 0.17, 0.02, 10), MT(0.3, 0.85, 0.05)]]),
+  sack: mergeG([[new THREE.SphereGeometry(0.26, 7, 5), MT(0.12, 1.55, -0.05, 1.5, 0.8, 0.9)]]) };
+const NC_PROPS = IS_HEADSET ? 640 : 860;   // one slot per person (as the crowd)
+const PROP_COL = { yoke: 0x6a5238, faggot: 0x5a4632, distaff: 0xd8ccb0, basket: 0x8a7452, sack: 0xb8a888 };
+const PROPS = {}; for (const k in PROP_G) { const im = new THREE.InstancedMesh(PROP_G[k], M(PROP_COL[k], { vertexColors: true }), NC_PROPS); im.frustumCulled = false; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.count = 0; scene.add(im);
+  PROPS[k] = { im, slot: new Int32Array(NC_PROPS).fill(-1), who: new Int32Array(NC_PROPS), n: 0 }; }   // packed: only the props being carried are drawn
+const _pm = new THREE.Matrix4();
+function propSet(A, y) { const P = PROPS[A.prop]; if (!P) return; if (P.slot[A.i] < 0) { P.slot[A.i] = P.n; P.who[P.n] = A.i; P.n++; P.im.count = P.n; }
+  O3.position.set(A.x, y, A.z); O3.rotation.set(0, A.h, 0); const s = A.L.s; O3.scale.set(s, s, s); O3.updateMatrix(); P.im.setMatrixAt(P.slot[A.i], O3.matrix); P.im.instanceMatrix.needsUpdate = true; }
+function propHide(A) { const P = PROPS[A.prop]; if (!P) return; const s = P.slot[A.i]; if (s < 0) return; const last = --P.n, j = P.who[last];
+  if (s !== last) { P.im.getMatrixAt(last, _pm); P.im.setMatrixAt(s, _pm); P.slot[j] = s; P.who[s] = j; } P.slot[A.i] = -1; P.im.count = P.n; P.im.instanceMatrix.needsUpdate = true; }
+// household tasks for the people in the streets near you
+function nearestWell(x, z) { let best = null, bd = 140; for (const W of WELLS) { const d = Math.hypot(W[0] - x, W[1] - z); if (d < bd) { bd = d; best = W; } } return best; }
+function placeTask(A, px, pz) { const R = Math.random, r = R(), role = A.L.role;
+  if (role === "child" && r < 0.6) { const S = STREETS[(R() * STREETS.length) | 0], [x, z] = S.L.at(R() * S.L.L); if (Math.hypot(x - px, z - pz) > 300 || baseH(x, z) < 0.5) return false; A.mode = "play"; A.c = [x, z]; A.ph = R() * 6; A.prop = null; return true; }   // children chasing each other round
+  const H = HOUSES[(R() * HOUSES.length) | 0]; if (!H.dp || H.burnt || H.kind !== "house" || Math.hypot(H.dp[0] - px, H.dp[1] - pz) > 300) return false;
+  const door = [H.dp[0] + Math.sin(H.dp[2]) * 1.2, H.dp[1] + Math.cos(H.dp[2]) * 1.2];
+  if (r < 0.4) { const W = nearestWell(door[0], door[1]); if (!W) return false; A.mode = "loop"; A.path = [door, [W[0] + 1, W[1] + 1]]; A.prop = "yoke"; A.pause = "sell"; A.task = "water"; }   // fetching water
+  else if (r < 0.55 && role === "woman") { A.mode = "fixed"; A.x = door[0] + (R() - 0.5); A.z = door[1] + (R() - 0.5); A.h = H.dp[2] + (R() - 0.5); A.kind = "spin"; A.prop = "distaff"; A.task = "spin"; }   // spinning at the door
+  else if (r < 0.75) { const S = STREETS[(R() * STREETS.length) | 0], [sx, sz] = S.L.at(R() * S.L.L); if (Math.hypot(sx - door[0], sz - door[1]) > 160) return false; A.mode = "loop"; A.path = [[sx, sz], door]; A.prop = role === "woman" ? "basket" : "faggot"; A.pause = "stand"; A.task = "carry"; }   // bringing in firewood, or home from errands
+  else return false;
+  A.v = 0.9 + R() * 0.4; A.u = R() * 60; return true; }
+function taskStep(A, dt, rate, t) { if (A.mode === "play") { A.ph += dt * rate * 1.6; A.x = A.c[0] + Math.cos(A.ph) * 3 + Math.cos(A.ph * 2.3) * 1.2; A.z = A.c[1] + Math.sin(A.ph) * 3; A.h = A.ph + Math.PI; A.kind = "walk"; A.walk = 2; return; }
+  if (A.mode === "fixed") return;
+  const P = A.path, L = Math.hypot(P[1][0] - P[0][0], P[1][1] - P[0][1]), cyc = 2 * L / A.v + 30; A.u = (A.u + dt * rate) % cyc; const u = A.u;   // there and back, with a pause at each end (drawing water; at the door)
+  if (u < L / A.v) { const f = u * A.v / L; A.x = P[0][0] + (P[1][0] - P[0][0]) * f; A.z = P[0][1] + (P[1][1] - P[0][1]) * f; A.h = Math.atan2(P[1][0] - P[0][0], P[1][1] - P[0][1]); A.kind = "walk"; A.walk = 1; }
+  else if (u < L / A.v + 15) { A.x = P[1][0]; A.z = P[1][1]; A.kind = A.pause; A.walk = 0; }
+  else if (u < 2 * L / A.v + 15) { const f = 1 - (u - L / A.v - 15) * A.v / L; A.x = P[0][0] + (P[1][0] - P[0][0]) * f; A.z = P[0][1] + (P[1][1] - P[0][1]) * f; A.h = Math.atan2(P[0][0] - P[1][0], P[0][1] - P[1][1]); A.kind = "walk"; A.walk = 1; }
+  else { A.x = P[0][0]; A.z = P[0][1]; A.kind = "stand"; A.walk = 0; } }
+// workshops at house doors: props, and on working days the craftsman at work
+const WORKSHOPS = [];
+{ const R = seeded(1066), kinds = ["smith", "smith", "carpenter", "carpenter", "cooper", "shoemaker", "shoemaker", "wheelwright", "weaver", "weaver", "baker", "comb"], used = new Set();
+  const cand = HOUSES.filter(H => H.dp && !H.burnt && H.kind === "house" && !H.ale && !H.home && CITY.inside(H.x, H.z));
+  for (let k = 0; k < 30 && cand.length; k++) { const H = cand[(R() * cand.length) | 0]; if (used.has(H)) continue; used.add(H); const kind = kinds[k % kinds.length], a = H.dp[2], fx = Math.sin(a), fz = Math.cos(a), sx = Math.cos(a), sz = -Math.sin(a);
+    const at = (u, v) => [H.dp[0] + fx * v + sx * u, H.dp[1] + fz * v + sz * u], P = (key, geo, mat, u, v, y, w, h, d, ry = 0) => { const [x, z] = at(u, v); put("ws:" + key, geo, mat, x, groundH(x, z) + y, z, w, h, d, a + ry); };
+    let worker = null;
+    if (kind === "smith") { P("stump", CYL_G, MAT.wood, 0, 2.2, 0, 0.5, 0.55, 0.5); P("anvil", BOX_G, MAT.iron, 0, 2.2, 0.55, 0.25, 0.25, 0.6); P("forge", BOX_G, MAT.rag, 1.6, 2.4, 0, 1.0, 0.8, 1.0); P("coals", BOX_G, M(0xff6a20, { emissive: 0xff4a10, emissiveIntensity: 0.8 }), 1.6, 2.4, 0.8, 0.6, 0.06, 0.6); P("tub", CYL_G, MAT.wood, -1.0, 2.0, 0, 0.6, 0.5, 0.6); worker = [0, 1.5, "hammer"]; }
+    else if (kind === "carpenter") { for (const u of [-1.2, 1.2]) P("trestle", BOX_G, MAT.wood, u, 2.4, 0, 0.12, 0.7, 0.7); P("beam", BOX_G, MAT.wood, 0, 2.4, 0.7, 3.4, 0.3, 0.3); worker = [0.4, 1.8, "hammer"]; }
+    else if (kind === "cooper") { for (let q = 0; q < 3; q++) P("barrel", CYL_G, MAT.wood, -1.2 + q * 0.7, 2.6, 0, 0.6, 0.85, 0.6); P("hoop", new THREE.TorusGeometry(0.35, 0.03, 4, 14).rotateX(Math.PI / 2), MAT.iron, 0.9, 2.1, 0.6, 1, 1, 1); worker = [0.9, 1.5, "hammer"]; }
+    else if (kind === "shoemaker") { P("bench", BOX_G, MAT.wood, 0, 1.6, 0, 1.6, 0.42, 0.45); for (let q = 0; q < 4; q++) P("shoe", BOX_G, M(0x5a3a22), -0.6 + q * 0.3, 1.6, 0.44, 0.09, 0.07, 0.24); worker = [0.4, 1.6, "sell", true]; }
+    else if (kind === "wheelwright") { P("wheel", WHEEL2_G, MAT.wood, -1.0, 2.0, 0.55, 1, 1, 1, Math.PI / 2); P("hub", CYL_G, MAT.wood, 0.8, 2.0, 0, 0.35, 0.5, 0.35); worker = [0.3, 1.5, "hammer"]; }
+    else if (kind === "weaver") { for (const u of [-0.8, 0.8]) P("loompost", BOX_G, MAT.wood, u, 1.0, 0, 0.1, 2.0, 0.1); P("loombeam", BOX_G, MAT.wood, 0, 1.0, 1.9, 1.8, 0.1, 0.1); P("cloth", BOX_G, M([0x8a2a2a, 0x3a5a7a, 0x9a8a5a][k % 3]), 0, 1.02, 0.4, 1.4, 1.45, 0.02); worker = [0, 1.7, "sell", false, "woman"]; }   // a two-beam upright loom by the door
+    else if (kind === "baker") { P("oven", new THREE.SphereGeometry(0.9, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), M(0x8a6a4a), 1.2, 2.6, 0, 1, 1, 1); P("table", BOX_G, MAT.wood, -0.8, 2.2, 0.75, 1.2, 0.05, 0.6); for (let q = 0; q < 5; q++) P("loaf", new THREE.SphereGeometry(0.12, 8, 5).scale(1, 0.55, 1.2), M(0xb07a3a), -1.2 + q * 0.2, 2.2, 0.82, 1, 1, 1); worker = [-0.8, 1.5, "sell", false, "woman"]; }
+    else if (kind === "comb") { P("bench", BOX_G, MAT.wood, 0, 1.6, 0, 1.4, 0.42, 0.45); for (let q = 0; q < 5; q++) P("antler", CYL_G, M(0xc8b898), -0.5 + q * 0.25, 1.6, 0.44, 0.04, 0.3, 0.04, q); worker = [0.3, 1.6, "sell", true]; }
+    WORKSHOPS.push({ kind, H, at, worker }); } }
+// on the shore: boatbuilders at a hull on the stocks, fishermen mending nets; porters carrying up from the hithes; a thatcher on a roof
+const SHORE_WORK = [];
+{ const R = seeded(77); for (const [lat, lon] of [[51.5112, -0.0975], [51.5098, -0.0812]]) { let [x, z] = LL(lat, lon), k = 0; while (baseH(x, z) > 0.4 && k++ < 120) z += 1.5; z -= 8;
+    put("ws:stocks", BOX_G, MAT.wood, x, groundH(x, z), z, 0.4, 0.5, 6, 0); put("ws:hull", BOAT_G, MAT.wood, x, groundH(x, z) + 0.5, z, 1.9, 0.75, 8, Math.PI / 2 * 0); for (const r of [-0.5, 0.5]) put("ws:rib", BOX_G, MAT.wood, x + r * 2.5, groundH(x, z) + 0.6, z, 0.08, 1.0, 0.1);
+    SHORE_WORK.push({ x: x + 1.6, z: z - 1, h: -Math.PI / 2, kind: "hammer" }, { x: x - 1.6, z: z + 1.5, h: Math.PI / 2, kind: "hammer" });
+    const nx = x + 14; for (const dz of [-2, 2]) put("ws:netpole", CYL_G, MAT.wood, nx, groundH(nx, z + dz), z + dz, 0.08, 1.8, 0.08); put("ws:net", BOX_G, MAT.wattle, nx, groundH(nx, z) + 0.4, z, 0.02, 1.3, 4); SHORE_WORK.push({ x: nx + 0.8, z, h: -Math.PI / 2, kind: "sell", sit: true }); }
+  mark("Boatbuilders", ...LL(51.5106, -0.0975), "typical", "On the foreshore, a clinker-built boat on the stocks: overlapping oak planks fastened with iron rivets over washers, the frames put in after the planking, as in the Viking-age boats found on the London waterfront. Nearby, fishermen mend their nets.", { y: 3, r: 15, range: 300 }); }
+const THATCH_H = HOUSES.find(H => H.roof === "thatch" && H.dp && !H.burnt && CITY.inside(H.x, H.z) && H.kind === "house" && !H.home && !H.ale && Math.hypot(H.x - 2200, H.z + 1430) < 400);
+if (THATCH_H) { const a = THATCH_H.ry, c = Math.cos(a), s = Math.sin(a), lx = THATCH_H.x + c * (THATCH_H.w / 2 + 0.6), lz = THATCH_H.z - s * (THATCH_H.w / 2 + 0.6); put("ws:ladder", BOX_G, MAT.wood, lx, THATCH_H.gy, lz, 0.5, THATCH_H.wh + THATCH_H.rh * 0.6, 0.08, a + Math.PI / 2, -0.3); }
+if (MARKET) { const w = WORKSHOPS[0]; if (w) mark("A smithy", ...w.at(0, 2.2), "typical", "Smiths worked at the door: a charcoal forge blown by bellows, an anvil on a tree stump, a tub to quench the iron. Smithing slag and hammerscale are found all over Late Saxon London; iron came from the Weald. Knives, nails, keys, horseshoes, tools.", { y: 3, r: 6, range: 150 });
+  const wv = WORKSHOPS.find(q => q.kind === "weaver"); if (wv) mark("A weaver", ...wv.at(0, 1.0), "typical", "Weaving on a two-beam upright loom, by the door for the light: by the 11th century this had largely replaced the old warp-weighted loom in towns. Cloth was woven at home by women, then fulled and dyed.", { y: 3, r: 5, range: 120 }); }
+mark("Fetching water", ...(WELLS[0] || [0, 0]), "typical", "Water came from wells in the yards (timber-lined shafts are common finds behind Late Saxon houses), or from the Thames and the Walbrook, carried home in wooden pails on a shoulder-yoke, several times a day. Most of what people drank was ale.", { y: 2.5, r: 6, range: 120 });
 
 // ---------- the day's clock ----------
 // The hour of the coronation is not recorded. Mass on a great feast was in the morning; here the procession sets out at 10:00 and
@@ -54679,12 +54789,18 @@ FIRE_H.forEach((H, k) => { H.ignite = T.fire + k * 45; H.state = 0; const G = GU
 // the stallholders, and a boatman for hire
 for (const S of STALLS) { const [x, z, h] = S.seller; S.agent = agent(S.kind === "butcher" || S.kind === "iron" ? "eng" : hash(x | 0, z | 0) < 0.45 ? "woman" : "eng", { fixed: [x, z, h], kind: S.kind === "butcher" ? "hammer" : "sell", seller: true }); }
 const ROWER = agent("eng", { rower: true });
+// craftsmen at their doors, boatbuilders and net-menders on the shore, porters up from the hithe, a thatcher on a roof: on working days
+if (MARKET) { for (const W of WORKSHOPS) { if (!W.worker) continue; const [u, v, kind, sit, role] = W.worker, [x, z] = W.at(u, v); agent(role || "eng", { fixed: [x, z, W.H.dp[2]], kind: sit ? "sit" : kind, farm: true }); }
+  for (const S of SHORE_WORK) agent("eng", { fixed: [S.x, S.z, S.h], kind: S.sit ? "sit" : S.kind, farm: true });
+  const P = PIERS.find(p => p.name === "Queenhithe"), [qx, qz] = LL(51.5112, -0.0948); if (P) for (let k = 0; k < 4; k++) agent("eng", { loop: [[P.land[0] + k, P.land[1]], [qx + k * 2, qz - 4]], phase: k * 17, speed: 0.9, prop: "sack", farm: true });
+  if (THATCH_H) agent("eng", { fixed: [THATCH_H.x, THATCH_H.z, THATCH_H.ry + Math.PI / 2], kind: "hammer", yOff: THATCH_H.wh + THATCH_H.rh * 0.5, farm: true }); }
 for (const V of VEH) agent(V.type === "rider" ? (V.nr === 1 ? "noble" : "soldier") : "eng", { veh: V });   // carters walking at their beasts' heads; riders: Norman knights, or an English thegn
 if (MARKET) for (const [x, z, h] of [[-68, -27, 0], [-73, 29, Math.PI], [-63, 31, Math.PI], [-102, 4.5, Math.PI / 2], [-106, 2.5, -Math.PI / 2], [-50, 10, -Math.PI / 2]]) agent("eng", { fixed: [x, z, h], kind: "hammer", farm: true });   // masons dressing stone, sawyers at the sawpit
 // farm folk at their winter work: threshing with flails in the barn doorways, in the yards, herding, and the ploughman behind his team
 for (const F of [...FARM_SPOTS.filter(f => f.plough), ...FARM_SPOTS.filter(f => !f.plough).filter((f, i) => i % 2 === 0)].slice(0, 64)) agent(F.role, F.plough ? { plough: F.plough, farm: true } : { fixed: [F.x, F.z, F.h], kind: F.kind, farm: true });
 const AMB = []; { const N = NC - nextI - 8; for (let k = 0; k < N; k++) { const A = agent(null, { amb: true }); if (A) AMB.push(A); } }
-function placeAmbient(A, px, pz) { const R = Math.random;
+function placeAmbient(A, px, pz) { const R = Math.random; propHide(A); A.prop = null;
+  if (R() < 0.5 && placeTask(A, px, pz)) { if (A.path) { A.x = A.path[0][0]; A.z = A.path[0][1]; } if (A.c) { A.x = A.c[0]; A.z = A.c[1]; } return true; }   // a household task
   for (let t = 0; t < 25; t++) { if (R() < 0.3 && HOUSES.length) { const H = HOUSES[(R() * HOUSES.length) | 0]; if (H.burnt && R() < 0.6) continue; if (!H.dp || Math.hypot(H.dp[0] - px, H.dp[1] - pz) > 320) continue;   // talking at a doorway
       const ox = Math.sin(H.dp[2]) * 1.4, oz = Math.cos(H.dp[2]) * 1.4; A.mode = "talk"; A.x = H.dp[0] + ox + (R() - 0.5) * 2; A.z = H.dp[1] + oz + (R() - 0.5) * 2; A.h = R() * 6.28; A.kind = R() < 0.15 ? "carry" : "talk"; return true; }
     const S = STREETS[(R() * STREETS.length) | 0], s = R() * S.L.L, [x, z] = S.L.at(s); if (Math.hypot(x - px, z - pz) > 330 || baseH(x, z) < 0.5) continue;
@@ -54768,18 +54884,19 @@ function lifeStep(dt, t) { frameN++; const px = P_.x, pz = P_.z, rate = Math.min
   for (const A of AG2) {
     if (A.amb) { if (A.mode === "off" || Math.hypot(A.x - px, A.z - pz) > 400) { if ((frameN + A.i) % 30 === 0) placeAmbient(A, px, pz); if (A.mode === "off" || Math.hypot(A.x - px, A.z - pz) > 400) { if (A.shown) { crowd.hide(A.i); A.shown = false; } continue; } }
       const rx = A.react && t < A.react.until;
+      if ((A.mode === "loop" || A.mode === "fixed" || A.mode === "play") && !rx) taskStep(A, dt, rate, t);
       if (A.mode === "walk" && !rx) { A.s += A.dir * A.v * dt * rate; if (A.s < 0 || A.s > A.S.L.L) { A.dir *= -1; A.s = clampN(A.s, 0, A.S.L.L); }
         const [x, z, a] = A.S.L.at(A.s); A.x = x + Math.cos(a) * A.lane; A.z = z - Math.sin(a) * A.lane; A.h = A.dir > 0 ? a : a + Math.PI; }
       const d = Math.hypot(A.x - px, A.z - pz), step = d < 35 ? 1 : d < 120 ? 3 : 8; if ((frameN + A.i) % step && A.shown) continue;
-      if (!seen(A.x, A.z, d)) { if (A.shown) { crowd.hide(A.i); A.shown = false; } continue; }
-      crowd.set(A.i, A.x, personY(A.x, A.z), A.z, rx ? A.react.h : A.h, rx ? (A.react.bow ? "bow" : "talk") : A.kind, t, A.mode === "walk" ? A.v * rate : 1); A.shown = true; continue; }
-    const st = agentState(A); if (!st) { if (A.shown) { crowd.hide(A.i); A.shown = false; } continue; }
+      if (!seen(A.x, A.z, d)) { if (A.shown) { crowd.hide(A.i); propHide(A); A.shown = false; } continue; }
+      const ay = personY(A.x, A.z); crowd.set(A.i, A.x, ay, A.z, rx ? A.react.h : A.h, rx ? (A.react.bow ? "bow" : "talk") : A.kind, t, A.mode === "walk" ? A.v * rate : A.walk ? Math.min(2, A.walk * rate) : 1); A.shown = true; if (A.prop) propSet(A, ay); continue; }
+    const st = agentState(A); if (!st) { if (A.shown) { crowd.hide(A.i); propHide(A); A.shown = false; } continue; }
     let [x, z, h, kind, moving, sp] = st; if (A.react && t < A.react.until && !moving && kind !== "sit") { h = A.react.h; kind = A.react.bow ? "bow" : "talk"; } A.x = x; A.z = z; A.h = h; A.kind = kind; const d = Math.hypot(x - px, z - pz);
     if (!seen(x, z, d)) { if (A.shown) { crowd.hide(A.i); A.shown = false; } continue; }
     const step = d < 35 ? 1 : d < 120 ? 3 : 8; if ((frameN + A.i) % step && A.shown) continue;
     if (A.key === "william") { const crowned = SIM > T.crown + 20; if (crowned !== !!A.crowned) { A.crowned = crowned; A.L = looks(A.i, crowned ? "king" : "duke"); crowd.look(A.i, A.L); } }
-    let y = personY(x, z); if (A.key === "william" && kind === "sit" && inAbbey(x, z)) y = AB_Y + 0.76; if (A.rower) y = WATER + 0.05; if (kind === "ride") y = Math.max(groundH(x, z), spanY(x, z)) + 0.92;
-    crowd.set(A.i, x, y, z, h, kind, t, moving ? Math.min(2, (sp || 0.9) / 1.2) * Math.min(rate, 3) : 1); A.shown = true; }
+    let y = personY(x, z); if (A.yOff) y = groundH(x, z) + A.yOff; if (A.key === "william" && kind === "sit" && inAbbey(x, z)) y = AB_Y + 0.76; if (A.rower) y = WATER + 0.05; if (kind === "ride") y = Math.max(groundH(x, z), spanY(x, z)) + 0.92;
+    crowd.set(A.i, x, y, z, h, kind, t, moving ? Math.min(2, (sp || 0.9) / 1.2) * Math.min(rate, 3) : 1); A.shown = true;  if (A.prop) propSet(A, y); }
   crowd.done(); }
 
 // ---------- fire and smoke ----------
@@ -54918,6 +55035,7 @@ function start() { if (started) return; started = true; intro?.classList.add("go
   if (MARKET) return say("A market day a few days before Christmas 1066, at Westminster. The City is about 3 km east, along the Strand (or take a boat from the wharf, or use the guide's 'Things to do'). In the City: stalls on Cheapside, butchers at the Shambles and in Eastcheap, fish by the hithes. You carry 30 silver pennies: press E at a stall to buy.", 22);
   say("Westminster, Christmas morning 1066. Before you, Edward the Confessor's new abbey; to your right, the houses of the little vill. At 10:00 William's procession comes from the palace (to the south-east) to the north door. Walk anywhere: into the abbey, along the Strand to the City, across London Bridge. Markers name things and say how well we know them: press E near one to read it.", 22); }
 addEventListener("keydown", e => { keys[e.code] = true; start();
+  if (RIDE && (e.code === "Equal" || e.code === "Minus")) { boatPace = clampN(boatPace + (e.code === "Equal" ? 1 : -1), 0, BOAT_PACE.length - 1); say(`The boat's pace: ${BOAT_PACE[boatPace] === 1 ? "rowing (about 4 mph)" : "sped up ×" + BOAT_PACE[boatPace]}.`, 3); return; }
   if (e.code === "Equal") speedI = Math.min(SPEEDS.length - 1, speedI + 1); if (e.code === "Minus") speedI = Math.max(0, speedI - 1);
   if (e.code === "KeyF") flying = !flying; if (e.code === "KeyE") interact(); if (e.code === "KeyM") MAPC.style.display = MAPC.style.display === "none" ? "" : "none";
   if (e.code === "KeyL") labelsOn = !labelsOn; if (e.code === "KeyT") cycleRate(); if (e.code === "KeyN") nextMoment(); });
@@ -54950,7 +55068,7 @@ function drawGuide() { const TD = self.TODO_LIST || []; GUIDE.innerHTML = (MARKE
   `<div style="color:#c8b898;font-size:11.5px;margin-top:6px"><span style="color:${TAGC.known}">●</span> known &nbsp;<span style="color:${TAGC.inferred}">●</span> inferred &nbsp;<span style="color:${TAGC.typical}">●</span> typical &nbsp;<span style="color:${TAGC.absent}">●</span> not yet built &nbsp;<span style="color:${TAGC.person}">●</span> people</div>`; }
 GUIDE.addEventListener("click", e => { e.stopPropagation(); const d = e.target.closest("[data-i],[data-m],[data-r],[data-l],[data-t],[data-day],[data-home]"); if (!d) return; if (d.dataset.home) { start(); const p = homeDoor(); if (p) teleport(p[0], p[1], HOME ? HOME.x : SHELTER.fire[0], HOME ? HOME.z : SHELTER.fire[1]); return; } if (d.dataset.day) { const q = new URLSearchParams(location.search); if (MARKET) q.delete("day"); else q.set("day", "market"); location.search = q.toString(); return; } if (d.dataset.t) return goTodo(+d.dataset.t); if (d.dataset.i) goPlace(PLACES[+d.dataset.i]); else if (d.dataset.m) goMoment(+d.dataset.m); else if (d.dataset.r) cycleRate(); else { labelsOn = !labelsOn; drawGuide(); } });
 drawGuide();
-function interact(skipTasks) { if (!started) return start(); if (RIDE || busy) return; if (MENU) return closeMenu(); if (mountToggle()) return;
+function interact(skipTasks) { if (!started) return start(); if (busy) return; if (RIDE) { if (MENU) return closeMenu(); return RIDE.voyage ? voyageMenu() : say("On the way: − / = to change the pace.", 3); } if (MENU) return closeMenu(); if (mountToggle()) return;
   if (!skipTasks) { const avail = MY_TASKS.filter(t => t.test()); if (avail.length) return tasksMenu(avail, () => interact(true)); }
   if (INSIDE_H) return insideInteract();
   const PR = nearPier(); if (PR) return boatMenu(PR); const ST = nearStall(); if (ST) return stallMenu(ST);
@@ -55059,7 +55177,7 @@ function frame() {
       if (src.handedness === "left") { mx += ax; my += ay; if (tap("L", gp, 4)) nextMoment(); if (tap("L", gp, 5)) cycleRate(); }
       else { if (gp.buttons[0]?.value > 0.3) run = 3;
         if (MENU) { if (Math.abs(ay) > 0.7 && snap) { MENU.sel = (MENU.sel + (ay > 0 ? 1 : MENU.opts.length - 1)) % MENU.opts.length; snap = false; drawMenu(); } if (tap("R", gp, 4)) { const o = MENU.opts[MENU.sel]; closeMenu(); o.fn(); } if (tap("R", gp, 5)) closeMenu(); }
-        else { if (tap("R", gp, 4)) interact(); if (tap("R", gp, 5)) { placeI = (placeI + 1) % PLACES.length; goPlace(PLACES[placeI]); } }
+        else { if (tap("R", gp, 4)) interact(); if (tap("R", gp, 5)) { if (RIDE) boatPace = (boatPace + 1) % BOAT_PACE.length; else { placeI = (placeI + 1) % PLACES.length; goPlace(PLACES[placeI]); } } }
         if (Math.abs(ax) > 0.7 && snap) { vrTurn -= Math.sign(ax) * Math.PI / 6; snap = false; } else if (Math.abs(ax) < 0.3 && Math.abs(ay) < 0.3) snap = true; } }
     rig.rotation.y = vrTurn; fwd.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(rig.quaternion); }
   else { camera.rotation.set(pitch, yaw, 0, "YXZ"); camera.getWorldDirection(fwd); if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD) mx += 1; if (keys.KeyA) mx -= 1;
@@ -55100,7 +55218,7 @@ function frame() {
     const room = { hall: "in the great hall of Edward's palace", chamber: P_.y > PAL.chamber.gy + 2 ? "upstairs in the king's chamber" : "in the chamber block's ground floor (the stair is outside)", kitchen: "in the palace kitchen", church: "inside the church" }[zoneOf(P_.x, P_.z)];
     const where = INSIDE_H ? "inside a house · E near things to read; E at the doorway to go out" : DH ? "at a doorway · <b>E: go inside</b>" : nearM ? `at <b>${nearM.name}</b> · E to read` : inA ? "inside Westminster Abbey" : room || (CITY.inside(P_.x, P_.z) ? "inside the walls of London" : "");
     HUD.innerHTML = `<b>London and Westminster, ${MARKET ? "a market day, December" : "Christmas Day"} 1066</b> · ${hh}:${String(mi).padStart(2, "0")}${timeRate > 1 ? ` (time ×${timeRate})` : ""} · ${flying ? "flying" : SPEEDS[speedI][1] + (run > 1 ? ", running" : "")}<br>${where}<br>
-      <span style="color:#e8dcc0">${UNSEEN ? "time traveller (unseen)" : "you: " + LIFE.short}${combs ? " · combs " + combs : ""}${eels ? " · eels " + eels : ""}${ale ? " · ale brewed" : ""} · purse ${fmtD(PURSE)}${BASKET.length ? " · basket: " + BASKET.slice(-6).join(", ") + (BASKET.length > 6 ? " …" : "") : ""}${RIDE ? " · in the boat to " + RIDE.Q.name : ""}</span><br><span style="color:#c8b898;font-size:12.5px">WASD walk · drag to look · shift run · − / = pace · E read / go in · N next moment · T time speed · L markers · F fly · M map</span>`;
+      <span style="color:#e8dcc0">${UNSEEN ? "time traveller (unseen)" : "you: " + LIFE.short}${combs ? " · combs " + combs : ""}${eels ? " · eels " + eels : ""}${ale ? " · ale brewed" : ""} · purse ${fmtD(PURSE)}${BASKET.length ? " · basket: " + BASKET.slice(-6).join(", ") + (BASKET.length > 6 ? " …" : "") : ""}${RIDE ? (RIDE.voyage ? " · on a voyage down the river" : " · in the boat to " + RIDE.Q.name) + (BOAT_PACE[boatPace] > 1 ? " (×" + BOAT_PACE[boatPace] + ")" : "") : ""}</span><br><span style="color:#c8b898;font-size:12.5px">WASD walk · drag to look · shift run · − / = pace · E read / go in · N next moment · T time speed · L markers · F fly · M map</span>`;
     if (vr && (vrDirty || ((t * 3) | 0) % 3 === 0)) { drawVR(`${hh}:${String(mi).padStart(2, "0")} · ${where.replace(/<[^>]+>/g, "")}`, msgText || "Left stick walk · right stick turn · trigger run · A read / go in · B next place · X next moment of the coronation · Y time speed"); vrDirty = false; } }
   renderer.render(scene, camera);
 }
@@ -55125,13 +55243,28 @@ function stallMenu(S) { const G = S.G; showMenu(`${G.name}`, G.items.map(([n, p,
 function aleMenu() { showMenu("The alewife", [{ label: `a jug of ale · ${fmtD(2)}`, fn: () => buy("a jug of ale", 2, "You sit on the bench and drink: thick, sweetish, cloudy and not strong. Unhopped: hops came to England in the 15th century.", () => sitDown("Sitting in the alehouse with your ale. Walk to stand up.")) }, { label: "a cup of mead (honey wine, dearer) · " + fmtD(4), fn: () => buy("a cup of mead", 4, "Mead, made from honey: a drink for feasts.", () => sitDown("Sitting with your mead. Walk to stand up.")) }]); }
 function sitDown(txt) { SITTING_DOWN = true; say(txt, 10); }
 // boats
-function boatMenu(P) { showMenu(`Hire a boat at ${P.name}`, PIERS.filter(Q => Q !== P).map(Q => ({ label: `to ${Q.name} · ${fmtD(2)}`, fn: () => buy(`a boat to ${Q.name}`, 2, "", () => startRide(P, Q)) })), "The boatman rows you along the river; the trip is sped up."); }
-const rideBoat = new THREE.Mesh(BOAT_G, MAT.tar); rideBoat.scale.set(1.5, 0.6, 6); rideBoat.visible = false; scene.add(rideBoat);
-function startRide(P, Q) { if (INSIDE_H) leaveHouse(); const path = riverRoute(P, Q), len = path.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - path[i][0], p[1] - path[i][1]), 0); RIDE = { P, Q, path, len, s: 0, rx: 0, rz: 0, rh: 0 }; rideBoat.visible = true; flying = false; SITTING_DOWN = false;
-  say(`You step into the boat at ${P.name}. The boatman pushes off for ${Q.name}. Look around: the river was London's main road.`, 10); }
-function rideStep(dt) { const R = RIDE; R.s += dt * 9; const [x, z, h, done] = routeAt(R.path, R.s); const sx = Math.sin(h), sz = Math.cos(h);
-  rideBoat.position.set(x, WATER - 0.35, z); rideBoat.rotation.set(0, h, 0); P_.x = x - sx * 1.0; P_.z = z - sz * 1.0; P_.y = WATER - 0.25; R.rx = x + sx * 1.3; R.rz = z + sz * 1.3; R.rh = h + Math.PI;
-  if (done) { RIDE = null; rideBoat.visible = false; P_.x = R.Q.land[0]; P_.z = R.Q.land[1]; P_.y = groundAt(P_.x, P_.z); if (R.eels) { eels += 6; DIARY.push([SIM, "Checked the eel traps"]); SIM += 3600; say("Six fat eels in the traps, and the traps re-baited. Back at the landing an hour later.", 10); } else say(`You step ashore at ${R.Q.name}.`, 6); } }
+function boatMenu(P) { showMenu(`Hire a boat at ${P.name}`, [...PIERS.filter(Q => Q !== P).map(Q => ({ label: `to ${Q.name} · ${fmtD(2)}`, fn: () => buy(`a boat to ${Q.name}`, 2, "", () => startRide(P, Q)) })),
+    { label: `down the river to the sea, a long voyage · ${fmtD(8)}`, fn: () => buy("a passage down the river", 8, "", () => startVoyage(P)) }], "A rowed boat makes 3-5 miles an hour; − and = (or B in VR) speed the trip up."); }
+const rideBoat = new THREE.Group(); { const hull = new THREE.Mesh(BOAT_G, MAT.tar); hull.scale.set(1.6, 0.75, 6.4); rideBoat.add(hull); const boards = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.05, 5.2), MAT.wood); boards.position.y = 0.2; rideBoat.add(boards);
+  for (const z of [-1.2, 0.6, 2.0]) { const th = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.06, 0.25), MAT.wood); th.position.set(0, 0.42, z); rideBoat.add(th); } }   // hull, bottom boards, thwarts
+rideBoat.visible = false; scene.add(rideBoat);
+const BOAT_PACE = [1, 3, 10, 30]; let boatPace = 0;
+function startRide(P, Q) { if (INSIDE_H) leaveHouse(); if (MOUNT?.ridden) mountToggle(); const path = riverRoute(P, Q), len = path.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - path[i][0], p[1] - path[i][1]), 0); RIDE = { P, Q, path, len, s: 0, rx: 0, rz: 0, rh: 0, seen: new Set() }; rideBoat.visible = true; flying = false; SITTING_DOWN = false;
+  say(`You step into the boat at ${P.name}. The boatman pushes off for ${Q.name}. Look around: the river was London's main road. (− / = to speed up the trip.)`, 10); }
+// a voyage down the river to the sea: along the Thames from the pier, then the lower river; E aboard to put ashore or turn back
+function startVoyage(P) { if (INSIDE_H) leaveHouse(); if (MOUNT?.ridden) mountToggle(); let sP = 0, bd = 1e9; for (let s = 0; s <= THAMES.L; s += 20) { const [x, z] = THAMES.at(s), d = Math.hypot(x - P.boat[0], z - P.boat[1]); if (d < bd) { bd = d; sP = s; } }
+  const path = [P.boat]; for (let s = sP; s < THAMES.L - 50; s += 60) { const [x, z] = THAMES.at(s); path.push([x, z]); } for (let s = 0; s <= LOWER.L; s += 80) { const [x, z] = LOWER.at(s); path.push([x, z]); }
+  const len = path.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - path[i][0], p[1] - path[i][1]), 0); RIDE = { P, Q: P, path, len, s: 0, rx: 0, rz: 0, rh: 0, voyage: true, seen: new Set() }; rideBoat.visible = true; flying = false; SITTING_DOWN = false; boatPace = 1;
+  say("You take passage down the river: past the bridge and the Tower's empty corner, round the Isle of Dogs, and on through the marshes to the estuary and the sea, about 70 km. Press E aboard to put ashore or turn back; − / = (B in VR) change the pace.", 14); }
+function voyageMenu() { showMenu("Aboard", [{ label: "keep going", fn: () => {} }, { label: "put ashore here", fn: putAshore }, { label: "turn back to London", fn: () => { const P = PIERS.find(p => p.name === "Queenhithe"); RIDE = null; rideBoat.visible = false; teleport(P.land[0], P.land[1], P.land[0] + 10, P.land[1] + 30); say("A day later, you are back at Queenhithe.", 6); } }]); }
+function putAshore() { const R = RIDE; if (!R) return; const x0 = rideBoat.position.x, z0 = rideBoat.position.z; let best = null;
+  for (let r = 10; r < 9000 && !best; r += 15) for (let a = 0; a < 6.283; a += 0.2) { const x = x0 + Math.cos(a) * r, z = z0 + Math.sin(a) * r; if (baseH(x, z) > 0.6) { best = [x, z]; break; } }
+  RIDE = null; rideBoat.visible = false; if (best) { teleport(best[0], best[1], x0, z0); say("The boatman runs the boat up on the shore and you step out. To get back, use the guide's places (or find a boat).", 8); } }
+function rideStep(dt) { const R = RIDE; R.s += dt * 2.0 * BOAT_PACE[boatPace]; const [x, z, h, done] = routeAt(R.path, R.s); const sx = Math.sin(h), sz = Math.cos(h);
+  rideBoat.position.set(x, WATER - 0.22 + Math.sin(clock.elapsedTime * 1.4) * 0.04, z); rideBoat.rotation.set(Math.sin(clock.elapsedTime * 0.9) * 0.02, h, 0); P_.x = x - sx * 1.0; P_.z = z - sz * 1.0; P_.y = WATER + 0.05; R.rx = x + sx * 1.6; R.rz = z + sz * 1.6; R.rh = h + Math.PI;
+  if (((clock.elapsedTime * 2) | 0) % 2 === 0) for (const m of MARKS) { if (R.seen.has(m) || m.follow || m.hidden || m.tag === "person") continue; if (Math.hypot(m.x - x, m.z - z) < Math.min(1500, m.range)) { R.seen.add(m); if (R.voyage && m.big !== undefined && VILLS.some(V => V.name === m.name)) { say(`<b>Passing ${m.name}</b> · ${m.text}`, 18); break; } } }   // what you pass
+  if (done) { RIDE = null; rideBoat.visible = false; if (R.voyage) { putAshore(); say("The estuary opens into the sea. Beyond the Nore, the German Ocean: the way the wine ships came from Rouen and the Danes came from the north. You are put ashore.", 14); return; }
+    P_.x = R.Q.land[0]; P_.z = R.Q.land[1]; P_.y = groundAt(P_.x, P_.z); if (R.eels) { eels += 6; DIARY.push([SIM, "Checked the eel traps"]); SIM += 3600; say("Six fat eels in the traps, and the traps re-baited. Back at the landing an hour later.", 10); } else say(`You step ashore at ${R.Q.name}.`, 6); } }
 // sitting at the tables in the palace hall
 function hallSeat() { const F = PAL.hall, dx = P_.x - F.x, dz = P_.z - F.z, lx = dx * F.c - dz * F.s, lz = dx * F.s + dz * F.c; return Math.abs(Math.abs(lx) - 4.7) < 1.4 && lz > -10 && lz < 8; }
 const FEAST_TXT = () => MARKET ? "You sit at a trestle table in the king's hall. Servants are about; there is bread and ale for the household." :
