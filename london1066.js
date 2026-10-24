@@ -506,8 +506,12 @@ function gHouse(H) { const F = FR(H.x, H.z, H.ry, H.gy, H.chunkKey), w = H.w, d 
   const dr = H.door, onX = dr === "+x" || dr === "-x", sg = dr[0] === "+" ? 1 : -1, n = onX ? [sg, 0, 0] : [0, 0, sg], ox = onX ? sg * (w / 2 + 0.04) : 0, oz = onX ? 0 : sg * (d / 2 + 0.04), dw = 0.95, dh = Math.min(1.8, wh - 0.2);
   const at = (u, y) => onX ? [ox, y, u] : [u, y, oz];
   GTINT = [1.05, 1, 0.95]; gpoly(F, "plank", [at(-dw / 2, 0), at(dw / 2, 0), at(dw / 2, dh), at(-dw / 2, dh)], [[0, 0], [dw, 0], [dw, dh], [0, dh]], n);
-  GTINT = [1, 1, 1]; for (const u of [-dw / 2 - 0.09, dw / 2 + 0.09]) { const [px, , pz] = at(u, 0); gbox(F, "oak", px, dh / 2, pz, onX ? 0.12 : 0.16, dh, onX ? 0.16 : 0.12); }
-  { const [px, , pz] = at(0, 0); gbox(F, "oak", px, dh + 0.08, pz, onX ? 0.12 : dw + 0.4, 0.16, onX ? dw + 0.4 : 0.12); }
+  const rich = R() < 0.3;   // better houses: door frames carved and painted (red ochre, with lighter bands), as wood was carved in the Ringerike style
+  GTINT = rich ? [1.6, 0.55, 0.38] : [1, 1, 1]; for (const u of [-dw / 2 - 0.09, dw / 2 + 0.09]) { const [px, , pz] = at(u, 0); gbox(F, "oak", px, dh / 2, pz, onX ? 0.14 : 0.2, dh, onX ? 0.2 : 0.14); if (rich) { GTINT = [1.7, 1.5, 0.9]; for (const y of [0.5, 1.0, 1.5]) gbox(F, "oak", px, y, pz, onX ? 0.16 : 0.22, 0.06, onX ? 0.22 : 0.16, ""); GTINT = [1.6, 0.55, 0.38]; } }
+  { const [px, , pz] = at(0, 0); gbox(F, "oak", px, dh + 0.1, pz, onX ? 0.14 : dw + 0.5, rich ? 0.3 : 0.16, onX ? dw + 0.5 : 0.14); if (rich) { GTINT = [1.7, 1.5, 0.9]; gbox(F, "oak", px, dh + 0.1, pz, onX ? 0.16 : dw + 0.3, 0.06, onX ? dw + 0.3 : 0.16, ""); } }
+  if (rich && !H.hip) { GTINT = [1.3, 0.6, 0.4]; for (const sz of [-1, 1]) for (const sx of [-1, 1]) { const P0 = [0, wh + rh + 0.15, sz * (d / 2 + 0.32)], P1 = [sx * 0.55, wh + rh + 0.9, sz * (d / 2 + 0.32)];   // crossed gable finials, carved
+      gpoly(F, "oak", [[P0[0] - 0.06, P0[1], P0[2]], [P0[0] + 0.06, P0[1], P0[2]], [P1[0] + 0.06, P1[1], P1[2]], [P1[0] - 0.06, P1[1], P1[2]]], [[0, 0], [1, 0], [1, 1], [0, 1]], [0, 0, sz]); gpoly(F, "oak", [[P0[0] - 0.06, P0[1], P0[2]], [P0[0] + 0.06, P0[1], P0[2]], [P1[0] + 0.06, P1[1], P1[2]], [P1[0] - 0.06, P1[1], P1[2]]], [[0, 0], [1, 0], [1, 1], [0, 1]], [0, 0, -sz]); } }
+  GTINT = [1, 1, 1];
   // window openings with a shutter, one on each long wall
   for (const sx of [-1, 1]) { if (onX && sx === sg) continue; const z = (R() - 0.5) * d * 0.4, wy = Math.min(1.3, wh - 0.75); GTINT = [1, 1, 1];
     gpoly(F, "dark", [[sx * (w / 2 + 0.03), wy, z - 0.28], [sx * (w / 2 + 0.03), wy, z + 0.28], [sx * (w / 2 + 0.03), wy + 0.42, z + 0.28], [sx * (w / 2 + 0.03), wy + 0.42, z - 0.28]], [[0, 0], [1, 0], [1, 1], [0, 1]], [sx, 0, 0]);
@@ -618,7 +622,8 @@ const wattleT = tex(256, 128, (g, w, h) => { g.fillStyle = "#3a2e20"; g.fillRect
 MAT.wattle = new THREE.MeshStandardMaterial({ map: wattleT, roughness: 1 });
 const logEndT = tex(128, 128, (g, w, h) => { g.fillStyle = "#3a2e22"; g.fillRect(0, 0, w, h); for (let k = 0; k < 60; k++) { const x = rnd() * w, y = rnd() * h, r = 5 + rnd() * 6; g.fillStyle = "#a88a5a"; g.beginPath(); g.arc(x, y, r, 0, 6.283); g.fill(); g.strokeStyle = "#6a5032"; g.beginPath(); g.arc(x, y, r * 0.5, 0, 6.283); g.stroke(); } }, [1, 1]);
 MAT.woodpile = new THREE.MeshStandardMaterial({ map: logEndT, roughness: 1 });
-function yardThings(x, z, ry, R) { const c = Math.cos(ry), s = Math.sin(ry), at = (u, v) => [x + u * c + v * s, z - u * s + v * c], r = R();
+const FRUIT = [];   // fruit trees in the yards, placed with the town's trees
+function yardThings(x, z, ry, R) { const c = Math.cos(ry), s = Math.sin(ry), at = (u, v) => [x + u * c + v * s, z - u * s + v * c], r = R(); if (R() < 0.3) { const [fx, fz] = at((R() - 0.5) * 4, 4 + R() * 3); FRUIT.push([fx, fz, 0.45 + R() * 0.2]); }
   if (r < 0.35) { const [px, pz] = at((R() - 0.5) * 3, 0); put("woodpile", BOX_G, MAT.woodpile, px, groundH(px, pz), pz, 1.6, 0.9, 0.6, ry); }
   else if (r < 0.55) { const [px, pz] = at((R() - 0.5) * 3, 0); put("barrel", CYL_G, MAT.wood, px, groundH(px, pz), pz, 0.6, 0.85, 0.6); }
   else if (r < 0.68) { const [px, pz] = at((R() - 0.5) * 3, 1); put("well", CYL_G, MAT.wattle, px, groundH(px, pz), pz, 1.2, 0.7, 1.2); put("wellpost", BOX_G, MAT.wood, px + 0.5, groundH(px, pz), pz, 0.12, 1.6, 0.12); put("wellpost", BOX_G, MAT.wood, px - 0.5, groundH(px, pz), pz, 0.12, 1.6, 0.12); put("wellbar", BOX_G, MAT.wood, px, groundH(px, pz) + 1.55, pz, 1.2, 0.1, 0.1); }
@@ -1091,7 +1096,7 @@ function findFree(x, z, w, d, ry = 0) { for (let r = 0; r < 60; r += 3) for (let
       GTINT = dress; for (const u of [-2.6, 2.6]) strip(u, 1.5, 19.5); for (const y of [10, 19.6]) gbox(TF, "rubble", ox + o[0] * 0.06, y, oz + o[2] * 0.06, o[0] ? 0.12 : 10, 0.25, o[0] ? 10 : 0.12, "");
       GTINT = [1, 1, 1]; gtri(TF, ox, 13, oz, 0.7, 1.9, o); for (const u of [-1.0, 1.0]) garch(TF, "dark", ox + (o[2] ? u : 0), 22, oz + (o[0] ? u : 0), 1.3, 2.6, o);
       GTINT = dress; gbox(TF, "rubble", ox + o[0] * 0.12, 23.2, oz + o[2] * 0.12, o[0] ? 0.25 : 0.32, 2.4, o[0] ? 0.32 : 0.25, ""); }
-    GTINT = [1, 1, 1]; put("cap", CONE4_G, MAT.shingle, tx, gy + H, tz, 11, 5, 11); ZONES.push({ name: "church", F: TF, w: 9, d: 9, light: [0, 2.5, 0], doors: [[0, -5]] }); }
+    GTINT = [1, 1, 1]; put("cap", CONE4_G, MAT.shingle, tx, gy + H, tz, 11, 5, 11); put("vane", CYL_G, MAT.iron, tx, gy + H + 5, tz, 0.08, 2, 0.08); put("vane", BOX_G, new THREE.MeshStandardMaterial({ color: 0xd8b04a, metalness: 0.8, roughness: 0.3 }), tx, gy + H + 6.6, tz, 1.0, 0.6, 0.1); ZONES.push({ name: "church", F: TF, w: 9, d: 9, light: [0, 2.5, 0], doors: [[0, -5]] }); }   // with a gilded weathercock (Winchester's is described in a 10th-century poem)
   // inside, richly furnished as the great English churches were: a painted frieze of saints along the clerestory, painted plaster in the aisles,
   // the great rood over the chancel arch, hanging crown-shaped lamps, embroidered hangings, some coloured glass, and St Erkenwald's shrine
   { const saintsT = tex(1024, 256, (g, w, h) => { g.fillStyle = "#1e3260"; g.fillRect(0, 0, w, h); g.fillStyle = "#c8a040"; g.fillRect(0, 0, w, 14); g.fillRect(0, h - 30, w, 30); g.fillStyle = "#8a2a20"; g.fillRect(0, h - 22, w, 14);
@@ -1205,11 +1210,11 @@ function bareTreeGeo() { const parts = [[new THREE.CylinderGeometry(0.16, 0.32, 
     for (let q = 0; q < 1; q++) { const L2 = 1.2 + R(), m2 = m.clone().multiply(new THREE.Matrix4().makeTranslation(0, L * (0.1 + q * 0.4), 0)).multiply(new THREE.Matrix4().makeRotationZ((q ? -1 : 1) * (0.6 + R() * 0.4))).multiply(new THREE.Matrix4().makeTranslation(0, L2 / 2, 0)); parts.push([new THREE.CylinderGeometry(0.015, 0.04, L2, 3), m2]); } }
   return mergeG(parts); }
 const TREE_G = bareTreeGeo(), treeM = M(0x4a4038, { roughness: 1 });
-{ const R = seeded(71); let n = 0, cap = IS_HEADSET ? 800 : 1300;
+{ const R = seeded(71); let n = 0, cap = IS_HEADSET ? 1100 : 2000;
   for (let gz = RZ0; gz < RZ0 + RH * RC && n < cap; gz += 22) for (let gx = RX0; gx < RX0 + RW * RC && n < cap; gx += 22) { const x = gx + R() * 20, z = gz + R() * 20, h = baseH(x, z); if (h < 0.9) continue;
     const v = rGet(x, z); if (v === 1 || v === 2 || v === 7 || v === 4) continue; const inC = CITY.inside(x, z);
     const wet = (THAMES.side(x, z) > 0 && h < 2.3) || [TYB_N, TYB_S, TYB_W, FLEET, WALBROOK].some(L => L.near(x, z, 40) && L.d(x, z) < 40);
-    const p = inC ? (v === 3 ? 0.03 : 0.01) : wet ? 0.22 : v === 3 ? 0.08 : 0.035 + 0.06 * sstepN(fbm(x / 400, z / 400, 2), 0.5, 0.7);
+    const p = inC ? (v === 3 ? 0.03 : 0.01) : wet ? 0.26 : v === 3 ? 0.08 : 0.035 + 0.06 * sstepN(fbm(x / 400, z / 400, 2), 0.5, 0.7) + (x < -450 ? 0.04 + 0.2 * sstepN(fbm(x / 300 + 5, z / 300, 2), 0.45, 0.62) : 0);   // more wood west of the Tyburn
     if (R() > p) continue; const s = wet ? 0.7 + R() * 0.4 : 0.8 + R() * 0.7; put("tree", TREE_G, treeM, x, h - 0.2, z, s, s * (wet ? 0.8 : 1), s, R() * 6.28); n++; } }
 // boats: run up on the foreshore at the hithes, a few seagoing ships, small boats along the banks
 function bankPoint(lat, lon, out) { let [x, z] = LL(lat, lon), k = 0; while (baseH(x, z) > -0.3 && k++ < 120) z += 1.5; return [x, z + out]; }
@@ -1227,6 +1232,17 @@ mark("Boats on the foreshore", ...bankPoint(51.5112, -0.0948, 0), "typical", "Bo
     "A house in Westminster's little vill. In the coronation (from about 10:13) Norman guards outside the abbey set these houses alight."];
   picks.forEach(([lat, lon], i) => { const [x, z] = LL(lat, lon); let best = null, bd = 1e9; for (const H of HOUSES) { const d = Math.hypot(H.x - x, H.z - z); if (d < bd) { bd = d; best = H; } }
     if (best) mark(["A town house", "Yards and plots", "Burnt Southwark", "A Westminster house"][i], best.x, best.z, "typical", txt[i], { y: 6, range: 200 }); }); }
+// fruit trees in the yards and crofts (apples, pears, plums, and cherries all occur in Late Saxon pits)
+{ const im = new THREE.InstancedMesh(TREE_G, treeM, Math.max(1, FRUIT.length)); FRUIT.forEach(([x, z, s], i) => { O3.position.set(x, groundH(x, z) - 0.1, z); O3.rotation.set(0, i * 1.7, 0); O3.scale.set(s, s * 0.7, s); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); }); im.count = FRUIT.length; im.computeBoundingSphere(); scene.add(im); }
+// the St Paul's stone: the end of a tomb in St Paul's churchyard, carved in the Scandinavian Ringerike style and painted; its runes read
+// "Ginna and Toki had this stone laid". Found in 1852; now in the Museum of London. About 1030-1040, when Cnut's Danes were in London.
+{ const [x, z] = LL(51.5133, -0.0972), gy = groundH(x, z), stoneT = tex(256, 160, (g, w, h) => { g.fillStyle = "#cfc6b2"; g.fillRect(0, 0, w, h);
+    g.lineWidth = 9; g.strokeStyle = "#20283a"; g.lineCap = "round"; g.beginPath(); g.moveTo(40, 120); g.bezierCurveTo(70, 60, 140, 130, 175, 70); g.bezierCurveTo(190, 45, 215, 55, 210, 80); g.stroke();   // the great beast
+    g.beginPath(); g.moveTo(90, 100); g.lineTo(70, 140); g.moveTo(140, 105); g.lineTo(150, 145); g.stroke(); g.lineWidth = 3; for (let k = 0; k < 7; k++) { g.beginPath(); g.moveTo(60 + k * 22, 80); g.bezierCurveTo(50 + k * 22, 40, 90 + k * 20, 30, 80 + k * 20, 15); g.stroke(); }   // its tendrils
+    g.strokeStyle = "#9a2a22"; g.lineWidth = 2; g.beginPath(); g.moveTo(40, 120); g.bezierCurveTo(70, 60, 140, 130, 175, 70); g.stroke(); g.fillStyle = "#f4f0e6"; for (let k = 0; k < 14; k++) { g.beginPath(); g.arc(60 + k * 9, 95 - Math.sin(k * 0.5) * 18, 2, 0, 6.283); g.fill(); }
+    g.fillStyle = "#20283a"; g.font = "bold 13px serif"; g.fillText("ᚴᛁᚾᛅ᛫ᛚᛁᛏ᛫ᛚᛁᚴᛁᛅ᛫ᛋᛏᛁᛁᚾ", 12, 152); });
+  put("tomb", BOX_G, AMAT.ashlar, x, gy, z, 2.0, 0.65, 0.75, 0); put("stoneend", BOX_G, new THREE.MeshStandardMaterial({ map: stoneT, roughness: 0.85 }), x - 1.03, gy, z, 0.06, 0.62, 0.72, 0);
+  mark("The St Paul's stone", x, z, "known", "The end of a tomb in St Paul's churchyard, carved with a great beast and tendrils in the Scandinavian Ringerike style and painted dark blue-black, red and white; the runes on its edge read 'Ginna and Toki had this stone laid'. About 1030-1040, when Cnut's Danish followers lived in London. Found in 1852; now in the Museum of London. Houses and furnishings were carved and painted in the same styles.", { y: 2, r: 5, range: 150 }); }
 // ploughland north of the City and the Strand: winter strips of the open fields
 function fieldAt(x, z, h) { if (h < 4 || THAMES.side(x, z) > 0 || CITY.inside(x, z)) return 0; if (WALL.near(x, z, 160) && WALL.d(x, z) < 160) return 0; const v = vnoise(x / 260 + 40, z / 260); return v > 0.52 ? 1 : 0; }
 const [moorX, moorZ] = LL(51.5198, -0.0885);
@@ -1376,9 +1392,9 @@ const FIELD_R = 1100;
 function nearVill(x, z) { let best = null, bd = 1e9; for (const V of VILLS) { const d = Math.hypot(V.x - x, V.z - z); if (d < bd) { bd = d; best = V; } } return [best, bd]; }
 function landUse(x, z, h) { if (h < 0.6 || CITY.inside(x, z)) return 0; const [V, d] = nearVill(x, z), wet = THAMES.side(x, z) > 0 ? h < 2.2 : h < 1.4;
   if (wet) return 4;   // marsh and meadow
-  const wood = fbm(x / 1400 + 31, z / 1400, 3) + (z < -4800 ? 0.22 : 0) + (z > 5200 ? 0.15 : 0) - (d < FIELD_R ? 0.35 : 0);
+  const wood = fbm(x / 1400 + 31, z / 1400, 3) + (z < -4800 ? 0.22 : 0) + (z > 5200 ? 0.15 : 0) - (d < FIELD_R * (V.n <= 5 ? 0.65 : 1) ? 0.35 : 0) + (x < -1000 && x > -4600 && z < -300 && z > -2900 ? 0.42 : 0);   // with the woods west of the Tyburn (later Hyde Park)
   if (wood > 0.62) return 3;   // woodland
-  if (d < FIELD_R || (THAMES.side(x, z) < 0 && z < -2300 && d < 1900)) return 1;   // open fields
+  if (d < FIELD_R * (V.n <= 5 ? 0.65 : 1) || (riverSide(x, z) < 0 && z < -2300 && d < 1900)) return 1;   // open fields
   return fbm(x / 700 + 13, z / 700, 2) > 0.58 ? 5 : 2; }   // heath and commons, or pasture
 function ruralColor(x, z, h, c, n1) { if (rIdx(x, z) < 0) for (const S of ROADS_OUT) if (S.L.near(x, z, 6) && S.L.d(x, z) < S.w / 2) return c.setRGB(0.5 + 0.06 * n1, 0.44, 0.33);
   const u = landUse(x, z, h); if (!u) return c;
@@ -1431,16 +1447,37 @@ mark("No windmills", ...LL(51.5560, -0.1000), "absent", "There are no windmills 
     for (let q = 0; q < 14; q++) put("weir", CYL_G, MAT.wood, x + q * 1.6, -1.6, z + q * 0.9, 0.12, 2.3 + R() * 0.3, 0.12); put("weirw", BOX_G, MAT.wattle, x + 11, -0.8, z + 6.3, 0.08, 1.0, 25, Math.atan2(1.6, 0.9)); }
   mark("A fish weir", ...LL(51.4925, -0.1225), "typical", "Fish weirs of stakes and wattle in the shallows funnelled salmon, shad and eels into wicker traps; the Thames was lined with them, and later laws tried to keep the channel clear of them.", { y: 3, range: 500 }); }
 // trees: woods, hedgerow trees, scattered field trees; bare for winter. Simple far trees in 2 km tiles so unseen ones are skipped.
+// a winter tree for woods and fields: three crossed planes painted with a branching crown of bare twigs, cut out by alpha
+const TWIG_T = tex(256, 256, (g, w, h) => { g.clearRect(0, 0, w, h); const R = seeded(12);
+  const br = (x, y, a, l, wd, d) => { const x2 = x + Math.sin(a) * l, y2 = y - Math.cos(a) * l; g.strokeStyle = d < 2 ? "#3e3228" : "#4e4034"; g.lineWidth = wd; g.lineCap = "round"; g.beginPath(); g.moveTo(x, y); g.lineTo(x2, y2); g.stroke();
+    if (d > 7 || l < 3) return; const n = d < 2 ? 3 : 2; for (let k = 0; k < n; k++) br(x2, y2, a + (R() - 0.5) * 1.3 + (k - (n - 1) / 2) * 0.5, l * (0.68 + R() * 0.15), Math.max(0.6, wd * 0.62), d + 1); };
+  br(w / 2, h, 0, h * 0.3, 9, 0); });
+const TWIG_G = (() => { const P = [], N = [], U = []; for (let k = 0; k < 3; k++) { const q = new THREE.PlaneGeometry(8, 8).translate(0, 4, 0).rotateY(k * Math.PI / 3).toNonIndexed(); P.push(...q.attributes.position.array); U.push(...q.attributes.uv.array); for (let i = 0; i < q.attributes.position.count; i++) N.push(0, 1, 0); }
+  const out = new THREE.BufferGeometry(); out.setAttribute("position", new THREE.Float32BufferAttribute(P, 3)); out.setAttribute("normal", new THREE.Float32BufferAttribute(N, 3)); out.setAttribute("uv", new THREE.Float32BufferAttribute(U, 2)); return out; })();   // (normals up: lit like a crown, not a board)
+const twigM = new THREE.MeshStandardMaterial({ map: TWIG_T, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 1 });
+const HOLLY_G = mergeG([[new THREE.IcosahedronGeometry(1, 1), MT(0, 1.1, 0, 1.1, 1.3, 1.1)]]), YEW_G = mergeG([[new THREE.CylinderGeometry(0.25, 0.35, 1.5, 6), MT(0, 0.75, 0)], [new THREE.IcosahedronGeometry(2.2, 1), MT(0, 3.4, 0, 1, 1.25, 1)]]);
+const hollyM = M(0x1e3a22, { vertexColors: true }), yewM = M(0x1a2e1c, { vertexColors: true });   // the winter evergreens: holly in the woods, yew in the churchyards
+const TREE_TILES = [];   // tiles of woodland, drawn only near you
 const WOOD_G = mergeG([[new THREE.CylinderGeometry(0.15, 0.3, 5, 5), MT(0, 2.5, 0)], [new THREE.IcosahedronGeometry(3.2, 0), MT(0, 7.0, 0, 1, 1.15, 1)]]), woodM = new THREE.MeshStandardMaterial({ color: 0x5a4c42, roughness: 1, vertexColors: true });
-{ const tiles = new Map(), R = seeded(503), X0 = -7500, X1 = 8500, Z0 = -7500, Z1 = 6500, step = IS_HEADSET ? 34 : 26; let n = 0, cap = IS_HEADSET ? 4000 : 7000;
-  for (let z = Z0; z < Z1 && n < cap; z += step) for (let x = X0; x < X1 && n < cap; x += step) { const px = x + R() * step, pz = z + R() * step; if (rIdx(px, pz) >= 0 && Math.abs(px) < 3000 && pz > -2200 && pz < 1200) continue;   // the town area has its own trees
-    const h = baseH(px, pz); if (h < 0.7) continue; const u = landUse(px, pz, h), p = u === 3 ? 0.55 : u === 4 ? 0.04 : u === 2 ? 0.02 : u === 5 ? 0.03 : u === 1 ? 0.006 : 0; if (!p || R() > p) continue;
-    const key = Math.floor(px / 2000) + "," + Math.floor(pz / 2000); if (!tiles.has(key)) tiles.set(key, []); tiles.get(key).push([px, h - 0.3, pz, 0.7 + R() * 0.6]); n++; }
-  for (const [, list] of tiles) { const im = new THREE.InstancedMesh(WOOD_G, woodM, list.length); list.forEach(([x, y, z, s], i) => { O3.position.set(x, y, z); O3.rotation.set(0, s * 9, 0); O3.scale.set(s, s, s); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); }); im.computeBoundingSphere(); scene.add(im); } }
+{ const tiles = new Map(), R = seeded(503), X0 = -7500, X1 = 8500, Z0 = -7500, Z1 = 6500, step = IS_HEADSET ? 34 : 26; let n = 0, cap = IS_HEADSET ? 90000 : 200000;
+  const NXc = Math.ceil((X1 - X0) / step), NZc = Math.ceil((Z1 - Z0) / step), TOT = NXc * NZc;   // cells visited in a scattered order, so the budget is spread over the whole map
+  for (let q = 0; q < TOT && n < cap; q++) { const cell = (q * 7919) % TOT, x = X0 + (cell % NXc) * step, z = Z0 + Math.floor(cell / NXc) * step; const px = x + R() * step, pz = z + R() * step; if (rIdx(px, pz) >= 0 && Math.abs(px) < 3000 && pz > -2200 && pz < 1200) continue;   // the town area has its own trees
+    const h = baseH(px, pz); if (h < 0.7) continue; const u = landUse(px, pz, h), p = u === 3 ? 0.6 : u === 4 ? 0.07 : u === 2 ? 0.05 : u === 5 ? 0.06 : u === 1 ? 0.008 : 0; if (!p || R() > p) continue;
+    const key = Math.floor(px / 2000) + "," + Math.floor(pz / 2000); if (!tiles.has(key)) tiles.set(key, []); const many = u === 3 ? 3 : 1; for (let m = 0; m < many; m++) { const qx = px + (m ? (R() - 0.5) * step : 0), qz = pz + (m ? (R() - 0.5) * step : 0); tiles.get(key).push([qx, baseH(qx, qz) - 0.3, qz, 0.6 + R() * 0.7, u === 3 && R() < 0.14]); n++; } }   // woods are dense: several trees to a cell, holly beneath
+  for (const [key, list] of tiles) { const [tx, tz] = key.split(",").map(v => (+v + 0.5) * 2000); for (const [geo, mat, sel] of [[TWIG_G, twigM, t => !t[4]], [HOLLY_G, hollyM, t => t[4]]]) { const L = list.filter(sel); if (!L.length) continue; const im = new THREE.InstancedMesh(geo, mat, L.length); TREE_TILES.push({ im, x: tx, z: tz }); L.forEach(([x, y, z, s], i) => { O3.position.set(x, y, z); O3.rotation.set(0, s * 9, 0); O3.scale.set(s, s, s); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); }); im.computeBoundingSphere(); scene.add(im); } } }
 // trees round the villages down the river, beyond the generated countryside
 { const R = seeded(907), list = []; for (const V of VILLS) { if (V.x < 8500) continue; for (let q = 0; q < 160; q++) { const a = R() * 6.283, r = 300 + R() * 1500, x = V.x + Math.cos(a) * r, z = V.z + Math.sin(a) * r, h = baseH(x, z); if (h < 1.2) continue; const u = landUse(x, z, h); if (u === 1 && R() < 0.85) continue; list.push([x, h - 0.3, z, 0.7 + R() * 0.6]); } }
   const tiles = new Map(); for (const t of list) { const k = Math.floor(t[0] / 4000) + "," + Math.floor(t[2] / 4000); if (!tiles.has(k)) tiles.set(k, []); tiles.get(k).push(t); }
-  for (const [, L] of tiles) { const im = new THREE.InstancedMesh(WOOD_G, woodM, L.length); L.forEach(([x, y, z, s], i) => { O3.position.set(x, y, z); O3.rotation.set(0, s * 9, 0); O3.scale.set(s, s, s); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); }); im.computeBoundingSphere(); scene.add(im); } }
+  for (const [, L] of tiles) { const im = new THREE.InstancedMesh(TWIG_G, twigM, L.length); L.forEach(([x, y, z, s], i) => { O3.position.set(x, y, z); O3.rotation.set(0, s * 9, 0); O3.scale.set(s, s, s); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); }); im.computeBoundingSphere(); scene.add(im); } }
+// pollard willows and alders along the brooks; trees along the lanes and roads; yews in the churchyards
+{ const R = seeded(1201), W = [], Y = [];
+  for (const L of [...BROOKS, TYB_N, TYB_S, TYB_W, FLEET, WALBROOK]) for (let s = 0; s < L.L; s += 9) { const [x, z, a] = L.at(s); for (const sg of [-1, 1]) { if (R() < 0.35) continue; const o = 4 + R() * 4, px = x + Math.cos(a) * o * sg, pz = z - Math.sin(a) * o * sg, h = baseH(px, pz); if (h < 0.4 || CITY.inside(px, pz) || rGet(px, pz) === 2 || rGet(px, pz) === 1) continue; W.push([px, h - 0.2, pz, 0.45 + R() * 0.25]); } }
+  for (const S of ROADS_OUT) for (let s = 0; s < S.L.L; s += 14) { if (R() < 0.45) continue; const [x, z, a] = S.L.at(s), sg = R() < 0.5 ? -1 : 1, o = S.w / 2 + 2.5 + R() * 2, px = x + Math.cos(a) * o * sg, pz = z - Math.sin(a) * o * sg, h = baseH(px, pz); if (h < 0.6 || CITY.inside(px, pz)) continue; W.push([px, h - 0.2, pz, 0.7 + R() * 0.5]); }
+  for (const C of CHURCHES) for (let k = 0; k < (R() < 0.5 ? 2 : 1); k++) { const px = C.x - C.nl / 2 - 5 - R() * 5, pz = C.z + (R() < 0.5 ? -1 : 1) * (6 + R() * 4); Y.push([px, groundH(px, pz) - 0.1, pz, 0.8 + R() * 0.4]); }
+  for (const [list, geo, mat] of [[W, TWIG_G, twigM], [Y, YEW_G, yewM]]) if (list.length) { const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach(([x, y, z, s], i) => { O3.position.set(x, y, z); O3.rotation.set(0, i * 2.1, 0); O3.scale.set(s, s, s); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); }); im.computeBoundingSphere(); scene.add(im); } }
+// vineyards: Domesday Book (1086) records vineyards at Kensington and at Holborn (some "newly planted", so not all were there in 1066). In winter: pruned vines on stakes
+for (const [lat, lon, name] of [[51.5030, -0.1880, "Kensington"], [51.5190, -0.1110, "Holborn"]]) { const [cx, cz] = LL(lat, lon); for (let r = 0; r < 14; r++) for (let k = 0; k < 22; k++) { const x = cx - 22 + k * 2, z = cz - 14 + r * 2.1; if (baseH(x, z) < 1) continue; put("vine", CYL_G, MAT.wood, x, groundH(x, z), z, 0.05, 1.3, 0.05); put("vinestem", CYL_G, M(0x4a3a2a), x, groundH(x, z), z, 0.09, 0.6, 0.09); }
+  mark("A vineyard at " + name, cx, cz, "known", "Domesday Book (1086) records vineyards in Middlesex, at Kensington and at Holborn among others; some are described as newly planted, so this one may not yet have been here in 1066. English wine was made in the south until the climate cooled in the later Middle Ages. In winter the vines are pruned back to their stakes.", { y: 3, r: 25, range: 400 }); }
 // animals in the fields: sheep on the pastures, cattle on the meadows, pigs in the woods; on the market day a plough team of eight oxen
 const COW_G = mergeG([[new THREE.CapsuleGeometry(0.38, 0.95, 4, 10).rotateX(Math.PI / 2), MT(0, 0.98, 0, 0.92, 1, 1)], [new THREE.CylinderGeometry(0.16, 0.22, 0.45, 8).rotateX(-1.0), MT(0, 1.05, 0.72)], [new THREE.CapsuleGeometry(0.15, 0.25, 3, 8).rotateX(Math.PI / 2 + 0.5), MT(0, 0.92, 1.0)],   // body, neck, head
   ...[[0.2, 0.5], [-0.2, 0.5], [0.2, -0.5], [-0.2, -0.5]].map(([x, z]) => [new THREE.CylinderGeometry(0.095, 0.075, 0.7, 7), MT(x, 0.35, z)]),
@@ -1467,6 +1504,7 @@ function countryStep(t) { const cnt = {}; for (const k in fieldIM) cnt[k] = 0; f
     for (let r = 0; r < 4; r++) { const d = 3 + r * 2.4; O3.position.set(x + fx * d, groundH(x + fx * d, z + fz * d), z + fz * d); O3.updateMatrix(); yokeIM.setMatrixAt(i * 4 + r, O3.matrix); } });
   ploughIM.instanceMatrix.needsUpdate = yokeIM.instanceMatrix.needsUpdate = true;
   for (const k in fieldIM) fieldIM[k].instanceMatrix.needsUpdate = true;
+  if ((t * 2 | 0) !== countryStep.tk) { countryStep.tk = t * 2 | 0; for (const T of TREE_TILES) T.im.visible = Math.max(Math.abs(T.x - P_.x), Math.abs(T.z - P_.z)) < 2600; }
   for (const Mi of MILLS) if (Math.abs(Mi.x - P_.x) < 600 && Math.abs(Mi.z - P_.z) < 600) Mi.w.rotateZ(-0.012); }   // the wheels turn
 if (MARKET) mark("A plough team", ...((P => [P.cx, P.cz])(FARM_SPOTS.find(f => f.plough).plough)), "typical", "Eight oxen yoked in pairs pulling a heavy plough with a coulter and a mouldboard that turns the sod: Domesday Book measures land in such 'ploughs'. Winter ploughing readied the fallow for spring sowing; a ploughman and a boy with a goad.", { y: 4, range: 600, r: 30 });
 
