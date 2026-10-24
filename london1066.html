@@ -53116,54 +53116,92 @@ const speckle = (base, n, cols, sw = 2, sh = 2) => (g, w, h) => { g.fillStyle = 
 // wrappings, cloaks fastened with a brooch; Englishmen with long hair and moustaches, Normans with the back of the head shaved;
 // women in ankle-length gowns with a headrail (veil) over the hair; Norman soldiers in mail hauberks, conical nasal helmets and
 // kite shields, with spears; Benedictine monks in black habits; bishops in white albs, coloured chasubles and mitres.
-const SKINS = [0xe8c4a8, 0xdcb494, 0xf0d0b8, 0xd8a888, 0xe4bc9c], DYE = [0x6a5a48, 0x8a7a5a, 0x4a5a3a, 0x7a3a2a, 0x3a4a6a, 0xa89a78, 0x5a4a3a, 0x9a6a3a, 0x6a6a5a, 0x3a3a3a];
+const SKINS = [0xe8c4a8, 0xdcb494, 0xf0d0b8, 0xd8a888, 0xe4bc9c];
+// cloth colours: most people wore undyed wool (off-white, oatmeal, grey, brown) or cheap, faded dyes (woad blue, madder red, weld yellow,
+// woad-and-weld green); the rich wore strong reds, blues and purples, with tablet-woven or embroidered bands at hems and cuffs
+const NATURAL = [0xd2c8b0, 0xb8ab90, 0x8c8476, 0x6e5e4c, 0x5a4a3a, 0x3e342c], COMMON = [0x56607a, 0x7a3e30, 0xa08c4c, 0x5c6640, 0x6a4f56], RICH = [0x9a2424, 0x2c4880, 0x4e2a58, 0x2e5a3a, 0xa8302a, 0x1e3a6a], TRIMS = [0xc8a040, 0xb8302a, 0x2a3a7a, 0xd8c890];
+const HAIRS = [0x3a2618, 0x5a3a20, 0x7a5a32, 0xa07a40, 0x2a1c12, 0x6a4a2a];
 function mergeG(parts) { let n = 0; const gs = parts.map(([g, m]) => { const q = (g.index ? g.toNonIndexed() : g.clone()).applyMatrix4(m); if (q.attributes.uv) q.deleteAttribute("uv"); n += q.attributes.position.count; return q; });
   const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let o = 0; for (const q of gs) { pos.set(q.attributes.position.array, o * 3); nor.set(q.attributes.normal.array, o * 3); o += q.attributes.position.count; }
   const out = new THREE.BufferGeometry(); out.setAttribute("position", new THREE.BufferAttribute(pos, 3)); out.setAttribute("normal", new THREE.BufferAttribute(nor, 3)); return out; }
 const MT = (x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) => new THREE.Matrix4().compose(V3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, 0, rz)), V3(sx, sy, sz));
 const HIPY = 0.92;
 const PG = {
-  leg: mergeG([[new THREE.SphereGeometry(0.068, 6, 4), MT(0, -0.02, 0)], [new THREE.CylinderGeometry(0.066, 0.046, 0.84, 8), MT(0, -0.42, 0)], [new THREE.BoxGeometry(0.09, 0.07, 0.22), MT(0, -0.85, 0.04)]]),
+  leg: mergeG([[new THREE.SphereGeometry(0.068, 6, 4), MT(0, -0.02, 0)], [new THREE.CylinderGeometry(0.066, 0.046, 0.82, 8), MT(0, -0.42, 0)]]),
+  shoe: mergeG([[new THREE.BoxGeometry(0.09, 0.07, 0.2), MT(0, -0.86, 0.035)], [new THREE.SphereGeometry(0.046, 6, 3, 0, Math.PI * 2, 0, Math.PI / 2), MT(0, -0.895, 0.13, 1, 0.9, 1.1)]]),   // leather turnshoes
   arm: mergeG([[new THREE.SphereGeometry(0.056, 6, 4), MT(0, -0.01, 0)], [new THREE.CylinderGeometry(0.052, 0.036, 0.56, 8), MT(0, -0.28, 0)]]),
   hand: new THREE.SphereGeometry(0.042, 5, 3).scale(0.8, 1.2, 0.9).translate(0, -0.6, 0.01),
   torso: mergeG([[new THREE.LatheGeometry([[0.135, 0], [0.125, 0.12], [0.15, 0.27], [0.168, 0.38], [0.16, 0.45], [0.06, 0.505]].map(([r, y]) => new THREE.Vector2(r, y)), 12), MT(0, 0, 0, 1, 1, 0.7)], [new THREE.CylinderGeometry(0.045, 0.05, 0.09, 9), MT(0, 0.53, 0)]]),
   head: mergeG([[new THREE.SphereGeometry(0.1, 10, 7), MT(0, 0.67, 0, 0.88, 1.1, 1)], [new THREE.BoxGeometry(0.024, 0.045, 0.032), MT(0, 0.665, 0.098)], [new THREE.SphereGeometry(0.05, 6, 4), MT(0, 0.61, 0.035, 1.25, 0.8, 1.2)],
     [new THREE.SphereGeometry(0.014, 4, 3), MT(0.035, 0.69, 0.088)], [new THREE.SphereGeometry(0.014, 4, 3), MT(-0.035, 0.69, 0.088)]]),
   eyes: mergeG([[new THREE.SphereGeometry(0.011, 4, 3), MT(0.034, 0.693, 0.096)], [new THREE.SphereGeometry(0.011, 4, 3), MT(-0.034, 0.693, 0.096)]]),
-  hairEng: mergeG([[new THREE.SphereGeometry(0.106, 10, 5, 0, Math.PI * 2, 0, Math.PI * 0.5), MT(0, 0.675, -0.01, 0.92, 1.1, 1.04)], [new THREE.BoxGeometry(0.17, 0.16, 0.04), MT(0, 0.6, -0.085)], [new THREE.BoxGeometry(0.07, 0.014, 0.02), MT(0, 0.641, 0.1, 1, 1, 1, 0, 0)]]),   // long hair and a moustache
+  hairEng: mergeG([[new THREE.SphereGeometry(0.106, 10, 5, 0, Math.PI * 2, 0, Math.PI * 0.5), MT(0, 0.675, -0.01, 0.92, 1.1, 1.04)], [new THREE.BoxGeometry(0.17, 0.17, 0.04), MT(0, 0.6, -0.085)]]),   // worn long, to the collar
+  hairLong: mergeG([[new THREE.SphereGeometry(0.106, 10, 5, 0, Math.PI * 2, 0, Math.PI * 0.5), MT(0, 0.675, -0.01, 0.92, 1.1, 1.04)], [new THREE.BoxGeometry(0.16, 0.34, 0.04), MT(0, 0.52, -0.09)]]),   // a girl's hair, loose down the back
   hairNor: new THREE.SphereGeometry(0.104, 10, 3, 0, Math.PI * 2, 0, Math.PI * 0.32).scale(0.92, 1.1, 1.02).translate(0, 0.682, 0.012).rotateX(-0.35),   // cropped, the back of the head shaved
+  tonsure: new THREE.SphereGeometry(0.107, 10, 3, 0, Math.PI * 2, Math.PI * 0.26, Math.PI * 0.3).scale(0.92, 1.1, 1.04).translate(0, 0.675, -0.005),   // a ring of hair, the crown shaved
+  moustache: mergeG([[new THREE.BoxGeometry(0.045, 0.014, 0.02), MT(0.022, 0.638, 0.1, 1, 1, 1, 0, -0.35)], [new THREE.BoxGeometry(0.045, 0.014, 0.02), MT(-0.022, 0.638, 0.1, 1, 1, 1, 0, 0.35)]]),
+  beard: new THREE.SphereGeometry(0.068, 8, 5, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.65).scale(1, 1.15, 0.8).translate(0, 0.625, 0.045),
   headrail: mergeG([[new THREE.SphereGeometry(0.115, 10, 5, 0, Math.PI * 2, 0, Math.PI * 0.6), MT(0, 0.675, -0.01, 0.95, 1.12, 1.06)], [new THREE.CylinderGeometry(0.1, 0.17, 0.3, 10, 1, true, Math.PI * 0.75, Math.PI * 1.5), MT(0, 0.5, -0.01, 1, 1, 0.85)]]),
-  tunic: new THREE.CylinderGeometry(0.16, 0.24, 0.5, 14, 1, true).scale(1, 1, 0.8).translate(0, -0.2, 0),
+  tunic: new THREE.CylinderGeometry(0.17, 0.25, 0.52, 14, 1, true).scale(1, 1, 0.8).translate(0, -0.19, 0),
+  trim: new THREE.CylinderGeometry(0.253, 0.256, 0.05, 14, 1, true).scale(1, 1, 0.8).translate(0, -0.43, 0),
+  belt: new THREE.CylinderGeometry(0.142, 0.142, 0.035, 12, 1, true).scale(1, 1, 0.72).translate(0, 0.07, 0),
   gown: new THREE.CylinderGeometry(0.16, 0.3, 0.88, 14, 1, true).scale(1, 1, 0.82).translate(0, -0.39, 0),
-  cloak: new THREE.CylinderGeometry(0.19, 0.32, 0.95, 14, 1, true, Math.PI * 0.62, Math.PI * 1.76).scale(1, 1, 0.78).translate(0, 0.0, -0.01),
-  brooch: new THREE.CylinderGeometry(0.03, 0.03, 0.012, 10).rotateX(Math.PI / 2).translate(0.09, 0.44, 0.13),
+  cloak: new THREE.CylinderGeometry(0.19, 0.32, 0.95, 14, 1, true, -Math.PI * 0.18, Math.PI * 1.76).scale(1, 1, 0.78).translate(0, 0.0, -0.01),   // open at the right, pinned on the right shoulder
+  mantle: new THREE.CylinderGeometry(0.18, 0.34, 0.92, 14, 1, true).scale(1, 1, 0.8).translate(0, 0.0, -0.005),   // a woman's closed mantle
+  brooch: new THREE.CylinderGeometry(0.028, 0.028, 0.012, 10).rotateX(Math.PI / 2).translate(-0.1, 0.44, 0.12),
   helm: mergeG([[new THREE.ConeGeometry(0.115, 0.2, 10), MT(0, 0.81, 0)], [new THREE.CylinderGeometry(0.112, 0.112, 0.06, 10, 1, true), MT(0, 0.72, 0)], [new THREE.BoxGeometry(0.022, 0.1, 0.02), MT(0, 0.67, 0.112)]]),
-  mitre: mergeG([[new THREE.BoxGeometry(0.16, 0.24, 0.05), MT(0, 0.83, 0.03)], [new THREE.BoxGeometry(0.16, 0.24, 0.05), MT(0, 0.83, -0.03)], [new THREE.ConeGeometry(0.085, 0.08, 4), MT(0, 0.98, 0)]]),
-  crown: mergeG(Array.from({ length: 6 }, (_, k) => [new THREE.BoxGeometry(0.035, 0.07, 0.012), new THREE.Matrix4().makeRotationY(k / 6 * Math.PI * 2).multiply(MT(0, 0.79, 0.098))]).concat([[new THREE.TorusGeometry(0.1, 0.012, 3, 12).rotateX(Math.PI / 2), MT(0, 0.76, 0)]])),
+  coif: new THREE.CylinderGeometry(0.1, 0.16, 0.16, 10, 1, true).translate(0, 0.56, -0.005),   // mail round the neck
+  sword: mergeG([[new THREE.BoxGeometry(0.045, 0.78, 0.025), MT(0.19, -0.3, 0.03, 1, 1, 1, 0.12, 0.08)], [new THREE.BoxGeometry(0.13, 0.025, 0.03), MT(0.17, 0.1, 0.0)]]),
+  mitre: mergeG([[new THREE.SphereGeometry(0.108, 10, 4, 0, Math.PI * 2, 0, Math.PI / 2), MT(0, 0.72, 0, 1, 1.3, 1)], [new THREE.ConeGeometry(0.04, 0.07, 6), MT(0.055, 0.85, 0)], [new THREE.ConeGeometry(0.04, 0.07, 6), MT(-0.055, 0.85, 0)]]),   // the low mitre of the 1060s
+  chasuble: new THREE.CylinderGeometry(0.15, 0.33, 0.74, 14, 1, true).scale(1, 1, 0.78).translate(0, 0.1, 0),
+  pallium: mergeG([[new THREE.TorusGeometry(0.15, 0.018, 4, 14).rotateX(Math.PI / 2), MT(0, 0.44, 0, 1, 1, 0.8)], [new THREE.BoxGeometry(0.05, 0.42, 0.012), MT(0, 0.2, 0.2)], [new THREE.BoxGeometry(0.05, 0.42, 0.012), MT(0, 0.2, -0.17)]]),
+  crozier: mergeG([[new THREE.CylinderGeometry(0.012, 0.012, 1.85, 5), MT(0, -0.12, 0)], [new THREE.TorusGeometry(0.06, 0.013, 4, 10, Math.PI * 1.5), MT(0, 0.86, 0, 1, 1, 1, 0, 0)]]),
+  cowl: new THREE.TorusGeometry(0.11, 0.05, 5, 12).rotateX(Math.PI / 2).scale(1, 1, 0.9).translate(0, 0.5, -0.02),
   hood: new THREE.SphereGeometry(0.13, 8, 4, 0, Math.PI * 2, 0, Math.PI * 0.62).scale(1, 1.1, 1.1).translate(0, 0.68, -0.025),
+  cap: new THREE.ConeGeometry(0.105, 0.17, 10).rotateX(0.35).translate(0, 0.79, 0.02),   // a soft cap
+  crown: mergeG(Array.from({ length: 6 }, (_, k) => [new THREE.BoxGeometry(0.035, 0.07, 0.012), new THREE.Matrix4().makeRotationY(k / 6 * Math.PI * 2).multiply(MT(0, 0.79, 0.098))]).concat([[new THREE.TorusGeometry(0.1, 0.012, 3, 12).rotateX(Math.PI / 2), MT(0, 0.76, 0)]])),
+  sceptre: mergeG([[new THREE.CylinderGeometry(0.012, 0.012, 0.8, 5), MT(0, 0.3, 0)], [new THREE.SphereGeometry(0.03, 6, 4), MT(0, 0.72, 0)]]),
   shield: mergeG([[new THREE.CylinderGeometry(0.28, 0.02, 0.95, 3, 1, false, -Math.PI / 6, Math.PI * 2).scale(1, 1, 0.12), MT(0.27, 0.32, 0.12)]]),
   spear: mergeG([[new THREE.CylinderGeometry(0.013, 0.013, 2.4, 5), MT(0, 0.2, 0.05)], [new THREE.ConeGeometry(0.03, 0.2, 5), MT(0, 1.5, 0.05)]]) };
-const PARTS = ["legL", "legR", "armL", "armR", "handL", "handR", "torso", "head", "eyes", "hairEng", "hairNor", "headrail", "tunic", "gown", "cloak", "brooch", "helm", "mitre", "crown", "hood", "shield", "spear"];
-const PGEO = { legL: PG.leg, legR: PG.leg, armL: PG.arm, armR: PG.arm, handL: PG.hand, handR: PG.hand };
-const personMat = new THREE.MeshStandardMaterial({ roughness: 0.85, side: THREE.DoubleSide });
-// roles: eng (an Englishman), woman, child, norman (a Norman knight or lord), soldier (a Norman soldier on guard), monk, cleric, bishop, noble (an English thegn), king
-function looks(i, role) { const h = k => hash(i * 13 + k, 77), r = role || (h(1) < 0.47 ? "woman" : h(2) < 0.16 ? "child" : h(3) < 0.12 ? "norman" : "eng"), skin = SKINS[(h(4) * SKINS.length) | 0];
-  const L = { role: r, s: r === "child" ? 0.62 + h(5) * 0.12 : 0.92 + h(5) * 0.12, skin, hair: [0x4a3020, 0x2a1a10, 0x8a6a3a, 0xa87a3a, 0x5a3a20][(h(6) * 5) | 0],
-    tunic: DYE[(h(7) * DYE.length) | 0], hose: [0x5a4a3a, 0x6a5a48, 0x8a2a2a, 0x3a3a3a, 0xa89a7a][(h(8) * 5) | 0], cloak: DYE[(h(9) * DYE.length) | 0], hasCloak: h(10) < 0.55, extra: 0 };
-  if (r === "soldier") Object.assign(L, { tunic: 0x7a7a80, hose: 0x5a4a3a, cloak: 0x7a2a2a, hasCloak: h(10) < 0.3 });
-  if (r === "cleric") Object.assign(L, { tunic: 0xece6d6, cloak: 0xece6d6, hasCloak: false });
-  if (r === "monk") Object.assign(L, { tunic: 0x1e1a18, cloak: 0x1e1a18, hasCloak: false });
-  if (r === "bishop") Object.assign(L, { tunic: 0xf0ece0, cloak: [0xc8a83a, 0x8a2a5a, 0xa82a2a][(h(11) * 3) | 0], hasCloak: true });
-  if (r === "noble" || r === "norman") Object.assign(L, { tunic: [0xa82a2a, 0x2a4a9a, 0x3a6a3a, 0x8a5a2a][(h(11) * 4) | 0], cloak: [0x6a2a5a, 0xb8382a, 0x2a3a6a, 0x5a3a20][(h(12) * 4) | 0], hasCloak: true });
-  if (r === "king") Object.assign(L, { tunic: 0x7a1a3a, cloak: 0xa8202a, hose: 0x8a2a2a, hasCloak: true, s: 1.05 });
+const PARTS = ["legL", "legR", "shoeL", "shoeR", "armL", "armR", "handL", "handR", "torso", "head", "eyes", "hairEng", "hairLong", "hairNor", "tonsure", "moustache", "beard", "headrail", "tunic", "trim", "belt", "gown", "cloak", "mantle", "brooch",
+  "helm", "coif", "sword", "mitre", "chasuble", "pallium", "crozier", "cowl", "hood", "cap", "crown", "sceptre", "shield", "spear"];
+const PGEO = { legL: PG.leg, legR: PG.leg, shoeL: PG.shoe, shoeR: PG.shoe, armL: PG.arm, armR: PG.arm, handL: PG.hand, handR: PG.hand };
+const METAL = new Set(["helm", "crown", "brooch", "sceptre", "coif"]);
+const personMat = new THREE.MeshStandardMaterial({ roughness: 0.88, side: THREE.DoubleSide });
+// roles: eng (an Englishman), woman, child, norman (a Norman lord or knight), soldier, monk, cleric, bishop, archbishop, noble (an English thegn), duke (William before the crowning), king
+function looks(i, role) { const h = k => hash(i * 13 + k, 77), pick = (A, k) => A[(h(k) * A.length) | 0];
+  const r = role || (h(1) < 0.45 ? "woman" : h(2) < 0.18 ? "child" : h(3) < 0.03 ? "norman" : h(3) < 0.1 ? "noble" : "eng");
+  const poor = h(20) < 0.7, plain = k => poor ? (h(k + 40) < 0.72 ? pick(NATURAL, k) : pick(COMMON, k)) : (h(k + 40) < 0.5 ? pick(COMMON, k) : pick(RICH, k));
+  const L = { role: r, s: 0.92 + h(5) * 0.12, skin: pick(SKINS, 4), hair: h(30) < 0.12 ? 0x8a8478 : pick(HAIRS, 6), tunic: plain(7), hose: plain(8), shoes: h(21) < 0.5 ? 0x3a2a1e : 0x4e3a28, cloak: plain(9), hasCloak: h(10) < 0.75,
+    trim: null, belt: 0x3a2c20, rail: h(22) < 0.8 ? 0xe6e0d0 : pick([0xcfc4a8, 0xb8ab90, 0x9a8c70], 23), beard: h(24) < 0.25, mous: h(25) < 0.85, hood: h(26) < 0.18, cap: h(27) < 0.12, mantle: h(28) < 0.55, girl: h(29) < 0.5, chas: 0, pallium: false };
+  if (r === "child") { L.s = 0.62 + h(5) * 0.14; L.hasCloak = h(10) < 0.4; L.tunic = plain(7); }
+  if (r === "noble" || r === "norman") Object.assign(L, { tunic: pick(RICH, 11), cloak: pick(RICH, 12), hose: pick([0x8a2a2a, 0x2a3a6a, 0x5a4a3a, 0xa89a7a], 13), hasCloak: true, trim: pick(TRIMS, 14), hood: false, cap: false, belt: 0x5a3a20 });
+  if (r === "woman" && !poor) L.trim = pick(TRIMS, 14);
+  if (r === "soldier") Object.assign(L, { tunic: 0x80838a, hose: plain(8), cloak: pick(RICH, 12), hasCloak: h(10) < 0.25, hood: false, cap: false });   // a mail hauberk over a padded tunic
+  if (r === "monk") Object.assign(L, { tunic: 0x1c1816, hasCloak: false, belt: 0x2a2420 });
+  if (r === "cleric") Object.assign(L, { tunic: 0xece6d6, hasCloak: false, belt: 0xd8d0c0 });
+  if (r === "bishop" || r === "archbishop") Object.assign(L, { tunic: 0xf0ece0, chas: [0xc8a83a, 0x8a2a5a, 0xa82a2a, 0x2a4a8a][(h(11) * 4) | 0], hasCloak: false, pallium: r === "archbishop", s: 0.95 + h(5) * 0.08 });
+  if (r === "duke") Object.assign(L, { tunic: 0x2c3a78, cloak: 0x8a1a22, trim: 0xc8a040, hasCloak: true, hose: 0x8a2a2a, s: 1.03 });
+  if (r === "king") Object.assign(L, { tunic: 0x6a1a4a, cloak: 0xa8202a, trim: 0xd8b040, hasCloak: true, hose: 0x8a2a2a, s: 1.03 });
   return L; }
-function colorOf(L, p) { const g = L.role === "woman"; return p.startsWith("leg") ? (g ? L.tunic : L.hose) : p.startsWith("arm") || p === "torso" ? L.tunic : p === "hand" || p.startsWith("hand") || p === "head" ? L.skin : p === "eyes" ? 0x2a2018 :
-  p === "hairEng" || p === "hairNor" ? L.hair : p === "headrail" ? [0xe8e0d0, 0xc8b898, 0xd8d0c0, 0x8a7a5a][Math.floor(L.s * 100) % 4] : p === "tunic" || p === "gown" ? L.tunic : p === "cloak" ? L.cloak : p === "brooch" || p === "crown" ? 0xd8b84a :
-  p === "helm" ? 0x8a8a90 : p === "mitre" ? 0xf0ece0 : p === "hood" ? L.tunic : p === "shield" ? [0xb8302a, 0x2a4a9a, 0xd8b83a, 0x3a6a3a][Math.floor(L.s * 37) % 4] : p === "spear" ? 0x6a4a2c : 0xffffff; }
-function shows(L, p) { const r = L.role, robe = r === "woman" || r === "monk" || r === "cleric" || r === "bishop" || r === "king";
-  switch (p) { case "hairEng": return r === "eng" || r === "child" || r === "noble" || r === "cleric"; case "hairNor": return r === "norman" || r === "king"; case "headrail": return r === "woman"; case "tunic": return !robe; case "gown": return robe;
-    case "cloak": return L.hasCloak && r !== "monk"; case "brooch": return L.hasCloak && r !== "monk" && r !== "bishop"; case "helm": return r === "soldier"; case "mitre": return r === "bishop"; case "crown": return r === "king"; case "hood": return r === "monk";
-    case "shield": case "spear": return r === "soldier"; default: return true; } }
+const adultMan = L => L.role === "eng" || L.role === "noble";
+function shows(L, p) { const r = L.role, girl = r === "child" && L.girl, robe = r === "woman" || girl || r === "monk" || r === "cleric" || r === "bishop" || r === "archbishop" || r === "duke" || r === "king", clergy = r === "monk" || r === "cleric" || r === "bishop" || r === "archbishop";
+  switch (p) {
+    case "hairEng": return adultMan(L) || (r === "child" && !L.girl); case "hairLong": return girl; case "hairNor": return r === "norman" || r === "duke" || r === "king";
+    case "tonsure": return clergy; case "moustache": return adultMan(L) && L.mous; case "beard": return adultMan(L) && L.beard; case "headrail": return r === "woman";
+    case "tunic": return !robe; case "trim": return L.trim !== null; case "belt": return r !== "bishop" && r !== "archbishop"; case "gown": return robe;
+    case "cloak": return L.hasCloak && !clergy && r !== "woman" && !girl; case "mantle": return (r === "woman" && L.mantle) || (girl && L.hasCloak); case "brooch": return L.hasCloak && !clergy && r !== "woman" && !girl;
+    case "helm": case "coif": case "sword": case "shield": case "spear": return r === "soldier";
+    case "mitre": case "chasuble": case "crozier": return r === "bishop" || r === "archbishop"; case "pallium": return L.pallium; case "cowl": return r === "monk";
+    case "hood": return L.hood && (adultMan(L) || r === "child") && !L.cap; case "cap": return L.cap && adultMan(L);
+    case "crown": case "sceptre": return r === "king"; default: return true; } }
+function colorOf(L, p) { const robeLegs = L.role === "woman" || (L.role === "child" && L.girl);
+  if (p.startsWith("leg")) return robeLegs ? L.tunic : L.hose; if (p.startsWith("shoe")) return L.shoes; if (p.startsWith("hand") || p === "head") return L.skin;
+  switch (p) { case "armL": case "armR": case "torso": return L.tunic; case "eyes": return 0x2a2018; case "hairEng": case "hairLong": case "hairNor": case "tonsure": case "moustache": case "beard": return L.hair;
+    case "headrail": return L.rail; case "tunic": case "gown": return L.tunic; case "trim": return L.trim ?? L.tunic; case "belt": return L.belt; case "cloak": case "mantle": return L.cloak;
+    case "brooch": return L.trim ? 0xd8b84a : 0x9a9a90; case "helm": return 0x8a8a90; case "coif": return 0x80838a; case "sword": return 0x4a3a2a; case "mitre": return 0xf2eee2; case "chasuble": return L.chas;
+    case "pallium": return 0xf4f0e6; case "crozier": return 0xc8a040; case "cowl": return 0x1c1816; case "hood": case "cap": return L.cloak; case "crown": return 0xd8b84a; case "sceptre": return 0xd8b84a;
+    case "shield": return [0xb8302a, 0x2a4a9a, 0xd8b83a, 0x3a6a3a][Math.floor(L.s * 37) % 4]; case "spear": return 0x6a4a2c; } return 0xffffff; }
 function poseOf(kind, t, ph, walkAmt = 1) { const w = Math.sin(t * 7 + ph);
   switch (kind) {
     case "walk": return { drop: 0, lean: 0.04, lL: 0.42 * w * walkAmt, lR: -0.42 * w * walkAmt, aL: -0.32 * w * walkAmt, aR: 0.32 * w * walkAmt };
@@ -53180,29 +53218,33 @@ function poseOf(kind, t, ph, walkAmt = 1) { const w = Math.sin(t * 7 + ph);
     case "sell": return { drop: 0, lean: 0.1, lL: 0, lR: 0, aL: -0.8, aR: -0.9 - 0.3 * Math.sin(t * 2 + ph) };
     default: return { drop: 0, lean: 0, lL: 0, lR: 0, aL: 0.03 * Math.sin(t * 0.8 + ph), aR: -0.03 * Math.sin(t * 0.8 + ph) }; } }
 const _b = new THREE.Matrix4(), _hm = new THREE.Matrix4(), _j = new THREE.Matrix4(), _tmp = new THREE.Matrix4(), _q2 = new THREE.Quaternion(), _e2 = new THREE.Euler(), ZEROM = new THREE.Matrix4().makeScale(0, 0, 0), _p = V3(0, 0, 0), _s = V3(1, 1, 1);
+const _M = {};
 function partMatrices(x, y, z, h, L, P, out) { _e2.set(0, h, 0); _q2.setFromEuler(_e2); _b.compose(_p.set(x, y, z), _q2, _s.set(L.s, L.s, L.s));
   _hm.copy(_b).multiply(_tmp.makeTranslation(0, HIPY - P.drop, 0)).multiply(_j.makeRotationX(P.lean));
-  const legAt = (sx, a) => out.push(_b.clone().multiply(_tmp.makeTranslation(sx, HIPY - P.drop, 0)).multiply(_j.makeRotationX(a)));
-  legAt(0.085, P.lL); legAt(-0.085, P.lR);
+  const legAt = (sx, a) => _b.clone().multiply(_tmp.makeTranslation(sx, HIPY - P.drop, 0)).multiply(_j.makeRotationX(a));
+  _M.legL = _M.shoeL = legAt(0.085, P.lL); _M.legR = _M.shoeR = legAt(-0.085, P.lR);
   const armM = (sx, a, sp) => _hm.clone().multiply(_tmp.makeTranslation(sx, 0.45, 0)).multiply(_j.makeRotationX(a)).multiply(_tmp.makeRotationZ(sp)), aL = armM(0.175, P.aL, -0.05), aR = armM(-0.175, P.aR, 0.05);
-  out.push(aL, aR, aL, aR);
-  for (const p of PARTS.slice(6)) { if (!shows(L, p)) { out.push(ZEROM); continue; } if (p === "spear") out.push(aR.clone().multiply(_tmp.makeTranslation(0, -0.6, 0)).multiply(_j.makeRotationX(Math.PI / 2 - P.aR * 0.9)));
-    else if (p === "shield") out.push(aL.clone().multiply(_tmp.makeTranslation(0, -0.3, 0)).multiply(_j.makeRotationX(-P.aL))); else out.push(_hm.clone()); } }
+  _M.armL = _M.handL = aL; _M.armR = _M.handR = aR;
+  _M.spear = aR.clone().multiply(_tmp.makeTranslation(0, -0.6, 0)).multiply(_j.makeRotationX(Math.PI / 2 - P.aR * 0.9));
+  _M.shield = aL.clone().multiply(_tmp.makeTranslation(0, -0.3, 0)).multiply(_j.makeRotationX(-P.aL));
+  _M.crozier = aL.clone().multiply(_tmp.makeTranslation(0, -0.6, 0.02)).multiply(_j.makeRotationX(-P.aL - P.lean));   // held upright
+  _M.sceptre = aR.clone().multiply(_tmp.makeTranslation(0, -0.6, 0.02)).multiply(_j.makeRotationX(-P.aR - P.lean));
+  for (const p of PARTS) { if (!shows(L, p)) { out.push(ZEROM); continue; } out.push(_M[p] && (p.startsWith("leg") || p.startsWith("shoe") || p.startsWith("arm") || p.startsWith("hand") || p === "spear" || p === "shield" || p === "crozier" || p === "sceptre") ? _M[p] : _hm.clone()); } }
 function personMesh(i, role, kind, x, y, z, h, t = 0) { const L = looks(i, role), g = new THREE.Group(), ms = []; partMatrices(0, 0, 0, 0, L, poseOf(kind, t, i), ms);
-  PARTS.forEach((p, k) => { if (ms[k] === ZEROM) return; const m = new THREE.Mesh(PGEO[p] || PG[p], M(colorOf(L, p), { roughness: p === "helm" || p === "crown" ? 0.35 : 0.85, metalness: p === "helm" || p === "crown" || p === "brooch" ? 0.7 : 0, side: THREE.DoubleSide })); m.matrixAutoUpdate = false; m.matrix.copy(ms[k]); g.add(m); });
+  PARTS.forEach((p, k) => { if (ms[k] === ZEROM) return; const m = new THREE.Mesh(PGEO[p] || PG[p], M(colorOf(L, p), { roughness: METAL.has(p) ? 0.35 : 0.85, metalness: METAL.has(p) ? 0.7 : 0, side: THREE.DoubleSide })); m.matrixAutoUpdate = false; m.matrix.copy(ms[k]); g.add(m); });
   g.position.set(x, y, z); g.rotation.y = h; g.userData = { i, role, kind }; return g; }
-// the crowd: instanced parts, one set for everyone; only the people shown are packed into the first slots and drawn
-class Crowd { constructor(n) { this.n = n; this.L = []; this.M = {}; this.slot = new Int32Array(n).fill(-1); this.who = new Int32Array(n); this.count = 0;
-    PARTS.forEach(p => { const im = new THREE.InstancedMesh(PGEO[p] || PG[p], p === "helm" || p === "crown" || p === "brooch" ? new THREE.MeshStandardMaterial({ roughness: 0.35, metalness: 0.7 }) : personMat, n);
-      im.frustumCulled = false; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.setColorAt(0, new THREE.Color()); im.count = 0; this.M[p] = im; scene.add(im); }); this.ms = []; this._m = new THREE.Matrix4(); this._c = new THREE.Color(); }
-  paint(i) { const s = this.slot[i]; if (s < 0) return; const L = this.L[i]; PARTS.forEach(p => this.M[p].setColorAt(s, this._c.setHex(colorOf(L, p)))); this.colorsDirty = true; }
-  look(i, L) { this.L[i] = L; this.paint(i); }
-  set(i, x, y, z, h, kind, t, walkAmt = 1) { if (this.slot[i] < 0) { const s = this.count++; this.slot[i] = s; this.who[s] = i; this.paint(i); }
-    const s = this.slot[i]; this.ms.length = 0; partMatrices(x, y, z, h, this.L[i], poseOf(kind, t, i * 1.7, walkAmt), this.ms); PARTS.forEach((p, k) => this.M[p].setMatrixAt(s, this.ms[k])); }
-  hide(i) { const s = this.slot[i]; if (s < 0) return; const last = --this.count, j = this.who[last];
-    if (s !== last) { for (const p of PARTS) { const im = this.M[p]; im.getMatrixAt(last, this._m); im.setMatrixAt(s, this._m); im.getColorAt(last, this._c); im.setColorAt(s, this._c); } this.slot[j] = s; this.who[s] = j; this.colorsDirty = true; }
-    this.slot[i] = -1; }
-  done() { for (const m of Object.values(this.M)) { m.count = this.count; m.instanceMatrix.needsUpdate = true; if (this.colorsDirty && m.instanceColor) m.instanceColor.needsUpdate = true; } this.colorsDirty = false; } }
+// the crowd: one instanced mesh per garment or part; each packs only the people wearing it into its first slots, so nothing unworn is drawn
+class Crowd { constructor(n) { this.n = n; this.L = []; this.P = PARTS.map(p => { const im = new THREE.InstancedMesh(PGEO[p] || PG[p], METAL.has(p) ? new THREE.MeshStandardMaterial({ roughness: 0.35, metalness: 0.7 }) : personMat, n);
+      im.frustumCulled = false; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.setColorAt(0, new THREE.Color()); im.count = 0; scene.add(im); return { p, im, slot: new Int32Array(n).fill(-1), who: new Int32Array(n), count: 0 }; });
+    this.ms = []; this._m = new THREE.Matrix4(); this._c = new THREE.Color(); this.count = 0; this.on = new Uint8Array(n); }
+  free(Q, i) { const s = Q.slot[i]; if (s < 0) return; const last = --Q.count, j = Q.who[last];
+    if (s !== last) { Q.im.getMatrixAt(last, this._m); Q.im.setMatrixAt(s, this._m); Q.im.getColorAt(last, this._c); Q.im.setColorAt(s, this._c); Q.slot[j] = s; Q.who[s] = j; } Q.slot[i] = -1; Q.dirty = true; }
+  look(i, L) { this.L[i] = L; for (const Q of this.P) if (Q.slot[i] >= 0) { if (shows(L, Q.p)) { Q.im.setColorAt(Q.slot[i], this._c.setHex(colorOf(L, Q.p))); Q.dirty = true; } else this.free(Q, i); } }
+  set(i, x, y, z, h, kind, t, walkAmt = 1) { const L = this.L[i]; this.ms.length = 0; partMatrices(x, y, z, h, L, poseOf(kind, t, i * 1.7, walkAmt), this.ms); if (!this.on[i]) { this.on[i] = 1; this.count++; }
+    this.P.forEach((Q, k) => { const m = this.ms[k]; if (m === ZEROM) { if (Q.slot[i] >= 0) this.free(Q, i); return; }
+      if (Q.slot[i] < 0) { const s = Q.count++; Q.slot[i] = s; Q.who[s] = i; Q.im.setColorAt(s, this._c.setHex(colorOf(L, Q.p))); Q.dirty = true; } Q.im.setMatrixAt(Q.slot[i], m); }); }
+  hide(i) { if (this.on[i]) { this.on[i] = 0; this.count--; } for (const Q of this.P) this.free(Q, i); }
+  done() { for (const Q of this.P) { Q.im.count = Q.count; Q.im.instanceMatrix.needsUpdate = true; if (Q.dirty && Q.im.instanceColor) { Q.im.instanceColor.needsUpdate = true; Q.dirty = false; } } } }
 
 
 // ---------- the map: latitude and longitude to metres (x east, z south) from Westminster Abbey's crossing ----------
@@ -53222,13 +53264,13 @@ function poly(pts) { const P = pts.map(([a, b]) => LL(a, b)); return { P, inside
 // SOURCES: the Late Saxon north bank ran roughly 0-30 m south of today's Thames Street (MOLA waterfront excavations at Queenhithe,
 // Bull Wharf, New Fresh Wharf, Billingsgate), so the river was wider than now, more than ~300 m at the bridge and shallower; the south
 // bank at Southwark was gravel islands (eyots) in tidal marsh; Thorney Island (Westminster) a gravel island of ~470 x 370 m between
-// branches of the Tyburn; the Fleet a tidal inlet up to Holborn; the Walbrook a small boggy stream splitting the City's two hills,
+// branches of the Tyburn; the Fleet a tidal inlet up to Holborn, under today's New Bridge Street and Farringdon Street, broad at its mouth and narrowing upstream; the Walbrook a small boggy stream splitting the City's two hills,
 // Ludgate Hill and Cornhill, gravel terraces about 15-18 m above the Thames. Channel outlines are approximate (low confidence).
 // Level 0 is a typical high tide; the ground is given in metres above it.
 const THAMES = line([[51.4880, -0.1245], [51.4935, -0.1222], [51.4995, -0.1214], [51.5040, -0.1200], [51.5070, -0.1178], [51.5085, -0.1135], [51.5094, -0.1080], [51.5097, -0.1028],
   [51.5091, -0.0960], [51.5087, -0.0910], [51.5080, -0.0870], [51.5076, -0.0820], [51.5073, -0.0770], [51.5062, -0.0710], [51.5038, -0.0640]]);   // the centre line; half-width below
 const RIVER_HW = 175;
-const FLEET = line([[51.5108, -0.1040], [51.5130, -0.1048], [51.5150, -0.1055], [51.5175, -0.1068], [51.5200, -0.1080]]), WALBROOK = line([[51.5103, -0.0905], [51.5125, -0.0902], [51.5150, -0.0893], [51.5178, -0.0888]]);
+const FLEET = line([[51.5108, -0.1039], [51.5125, -0.1041], [51.5140, -0.1043], [51.5160, -0.1048], [51.5185, -0.1058], [51.5205, -0.1068]]), WALBROOK = line([[51.5103, -0.0905], [51.5125, -0.0902], [51.5150, -0.0893], [51.5178, -0.0888]]);
 const TYB_N = line([[51.5040, -0.1350], [51.5030, -0.1290], [51.5020, -0.1228]]), TYB_S = line([[51.4975, -0.1345], [51.4968, -0.1300], [51.4955, -0.1238]]), TYB_W = line([[51.5040, -0.1350], [51.5005, -0.1352], [51.4975, -0.1345]]);
 const THORNEY = { c: LL(51.4995, -0.1268), rx: 235, rz: 185 };
 const HILLS = [[...LL(51.5138, -0.0985), 9, 380], [...LL(51.5135, -0.0860), 9, 380], [...LL(51.5150, -0.0930), 4, 500]];
@@ -53247,7 +53289,7 @@ function baseH(x, z) { const s = THAMES.side(x, z), d = Math.abs(s); let h;
     h = lerpN(1.0, h, sstepN(d, RIVER_HW, RIVER_HW + 150)); }                                                                                                          // the foreshore
   if (d < RIVER_HW + 30) h = lerpN(-4, h, sstepN(d, RIVER_HW - 50, RIVER_HW + (s > 0 ? 10 : 30)));
   const carve = (L, w, dep, bank) => { if (!L.near(x, z, w + bank)) return; const dd = L.d(x, z); if (dd < w + bank) h = Math.min(h, lerpN(dep, h, sstepN(dd, w * 0.5, w + bank))); };
-  carve(FLEET, 40, -2.5, 60); carve(WALBROOK, 3, -0.4, 30); carve(TYB_N, 7, -1.2, 10); carve(TYB_S, 7, -1.2, 10); carve(TYB_W, 6, -1.0, 10);
+  if (FLEET.near(x, z, 60)) { const fw = clampN(26 - (-z - 1270) / 560 * 18, 7, 26), dd = FLEET.d(x, z); if (dd < fw + 22) h = Math.min(h, lerpN(-2.2, h, sstepN(dd, fw * 0.6, fw + 22))); }   // the Fleet: about 50 m across at its mouth, 15 m by Fleet Street carve(WALBROOK, 3, -0.4, 30); carve(TYB_N, 7, -1.2, 10); carve(TYB_S, 7, -1.2, 10); carve(TYB_W, 6, -1.0, 10);
   if (WALL.near(x, z, 30) && !CITY.inside(x, z)) { const wd = WALL.d(x, z); if (wd > 3 && wd < 18) h -= 2.4 * Math.sin((wd - 3) / 15 * Math.PI); }                     // the city ditch outside the wall
   return h; }
 const groundH = baseH;
@@ -53635,7 +53677,7 @@ function addChurch(x, z, o = {}) { const nw = o.nw || 6.5, nl = o.nl || 14, cw =
 // ---------- bridges ----------
 // London Bridge was timber, rebuilt several times; dendro-dated timbers from Fennings Wharf on the Southwark side date to about 987-1032.
 // Roughly 300 m of trestles carrying a plank deck about 4-6 m wide, with no houses on it (those came with the stone bridge after 1176).
-const SPANS = [{ L: BRIDGE, y: BRIDGE_Y, hw: 2.6, name: "London Bridge" }, { L: line([[51.5140, -0.1036], [51.5140, -0.1053]]), y: 4.5, hw: 2.8, name: "Fleet Bridge" },
+const SPANS = [{ L: BRIDGE, y: BRIDGE_Y, hw: 2.6, name: "London Bridge" }, { L: line([[51.5140, -0.1036], [51.5140, -0.1050]]), y: 4.5, hw: 2.8, name: "Fleet Bridge" },
   { L: line([[51.5028, -0.1266], [51.5017, -0.1266]]), y: 2.4, hw: 2, name: "the bridge over the Tyburn" }];
 for (const B of SPANS) { const [ax, az, bx, bz] = [B.L.P[0][0], B.L.P[0][1], B.L.P[1][0], B.L.P[1][1]], len = Math.hypot(bx - ax, bz - az), ry = Math.atan2(bx - ax, bz - az), n = Math.ceil(len / 6);
   for (let k = 0; k < n; k++) { const x = ax + (bx - ax) * (k + 0.5) / n, z = az + (bz - az) * (k + 0.5) / n; put("deck", BOX_G, MAT.wood, x, B.y - 0.35, z, B.hw * 2, 0.35, len / n + 0.05, ry);
@@ -53677,7 +53719,7 @@ const ceilT = tex(256, 256, (g, w, h) => { g.fillStyle = "#6a4a30"; g.fillRect(0
 ceilT.repeat.set(1 / 4, 1 / 4);
 const AMAT = { ashlar: new THREE.MeshStandardMaterial({ map: abT, roughness: 0.85 }), plank: new THREE.MeshStandardMaterial({ map: pnT, roughness: 0.9 }), ceil: new THREE.MeshStandardMaterial({ map: ceilT, roughness: 0.9 }),
   floor: new THREE.MeshStandardMaterial({ map: tex(256, 256, (g, w, h) => { speckle("#a8a090", 2000, ["#b8b0a0", "#989080", "#a09888"])(g, w, h); g.fillStyle = "rgba(70,60,50,.5)"; for (let k = 0; k < w; k += 64) { g.fillRect(k, 0, 2, h); g.fillRect(0, k, w, 2); } }, [1, 1]), roughness: 0.8 }),
-  glow: new THREE.MeshBasicMaterial({ color: 0x9aa4ae, side: THREE.DoubleSide, toneMapped: true }), dark: MAT.dark, red: M(0x8a1a1a), gold: M(0xc8a040, { metalness: 0.7, roughness: 0.35 }), wood: M(0x4e3a28), cloth: M(0xe8e0c8) };
+  glow: new THREE.MeshBasicMaterial({ color: 0x9aa4ae, side: THREE.DoubleSide, toneMapped: true }), dark: MAT.dark, shade: new THREE.MeshStandardMaterial({ color: 0x8a8070, roughness: 0.9, side: THREE.DoubleSide }), lead: new THREE.MeshStandardMaterial({ map: leadT, roughness: 0.6, metalness: 0.3, side: THREE.DoubleSide }), red: M(0x8a1a1a), gold: M(0xc8a040, { metalness: 0.7, roughness: 0.35 }), wood: M(0x4e3a28), cloth: M(0xe8e0c8) };
 AMAT.floor.map.repeat.set(1 / 3, 1 / 3);
 const AG = {}; for (const k in AMAT) AG[k] = [];
 // a box with its texture laid at real size (1 unit of texture = 1 m), base at y
@@ -53697,9 +53739,11 @@ function archPanel(w, y0, y1, open, ys) { const s = new THREE.Shape(), r = open 
 function windowPanel(w, y0, y1, open, ys, yb) { const s = new THREE.Shape(); s.moveTo(-w / 2, y0); s.lineTo(w / 2, y0); s.lineTo(w / 2, y1); s.lineTo(-w / 2, y1); s.closePath();
   const h = new THREE.Path(), r = open / 2; h.moveTo(-r, yb); h.lineTo(r, yb); h.lineTo(r, ys); h.absarc(0, ys, r, 0, Math.PI, false); h.lineTo(-r, yb); s.holes.push(h); return s; }
 // a window: a dark opening outside, pale daylight inside; nrm is the outward direction (+1/-1) along `axis`
+// a round-headed opening, centred on its middle, in the xy plane facing +z
+function archGeo(w, h) { const s = new THREE.Shape(), r = w / 2; s.moveTo(-r, -h / 2); s.lineTo(r, -h / 2); s.lineTo(r, h / 2 - r); s.absarc(0, h / 2 - r, r, 0, Math.PI, false); s.lineTo(-r, -h / 2); return new THREE.ShapeGeometry(s, 8); }
 function windowAt(x, y, z, w, h, axis, nrm, th) { const ry = axis === "z" ? (nrm > 0 ? 0 : Math.PI) : (nrm > 0 ? Math.PI / 2 : -Math.PI / 2);
   const ox = axis === "x" ? nrm * (th / 2 + 0.02) : 0, oz = axis === "z" ? nrm * (th / 2 + 0.02) : 0;
-  const pl = (mat, sx, sz, r) => { const g = new THREE.PlaneGeometry(w, h); AG[mat].push([g, new THREE.Matrix4().compose(V3(x + sx, y + h / 2, z + sz), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, r, 0)), V3(1, 1, 1))]); };
+  const pl = (mat, sx, sz, r) => { const g = archGeo(w, h); AG[mat].push([g, new THREE.Matrix4().compose(V3(x + sx, y + h / 2, z + sz), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, r, 0)), V3(1, 1, 1))]); };
   pl("dark", ox, oz, ry); pl("glow", -ox, -oz, ry + Math.PI); }
 // walls with gaps for doors: along x at z (th thick) or along z at x
 function wallX(x0, x1, z, th, y0, h, gaps = [], mat = "ashlar") { let a = x0; for (const [g0, g1, gh] of [...gaps, [x1, x1, 0]]) { if (g0 > a) slab(mat, (a + g0) / 2, y0, z, g0 - a, h, th, 0, 0, true); if (g1 > g0) slab(mat, (g0 + g1) / 2, y0 + gh, z, g1 - g0, h - gh, th); a = g1; } }
@@ -53745,7 +53789,7 @@ function wallZ(z0, z1, x, th, y0, h, gaps = [], mat = "ashlar") { let a = z0; fo
   for (const zs of [-1, 1]) slab("ashlar", CHOIR_E + 0.7, Y, 7.85 * zs, TH, 12.5, 6.7, 0, 0, true);   // the aisles' east walls
   // the apse: a half-round wall, three windows, a half-cone roof
   for (let k = 0; k < 9; k++) { const a = -Math.PI / 2 + (k + 0.5) / 9 * Math.PI, x = CHOIR_E + Math.cos(a) * 5.7, z = Math.sin(a) * 5.7; slab("ashlar", x, Y, z, TH, 19, 2.05, -a, 0, true);
-    if (k >= 3 && k <= 5) { const g = new THREE.PlaneGeometry(1.1, 2.8), m = new THREE.Matrix4().compose(V3(x - Math.cos(a) * 0.72, Y + 9, z - Math.sin(a) * 0.72), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -a - Math.PI / 2, 0)), V3(1, 1, 1)); AG.glow.push([g, m]);
+    if (k >= 3 && k <= 5) { const g = archGeo(1.1, 2.8), m = new THREE.Matrix4().compose(V3(x - Math.cos(a) * 0.72, Y + 9, z - Math.sin(a) * 0.72), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -a - Math.PI / 2, 0)), V3(1, 1, 1)); AG.glow.push([g, m]);
       const m2 = new THREE.Matrix4().compose(V3(x + Math.cos(a) * 0.72, Y + 9, z + Math.sin(a) * 0.72), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -a + Math.PI / 2, 0)), V3(1, 1, 1)); AG.dark.push([g.clone(), m2]); } }
   { const g = new THREE.CircleGeometry(5.7, 12, -Math.PI / 2, Math.PI).rotateX(Math.PI / 2); AG.ceil.push([g, new THREE.Matrix4().makeTranslation(CHOIR_E, Y + 18.9, 0)]); }
   { const g = new THREE.CylinderGeometry(5.7, 5.7, 0.2, 12, 1, false, 0, Math.PI); AG.floor.push([g, new THREE.Matrix4().makeTranslation(CHOIR_E, Y + 0.1, 0)]); }
@@ -53771,6 +53815,30 @@ function wallZ(z0, z1, x, th, y0, h, gaps = [], mat = "ashlar") { let a = z0; fo
       for (const zs of [-1, 1]) for (let h = 2; h < 10 - (k - 6); h += 2) put("plankS", BOX_G, MAT.wood, xc, Y + h + 0.1, 10.6 * zs, BAY, 0.08, 2.4);
       for (let n = 0; n < 5; n++) { const x = xc + (R() - 0.5) * 3, z = (R() - 0.5) * 7; put("block", BOX_G, AMAT.ashlar, x, Y - 0.1, z, 0.6 + R() * 0.3, 0.4, 0.4 + R() * 0.3, R()); } }
     put("pole", CYL_G, MAT.wood, -50, Y, 0, 0.3, 12, 0.3); put("pole", BOX_G, MAT.wood, -48, Y + 12, 0, 5, 0.25, 0.25); put("pole", CYL_G, MAT.wood, -46, Y, 0, 0.06, 12, 0.06); }
+  // Romanesque exterior detail, as at Jumièges and in the Bayeux Tapestry's picture: flat pilaster buttresses between the bays, string
+  // courses under the windows, a corbel table under the eaves, a round-arched north door, a two-stage crossing tower with blind arcading
+  // below and paired belfry openings above, small apses ending the choir aisles (Gem's reconstruction)
+  const PIL = (x, z, nx, nz, y0, y1, wd = 0.8) => slab("ashlar", x + nx * 0.17, Y + y0, z + nz * 0.17, nx ? 0.34 : wd, y1 - y0, nz ? 0.34 : wd);
+  const nb = [], cb = []; for (let k = 0; k <= 6; k++) nb.push(-5.7 - BAY * k); for (let k = 0; k <= 4; k++) cb.push(5.7 + 5 * k);
+  for (const zs of [-1, 1]) { for (const x of [...nb, ...cb]) { PIL(x, 11.2 * zs, 0, zs, 0, 12.3); PIL(x, 5.7 * zs, 0, zs, 14.5, 19); }
+    for (const [x0, x1] of [[NAVE_DONE, -6.4], [6.4, CHOIR_E + 0.7]]) { for (const y of [2.8, 8.2]) slab("ashlar", (x0 + x1) / 2, Y + y, 11.32 * zs, x1 - x0, 0.18, 0.24); slab("ashlar", (x0 + x1) / 2, Y + 14.9, 5.82 * zs, x1 - x0, 0.15, 0.24);
+      for (let x = x0 + 0.4; x < x1; x += 0.9) { slab("ashlar", x, Y + 12.1, 11.35 * zs, 0.28, 0.25, 0.3); slab("ashlar", x, Y + 18.7, 5.85 * zs, 0.28, 0.25, 0.3); } }
+    for (const x of [-6.4, 6.4]) { const sx = Math.sign(x); for (const z of [11.6, 19, 27.35]) PIL(x, z * zs, sx, 0, 0, 18.8, 1.0); for (let z = 11.6; z < 27.6; z += 0.9) slab("ashlar", x + sx * 0.15, Y + 18.7, z * zs, 0.3, 0.25, 0.28); slab("ashlar", x + sx * 0.12, Y + 2.8, 19.4 * zs, 0.24, 0.18, 16); slab("ashlar", x + sx * 0.12, Y + 13.1, 19.4 * zs, 0.24, 0.18, 16); }
+    for (const x of [-6.4, 0, 6.4]) PIL(x, 27.7 * zs, 0, zs, 0, 18.8, 1.0); slab("ashlar", 0, Y + 10.6, 27.82 * zs, 12.8, 0.18, 0.24); }
+  // the north door: a round arch of two orders with a plain tympanum
+  { const ring = (ri, ro, d, zo) => { const s = new THREE.Shape(); s.absarc(0, 0, ro, 0, Math.PI, false); s.lineTo(-ri, 0); s.absarc(0, 0, ri, Math.PI, 0, true); s.lineTo(ro, 0); const g = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: false, curveSegments: 12 }); AG.ashlar.push([g, new THREE.Matrix4().makeTranslation(0, Y + 4.2, -27.7 - zo)]); };
+    ring(1.7, 2.1, 0.25, 0.25); ring(2.1, 2.5, 0.15, 0.15); const t = new THREE.Shape(); t.absarc(0, 0, 1.7, 0, Math.PI, false); t.lineTo(1.7, 0); AG.ashlar.push([new THREE.ShapeGeometry(t, 12).rotateY(Math.PI), new THREE.Matrix4().makeTranslation(0, Y + 4.2, -27.75)]);
+    for (const sx of [-1, 1]) { const g = new THREE.CylinderGeometry(0.17, 0.17, 4.2, 10); AG.ashlar.push([g, new THREE.Matrix4().makeTranslation(sx * 1.9, Y + 2.1, -27.85)]); } }
+  // the crossing tower: blind arcading on the lower stage, two pairs of round-headed belfry openings above, string courses, corbels
+  for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const fx = nx * 6.32, fz = nz * 6.32, ry = nx ? (nx > 0 ? Math.PI / 2 : -Math.PI / 2) : (nz > 0 ? 0 : Math.PI);
+    const at = (u, y, w, h, mat) => { const g = archGeo(w, h); AG[mat].push([g, new THREE.Matrix4().compose(V3(fx + (nz ? u : 0) + nx * 0.03, Y + y + h / 2, fz + (nx ? u : 0) + nz * 0.03), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), V3(1, 1, 1))]); };
+    for (let k = 0; k < 5; k++) at(-4.4 + k * 2.2, 21.2, 1.5, 4.2, "shade");
+    for (const u of [-3.2, -1.6, 1.6, 3.2]) at(u, 28.4, 1.0, 3.6, "dark");
+    for (const y of [20.2, 27.2, 35.4]) slab("ashlar", fx * 1.0, Y + y, fz * 1.0, nz ? 13.0 : 0.3, 0.22, nx ? 13.0 : 0.3);
+    for (const u of [-6.3, 6.3]) slab("ashlar", fx + (nz ? u : 0) + nx * 0.17, Y + 19, fz + (nx ? u : 0) + nz * 0.17, nx ? 0.34 : 1.0, 17, nz ? 0.34 : 1.0); }
+  // small apses at the east ends of the choir aisles
+  for (const zs of [-1, 1]) { const cz = 7.85 * zs, cx = CHOIR_E + 1.4; for (let k = 0; k < 6; k++) { const a = -Math.PI / 2 + (k + 0.5) / 6 * Math.PI; slab("ashlar", cx + Math.cos(a) * 2.6, Y, cz + Math.sin(a) * 2.6, 0.9, 11.5, 1.5, -a, 0, true); }
+    windowAt(cx + 3.1, Y + 4, cz, 0.8, 2.0, "x", 1, 0.9); const g = new THREE.ConeGeometry(3.2, 2.6, 10, 1, true, 0, Math.PI); AG.lead.push([g, new THREE.Matrix4().makeTranslation(cx, Y + 11.5 + 1.3, cz)]); }
   flushAG(); rRect(-20, 30, 160, 140, 0, 4);
 }
 function inAbbey(x, z) { return (x > NAVE_DONE && x < CHOIR_E && Math.abs(z) < 11.2) || (Math.abs(x) < 6.4 && Math.abs(z) < 27.7) || (x >= CHOIR_E && Math.hypot(x - CHOIR_E, z) < 5.7); }
@@ -53906,16 +53974,38 @@ const markLL = (name, lat, lon, tag, text, o) => { const [x, z] = LL(lat, lon); 
 
 // ---------- churches ----------
 function findFree(x, z, w, d, ry = 0) { for (let r = 0; r < 60; r += 3) for (let a = 0; a < 6.28; a += r ? 0.7 : 7) { const X = x + Math.cos(a) * r, Z = z + Math.sin(a) * r; if (rRect(X, Z, w, d, ry, 0, true)) return [X, Z]; } return [x, z]; }
-{ // St Paul's: its site on Ludgate Hill is certain, its form unknown
+{ // St Paul's: its site on Ludgate Hill is certain, its form unknown. Shown as a Late Saxon great church, with features of those that survive
+  // or have been excavated: Canterbury's Anglo-Saxon cathedral (aisled nave, apse; excavated 1993), the westwork tower of Winchester Old
+  // Minster, side chapels (porticus) as at Deerhurst and Brixworth, pilaster strips and long-and-short quoins as at Earls Barton, small
+  // round- and triangular-headed openings, and walls rendered and limewashed.
   const [x, z] = LL(51.5138, -0.0985), gy = groundH(x, z) - 0.3; rRect(x, z, 150, 96, 0, 4);
-  gChurch(x - 4, z, { nl: 44, nw: 17, cl: 14, cw: 10, wh: 11, mat: "rag", roof: "shingle" }); solid(x - 4, z, 44, 17, 0); solid(x + 25, z, 14, 10, 0);
-  { const F = FR(x - 30.5, z, 0, gy); GTINT = [1.05, 1.03, 1]; gbox(F, "rubble", 0, 13, 0, 9, 26, 9); GTINT = [1, 1, 1]; for (const [ox, oz, o] of [[4.5, 0, [1, 0, 0]], [-4.5, 0, [-1, 0, 0]], [0, 4.5, [0, 0, 1]], [0, -4.5, [0, 0, -1]]]) { garch(F, "dark", ox, 21, oz, 0.9, 2.6, o); }
-    garch(F, "dark", -4.5, 0, 0, 1.8, 3.4, [-1, 0, 0]); put("cap", CONE4_G, MAT.shingle, x - 30.5, gy + 26, z, 10, 6, 10); solid(x - 30.5, z, 9, 9, 0); }
+  const NF = FR(x, z, Math.PI / 2, gy), lime = [1.32, 1.3, 1.24], dress = [1.22, 1.18, 1.1];
+  const gtri = (F, cx, y0, cz, w, h, out) => { const along = out[0] ? [0, 0, 1] : [1, 0, 0], P = (u, y) => [cx + along[0] * u + out[0] * 0.03, y, cz + along[2] * u + out[2] * 0.03], r = w / 2, ys = y0 + h - r;
+    gpoly(F, "dark", [P(-r, y0), P(r, y0), P(r, ys), P(-r, ys)], [[0, 0], [1, 0], [1, 1], [0, 1]], out); gpoly(F, "dark", [P(-r, ys), P(r, ys), P(0, y0 + h)], [[0, 0], [1, 0], [0.5, 1]], out); };
+  GTINT = lime; gbox(NF, "daub", 0, 6.5, 0, 9, 13, 40); for (const sx of [-1, 1]) gbox(NF, "daub", sx * 6.75, 3.5, 0, 4.5, 7, 40);   // the nave and its aisles
+  GTINT = [0.9, 0.9, 0.9]; for (const sx of [-1, 1]) gpoly(NF, "shingle", [[sx * 9.3, 7.2, -20.2], [sx * 9.3, 7.2, 20.2], [sx * 4.5, 9.7, 20.2], [sx * 4.5, 9.7, -20.2]], [[0, 0], [40, 0], [40, 5], [0, 5]], [sx, 1, 0]);
+  groof(NF, "shingle", 9, 40, 13, 5, { e: 0.4, g: 0.3 });
+  GTINT = [1, 1, 1]; for (const sx of [-1, 1]) for (let zz = -16; zz <= 16; zz += 4) { garch(NF, "dark", sx * 4.5, 10.2, zz, 0.6, 1.5, [sx, 0, 0]); garch(NF, "dark", sx * 9, 3.2, zz, 0.5, 1.3, [sx, 0, 0]); }
+  GTINT = dress; for (const sx of [-1, 1]) for (let zz = -18; zz <= 18; zz += 4) gbox(NF, "rubble", sx * 4.55, 10.0, zz, 0.1, 6, 0.32, "bt");   // pilaster strips on the clerestory
+  for (const sx of [-1, 1]) { const [px, , pz] = gw(NF, sx * 12, 0, 14), PF = FR(px, pz, 0, gy, NF.key); GTINT = lime; gbox(PF, "daub", 0, 3.5, 0, 6, 7, 6); GTINT = [0.9, 0.9, 0.9]; groof(PF, "shingle", 6, 6, 7, 3.5, { e: 0.3 });   // side chapels
+    GTINT = [1, 1, 1]; garch(PF, "dark", 0, 3, -3 * sx, 0.5, 1.3, [0, 0, -sx]); solid(px, pz, 6, 6, 0); }
+  { const [cx, , cz] = gw(NF, 0, 0, 26), CF = FR(cx, cz, Math.PI / 2, gy, NF.key); GTINT = lime; gbox(CF, "daub", 0, 5.5, 0, 9, 11, 12); GTINT = [0.9, 0.9, 0.9]; groof(CF, "shingle", 9, 12, 11, 4.5, { e: 0.35 });   // the chancel and apse
+    GTINT = [1, 1, 1]; for (const sx of [-1, 1]) garch(CF, "dark", sx * 4.5, 6, 0, 0.55, 1.5, [sx, 0, 0]);
+    const [ax, , az] = gw(NF, 0, 0, 32); GTINT = lime; for (let k = 0; k < 7; k++) { const a = -Math.PI / 2 + (k + 0.5) / 7 * Math.PI, SF = FR(ax + Math.cos(a) * 4.1, az + Math.sin(a) * 4.1, -a, gy, NF.key); gbox(SF, "daub", 0, 4.5, 0, 0.8, 9, 2.0); if (k === 3) { GTINT = [1, 1, 1]; garch(SF, "dark", 0.4, 4.5, 0, 0.5, 1.4, [1, 0, 0]); GTINT = lime; } }
+    put("spapse", new THREE.ConeGeometry(4.8, 4, 10, 1, true, 0, Math.PI), new THREE.MeshStandardMaterial({ map: shingleT, roughness: 0.95, side: THREE.DoubleSide }), ax, gy + 9 + 2, az, 1, 1, 1); solid(cx, cz, 12, 9, 0); solid(ax + 2, az, 4, 8, 0); }
+  { const [tx, , tz] = gw(NF, 0, 0, -25), TF = FR(tx, tz, Math.PI / 2, gy, NF.key), H = 28; GTINT = lime; gbox(TF, "daub", 0, H / 2, 0, 10, H, 10);   // the west tower
+    GTINT = dress; for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (let y = 0; y < H - 1; y += 1.5) { gbox(TF, "rubble", sx * 5, y + 0.6, sz * 5, 0.42, 1.2, 0.42, ""); gbox(TF, "rubble", sx * 4.75, y + 1.32, sz * 4.75, 0.95, 0.24, 0.95, ""); }   // long-and-short quoins
+    for (const [ox, oz, o] of [[5, 0, [1, 0, 0]], [-5, 0, [-1, 0, 0]], [0, 5, [0, 0, 1]], [0, -5, [0, 0, -1]]]) { const strip = (u, y0, y1) => gbox(TF, "rubble", ox + (o[2] ? u : 0) + o[0] * 0.05, (y0 + y1) / 2, oz + (o[0] ? u : 0) + o[2] * 0.05, o[0] ? 0.1 : 0.3, y1 - y0, o[0] ? 0.3 : 0.1, "bt");
+      GTINT = dress; for (const u of [-2.6, 2.6]) strip(u, 1.5, 19.5); for (const y of [10, 19.6]) gbox(TF, "rubble", ox + o[0] * 0.06, y, oz + o[2] * 0.06, o[0] ? 0.12 : 10, 0.25, o[0] ? 10 : 0.12, "");
+      GTINT = [1, 1, 1]; gtri(TF, ox, 13, oz, 0.7, 1.9, o); for (const u of [-1.0, 1.0]) garch(TF, "dark", ox + (o[2] ? u : 0), 22, oz + (o[0] ? u : 0), 1.3, 2.6, o);
+      GTINT = dress; gbox(TF, "rubble", ox + o[0] * 0.12, 23.2, oz + o[2] * 0.12, o[0] ? 0.25 : 0.32, 2.4, o[0] ? 0.32 : 0.25, ""); }
+    GTINT = [1, 1, 1]; garch(TF, "dark", 0, 0, -5, 1.8, 3.6, [0, 0, -1]); put("cap", CONE4_G, MAT.shingle, tx, gy + H, tz, 11, 5, 11); solid(tx, tz, 10, 10, 0); }
+  GTINT = [1, 1, 1]; solid(x, z, 40, 18.6, 0);
   for (const [dx, dz] of [[-10, 26], [6, 28], [22, -24], [-16, -26]]) addHouse(x + dx, z + dz, 6, 10, 0, { wall: "plank", roof: "shingle", door: "-z" });   // canons' houses
-  mark("St Paul's Cathedral", x, z, "inferred", "London's cathedral since Bishop Mellitus founded it in 604, on the top of Ludgate Hill. The church that stood here in 1066 was rebuilt after a fire in 962 and burned down in 1087, when the great Norman cathedral (Old St Paul's) was begun. No trace of the Saxon building has been found, so its form here is a guess: a large stone church with a west tower, in a precinct with the canons' houses. The bishop of London in 1066 was William, a Norman appointed by Edward the Confessor in 1051.", { big: true, range: 3000, y: 34, r: 45 });
+  mark("St Paul's Cathedral", x, z, "inferred", "London's cathedral since Bishop Mellitus founded it in 604, on the top of Ludgate Hill. The church that stood here in 1066 was rebuilt after a fire in 962 and burned down in 1087, when the great Norman cathedral (Old St Paul's) was begun. No trace of the Saxon building has been found, so it is shown as a Late Saxon great church, quite unlike the new Norman abbey at Westminster: an aisled nave with side chapels and an apse (as in the excavated Anglo-Saxon cathedral at Canterbury), a big west tower (like Winchester Old Minster's westwork), rendered and limewashed walls with pilaster strips, long-and-short corner stones and small round- and triangular-headed openings (as at Earls Barton, Deerhurst and Brixworth), in a precinct with the canons' houses. The bishop of London in 1066 was William, a Norman appointed by Edward the Confessor in 1051.", { big: true, range: 3000, y: 34, r: 45 });
 }
 const CH = [["All Hallows by the Tower", 51.5098, -0.0795, "known", "Founded by Barking Abbey in the 7th century: a round-headed arch of reused Roman tiles from that first church still stands inside the present one. A stone church, the oldest in the City."],
-  ["St Bride's", 51.5136, -0.1053, "known", "Dedicated to St Brigid of Kildare, beside the Fleet. Excavated after the church was bombed in 1940: a small stone two-cell church of the 11th century (perhaps earlier) over Roman remains."],
+  ["St Bride's", 51.5136, -0.1053, "known", "Dedicated to St Brigid of Kildare, on the gravel terrace just west of the Fleet, beside a holy well (Bride's Well, later Bridewell). Excavated after the church was bombed in 1940: a small stone two-cell church of the 11th century (perhaps earlier) over Roman remains."],
   ["St Alban, Wood Street", 51.5163, -0.0935, "known", "A small Late Saxon church excavated after the Blitz, inside the corner of the old Roman fort. Medieval legend tied it to King Offa of Mercia."],
   ["St Andrew, Holborn", 51.5172, -0.1080, "known", "Recorded in a charter of 951 as 'the old wooden church of St Andrew' on the Holborn road outside the city: shown here in timber."],
   ["St Clement Danes", 51.5131, -0.1140, "known", "The church of the Danish community outside the walls on the road to Westminster. Harold Harefoot, king 1035-1040, was said to be buried here."],
@@ -53962,7 +54052,7 @@ markLL("The vill of Westminster", 51.5012, -0.1262, "known", "The little settlem
 // ---------- the land: Thorney, rivers, marsh, hills ----------
 markLL("Thorney Island", 51.4980, -0.1290, "known", "'The island of thorns': a gravel island about 470 by 370 m, between two mouths of the Tyburn stream and the Thames. Here the abbey of St Peter was founded in the 10th century (a minster may have stood here earlier), and Edward the Confessor built his palace and great church. It was 'Westminster', the west minster, as against St Paul's in the east.", { big: true, range: 2500, y: 30 });
 markLL("The Tyburn", 51.5032, -0.1300, "known", "A stream from Hampstead that split into channels as it reached the Thames, making Thorney an island. Their exact courses are uncertain; they were later culverted and built over.", { range: 600 });
-markLL("The Fleet", 51.5150, -0.1056, "known", "London's second river: a tidal inlet up to 100 m wide at its mouth, with wharves and mills. Fleet Street crossed it by a bridge just outside Ludgate. It was later narrowed into a canal and then buried; it still runs, in a sewer.", { range: 1500 });
+markLL("The Fleet", 51.5150, -0.1046, "known", "London's second river: a tidal inlet up to 100 m wide at its mouth, with wharves and mills. Fleet Street crossed it by a bridge just outside Ludgate. It was later narrowed into a canal and then buried; it still runs, in a sewer.", { range: 1500 });
 markLL("The Walbrook", 51.5125, -0.0903, "known", "A small stream running down the valley between the City's two hills, Ludgate Hill and Cornhill, to the Thames. Its banks were boggy; Roman finds from it include the temple of Mithras. By 1066 it was silting and narrow.", { range: 500 });
 markLL("Moorfields", 51.5195, -0.0880, "known", "The great marsh outside the north wall: the Roman wall dammed the streams that ran south, and the ground behind it became a fen. On frozen winters, a 12th-century writer says, young men skated here on animal shin-bones.", { range: 1500 });
 markLL("Ludgate Hill", 51.5139, -0.0995, "known", "The western of the City's two hills, about 15-18 m above the river, with St Paul's on its top.", { range: 300, hidden: true });
@@ -54059,7 +54149,7 @@ const PAL_DOOR = [PAL.northDoor[0], PAL.northDoor[2]], PAL_IN = [PAL.inNorth[0],
 const PROC_PATH = [PAL_DOOR, [PAL_DOOR[0] - 13, PAL_DOOR[1] + 4], [PALACE[0] - 47, PALACE[1]], [110, 10], [90, -45], [30, -45], [0, -40], ND, [0, -12], [0, -2]];   // out of the hall, through the palisade gate, round to the north door
 // the procession and the principals
 const PRIN = {};
-{ const order = [["cleric", "cross"], ["cleric", "candle"], ["cleric", "candle"], ["cleric", "book"], ["cleric"], ["cleric"], ["monk", "edwin"], ["bishop", "geoffrey"], ["bishop", "ealdred"], ["norman", "william"],
+{ const order = [["cleric", "cross"], ["cleric", "candle"], ["cleric", "candle"], ["cleric", "book"], ["cleric"], ["cleric"], ["monk", "edwin"], ["bishop", "geoffrey"], ["archbishop", "ealdred"], ["duke", "william"],
     ["norman", "lord"], ["norman", "lord"], ["norman", "lord"], ["norman", "lord"], ["norman", "lord"], ["norman", "lord"]];
   const stations = { cross: [21.5, 0, -Math.PI / 2], candle: [19.5, 2.2, -Math.PI / 2], book: [17.2, -1.4, Math.PI / 2], edwin: [17.4, 2.6, -Math.PI / 2], geoffrey: [-0.5, -3.5, -Math.PI / 2], ealdred: [17.0, 0, -Math.PI / 2], william: [15.5, 0, Math.PI / 2] };
   let ci = 0, li = 0;
@@ -54077,7 +54167,7 @@ for (let k = 0; k < 18; k++) { const zs = k % 2 ? 1 : -1, x = -12.5 + Math.floor
   for (let x = -14.5; x < -6.5; x += 1.15) for (const z of [6.4, 7.5, 8.6, 9.6, -6.4, -7.5, -8.6, -9.6]) spots.push([x + (R() - 0.5) * 0.3, z, "nave"]);
   for (let x = -4.2; x <= 4.2; x += 1.1) for (let z = 11; z < 25.5; z += 1.1) { spots.push([x + (R() - 0.5) * 0.3, z, "s"]); if (z > 11.5) spots.push([x + (R() - 0.5) * 0.3, -z, "n"]); }
   const nCong = Math.min(spots.length, NC - nextI - 260);
-  for (let k = 0; k < nCong; k++) { const sp = spots[Math.floor(R() * spots.length)]; spots.splice(spots.indexOf(sp), 1); const north = sp[1] < 0, role = north ? (R() < 0.85 ? "norman" : "cleric") : (R() < 0.3 ? "woman" : R() < 0.25 ? "noble" : R() < 0.1 ? "cleric" : "eng");
+  for (let k = 0; k < nCong; k++) { const sp = spots[Math.floor(R() * spots.length)]; spots.splice(spots.indexOf(sp), 1); const north = sp[1] < 0, role = north ? (R() < 0.96 ? "norman" : "cleric") : (R() < 0.3 ? "woman" : R() < 0.3 ? "noble" : R() < 0.04 ? "cleric" : "eng");
     const out = sp[2] === "nave" ? [WD, [WD[0] - 6, sp[1] * 0.4], [-50 - R() * 30, -14 - R() * 6], [-40 + R() * 100, -60 - R() * 70]] : [[0, sp[1] * 0.6], ND, [0, -34], [-30 + R() * 140, -60 - R() * 80]];
     const A = agent(role, { cong: true, seat: [sp[0], sp[1]], out: [[sp[0], sp[1]], ...out], leaveAt: T.flee + R() * 200 + (sp[2] === "s" ? 50 : 0), speed: 1.5 + R() * 0.8 });
     A.faceSeat = face(sp[0], sp[1], 10, sp[1] * 0.2); } }
@@ -54120,12 +54210,26 @@ mark("Norman lords and knights", 0, -18, "person", "The Norman nobles and knight
 mark("The English", 0, 18, "person", "English thegns, churchmen and Londoners. English men wore their hair long, with moustaches; women covered their hair with a headrail.", { y: 4, r: 10, range: 80 });
 mark("Norman guards", -10, -48, "person", "Armed Norman knights and soldiers posted round the abbey and in the town: mail hauberks, conical helmets with a nose-guard, kite-shaped shields and spears, as in the Bayeux Tapestry.", { y: 4, r: 14, range: 200 });
 // what each kind of person is wearing (E near anyone)
-const DRESS = { eng: "An Englishman: knee-length woollen tunic, belted, hose or leg wrappings, a cloak pinned at the shoulder with a brooch; long hair and a moustache (the Tapestry draws the English so, unlike the Normans).",
+const DRESS0 = { eng: "An Englishman: knee-length woollen tunic, belted, hose or leg wrappings, a cloak pinned at the shoulder with a brooch; long hair and a moustache (the Tapestry draws the English so, unlike the Normans).",
   woman: "An Englishwoman: an ankle-length gown over a linen underdress, a headrail (veil) covering the hair and shoulders, a cloak in winter. Married women always covered their hair.",
   child: "A child, dressed like the grown-ups in small: tunic or gown, cloak, leather shoes.", norman: "A Norman: tunic and cloak in strong colours, the hair cut short with the back of the head shaved, clean-shaven.",
   soldier: "A Norman soldier: a mail hauberk to the knees over a padded tunic, a conical iron helmet with a nose-guard, a kite-shaped wooden shield, a spear; a sword at the belt.",
   monk: "A Benedictine monk of Westminster: a black habit and cowl, tonsured.", cleric: "A cleric in a white alb, the long linen robe of the clergy at the altar.", bishop: "A bishop: alb, coloured chasuble, mitre (low two-horned mitres were just coming into use in the 1060s).",
   noble: "An English thegn, a landholder of rank: a better-dyed tunic and cloak, a fine brooch.", king: "The king, crowned, in rich robes." };
+// what each kind of person wears, from the Bayeux Tapestry, grave finds and written sources
+const DRESS = {
+  eng: "An Englishman: a knee-length woollen tunic, bloused over a belt, over a linen shirt; hose or leg-wrappings (winingas) bound to the knee; leather turnshoes. Most cloth was undyed wool (off-white, grey, brown) or cheaply dyed with woad (blue), madder (red) or weld (yellow). A rectangular cloak pinned at the right shoulder, leaving the sword arm free; a hood or soft cap in winter. Englishmen wore their hair long, with a moustache (as the Tapestry draws them); older men often a beard.",
+  woman: "An Englishwoman: an ankle-length woollen gown (cyrtel) over a linen underdress, belted with a girdle; a linen headrail (veil) wrapped over the head and neck: a grown woman's hair was always covered. In winter a closed mantle over the shoulders. Better-off women had embroidered bands at hem and cuffs.",
+  child: "A child, dressed like a small adult: boys in tunics and hose, girls in gowns with their hair loose and uncovered (only married women covered theirs).",
+  norman: "A Norman lord or knight in his best: a knee-length tunic in strong colours with a woven band at the hem, a cloak pinned at the right shoulder, coloured hose. The hair cut short and the back of the head shaved, clean-shaven: the Tapestry marks Normans out this way.",
+  soldier: "A Norman soldier: a mail hauberk to the knees, split front and back for riding, with mail sleeves to the elbow, over a padded tunic; mail round the neck; a conical iron helmet with a nose-guard; a kite-shaped wooden shield, painted; a spear; a sword on a belt at the left hip.",
+  monk: "A Benedictine monk of Westminster: a black woollen habit (tunic and cowl), a cord belt, the crown of the head shaved (the tonsure), clean-shaven.",
+  cleric: "A cleric serving at the altar: a long white linen alb, belted, the tonsure.",
+  bishop: "A bishop vested for mass: a white alb; over it the chasuble, a coloured silk vestment shaped like a bell; the low, rounded mitre of the 1060s (the tall two-horned mitre came in the next century); a crozier, the bishop's pastoral staff.",
+  archbishop: "An archbishop: vested like a bishop, with the pallium over the chasuble, a white woollen band round the shoulders with strips hanging front and back, sent by the pope.",
+  noble: "An English thegn, a landholder of rank: tunic and cloak in strong dyes with an embroidered or tablet-woven band, a gilt brooch at the shoulder; long hair, moustache.",
+  duke: "William, duke of Normandy, in a long robe and a mantle for the ceremony; Norman haircut, clean-shaven.",
+  king: "King William, crowned: the crown (the Carmen describes one with twelve gems), sceptre in hand, a long robe and mantle." };
 
 // ---------- moving everyone, by the clock ----------
 function personY(x, z) { if (inAbbey(x, z)) return AB_F; const F = PAL.hall, dx = x - F.x, dz = z - F.z, lx = dx * F.c - dz * F.s, lz = dx * F.s + dz * F.c; if (Math.abs(lx) < 5.85 && lz > 11.15 && lz < 14.9) return F.gy + 0.45;   // the dais
@@ -54154,7 +54258,7 @@ function agentState(A) { const S = SIM;
     const fight = _aseed(A) < 0.45, F = FIRE_H[A.i % FIRE_H.length], tgt = fight && F ? [F.x + Math.cos(A.i) * (F.w / 2 + 3), F.z + Math.sin(A.i) * (F.d / 2 + 3)] : A.fleeTo, P = [[A.fixed[0], A.fixed[1]], tgt], [x, z, h, done] = routeAt(P, (S - go) * A.speed);
     return done ? [x, z, fight && F ? face(x, z, F.x, F.z) : h, fight ? "hammer" : "talk"] : [x, z, h, "walk", true, A.speed]; }
   if (A.torch && S > T.shout + 15) { const H = A.torch, P = [[A.fixed[0], A.fixed[1]], [H.dp[0] + Math.sin(H.dp[2]) * 2, H.dp[1] + Math.cos(H.dp[2]) * 2]], s = (S - T.shout - 15) * Math.max(0.6, Math.hypot(P[1][0] - P[0][0], P[1][1] - P[0][1]) / Math.max(10, A.torchAt - T.shout - 15)), [x, z, h, done] = routeAt(P, s);
-    return done ? [x, z, face(x, z, H.x, H.z), "guard"] : [x, z, h, "carry", true]; }
+    return done ? [x, z, face(x, z, H.x, H.z), "guard"] : [x, z, h, "walk", true]; }
   if (A.loop) { const P = A.loop, L = A.loopL || (A.loopL = P.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - P[i][0], p[1] - P[i][1]), 0)), u = (S * A.speed + A.phase * 7) % (2 * L + 16);   // to the hall and back, a pause at each end
     if (u < L) { const [x, z, h] = routeAt(P, u); return [x, z, h, "carry", true]; } if (u < L + 8) { const [x, z, h] = routeAt(P, L); return [x, z, h, "sell"]; }
     if (u < 2 * L + 8) { const [x, z, h] = routeAt(P, 2 * L + 8 - u); return [x, z, h + Math.PI, "walk", true]; } const [x, z, h] = routeAt(P, 0); return [x, z, h + Math.PI, "stand"]; }
@@ -54175,7 +54279,7 @@ function lifeStep(dt, t) { frameN++; const px = P_.x, pz = P_.z, rate = Math.min
     const [x, z, h, kind, moving, sp] = st; A.x = x; A.z = z; A.h = h; A.kind = kind; const d = Math.hypot(x - px, z - pz);
     if (!seen(x, z, d)) { if (A.shown) { crowd.hide(A.i); A.shown = false; } continue; }
     const step = d < 35 ? 1 : d < 120 ? 3 : 8; if ((frameN + A.i) % step && A.shown) continue;
-    if (A.key === "william") { const crowned = SIM > T.crown + 20; if (crowned !== !!A.crowned) { A.crowned = crowned; A.L = looks(A.i, crowned ? "king" : "norman"); crowd.look(A.i, A.L); } }
+    if (A.key === "william") { const crowned = SIM > T.crown + 20; if (crowned !== !!A.crowned) { A.crowned = crowned; A.L = looks(A.i, crowned ? "king" : "duke"); crowd.look(A.i, A.L); } }
     let y = personY(x, z); if (A.key === "william" && kind === "sit") y = AB_Y + 0.76;
     crowd.set(A.i, x, y, z, h, kind, t, moving ? Math.min(2, (sp || 0.9) / 1.2) * Math.min(rate, 3) : 1); A.shown = true; }
   crowd.done(); }
@@ -54454,7 +54558,7 @@ function frame() {
   sun.position.copy(rig.position).addScaledVector(S.dir, 800); sun.target.position.copy(rig.position);
   sun.intensity = 2.2 * clampN(el * 6, 0, 1); sun.color.setRGB(1, 0.88 - 0.25 * dusk, 0.74 - 0.4 * dusk); hemi.intensity = 0.2 + 1.45 * day;
   const inA = inAbbey(P_.x, P_.z) && !flying, zn = flying ? null : zoneOf(P_.x, P_.z), Z = zn && zn !== "abbey" ? ZONES.find(q => q.name === zn) : null;
-  hemi.groundColor.setHex(inA ? 0x9a8c78 : 0x7a7060); if (INSIDE_H) { sun.intensity *= 0.1; hemi.intensity *= 0.12; } else if (inA) { sun.intensity *= 0.12; hemi.intensity *= 0.75; } else if (Z) { sun.intensity *= 0.1; hemi.intensity *= 0.3; }
+  hemi.groundColor.setHex(inA ? 0x9a8c78 : 0x7a7060); if (INSIDE_H) { sun.intensity *= 0.1; hemi.intensity *= 0.12; } else if (inA) { sun.intensity *= 0.12; hemi.intensity *= 0.6; } else if (Z) { sun.intensity *= 0.1; hemi.intensity *= 0.3; }
   if (Z) { const up = Z.light0 && P_.y < Z.F.gy + 2.5, lp = gw(Z.F, ...(up ? Z.light0 : Z.light)); houseLight.position.set(...lp); houseLight.distance = Z.name === "hall" ? 34 : 14; houseLight.intensity = (Z.name === "hall" ? 65 : 16) * (0.88 + 0.08 * Math.sin(t * 13) + 0.04 * Math.sin(t * 29)); } else if (!INSIDE_H) houseLight.intensity = 0;
   abbeyLight.intensity = Math.hypot(P_.x, P_.z) < 90 ? (inA ? 260 : 30) * (0.9 + 0.1 * Math.sin(t * 7)) : 0;
   dayUp.setRGB(0.55, 0.62, 0.72).multiplyScalar(0.05 + 0.95 * day); dayHor.setRGB(0.80, 0.80, 0.80).multiplyScalar(0.06 + 0.94 * day).lerp(_c1.setRGB(0.95, 0.62, 0.40), dusk * 0.5);
