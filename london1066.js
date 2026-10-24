@@ -321,7 +321,7 @@ const STREETS = [
   ["Borough High Street", 7, [[51.5062, -0.0878], [51.5045, -0.0890], [51.5025, -0.0905], [51.5000, -0.0920], [51.4975, -0.0930]]],
   ["the road to Lambeth", 4, [[51.5000, -0.0920], [51.4985, -0.1000], [51.4965, -0.1100], [51.4952, -0.1185]]],
 ].map(([name, w, pts]) => ({ name, w, L: line(pts) }));
-const BRIDGE = line([[51.5097, -0.0872], [51.5062, -0.0878]]), BRIDGE_Y = 2.4;   // London Bridge, timber, on the line of Fish Street Hill
+const BRIDGE = line([[51.5097, -0.0872], [51.5062, -0.0878]]), BRIDGE_Y = 4.5;   // deck height above high water: not known; ships rowed under it (Olaf, 1014), so set well clear   // London Bridge, timber, on the line of Fish Street Hill
 
 // ---------- the land-use raster: 2 m cells over the whole map, for ground colour, placing buildings without overlaps, and walking ----------
 // 0 open ground, 1 street, 2 building, 3 yard, 4 churchyard / precinct, 5 ploughed field, 6 burnt ground, 7 wall
@@ -681,7 +681,7 @@ const SPANS = [{ L: BRIDGE, y: BRIDGE_Y, hw: 2.6, name: "London Bridge" }, { L: 
 // each bridge runs on past its ends onto dry land, its deck ramping down to the ground on either bank (timber approaches on earth banks)
 for (const B of SPANS) { const [ax0, az0, bx0, bz0] = B.L.S[0], len0 = Math.hypot(bx0 - ax0, bz0 - az0), ux = (bx0 - ax0) / len0, uz = (bz0 - az0) / len0;
   let ea = 4, eb = 4; while (ea < 60 && baseH(ax0 - ux * ea, az0 - uz * ea) < B.y - 1.1) ea += 3; while (eb < 60 && baseH(bx0 + ux * eb, bz0 + uz * eb) < B.y - 1.1) eb += 3;   // walk out until the bank is near deck height
-  B.ax = ax0 - ux * ea; B.az = az0 - uz * ea; B.ux = ux; B.uz = uz; B.len = len0 + ea + eb; B.gA = baseH(B.ax, B.az); B.gB = baseH(B.ax + ux * B.len, B.az + uz * B.len); B.R = Math.max(10, Math.min(ea, eb) + 6);
+  B.ax = ax0 - ux * ea; B.az = az0 - uz * ea; B.ux = ux; B.uz = uz; B.len = len0 + ea + eb; B.gA = baseH(B.ax, B.az); B.gB = baseH(B.ax + ux * B.len, B.az + uz * B.len); B.R = Math.max(14, Math.min(ea, eb) + 10);
   B.yAt = s => { const ra = Math.max(0, 1 - s / B.R), rb = Math.max(0, 1 - (B.len - s) / B.R); return B.y + (B.gA + 0.15 - B.y) * ra * ra * (3 - 2 * ra) + (B.gB + 0.15 - B.y) * rb * rb * (3 - 2 * rb); };
   const ry = Math.atan2(ux, uz), n = Math.ceil(B.len / 3);
   for (let k = 0; k < n; k++) { const s0 = B.len * k / n, s1 = B.len * (k + 1) / n, sm = (s0 + s1) / 2, x = B.ax + ux * sm, z = B.az + uz * sm, y0 = B.yAt(s0), y1 = B.yAt(s1), ym = (y0 + y1) / 2, seg = Math.hypot(s1 - s0, y1 - y0);
@@ -1513,7 +1513,7 @@ function boatsStep(t, dt) { let ci = 0, oi = 0, gi = 0, si = 0, pi = 0, pj = 0;
   for (const k in RB) RB[k].instanceMatrix.needsUpdate = true; }
 mark("Ships below the bridge", ...THAMES.at(BRIDGE_S + 260).slice(0, 2), "known", "Seagoing ships could not pass the low timber bridge: they moored and unloaded at Billingsgate and along the shore below it. The tolls of about 1000 list wine ships from Rouen, ships from Flanders, Ponthieu, Normandy and France, and the emperor's men from Germany, who paid in pepper, gloves and vinegar at Christmas and Easter. Their sails were striped, as the Bayeux Tapestry shows.", { y: 8, range: 1500, r: 80 });
 mark("River traffic", ...THAMES.at(BRIDGE_S - 700).slice(0, 2), "typical", "Above the bridge: barges rowed and poled with grain, stone (Caen stone for the abbey, Kentish rag), timber and firewood; ferries and passenger boats; fishermen at their weirs. " + (MARKET ? "A busy market day." : "Christmas Day, a holy day: few boats are out."), { y: 6, range: 1500, r: 80 });
-mark("Passing the bridge", ...THAMES.at(BRIDGE_S - 60).slice(0, 2), "inferred", "The timber bridge stood on rows of trestles a few metres apart, its deck only a few metres above high water. Barges and boats rowed through the gaps (at the turn of the tide, when the current was slack). How seagoing ships reached Queenhithe above the bridge is not known: ships of the Scandinavian kind could lower the mast and row through, and the bridge may have had a section that could be raised, as the stone bridge later had a drawbridge. Most unloaded below it, at Billingsgate.", { y: 6, range: 800, r: 40 });
+mark("Passing the bridge", ...THAMES.at(BRIDGE_S - 60).slice(0, 2), "inferred", "The timber bridge stood on rows of trestles a few metres apart. Its height is not known, but ships could row under it: the sagas tell how in 1014 King Olaf's ships, roofed over with wattle against the stones thrown down on them, rowed up beneath the bridge and tied ropes round its piles to pull it down. It also had to clear the highest tides and winter floods (the tidal range was smaller than today's 7 m). Here the deck is about 4.5 m above high water, more at low tide. Barges and boats rowed through the gaps, best at slack water; seagoing ships lowered their masts and rowed through, or unloaded below the bridge at Billingsgate.", { y: 6, range: 800, r: 40 });
 
 // ---------- carts, packhorses and riders in the streets ----------
 // Anglo-Saxon calendars (the 11th-century Cotton Julius A.vi and Tiberius B.v) show two-wheeled carts drawn by oxen and horses; carters
