@@ -253,9 +253,10 @@ const BROOKS = [line([[51.5400, -0.1650], [51.5250, -0.1530], [51.5150, -0.1480]
 const THORNEY = { c: LL(51.4995, -0.1268), rx: 235, rz: 185 };
 const HILLS = [[...LL(51.5138, -0.0985), 9, 380], [...LL(51.5135, -0.0860), 9, 380], [...LL(51.5150, -0.0930), 4, 500]];
 // the Roman wall (late 2nd century, ragstone with tile courses), its known line from the Tower to Blackfriars, and its gates
-const WALL_PTS = [[51.5081, -0.0759], [51.5110, -0.0752], [51.5135, -0.0770], [51.5150, -0.0790], [51.5163, -0.0815], [51.5172, -0.0850], [51.5177, -0.0890], [51.5178, -0.0935], [51.5181, -0.0960],
+const WALL_PTS = [[51.5076, -0.0753], [51.5110, -0.0751],   // the wall reached the river just east of where the White Tower would stand (Roman wall survives by the Wardrobe Tower)
+  [51.5135, -0.0770], [51.5150, -0.0790], [51.5163, -0.0815], [51.5172, -0.0850], [51.5177, -0.0890], [51.5178, -0.0935], [51.5181, -0.0960],
   [51.5168, -0.0970], [51.5162, -0.0988], [51.5155, -0.1003], [51.5147, -0.1018], [51.5139, -0.1026], [51.5128, -0.1031], [51.5114, -0.1034]];
-const WALL = line(WALL_PTS), CITY = poly([...WALL_PTS, [51.5100, -0.1034], [51.5103, -0.0960], [51.5100, -0.0880], [51.5094, -0.0800], [51.5087, -0.0760]]);
+const WALL = line(WALL_PTS), CITY = poly([...WALL_PTS, [51.5100, -0.1034], [51.5103, -0.0960], [51.5100, -0.0880], [51.5094, -0.0800], [51.5080, -0.0756]]);
 const GATES = [["Ludgate", 51.5139, -0.1026], ["Newgate", 51.5155, -0.1003], ["Aldersgate", 51.5168, -0.0970], ["Cripplegate", 51.5178, -0.0935], ["Bishopsgate", 51.5163, -0.0815], ["Aldgate", 51.5135, -0.0770]].map(([n, a, b]) => { const [x, z] = LL(a, b); return { n, x, z }; });
 function baseHL(x, z) { const s = THAMES.side(x, z), d = Math.abs(s); let h;
   if (s > 0) { h = 0.7 + 0.6 * fbm(x / 180, z / 180, 3); const up = sstepN(d, 900, 2600); const pond = fbm(x / 260 + 9, z / 260, 3); if (pond < 0.36) h = lerpN(h, -0.6, sstepN(0.36 - pond, 0, 0.05));   // the southern marshes, with pools and channels
@@ -291,7 +292,7 @@ function baseHE(x, z) { const R = lowerInfo(x, z), hw = lowerHW(R.s), north = R.
 function baseH(x, z) { if (x < 6200) return baseHL(x, z); const e = baseHE(x, z); if (x > 7200) return e; return lerpN(baseHL(x, z), e, (x - 6200) / 1000); }
 const riverSide = (x, z) => x < 6700 ? THAMES.side(x, z) : lowerInfo(x, z).side;
 const groundH = baseH;
-const TOWER_DITCH = line([[51.5070, -0.0792], [51.5094, -0.0792], [51.5094, -0.0754]]);   // west and north of the Norman Tower's bailey
+const TOWER_DITCH = line([[51.5072, -0.0784], [51.5094, -0.0784], [51.5094, -0.0752]]);   // west and north of the Norman Tower's bailey
 
 // ---------- streets of 1066 ----------
 // The Late Saxon street plan: Cheapside (Westcheap) the broad market street, Eastcheap, Thames Street along the bank, and the
@@ -1070,11 +1071,11 @@ const markLL = (name, lat, lon, tag, text, o) => { const [x, z] = LL(lat, lon); 
 // St Paul's rising after the fire of 1087; St Mary-le-Bow on Cheapside (about 1080); the abbey's nave finished; Southwark rebuilt.
 if (ERA === 1100) {
   const rect = (lat0, lon0, lat1, lon1, v) => { const [x0, z0] = LL(lat0, lon0), [x1, z1] = LL(lat1, lon1); rRect((x0 + x1) / 2, (z0 + z1) / 2, Math.abs(x1 - x0), Math.abs(z1 - z0), 0, v); };
-  rect(51.5071, -0.0791, 51.5093, -0.0757, 4);   // the Tower's bailey, kept clear of houses
+  rect(51.5073, -0.0783, 51.5093, -0.0755, 4);   // the Tower's bailey, kept clear of houses
   // the White Tower: about 36 x 32.5 m and 27.5 m to the battlements, Kentish ragstone with Caen stone dressings; turrets at the corners
   // (the north-east one round, holding the stair); the apse of St John's Chapel projecting at the south-east; the door at first-floor level,
   // reached by a timber stair. Flat pilaster buttresses, round-headed windows, paired above. Not yet whitewashed (that came in 1240).
-  { const [tx, tz] = LL(51.50815, -0.0771), gy = groundH(tx, tz) - 0.4, F = FR(tx, tz, 0, gy, "tower"), W = 36, D = 32.5, H = 27.5, rag = [1.15, 1.1, 1.02], caen = [1.4, 1.34, 1.16];
+  { const [tx, tz] = LL(51.50815, -0.07595), gy = groundH(tx, tz) - 0.4, F = FR(tx, tz, 0, gy, "tower"), W = 36, D = 32.5, H = 27.5, rag = [1.15, 1.1, 1.02], caen = [1.4, 1.34, 1.16];
     GTINT = rag; gbox(F, "rubble", 0, H / 2, 0, W, H, D); solid(tx, tz, W, D, 0);
     GTINT = caen; for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (let y = 0; y < H; y += 1.2) gbox(F, "rubble", sx * W / 2, y + 0.5, sz * D / 2, (y / 1.2) % 2 ? 1.0 : 0.6, 0.6, (y / 1.2) % 2 ? 0.6 : 1.0, "");   // dressed quoins
     for (const [side, L] of [["x", D], ["z", W]]) for (const sg of [-1, 1]) for (let u = -L / 2 + L / 4; u < L / 2; u += L / 4) { const px = side === "x" ? sg * (W / 2 + 0.3) : u, pz = side === "x" ? u : sg * (D / 2 + 0.3); gbox(F, "rubble", px, H / 2, pz, side === "x" ? 0.6 : 1.4, H, side === "x" ? 1.4 : 0.6, "b"); }   // pilaster buttresses
@@ -1090,7 +1091,7 @@ if (ERA === 1100) {
     mark("The White Tower", tx, tz, "known", "William the Conqueror's great stone keep, begun about 1075-80 under Gundulf, bishop of Rochester, and finished about 1100: about 36 by 32.5 m and 27.5 m high, of Kentish ragstone with Caen stone dressings, walls up to 4.5 m thick. Inside, a great hall and chambers, and St John's Chapel (its apse projects at the south-east corner). The door was at first-floor level, up a timber stair. It stood in a bailey in the angle of the Roman walls, with a ditch and palisade on the landward sides. It was first whitewashed in 1240, which gave it its name.", { big: true, range: 3500, y: 36, r: 40 }); }
   { const R = seeded(1100), pts = TOWER_DITCH.P; for (let k = 1; k < pts.length; k++) { const [ax, az] = pts[k - 1], [bx, bz] = pts[k], len = Math.hypot(bx - ax, bz - az), n = Math.ceil(len / 1.2); for (let q = 0; q < n; q++) { const x = ax + (bx - ax) * q / n + (bz - az) / len * 10, z = az + (bz - az) * q / n - (bx - ax) / len * 10; if (k === 2 && Math.abs(q - n / 2) < 3) continue; put("pale", BOX_G, MAT.paleWood || (MAT.paleWood = M(0x8a7a64)), x, groundH(x, z) - 0.3, z, 0.3, 4, 0.3); solid(x, z, 0.4, 0.4, 0); } }   // the palisade inside the ditch, a gate in the north side
     const [gx, gz] = TOWER_DITCH.at(TOWER_DITCH.cum[1] + (TOWER_DITCH.L - TOWER_DITCH.cum[1]) / 2); put("gatepost", BOX_G, MAT.wood, gx, groundH(gx, gz) + 3.8, gz + 10, 6, 0.5, 0.6); for (const s of [-3, 3]) put("gatepost", BOX_G, MAT.wood, gx + s, groundH(gx, gz) - 0.3, gz + 10, 0.6, 4.6, 0.6);
-    const [hx, hz] = LL(51.5087, -0.0784); addHouse(hx, hz, 8, 18, 0, { wall: "plank", roof: "shingle", door: "+x", kind: "palace-towerhall" }).noEnter = true; const [sx2, sz2] = LL(51.5077, -0.0785); addHouse(sx2, sz2, 6, 10, 0, { wall: "plank", roof: "thatch", door: "+x" }).noEnter = true; }   // timber buildings in the bailey
+    const [hx, hz] = LL(51.5088, -0.0776); addHouse(hx, hz, 8, 18, 0, { wall: "plank", roof: "shingle", door: "+x", kind: "palace-towerhall" }).noEnter = true; const [sx2, sz2] = LL(51.5078, -0.0777); addHouse(sx2, sz2, 6, 10, 0, { wall: "plank", roof: "thatch", door: "+x" }).noEnter = true; }   // timber buildings in the bailey
   // Baynard's Castle and Montfichet's Tower: built after 1066 by Norman lords in the west of the City, by the Fleet. Their form is not known
   // (a large ditch found at Ludgate Hill in 1986 may be Montfichet's); shown as stone towers in ditched and palisaded enclosures.
   for (const [name, lat, lon, s, text] of [["Baynard's Castle", 51.5117, -0.1024, 14, "Built after the Conquest by Ralph Baynard, a Norman lord who appears in Domesday Book, on the riverside in the south-west corner of the City, where the wall met the Fleet. Its form is unknown; King John destroyed it in 1213, and a later Baynard's Castle was built further east."],
