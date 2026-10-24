@@ -53125,53 +53125,74 @@ const SKINS = [0xe8c4a8, 0xdcb494, 0xf0d0b8, 0xd8a888, 0xe4bc9c];
 // woad-and-weld green); the rich wore strong reds, blues and purples, with tablet-woven or embroidered bands at hems and cuffs
 const NATURAL = [0xd2c8b0, 0xb8ab90, 0x8c8476, 0x6e5e4c, 0x5a4a3a, 0x3e342c], COMMON = [0x56607a, 0x7a3e30, 0xa08c4c, 0x5c6640, 0x6a4f56], RICH = [0x9a2424, 0x2c4880, 0x4e2a58, 0x2e5a3a, 0xa8302a, 0x1e3a6a], TRIMS = [0xc8a040, 0xb8302a, 0x2a3a7a, 0xd8c890];
 const HAIRS = [0x3a2618, 0x5a3a20, 0x7a5a32, 0xa07a40, 0x2a1c12, 0x6a4a2a];
-function mergeG(parts) { let n = 0; const gs = parts.map(([g, m]) => { const q = (g.index ? g.toNonIndexed() : g.clone()).applyMatrix4(m); if (q.attributes.uv) q.deleteAttribute("uv"); n += q.attributes.position.count; return q; });
-  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let o = 0; for (const q of gs) { pos.set(q.attributes.position.array, o * 3); nor.set(q.attributes.normal.array, o * 3); o += q.attributes.position.count; }
-  const out = new THREE.BufferGeometry(); out.setAttribute("position", new THREE.BufferAttribute(pos, 3)); out.setAttribute("normal", new THREE.BufferAttribute(nor, 3)); return out; }
+// geometry helpers: parts carry a vertex shade (darker in fold valleys and on undersides, a cheap stand-in for soft shadow)
+function mergeG(parts) { let n = 0; const gs = parts.map(([g, m]) => { const q = (g.index ? g.toNonIndexed() : g.clone()).applyMatrix4(m); n += q.attributes.position.count; return q; });
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3); let o = 0;
+  for (const q of gs) { const c = q.attributes.position.count; pos.set(q.attributes.position.array, o * 3); nor.set(q.attributes.normal.array, o * 3);
+    for (let i = 0; i < c; i++) { const sh = q.attributes.color ? q.attributes.color.getX(i) : 1, ny = q.attributes.normal.getY(i), v = sh * (0.8 + 0.2 * (ny * 0.5 + 0.5)); col[(o + i) * 3] = col[(o + i) * 3 + 1] = col[(o + i) * 3 + 2] = v; } o += c; }
+  const out = new THREE.BufferGeometry(); out.setAttribute("position", new THREE.BufferAttribute(pos, 3)); out.setAttribute("normal", new THREE.BufferAttribute(nor, 3)); out.setAttribute("color", new THREE.BufferAttribute(col, 3)); return out; }
 const MT = (x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) => new THREE.Matrix4().compose(V3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, 0, rz)), V3(sx, sy, sz));
-const HIPY = 0.92;
+const G1 = (g, m = MT(0, 0, 0)) => mergeG([[g, m]]);
+// cloth that hangs in folds: a tapered tube whose radius ripples more toward the hem, shaded in the valleys
+function foldTube(rTop, rBot, h, segs, folds, amp, open = 0, thetaStart = 0, seed = 0) { const g = new THREE.CylinderGeometry(rTop, rBot, h, segs, 4, true, thetaStart, Math.PI * 2 - open), p = g.attributes.position, sh = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), t = (h / 2 - y) / h, a = Math.atan2(x, z), wv = Math.sin(a * folds + seed) + 0.4 * Math.sin(a * folds * 2.3 + seed * 3), k = 1 + amp * t * wv;
+    p.setXYZ(i, x * k, y - t * t * 0.015 * (1 + Math.sin(a * 3 + seed)), z * k); const s = 0.86 + 0.14 * wv * t - 0.08 * t; sh[i * 3] = sh[i * 3 + 1] = sh[i * 3 + 2] = s; }
+  g.setAttribute("color", new THREE.BufferAttribute(sh, 3)); g.computeVertexNormals(); return g; }
+// a head: a sphere shaped into skull, cheeks and jaw, with nose, ears and brow
+function headGeo() { const g = new THREE.SphereGeometry(0.1, 16, 12), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { let x = p.getX(i) / 0.1, y = p.getY(i) / 0.1, z = p.getZ(i) / 0.1;
+    x *= 0.84; y *= 1.12; if (y < 0) { x *= 1 - 0.28 * -y; if (z > 0) z = z * (1 - 0.1 * -y) + 0.06 * -y; } if (z < 0) z *= 1.06; if (z > 0.6 && y > 0.32 && y < 0.5) z += 0.025;   // jaw narrows, chin forward, brow
+    p.setXYZ(i, x * 0.1, y * 0.1, z * 0.1); } g.computeVertexNormals();
+  return mergeG([[g, MT(0, 0.67, 0)], [new THREE.ConeGeometry(0.016, 0.05, 4).rotateX(-Math.PI / 2 - 0.35), MT(0, 0.663, 0.104)], [new THREE.SphereGeometry(0.02, 6, 4), MT(0.087, 0.668, -0.005, 0.35, 1.2, 0.9)], [new THREE.SphereGeometry(0.02, 6, 4), MT(-0.087, 0.668, -0.005, 0.35, 1.2, 0.9)],
+    [new THREE.CylinderGeometry(0.045, 0.05, 0.1, 10), MT(0, 0.55, -0.005)]]); }
+const HIPY = 0.92, THIGH = 0.44, SHIN = 0.42, UARM = 0.28, FARM = 0.26;
 const PG = {
-  leg: mergeG([[new THREE.SphereGeometry(0.068, 6, 4), MT(0, -0.02, 0)], [new THREE.CylinderGeometry(0.066, 0.046, 0.82, 8), MT(0, -0.42, 0)]]),
-  shoe: mergeG([[new THREE.BoxGeometry(0.09, 0.07, 0.2), MT(0, -0.86, 0.035)], [new THREE.SphereGeometry(0.046, 6, 3, 0, Math.PI * 2, 0, Math.PI / 2), MT(0, -0.895, 0.13, 1, 0.9, 1.1)]]),   // leather turnshoes
-  arm: mergeG([[new THREE.SphereGeometry(0.056, 6, 4), MT(0, -0.01, 0)], [new THREE.CylinderGeometry(0.052, 0.036, 0.56, 8), MT(0, -0.28, 0)]]),
-  hand: new THREE.SphereGeometry(0.042, 5, 3).scale(0.8, 1.2, 0.9).translate(0, -0.6, 0.01),
-  torso: mergeG([[new THREE.LatheGeometry([[0.135, 0], [0.125, 0.12], [0.15, 0.27], [0.168, 0.38], [0.16, 0.45], [0.06, 0.505]].map(([r, y]) => new THREE.Vector2(r, y)), 12), MT(0, 0, 0, 1, 1, 0.7)], [new THREE.CylinderGeometry(0.045, 0.05, 0.09, 9), MT(0, 0.53, 0)]]),
-  head: mergeG([[new THREE.SphereGeometry(0.1, 10, 7), MT(0, 0.67, 0, 0.88, 1.1, 1)], [new THREE.BoxGeometry(0.024, 0.045, 0.032), MT(0, 0.665, 0.098)], [new THREE.SphereGeometry(0.05, 6, 4), MT(0, 0.61, 0.035, 1.25, 0.8, 1.2)],
-    [new THREE.SphereGeometry(0.014, 4, 3), MT(0.035, 0.69, 0.088)], [new THREE.SphereGeometry(0.014, 4, 3), MT(-0.035, 0.69, 0.088)]]),
-  eyes: mergeG([[new THREE.SphereGeometry(0.011, 4, 3), MT(0.034, 0.693, 0.096)], [new THREE.SphereGeometry(0.011, 4, 3), MT(-0.034, 0.693, 0.096)]]),
-  hairEng: mergeG([[new THREE.SphereGeometry(0.106, 10, 5, 0, Math.PI * 2, 0, Math.PI * 0.5), MT(0, 0.675, -0.01, 0.92, 1.1, 1.04)], [new THREE.BoxGeometry(0.17, 0.17, 0.04), MT(0, 0.6, -0.085)]]),   // worn long, to the collar
-  hairLong: mergeG([[new THREE.SphereGeometry(0.106, 10, 5, 0, Math.PI * 2, 0, Math.PI * 0.5), MT(0, 0.675, -0.01, 0.92, 1.1, 1.04)], [new THREE.BoxGeometry(0.16, 0.34, 0.04), MT(0, 0.52, -0.09)]]),   // a girl's hair, loose down the back
-  hairNor: new THREE.SphereGeometry(0.104, 10, 3, 0, Math.PI * 2, 0, Math.PI * 0.32).scale(0.92, 1.1, 1.02).translate(0, 0.682, 0.012).rotateX(-0.35),   // cropped, the back of the head shaved
-  tonsure: new THREE.SphereGeometry(0.107, 10, 3, 0, Math.PI * 2, Math.PI * 0.26, Math.PI * 0.3).scale(0.92, 1.1, 1.04).translate(0, 0.675, -0.005),   // a ring of hair, the crown shaved
-  moustache: mergeG([[new THREE.BoxGeometry(0.045, 0.014, 0.02), MT(0.022, 0.638, 0.1, 1, 1, 1, 0, -0.35)], [new THREE.BoxGeometry(0.045, 0.014, 0.02), MT(-0.022, 0.638, 0.1, 1, 1, 1, 0, 0.35)]]),
-  beard: new THREE.SphereGeometry(0.068, 8, 5, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.65).scale(1, 1.15, 0.8).translate(0, 0.625, 0.045),
-  headrail: mergeG([[new THREE.SphereGeometry(0.115, 10, 5, 0, Math.PI * 2, 0, Math.PI * 0.6), MT(0, 0.675, -0.01, 0.95, 1.12, 1.06)], [new THREE.CylinderGeometry(0.1, 0.17, 0.3, 10, 1, true, Math.PI * 0.75, Math.PI * 1.5), MT(0, 0.5, -0.01, 1, 1, 0.85)]]),
-  tunic: new THREE.CylinderGeometry(0.17, 0.25, 0.52, 14, 1, true).scale(1, 1, 0.8).translate(0, -0.19, 0),
-  trim: new THREE.CylinderGeometry(0.253, 0.256, 0.05, 14, 1, true).scale(1, 1, 0.8).translate(0, -0.43, 0),
-  belt: new THREE.CylinderGeometry(0.142, 0.142, 0.035, 12, 1, true).scale(1, 1, 0.72).translate(0, 0.07, 0),
-  gown: new THREE.CylinderGeometry(0.16, 0.3, 0.88, 14, 1, true).scale(1, 1, 0.82).translate(0, -0.39, 0),
-  cloak: new THREE.CylinderGeometry(0.19, 0.32, 0.95, 14, 1, true, -Math.PI * 0.18, Math.PI * 1.76).scale(1, 1, 0.78).translate(0, 0.0, -0.01),   // open at the right, pinned on the right shoulder
-  mantle: new THREE.CylinderGeometry(0.18, 0.34, 0.92, 14, 1, true).scale(1, 1, 0.8).translate(0, 0.0, -0.005),   // a woman's closed mantle
-  brooch: new THREE.CylinderGeometry(0.028, 0.028, 0.012, 10).rotateX(Math.PI / 2).translate(-0.1, 0.44, 0.12),
-  helm: mergeG([[new THREE.ConeGeometry(0.115, 0.2, 10), MT(0, 0.81, 0)], [new THREE.CylinderGeometry(0.112, 0.112, 0.06, 10, 1, true), MT(0, 0.72, 0)], [new THREE.BoxGeometry(0.022, 0.1, 0.02), MT(0, 0.67, 0.112)]]),
-  coif: new THREE.CylinderGeometry(0.1, 0.16, 0.16, 10, 1, true).translate(0, 0.56, -0.005),   // mail round the neck
+  thigh: G1(new THREE.CylinderGeometry(0.078, 0.058, THIGH, 9).translate(0, -THIGH / 2, 0)),
+  shin: mergeG([[new THREE.SphereGeometry(0.058, 7, 5), MT(0, 0, 0)], [new THREE.LatheGeometry([[0.044, -SHIN], [0.048, -SHIN * 0.75], [0.058, -SHIN * 0.35], [0.055, -0.04], [0.05, 0]].map(([r, y]) => new THREE.Vector2(r, y)), 9), MT(0, 0, 0)]]),
+  shoe: mergeG([[new THREE.BoxGeometry(0.09, 0.065, 0.19), MT(0, -0.035, 0.035)], [new THREE.SphereGeometry(0.046, 7, 4, 0, Math.PI * 2, 0, Math.PI / 2), MT(0, -0.068, 0.125, 1, 0.9, 1.15)], [new THREE.SphereGeometry(0.048, 7, 4), MT(0, -0.03, -0.035, 1, 0.8, 1)]]),   // leather turnshoes
+  uarm: mergeG([[new THREE.SphereGeometry(0.062, 8, 6), MT(0, 0, 0)], [new THREE.CylinderGeometry(0.058, 0.047, UARM, 9).translate(0, -UARM / 2, 0), MT(0, 0, 0)]]),
+  farm: mergeG([[new THREE.SphereGeometry(0.048, 7, 5), MT(0, 0, 0)], [new THREE.CylinderGeometry(0.047, 0.036, FARM, 9).translate(0, -FARM / 2, 0), MT(0, 0, 0)]]),
+  hand: mergeG([[new THREE.SphereGeometry(0.038, 7, 5), MT(0, -0.05, 0.005, 0.85, 1.35, 0.6)], [new THREE.SphereGeometry(0.016, 5, 4), MT(0.03, -0.03, 0.02, 1, 1.9, 1, 0, 0.5)]]),   // a hand with a thumb
+  torso: mergeG([[new THREE.LatheGeometry([[0.14, -0.02], [0.13, 0.12], [0.15, 0.25], [0.165, 0.34], [0.17, 0.42], [0.12, 0.49], [0.055, 0.52]].map(([r, y]) => new THREE.Vector2(r, y)), 14), MT(0, 0, 0, 1, 1, 0.68)],
+    [new THREE.SphereGeometry(0.07, 8, 6), MT(0.155, 0.43, 0)], [new THREE.SphereGeometry(0.07, 8, 6), MT(-0.155, 0.43, 0)]]),
+  head: headGeo(),
+  eyeW: mergeG([[new THREE.SphereGeometry(0.014, 6, 4), MT(0.033, 0.694, 0.089, 1, 0.75, 0.55)], [new THREE.SphereGeometry(0.014, 6, 4), MT(-0.033, 0.694, 0.089, 1, 0.75, 0.55)]]),
+  eyes: mergeG([[new THREE.SphereGeometry(0.0065, 5, 4), MT(0.033, 0.694, 0.096)], [new THREE.SphereGeometry(0.0065, 5, 4), MT(-0.033, 0.694, 0.096)], [new THREE.BoxGeometry(0.03, 0.004, 0.008), MT(0, 0.632, 0.097)]]),   // pupils and the line of the mouth
+  brows: mergeG([[new THREE.BoxGeometry(0.03, 0.005, 0.008), MT(0.033, 0.712, 0.097, 1, 1, 1, 0, -0.12)], [new THREE.BoxGeometry(0.03, 0.005, 0.008), MT(-0.033, 0.712, 0.097, 1, 1, 1, 0, 0.12)]]),
+  hairEng: mergeG([[new THREE.SphereGeometry(0.108, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.52), MT(0, 0.675, -0.012, 0.9, 1.12, 1.05)], [foldTube(0.085, 0.095, 0.16, 12, 9, 0.12, Math.PI * 0.8, Math.PI * 0.4), MT(0, 0.6, -0.02)]]),   // worn long, to the collar
+  hairLong: mergeG([[new THREE.SphereGeometry(0.108, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.52), MT(0, 0.675, -0.012, 0.9, 1.12, 1.05)], [foldTube(0.085, 0.11, 0.36, 12, 9, 0.12, Math.PI * 0.85, Math.PI * 0.425), MT(0, 0.5, -0.025)]]),
+  hairNor: new THREE.SphereGeometry(0.108, 12, 4, 0, Math.PI * 2, 0, Math.PI * 0.3).scale(0.9, 1.12, 1.04).translate(0, 0.676, 0.008).rotateX(-0.18),
+  tonsure: G1(new THREE.SphereGeometry(0.108, 12, 3, Math.PI * 0.85, Math.PI * 1.3, Math.PI * 0.24, Math.PI * 0.24).scale(0.9, 1.12, 1.04).translate(0, 0.675, -0.005)),
+  moustache: mergeG([[new THREE.CapsuleGeometry(0.007, 0.035, 2, 4).rotateZ(Math.PI / 2), MT(0.02, 0.64, 0.1, 1, 1, 1, 0, -0.45)], [new THREE.CapsuleGeometry(0.007, 0.035, 2, 4).rotateZ(Math.PI / 2), MT(-0.02, 0.64, 0.1, 1, 1, 1, 0, 0.45)]]),
+  beard: G1(new THREE.SphereGeometry(0.07, 10, 6, 0, Math.PI * 2, Math.PI * 0.38, Math.PI * 0.62).scale(0.9, 1.2, 0.8).translate(0, 0.625, 0.04)),
+  headrail: mergeG([[new THREE.SphereGeometry(0.117, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.6), MT(0, 0.675, -0.012, 0.93, 1.13, 1.07)], [foldTube(0.1, 0.19, 0.32, 16, 7, 0.1, Math.PI * 0.5, Math.PI * 0.25), MT(0, 0.5, -0.015, 1, 1, 0.85)]]),
+  tunic: G1(foldTube(0.17, 0.27, 0.54, 20, 7, 0.07, 0, 0, 1).scale(1, 1, 0.8).translate(0, -0.2, 0)),
+  trim: G1(new THREE.CylinderGeometry(0.27, 0.275, 0.045, 20, 1, true).scale(1, 1, 0.8).translate(0, -0.45, 0)),
+  belt: mergeG([[new THREE.CylinderGeometry(0.142, 0.142, 0.035, 14, 1, true), MT(0, 0.07, 0, 1, 1, 0.72)], [new THREE.BoxGeometry(0.07, 0.08, 0.03), MT(0.11, 0.02, 0.08)]]),   // and a pouch
+  gown: G1(foldTube(0.16, 0.33, 0.9, 22, 9, 0.08, 0, 0, 2).scale(1, 1, 0.82).translate(0, -0.39, 0)),
+  cloak: G1(foldTube(0.19, 0.34, 0.97, 20, 6, 0.1, Math.PI * 0.24, -Math.PI * 0.18, 3).scale(1, 1, 0.8).translate(0, -0.01, -0.012)),   // open at the right, pinned on the right shoulder
+  mantle: G1(foldTube(0.18, 0.35, 0.92, 20, 8, 0.09, 0, 0, 4).scale(1, 1, 0.8).translate(0, 0.0, -0.005)),
+  brooch: G1(new THREE.CylinderGeometry(0.028, 0.028, 0.012, 10).rotateX(Math.PI / 2).translate(-0.1, 0.44, 0.12)),
+  helm: mergeG([[new THREE.ConeGeometry(0.117, 0.2, 12), MT(0, 0.81, 0)], [new THREE.CylinderGeometry(0.114, 0.114, 0.06, 12, 1, true), MT(0, 0.72, 0)], [new THREE.BoxGeometry(0.022, 0.1, 0.02), MT(0, 0.67, 0.114)]]),
+  coif: G1(new THREE.CylinderGeometry(0.1, 0.17, 0.17, 12, 1, true).translate(0, 0.56, -0.005)),
   sword: mergeG([[new THREE.BoxGeometry(0.045, 0.78, 0.025), MT(0.19, -0.3, 0.03, 1, 1, 1, 0.12, 0.08)], [new THREE.BoxGeometry(0.13, 0.025, 0.03), MT(0.17, 0.1, 0.0)]]),
-  mitre: mergeG([[new THREE.SphereGeometry(0.108, 10, 4, 0, Math.PI * 2, 0, Math.PI / 2), MT(0, 0.72, 0, 1, 1.3, 1)], [new THREE.ConeGeometry(0.04, 0.07, 6), MT(0.055, 0.85, 0)], [new THREE.ConeGeometry(0.04, 0.07, 6), MT(-0.055, 0.85, 0)]]),   // the low mitre of the 1060s
-  chasuble: new THREE.CylinderGeometry(0.15, 0.33, 0.74, 14, 1, true).scale(1, 1, 0.78).translate(0, 0.1, 0),
+  mitre: mergeG([[new THREE.SphereGeometry(0.11, 12, 5, 0, Math.PI * 2, 0, Math.PI / 2), MT(0, 0.72, 0, 1, 1.3, 1)], [new THREE.ConeGeometry(0.04, 0.07, 6), MT(0.055, 0.85, 0)], [new THREE.ConeGeometry(0.04, 0.07, 6), MT(-0.055, 0.85, 0)]]),   // the low mitre of the 1060s
+  chasuble: G1(foldTube(0.15, 0.34, 0.74, 20, 5, 0.07, 0, 0, 5).scale(1, 1, 0.78).translate(0, 0.1, 0)),
   pallium: mergeG([[new THREE.TorusGeometry(0.15, 0.018, 4, 14).rotateX(Math.PI / 2), MT(0, 0.44, 0, 1, 1, 0.8)], [new THREE.BoxGeometry(0.05, 0.42, 0.012), MT(0, 0.2, 0.2)], [new THREE.BoxGeometry(0.05, 0.42, 0.012), MT(0, 0.2, -0.17)]]),
-  crozier: mergeG([[new THREE.CylinderGeometry(0.012, 0.012, 1.85, 5), MT(0, -0.12, 0)], [new THREE.TorusGeometry(0.06, 0.013, 4, 10, Math.PI * 1.5), MT(0, 0.86, 0, 1, 1, 1, 0, 0)]]),
-  cowl: new THREE.TorusGeometry(0.11, 0.05, 5, 12).rotateX(Math.PI / 2).scale(1, 1, 0.9).translate(0, 0.5, -0.02),
-  hood: new THREE.SphereGeometry(0.13, 8, 4, 0, Math.PI * 2, 0, Math.PI * 0.62).scale(1, 1.1, 1.1).translate(0, 0.68, -0.025),
-  cap: new THREE.ConeGeometry(0.105, 0.17, 10).rotateX(0.35).translate(0, 0.79, 0.02),   // a soft cap
+  crozier: mergeG([[new THREE.CylinderGeometry(0.012, 0.012, 1.85, 5), MT(0, -0.12, 0)], [new THREE.TorusGeometry(0.06, 0.013, 4, 10, Math.PI * 1.5), MT(0, 0.86, 0)]]),
+  cowl: G1(new THREE.TorusGeometry(0.11, 0.05, 6, 14).rotateX(Math.PI / 2).scale(1, 1, 0.9).translate(0, 0.5, -0.02)),
+  hood: G1(new THREE.SphereGeometry(0.13, 10, 5, 0, Math.PI * 2, 0, Math.PI * 0.62).scale(1, 1.1, 1.1).translate(0, 0.68, -0.025)),
+  cap: G1(new THREE.ConeGeometry(0.105, 0.17, 10).rotateX(0.35).translate(0, 0.79, 0.02)),
   crown: mergeG(Array.from({ length: 6 }, (_, k) => [new THREE.BoxGeometry(0.035, 0.07, 0.012), new THREE.Matrix4().makeRotationY(k / 6 * Math.PI * 2).multiply(MT(0, 0.79, 0.098))]).concat([[new THREE.TorusGeometry(0.1, 0.012, 3, 12).rotateX(Math.PI / 2), MT(0, 0.76, 0)]])),
   sceptre: mergeG([[new THREE.CylinderGeometry(0.012, 0.012, 0.8, 5), MT(0, 0.3, 0)], [new THREE.SphereGeometry(0.03, 6, 4), MT(0, 0.72, 0)]]),
-  shield: mergeG([[new THREE.CylinderGeometry(0.28, 0.02, 0.95, 3, 1, false, -Math.PI / 6, Math.PI * 2).scale(1, 1, 0.12), MT(0.27, 0.32, 0.12)]]),
-  spear: mergeG([[new THREE.CylinderGeometry(0.013, 0.013, 2.4, 5), MT(0, 0.2, 0.05)], [new THREE.ConeGeometry(0.03, 0.2, 5), MT(0, 1.5, 0.05)]]) };
-const PARTS = ["legL", "legR", "shoeL", "shoeR", "armL", "armR", "handL", "handR", "torso", "head", "eyes", "hairEng", "hairLong", "hairNor", "tonsure", "moustache", "beard", "headrail", "tunic", "trim", "belt", "gown", "cloak", "mantle", "brooch",
+  shield: mergeG([[new THREE.CylinderGeometry(0.28, 0.02, 0.95, 3, 1, false, -Math.PI / 6, Math.PI * 2).scale(1, 1, 0.12), MT(0.09, -0.05, 0.1)]]),
+  spear: mergeG([[new THREE.CylinderGeometry(0.013, 0.013, 2.4, 5), MT(0, 0.2, 0)], [new THREE.ConeGeometry(0.03, 0.2, 5), MT(0, 1.5, 0)]]) };
+const PARTS = ["legL", "legR", "shinL", "shinR", "shoeL", "shoeR", "armL", "armR", "foreL", "foreR", "handL", "handR", "torso", "head", "eyeW", "eyes", "brows", "hairEng", "hairLong", "hairNor", "tonsure", "moustache", "beard", "headrail", "tunic", "trim", "belt", "gown", "cloak", "mantle", "brooch",
   "helm", "coif", "sword", "mitre", "chasuble", "pallium", "crozier", "cowl", "hood", "cap", "crown", "sceptre", "shield", "spear"];
-const PGEO = { legL: PG.leg, legR: PG.leg, shoeL: PG.shoe, shoeR: PG.shoe, armL: PG.arm, armR: PG.arm, handL: PG.hand, handR: PG.hand };
+const PGEO = { legL: PG.thigh, legR: PG.thigh, shinL: PG.shin, shinR: PG.shin, shoeL: PG.shoe, shoeR: PG.shoe, armL: PG.uarm, armR: PG.uarm, foreL: PG.farm, foreR: PG.farm, handL: PG.hand, handR: PG.hand };
+for (const k in PG) if (!PG[k].attributes.color) PG[k] = G1(PG[k]);
 const METAL = new Set(["helm", "crown", "brooch", "sceptre", "coif"]);
-const personMat = new THREE.MeshStandardMaterial({ roughness: 0.88, side: THREE.DoubleSide });
+const personMat = new THREE.MeshStandardMaterial({ roughness: 0.88, side: THREE.DoubleSide, vertexColors: true });
 // roles: eng (an Englishman), woman, child, norman (a Norman lord or knight), soldier, monk, cleric, bishop, archbishop, noble (an English thegn), duke (William before the crowning), king
 function looks(i, role) { const h = k => hash(i * 13 + k, 77), pick = (A, k) => A[(h(k) * A.length) | 0];
   const r = role || (h(1) < 0.45 ? "woman" : h(2) < 0.18 ? "child" : h(3) < 0.03 ? "norman" : h(3) < 0.1 ? "noble" : "eng");
@@ -53200,46 +53221,50 @@ function shows(L, p) { const r = L.role, girl = r === "child" && L.girl, robe = 
     case "hood": return L.hood && (adultMan(L) || r === "child") && !L.cap; case "cap": return L.cap && adultMan(L);
     case "crown": case "sceptre": return r === "king"; default: return true; } }
 function colorOf(L, p) { const robeLegs = L.role === "woman" || (L.role === "child" && L.girl);
-  if (p.startsWith("leg")) return robeLegs ? L.tunic : L.hose; if (p.startsWith("shoe")) return L.shoes; if (p.startsWith("hand") || p === "head") return L.skin;
-  switch (p) { case "armL": case "armR": case "torso": return L.tunic; case "eyes": return 0x2a2018; case "hairEng": case "hairLong": case "hairNor": case "tonsure": case "moustache": case "beard": return L.hair;
+  if (p.startsWith("leg") || p.startsWith("shin")) return robeLegs ? L.tunic : L.hose; if (p.startsWith("fore")) return L.role === "soldier" ? 0x6a5a48 : L.tunic; if (p.startsWith("shoe")) return L.shoes; if (p.startsWith("hand") || p === "head") return L.skin;
+  switch (p) { case "armL": case "armR": case "torso": return L.tunic; case "eyes": return 0x3a2a20; case "eyeW": return 0xe8e4dc; case "brows": return L.hair; case "hairEng": case "hairLong": case "hairNor": case "tonsure": case "moustache": case "beard": return L.hair;
     case "headrail": return L.rail; case "tunic": case "gown": return L.tunic; case "trim": return L.trim ?? L.tunic; case "belt": return L.belt; case "cloak": case "mantle": return L.cloak;
     case "brooch": return L.trim ? 0xd8b84a : 0x9a9a90; case "helm": return 0x8a8a90; case "coif": return 0x80838a; case "sword": return 0x4a3a2a; case "mitre": return 0xf2eee2; case "chasuble": return L.chas;
     case "pallium": return 0xf4f0e6; case "crozier": return 0xc8a040; case "cowl": return 0x1c1816; case "hood": case "cap": return L.cloak; case "crown": return 0xd8b84a; case "sceptre": return 0xd8b84a;
     case "shield": return [0xb8302a, 0x2a4a9a, 0xd8b83a, 0x3a6a3a][Math.floor(L.s * 37) % 4]; case "spear": return 0x6a4a2c; } return 0xffffff; }
-function poseOf(kind, t, ph, walkAmt = 1) { const w = Math.sin(t * 7 + ph);
+// poses: hip flex (l), knee bend (k), shoulder swing (a), elbow bend (e, negative = forearm forward), skirt tilt (sk)
+function poseOf(kind, t, ph, walkAmt = 1) { const c = t * 7 + ph, w = Math.sin(c), sway = 0.04 * Math.sin(t * 0.8 + ph);
+  const P = { drop: 0, lean: 0, lL: 0, lR: 0, kL: 0.05, kR: 0.05, aL: sway, aR: -sway, eL: -0.15, eR: -0.15, sk: 0 };
+  const walk = (amp = 1) => { const A = walkAmt * amp; P.lL = 0.42 * w * A; P.lR = -0.42 * w * A; P.kL = 0.08 + 0.6 * Math.max(0, Math.cos(c)) * A; P.kR = 0.08 + 0.6 * Math.max(0, -Math.cos(c)) * A; P.lean = 0.05; P.aL = -0.35 * w * A; P.aR = 0.35 * w * A; P.eL = -0.25 - 0.15 * Math.max(0, -w) * A; P.eR = -0.25 - 0.15 * Math.max(0, w) * A; };
+  const sit = () => Object.assign(P, { drop: HIPY - 0.47, lL: -1.5, lR: -1.45, kL: 1.5, kR: 1.45, lean: -0.04, sk: -1.15 });
   switch (kind) {
-    case "walk": return { drop: 0, lean: 0.04, lL: 0.42 * w * walkAmt, lR: -0.42 * w * walkAmt, aL: -0.32 * w * walkAmt, aR: 0.32 * w * walkAmt };
-    case "guard": return { drop: 0, lean: 0, lL: 0.02, lR: -0.02, aL: -0.25, aR: -0.55 };
-    case "kneel": return { drop: 0.42, lean: 0.12, lL: -1.5, lR: 0.2, aL: -0.4, aR: -0.4 };
-    case "pray": return { drop: 0.42, lean: 0.05, lL: -1.5, lR: 0.2, aL: -1.2, aR: -1.2 };
-    case "sit": return { drop: HIPY - 0.45, lean: -0.05, lL: -1.45, lR: -1.35, aL: -0.4, aR: -0.35 };
-    case "cheer": return { drop: 0, lean: -0.05, lL: 0, lR: 0, aL: -2.6 - 0.3 * Math.sin(t * 5 + ph), aR: -2.6 - 0.3 * Math.cos(t * 5 + ph) };
-    case "crown": return { drop: 0, lean: 0, lL: 0, lR: 0, aL: -2.4, aR: -2.4 };
-    case "bless": return { drop: 0, lean: 0, lL: 0, lR: 0, aL: -0.3, aR: -1.8 - 0.2 * Math.sin(t * 1.5) };
-    case "hammer": { const p2 = (t * 1.6 + ph) % 1; return { drop: 0, lean: 0.2, lL: 0.1, lR: -0.1, aL: -0.9, aR: p2 < 0.6 ? -1 - p2 * 2.8 : -2.7 + (p2 - 0.6) * 4.7 }; }
-    case "carry": return { drop: 0, lean: 0.06, lL: 0.4 * w * walkAmt, lR: -0.4 * w * walkAmt, aL: -1.0, aR: -1.0 };
-    case "talk": return { drop: 0, lean: 0, lL: 0.05, lR: -0.05, aL: 0.05, aR: -0.3 - 0.3 * Math.max(0, Math.sin(t * 1.3 + ph)) };
-    case "row": { const r = Math.sin(t * 2.4); return { drop: HIPY - 0.45, lean: 0.2 * r, lL: -1.45, lR: -1.45, aL: -1.25 - 0.45 * r, aR: -1.25 - 0.45 * r }; }
-    case "sell": return { drop: 0, lean: 0.1, lL: 0, lR: 0, aL: -0.8, aR: -0.9 - 0.3 * Math.sin(t * 2 + ph) };
-    default: return { drop: 0, lean: 0, lL: 0, lR: 0, aL: 0.03 * Math.sin(t * 0.8 + ph), aR: -0.03 * Math.sin(t * 0.8 + ph) }; } }
-const _b = new THREE.Matrix4(), _hm = new THREE.Matrix4(), _j = new THREE.Matrix4(), _tmp = new THREE.Matrix4(), _q2 = new THREE.Quaternion(), _e2 = new THREE.Euler(), ZEROM = new THREE.Matrix4().makeScale(0, 0, 0), _p = V3(0, 0, 0), _s = V3(1, 1, 1);
-const _M = {};
+    case "walk": walk(); break;
+    case "carry": walk(0.9); Object.assign(P, { aL: -0.45, aR: -0.45, eL: -1.15, eR: -1.15 }); break;
+    case "guard": Object.assign(P, { aR: -0.3, eR: -1.05, aL: -0.15, eL: -0.6 }); break;
+    case "kneel": Object.assign(P, { drop: HIPY - 0.5, lL: 0.05, lR: 0.05, kL: 1.55, kR: 1.55, lean: 0.06, aL: -0.45, aR: -0.45, eL: -1.25, eR: -1.25 }); break;
+    case "pray": Object.assign(P, { drop: HIPY - 0.5, lL: 0.05, lR: 0.05, kL: 1.55, kR: 1.55, lean: 0.12, aL: -0.7, aR: -0.7, eL: -1.55, eR: -1.55 }); break;
+    case "sit": sit(); Object.assign(P, { aL: -0.55, aR: -0.5, eL: -0.95, eR: -1.0 - 0.15 * Math.max(0, Math.sin(t * 0.9 + ph)) }); break;
+    case "row": { sit(); const r = Math.sin(t * 2.4); Object.assign(P, { lean: 0.22 * r, aL: -1.05 - 0.35 * r, aR: -1.05 - 0.35 * r, eL: -0.4 + 0.35 * r, eR: -0.4 + 0.35 * r }); break; }
+    case "cheer": Object.assign(P, { lean: -0.05, aL: -2.7 - 0.25 * Math.sin(t * 5 + ph), aR: -2.7 - 0.25 * Math.cos(t * 5 + ph), eL: -0.35, eR: -0.35 }); break;
+    case "crown": Object.assign(P, { aL: -2.2, aR: -2.2, eL: -0.7, eR: -0.7 }); break;
+    case "bless": Object.assign(P, { aL: -0.25, eL: -0.7, aR: -1.0 - 0.15 * Math.sin(t * 1.5), eR: -1.25 }); break;
+    case "hammer": { const q = (t * 1.6 + ph) % 1, up = q < 0.6 ? q / 0.6 : 1 - (q - 0.6) / 0.4; Object.assign(P, { lean: 0.22, lL: -0.1, lR: 0.12, kL: 0.15, kR: 0.1, aL: -0.55, eL: -0.9, aR: -0.5 - 1.9 * up, eR: -0.4 - 0.6 * up }); break; }
+    case "talk": Object.assign(P, { aL: 0.05, eL: -0.25, aR: -0.35 - 0.3 * Math.max(0, Math.sin(t * 1.3 + ph)), eR: -1.0 - 0.3 * Math.sin(t * 2.1 + ph) }); break;
+    case "sell": Object.assign(P, { lean: 0.1, aL: -0.45, eL: -0.8, aR: -0.5 - 0.25 * Math.sin(t * 2 + ph), eR: -0.9 }); break; }
+  return P; }
+const _b = new THREE.Matrix4(), _hm = new THREE.Matrix4(), _sk = new THREE.Matrix4(), _j = new THREE.Matrix4(), _tmp = new THREE.Matrix4(), _q2 = new THREE.Quaternion(), _e2 = new THREE.Euler(), ZEROM = new THREE.Matrix4().makeScale(0, 0, 0), _p = V3(0, 0, 0), _s = V3(1, 1, 1);
+const _M = {}, LIMB = new Set(["legL", "legR", "shinL", "shinR", "shoeL", "shoeR", "armL", "armR", "foreL", "foreR", "handL", "handR", "spear", "shield", "crozier", "sceptre"]), SKIRT = new Set(["tunic", "trim", "gown"]);
 function partMatrices(x, y, z, h, L, P, out) { _e2.set(0, h, 0); _q2.setFromEuler(_e2); _b.compose(_p.set(x, y, z), _q2, _s.set(L.s, L.s, L.s));
-  _hm.copy(_b).multiply(_tmp.makeTranslation(0, HIPY - P.drop, 0)).multiply(_j.makeRotationX(P.lean));
-  const legAt = (sx, a) => _b.clone().multiply(_tmp.makeTranslation(sx, HIPY - P.drop, 0)).multiply(_j.makeRotationX(a));
-  _M.legL = _M.shoeL = legAt(0.085, P.lL); _M.legR = _M.shoeR = legAt(-0.085, P.lR);
-  const armM = (sx, a, sp) => _hm.clone().multiply(_tmp.makeTranslation(sx, 0.45, 0)).multiply(_j.makeRotationX(a)).multiply(_tmp.makeRotationZ(sp)), aL = armM(0.175, P.aL, -0.05), aR = armM(-0.175, P.aR, 0.05);
-  _M.armL = _M.handL = aL; _M.armR = _M.handR = aR;
-  _M.spear = aR.clone().multiply(_tmp.makeTranslation(0, -0.6, 0)).multiply(_j.makeRotationX(Math.PI / 2 - P.aR * 0.9));
-  _M.shield = aL.clone().multiply(_tmp.makeTranslation(0, -0.3, 0)).multiply(_j.makeRotationX(-P.aL));
-  _M.crozier = aL.clone().multiply(_tmp.makeTranslation(0, -0.6, 0.02)).multiply(_j.makeRotationX(-P.aL - P.lean));   // held upright
-  _M.sceptre = aR.clone().multiply(_tmp.makeTranslation(0, -0.6, 0.02)).multiply(_j.makeRotationX(-P.aR - P.lean));
-  for (const p of PARTS) { if (!shows(L, p)) { out.push(ZEROM); continue; } out.push(_M[p] && (p.startsWith("leg") || p.startsWith("shoe") || p.startsWith("arm") || p.startsWith("hand") || p === "spear" || p === "shield" || p === "crozier" || p === "sceptre") ? _M[p] : _hm.clone()); } }
+  _hm.copy(_b).multiply(_tmp.makeTranslation(0, HIPY - P.drop, 0)).multiply(_j.makeRotationX(P.lean)); _sk.copy(_hm).multiply(_j.makeRotationX(P.sk - P.lean * 0.5));
+  const leg = (sx, l, k, side) => { const th = _b.clone().multiply(_tmp.makeTranslation(sx, HIPY - P.drop, 0)).multiply(_j.makeRotationX(l)), sh = th.clone().multiply(_tmp.makeTranslation(0, -THIGH, 0)).multiply(_j.makeRotationX(k));
+    _M["leg" + side] = th; _M["shin" + side] = sh; _M["shoe" + side] = sh.clone().multiply(_tmp.makeTranslation(0, -SHIN, 0)).multiply(_j.makeRotationX(-(l + k) * 0.85)); };
+  leg(0.085, P.lL, P.kL, "L"); leg(-0.085, P.lR, P.kR, "R");
+  const arm = (sx, a, e, sp, side) => { const u = _hm.clone().multiply(_tmp.makeTranslation(sx, 0.43, 0)).multiply(_j.makeRotationX(a)).multiply(_tmp.makeRotationZ(sp)), f = u.clone().multiply(_tmp.makeTranslation(0, -UARM, 0)).multiply(_j.makeRotationX(e)), hd = f.clone().multiply(_tmp.makeTranslation(0, -FARM, 0));
+    _M["arm" + side] = u; _M["fore" + side] = f; _M["hand" + side] = hd; return [f, hd]; };
+  const [fL, hL] = arm(0.19, P.aL, P.eL, -0.07, "L"), [, hR] = arm(-0.19, P.aR, P.eR, 0.07, "R");
+  const upright = (m, a) => m.clone().multiply(_tmp.makeTranslation(0, -0.04, 0.02)).multiply(_j.makeRotationX(-a - P.lean));   // held upright whatever the arm does
+  _M.spear = upright(hR, P.aR + P.eR); _M.crozier = upright(hL, P.aL + P.eL); _M.sceptre = upright(hR, P.aR + P.eR); _M.shield = fL.clone().multiply(_tmp.makeTranslation(0, -0.13, 0)).multiply(_j.makeRotationX(-(P.aL + P.eL)));
+  for (const p of PARTS) { if (!shows(L, p)) { out.push(ZEROM); continue; } out.push(LIMB.has(p) ? _M[p] : SKIRT.has(p) ? _sk.clone() : _hm.clone()); } }
 function personMesh(i, role, kind, x, y, z, h, t = 0) { const L = looks(i, role), g = new THREE.Group(), ms = []; partMatrices(0, 0, 0, 0, L, poseOf(kind, t, i), ms);
-  PARTS.forEach((p, k) => { if (ms[k] === ZEROM) return; const m = new THREE.Mesh(PGEO[p] || PG[p], M(colorOf(L, p), { roughness: METAL.has(p) ? 0.35 : 0.85, metalness: METAL.has(p) ? 0.7 : 0, side: THREE.DoubleSide })); m.matrixAutoUpdate = false; m.matrix.copy(ms[k]); g.add(m); });
+  PARTS.forEach((p, k) => { if (ms[k] === ZEROM) return; const m = new THREE.Mesh(PGEO[p] || PG[p], M(colorOf(L, p), { roughness: METAL.has(p) ? 0.35 : 0.85, metalness: METAL.has(p) ? 0.7 : 0, side: THREE.DoubleSide, vertexColors: true })); m.matrixAutoUpdate = false; m.matrix.copy(ms[k]); g.add(m); });
   g.position.set(x, y, z); g.rotation.y = h; g.userData = { i, role, kind }; return g; }
 // the crowd: one instanced mesh per garment or part; each packs only the people wearing it into its first slots, so nothing unworn is drawn
-class Crowd { constructor(n) { this.n = n; this.L = []; this.P = PARTS.map(p => { const im = new THREE.InstancedMesh(PGEO[p] || PG[p], METAL.has(p) ? new THREE.MeshStandardMaterial({ roughness: 0.35, metalness: 0.7 }) : personMat, n);
+class Crowd { constructor(n) { this.n = n; this.L = []; this.P = PARTS.map(p => { const im = new THREE.InstancedMesh(PGEO[p] || PG[p], METAL.has(p) ? new THREE.MeshStandardMaterial({ roughness: 0.35, metalness: 0.7, vertexColors: true }) : personMat, n);
       im.frustumCulled = false; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.setColorAt(0, new THREE.Color()); im.count = 0; scene.add(im); return { p, im, slot: new Int32Array(n).fill(-1), who: new Int32Array(n), count: 0 }; });
     this.ms = []; this._m = new THREE.Matrix4(); this._c = new THREE.Color(); this.count = 0; this.on = new Uint8Array(n); }
   free(Q, i) { const s = Q.slot[i]; if (s < 0) return; const last = --Q.count, j = Q.who[last];
@@ -53714,7 +53739,7 @@ function addBoat(x, z, ry, len, ship) { const gy = Math.max(WATER - 0.35, ground
 // completed only in the 1080s or later, so here its western half is still being built, closed off by a temporary timber wall.
 // Its axis runs east-west; x here is metres east of the centre of the crossing.
 const AB_Y = groundH(0, 0) + 0.05, AB_F = AB_Y + 0.2;   // the floor
-const NAVE_W = -62, NAVE_DONE = -33.5, CHOIR_E = 25, BAY = 4.75;
+const NAVE_W = -62, NAVE_DONE = -33.5, CHOIR_E = 25, BAY = 4.75, HS = 1.22;   // HS: heights scaled to Jumièges' proportions (nave walls about 23 m)
 const abT = ashlarT.clone(); abT.repeat.set(1 / 5.6, 1 / 5.6); abT.needsUpdate = true;
 const pnT = plankT.clone(); pnT.repeat.set(1 / 4, 1 / 2); pnT.needsUpdate = true;
 const ceilT = tex(256, 256, (g, w, h) => { g.fillStyle = "#6a4a30"; g.fillRect(0, 0, w, h);   // a flat boarded ceiling, painted (as at Peterborough later): form and colours inferred
@@ -53734,7 +53759,7 @@ function slab(mat, x, y, z, sx, sy, sz, ry = 0, rx = 0, coll = false) { const g 
   if (coll) solid(x, z, sx, sz, ry); }
 function shapeG(mat, shape, depth, x, y, z, ry) { const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 10 }); g.translate(0, 0, -depth / 2);
   AG[mat].push([g, new THREE.Matrix4().compose(V3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), V3(1, 1, 1))]); }
-function flushAG() { for (const k in AG) if (AG[k].length) { const m = new THREE.Mesh(mergeUV(AG[k]), AMAT[k]); m.frustumCulled = false; scene.add(m); AG[k].length = 0; } }
+function flushAG(sy = 1) { for (const k in AG) if (AG[k].length) { const m = new THREE.Mesh(mergeUV(AG[k]), AMAT[k]); m.scale.y = sy; m.position.y = AB_Y * (1 - sy); m.frustumCulled = false; scene.add(m); AG[k].length = 0; } }   // sy: the church's height, stretched from the floor
 function mergeUV(parts) { let n = 0; const gs = parts.map(([g, m]) => { const q = (g.index ? g.toNonIndexed() : g).applyMatrix4(m); n += q.attributes.position.count; return q; });
   const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2); let o = 0;
   for (const q of gs) { pos.set(q.attributes.position.array, o * 3); nor.set(q.attributes.normal.array, o * 3); if (q.attributes.uv) uv.set(q.attributes.uv.array, o * 2); o += q.attributes.position.count; }
@@ -53798,6 +53823,7 @@ function wallZ(z0, z1, x, th, y0, h, gaps = [], mat = "ashlar") { let a = z0; fo
       const m2 = new THREE.Matrix4().compose(V3(x + Math.cos(a) * 0.72, Y + 9, z + Math.sin(a) * 0.72), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -a + Math.PI / 2, 0)), V3(1, 1, 1)); AG.dark.push([g.clone(), m2]); } }
   { const g = new THREE.CircleGeometry(5.7, 12, -Math.PI / 2, Math.PI).rotateX(Math.PI / 2); AG.ceil.push([g, new THREE.Matrix4().makeTranslation(CHOIR_E, Y + 18.9, 0)]); }
   { const g = new THREE.CylinderGeometry(5.7, 5.7, 0.2, 12, 1, false, 0, Math.PI); AG.floor.push([g, new THREE.Matrix4().makeTranslation(CHOIR_E, Y + 0.1, 0)]); }
+  flushAG(HS);
   // the choir: monks' stalls under the crossing and in the first bays of the nave; the high altar; King Edward's tomb before it
   for (const zs of [-1, 1]) { slab("wood", -6, Y + 0.2, 3.6 * zs, 16, 0.5, 0.5, 0, 0, true); slab("wood", -6, Y + 0.2, 4.2 * zs, 16, 2.4, 0.15); slab("wood", -6, Y + 0.2, 2.6 * zs, 16, 0.9, 0.4); }
   slab("ashlar", 17.5, Y + 0.2, 0, 4, 0.35, 6); slab("ashlar", 18.5, Y + 0.55, 0, 1.2, 1.0, 2.6); slab("red", 18.5, Y + 1.55, 0, 1.3, 0.05, 2.7); slab("red", 17.88, Y + 0.85, 0, 0.04, 0.7, 2.7);
@@ -53806,13 +53832,14 @@ function wallZ(z0, z1, x, th, y0, h, gaps = [], mat = "ashlar") { let a = z0; fo
   slab("ashlar", 13.8, Y + 0.2, 0, 2.4, 0.45, 1.1, 0, 0, true);   // Edward's tomb: a plain raised slab (his shrine came in 1163)
   // the throne for the enthronement, set at the crossing, facing west: placing inferred
   slab("ashlar", 3, Y + 0.2, 0, 3, 0.5, 4); slab("wood", 3.4, Y + 0.7, 0, 0.8, 0.5, 0.9); slab("wood", 3.85, Y + 0.7, 0, 0.12, 1.6, 0.9); slab("red", 3.4, Y + 1.21, 0, 0.8, 0.06, 0.9);
+  flushAG();
   // exterior roofs and the crossing tower
-  put("r:lead", GABLE_G, MAT.lead, (NAVE_DONE - 5) / 2, Y + 19, 0, 12.8, 6.5, -5 - NAVE_DONE + 0.4, Math.PI / 2); put("r:lead", GABLE_G, MAT.lead, 15, Y + 19, 0, 12.8, 6.5, 20.4, Math.PI / 2);
-  for (const zs of [-1, 1]) put("r:lead", GABLE_G, MAT.lead, 0, Y + 19, 16.7 * zs, 12.8, 6.5, 22.4, 0);
-  { const g = new THREE.ConeGeometry(6.4, 6.5, 12, 1, true, 0, Math.PI); put("apseroof", g, new THREE.MeshStandardMaterial({ map: leadT, roughness: 0.6, metalness: 0.3, side: THREE.DoubleSide }), CHOIR_E, Y + 19 + 3.25, 0, 1, 1, 1, 0); }
+  put("r:lead", GABLE_G, MAT.lead, (NAVE_DONE - 5) / 2, Y + 19 * HS, 0, 12.8, 7, -5 - NAVE_DONE + 0.4, Math.PI / 2); put("r:lead", GABLE_G, MAT.lead, 15, Y + 19 * HS, 0, 12.8, 7, 20.4, Math.PI / 2);
+  for (const zs of [-1, 1]) put("r:lead", GABLE_G, MAT.lead, 0, Y + 19 * HS, 16.7 * zs, 12.8, 7, 22.4, 0);
+  { const g = new THREE.ConeGeometry(6.4, 6.5, 12, 1, true, 0, Math.PI); put("apseroof", g, new THREE.MeshStandardMaterial({ map: leadT, roughness: 0.6, metalness: 0.3, side: THREE.DoubleSide }), CHOIR_E, Y + 19 * HS + 3.25, 0, 1, 1, 1, 0); }
   slab("ashlar", 0, Y + 19, 0, 12.6, 17, 12.6); for (const [x, z, a] of [[6.32, 0, 0], [-6.32, 0, 0], [0, 6.32, 1], [0, -6.32, 1]]) for (const o of [-2.4, 0, 2.4]) slab("dark", x + (a ? o : 0), Y + 30, z + (a ? 0 : o), a ? 1.0 : 0.05, 3.2, a ? 0.05 : 1.0);
-  put("cap", CONE4_G, MAT.lead, 0, Y + 36, 0, 13.2, 4.5, 13.2); put("vane", CYL_G, MAT.iron, 0, Y + 40.5, 0, 0.1, 2.4, 0.1);
-  put("vane", BOX_G, new THREE.MeshStandardMaterial({ color: 0xd8b04a, metalness: 0.8, roughness: 0.3 }), 0, Y + 42.4, 0, 1.2, 0.7, 0.12);   // the weathercock: in the Bayeux Tapestry a man is fixing it to the new church
+  put("cap", CONE4_G, MAT.lead, 0, Y + 36 * HS, 0, 13.2, 6, 13.2); put("vane", CYL_G, MAT.iron, 0, Y + 36 * HS + 6, 0, 0.1, 2.4, 0.1);
+  put("vane", BOX_G, new THREE.MeshStandardMaterial({ color: 0xd8b04a, metalness: 0.8, roughness: 0.3 }), 0, Y + 36 * HS + 7.9, 0, 1.2, 0.7, 0.12);   // the weathercock: in the Bayeux Tapestry a man is fixing it to the new church
   // scaffolding and stone at the unfinished west end: putlog scaffolds of poles lashed together, and a hoist
   { const R = seeded(5); for (let k = 6; k < 12; k++) { const xc = -5 - BAY * (k + 0.5); for (const zs of [-1, 1]) for (const zo of [9.2, 12.0]) { const z = zo * zs;
       for (const xo of [-BAY / 2 + 0.3, BAY / 2 - 0.3]) put("pole", CYL_G, MAT.wood, xc + xo, Y, z, 0.16, 11 - (k - 6), 0.16);
@@ -53844,13 +53871,13 @@ function wallZ(z0, z1, x, th, y0, h, gaps = [], mat = "ashlar") { let a = z0; fo
   // small apses at the east ends of the choir aisles
   for (const zs of [-1, 1]) { const cz = 7.85 * zs, cx = CHOIR_E + 1.4; for (let k = 0; k < 6; k++) { const a = -Math.PI / 2 + (k + 0.5) / 6 * Math.PI; slab("ashlar", cx + Math.cos(a) * 2.6, Y, cz + Math.sin(a) * 2.6, 0.9, 11.5, 1.5, -a, 0, true); }
     windowAt(cx + 3.1, Y + 4, cz, 0.8, 2.0, "x", 1, 0.9); const g = new THREE.ConeGeometry(3.2, 2.6, 10, 1, true, 0, Math.PI); AG.lead.push([g, new THREE.Matrix4().makeTranslation(cx, Y + 11.5 + 1.3, cz)]); }
-  flushAG(); rRect(-20, 30, 160, 140, 0, 4);
+  flushAG(HS); rRect(-20, 30, 160, 140, 0, 4);
 }
 function inAbbey(x, z) { return (x > NAVE_DONE && x < CHOIR_E && Math.abs(z) < 11.2) || (Math.abs(x) < 6.4 && Math.abs(z) < 27.7) || (x >= CHOIR_E && Math.hypot(x - CHOIR_E, z) < 5.7); }
 // lamps: candles on the altar and lamps hung in the crossing
 const flameM = new THREE.MeshBasicMaterial({ color: 0xffb050, toneMapped: false }), FLAME_G = new THREE.ConeGeometry(0.03, 0.12, 5).translate(0, 0.06, 0);
 for (const zs of [-1, 1]) put("flame", FLAME_G, flameM, 18.6, AB_Y + 2.05, 1.05 * zs, 1, 1, 1);
-for (const [x, z] of [[0, 0], [-12, 0], [-22, 0], [12, 0], [0, -16], [0, 16]]) { put("corona", new THREE.TorusGeometry(0.9, 0.04, 4, 16).rotateX(Math.PI / 2), MAT.iron, x, AB_Y + 6, z, 1, 1, 1); put("chain", CYL_G, MAT.iron, x, AB_Y + 6, z, 0.03, 13, 0.03);
+for (const [x, z] of [[0, 0], [-12, 0], [-22, 0], [12, 0], [0, -16], [0, 16]]) { put("corona", new THREE.TorusGeometry(0.9, 0.04, 4, 16).rotateX(Math.PI / 2), MAT.iron, x, AB_Y + 6, z, 1, 1, 1); put("chain", CYL_G, MAT.iron, x, AB_Y + 6, z, 0.03, 19 * HS - 6, 0.03);
   for (let k = 0; k < 6; k++) put("flame", FLAME_G, flameM, x + Math.cos(k) * 0.9, AB_Y + 6.03, z + Math.sin(k) * 0.9, 1.5, 1.5, 1.5); }
 const abbeyLight = new THREE.PointLight(0xffd0a0, 0, 70, 1.0); abbeyLight.position.set(2, AB_Y + 9, 0); scene.add(abbeyLight);
 
@@ -53911,8 +53938,8 @@ const PAL = {}, hearthFireM = new THREE.MeshBasicMaterial({ color: 0xff9a3a, tra
   GTINT = [1, 1, 1]; gbox(F, "plank", 0, 0.225, 13, w - 0.3, 0.45, 3.7, "b");   // the dais
   gbox(F, "oak", 0, 0.45 + 0.72, 12.2, 7.2, 0.08, 0.95, ""); GTINT = [1.3, 1.28, 1.2]; gbox(F, "plain", 0, 0.45 + 0.765, 12.2, 7.4, 0.02, 1.05, "b"); GTINT = [1, 1, 1];   // the high table and its cloth
   for (const x of [-3, 3]) gbox(F, "oak", x, 0.45 + 0.36, 12.2, 0.1, 0.72, 0.8, "b");
-  gbox(F, "oak", 0, 0.45 + 0.6, 13.6, 0.9, 1.2, 0.7, "b"); gbox(F, "oak", 0, 0.45 + 1.15, 13.95, 0.9, 1.3, 0.12, "b"); GTINT = [1.1, 0.3, 0.3]; gbox(F, "plain", 0, 0.45 + 1.21, 13.55, 0.8, 0.06, 0.6, "b"); GTINT = [1, 1, 1];   // the king's chair
-  gbox(F, "oak", 0, 0.45 + 0.23, 13.4, 7, 0.06, 0.45, "b");   // a bench behind the high table for the others
+  gbox(F, "oak", 0, 0.45 + 0.21, 13.75, 0.9, 0.42, 0.6, "b"); gbox(F, "oak", 0, 0.45 + 0.95, 14.05, 0.9, 1.9, 0.12, "b"); GTINT = [1.1, 0.3, 0.3]; gbox(F, "plain", 0, 0.45 + 0.44, 13.72, 0.8, 0.05, 0.55, "b"); GTINT = [1, 1, 1];   // the king's chair
+  gbox(F, "oak", 0, 0.45 + 0.21, 13.5, 7, 0.42, 0.45, "b");   // a bench behind the high table for the others
   for (const sx of [-1, 1]) { gbox(F, "oak", sx * 4.7, 0.74, -1, 0.85, 0.06, 18, ""); for (let z = -9; z <= 7.01; z += 4) gbox(F, "oak", sx * 4.7, 0.36, z, 0.6, 0.72, 0.08, "b");   // trestle tables and benches in the aisles
     for (const bx of [3.95, 5.45]) gbox(F, "oak", sx * bx, 0.22, -1, 0.32, 0.44, 18, "b"); }
   for (const sx of [-1, 1]) for (const [z0, z1] of [[-9.6, 14.6]]) { const x = sx * (w / 2 - 0.17); gpoly(F, "hang", [[x, 1.0, z0], [x, 1.0, z1], [x, 3.6, z1], [x, 3.6, z0]], [[0, 0], [z1 - z0, 0], [z1 - z0, 2.6], [0, 2.6]], [-sx, 0, 0]); }   // hangings on the walls
@@ -54255,7 +54282,7 @@ if (!MARKET) { const order = [["cleric", "cross"], ["cleric", "candle"], ["cleri
   order.forEach(([role, key], k) => { const A = agent(role, { proc: true, delay: k * 2.4, key }); let st = stations[key];
     if (key === "candle") st = [19.5, ci++ ? -2.2 : 2.2, -Math.PI / 2]; if (!key) st = [16 + (k % 2) * 2, (k % 2 ? 3.5 : -3.5), k % 2 ? -Math.PI : 0]; if (key === "lord") { st = [-2.5 + (li % 3) * 2.4, -8 - Math.floor(li / 3) * 1.8, Math.PI]; li++; }
     const wt = PAL.seat(2.2 + (k % 3) * 1.2, -13.5 + Math.floor(k / 3) * 1.4); A.wait = [wt[0], wt[2]];   // waiting in the hall beforehand
-    const hs = { william: [0, 13.6, 1], ealdred: [1.3, 13.4, 1], geoffrey: [-1.3, 13.4, 1], edwin: [2.6, 13.4, 1] }[key] || [k % 2 ? 4.1 : -4.1, -8 + k * 1.1, 0], hw = PAL.seat(hs[0], hs[1]);   // and where they sit at the feast afterwards
+    const hs = { william: [0, 13.75, 1], ealdred: [1.3, 13.5, 1], geoffrey: [-1.3, 13.5, 1], edwin: [2.6, 13.5, 1] }[key] || [k % 2 ? 4.1 : -4.1, -8 + k * 1.1, 0], hw = PAL.seat(hs[0], hs[1]);   // and where they sit at the feast afterwards
     A.feast = [hw[0], hw[2], hs[2] ? -Math.PI / 2 : hs[0] > 0 ? Math.PI : 0, hs[2]];
     A.station = st; A.path = [A.wait, PAL_IN, ...PROC_PATH, [st[0], st[1]]]; if (key) PRIN[key] = A; }); }
 // monks in the choir stalls, singing
@@ -54383,7 +54410,7 @@ function lifeStep(dt, t) { frameN++; const px = P_.x, pz = P_.z, rate = Math.min
     if (!seen(x, z, d)) { if (A.shown) { crowd.hide(A.i); A.shown = false; } continue; }
     const step = d < 35 ? 1 : d < 120 ? 3 : 8; if ((frameN + A.i) % step && A.shown) continue;
     if (A.key === "william") { const crowned = SIM > T.crown + 20; if (crowned !== !!A.crowned) { A.crowned = crowned; A.L = looks(A.i, crowned ? "king" : "duke"); crowd.look(A.i, A.L); } }
-    let y = personY(x, z); if (A.key === "william" && kind === "sit") y = AB_Y + 0.76; if (A.rower) y = WATER + 0.05;
+    let y = personY(x, z); if (A.key === "william" && kind === "sit" && inAbbey(x, z)) y = AB_Y + 0.76; if (A.rower) y = WATER + 0.05;
     crowd.set(A.i, x, y, z, h, kind, t, moving ? Math.min(2, (sp || 0.9) / 1.2) * Math.min(rate, 3) : 1); A.shown = true; }
   crowd.done(); }
 
@@ -54483,7 +54510,7 @@ function nearDoorHouse() { let best = null, bd = 2.2; const L = []; for (let i =
   for (const r of L) { const H = r.tag; if (!H || !H.dp || H.burnt || H.state === 2) continue; const d = Math.hypot(H.dp[0] - P_.x, H.dp[1] - P_.z); if (d < bd) { bd = d; best = H; } } return best; }
 
 // ---------- the abbey's own markers ----------
-mark("Westminster Abbey", -14, -14, "known", "Edward the Confessor's abbey church of St Peter: the first Romanesque church in England, built in the new Norman manner from about 1050, consecrated on 28 December 1065. Edward was buried here on 6 January; Harold was probably crowned here the same day; today William. The plan is known from foundations found under the present church (rebuilt by Henry III from 1245); the look of it from the Bayeux Tapestry (with a crossing tower and a man fixing the weathercock) and the Life of King Edward. The crossing tower, transepts and east end were finished; the nave was still being built.", { big: true, range: 5000, y: 46, r: 45 });
+mark("Westminster Abbey", -14, -14, "known", "Edward the Confessor's abbey church of St Peter: the first Romanesque church in England, built in the new Norman manner from about 1050, consecrated on 28 December 1065. Edward was buried here on 6 January; Harold was probably crowned here the same day; today William. The plan is known from foundations found under the present church (rebuilt by Henry III from 1245); the look of it from the Bayeux Tapestry (with a crossing tower and a man fixing the weathercock) and the Life of King Edward. The crossing tower, transepts and east end were finished; the nave was still being built. Finished, it was about 98 m long, longer than any other church in England, with an aisled nave about 22 m wide. Its heights are not known; they are shown in the proportions of Jumièges in Normandy, its model: nave walls about 23 m, the crossing tower about 45 m to its cap.", { big: true, range: 5000, y: 58, r: 45 });
 mark("The unfinished nave", -48, 0, "inferred", "Most historians (Gem, Fernie) think the nave was completed only in the 1080s or later, and the two western towers later still. So here the western bays stand at arcade and gallery height in scaffolding, and a timber wall closes the finished part. How far the work had got in 1066 is not known.", { y: 14, r: 18, range: 400 });
 mark("The north door", 0, -30, "inferred", "With the nave unfinished, the way in was probably by a transept door. The north transept front became the abbey's main entrance in the 13th-century church.", { y: 6, r: 8, range: 250 });
 mark("The high altar", 18.5, 0, "known", "The high altar of St Peter, in the presbytery before the apse. The coronation was performed here: the oath, the anointing, the crowning.", { y: 3.2, r: 4, range: 60 });
