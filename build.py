@@ -411,3 +411,26 @@ TT = TT[:i0] + """<div id="intro"><div class="card">
 out12 = HERE / "time_train.html"
 out12.write_text(TT.replace("__THREE__", three).replace("__SCENE__", (HERE / "time_train.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out12.name}, {out12.stat().st_size // 1024} KB")
+
+
+# ---- the thirteenth page: London and Westminster on Christmas Day 1066 -----------------------------
+LN = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>London, Christmas Day 1066: the crowning of William</title>").replace("background:#c8d4d8", "background:#b8bcc0")
+i0, i1 = LN.index('<div id="intro">'), LN.index('<button id="vr">')
+LN = LN[:i0] + """<div id="intro"><div class="card">
+  <h1>London, Christmas Day 1066</h1>
+  <p>Ten weeks after Hastings, William, duke of Normandy, is crowned king in Edward the Confessor's new abbey at Westminster.
+  Walk the real ground as it was: Thorney Island between the Tyburn's mouths, the abbey with its unfinished nave, the Strand past the fields
+  over abandoned Lundenwic, Fleet Street and Ludgate, the Roman wall, St Paul's, Cheapside and the Saxon lanes, the hithes, the timber
+  London Bridge, and burnt Southwark. Go into the houses.</p>
+  <p>From 10:00 the coronation unfolds as the chroniclers tell it: the procession, the questions in French and English, the great shout,
+  the guards setting fire to the houses outside, the congregation fleeing, and the crowning by Archbishop Ealdred.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>E</kbd> read a marker, a person, or go into a house &nbsp;&middot;&nbsp;
+  <kbd>N</kbd> next moment &nbsp;&middot;&nbsp; <kbd>T</kbd> time speed &nbsp;&middot;&nbsp; <kbd>L</kbd> markers &nbsp;&middot;&nbsp; <kbd>F</kbd> fly<br>
+  In VR: left stick walk, right stick turn, <b>A</b> read / go in, <b>B</b> next place, <b>X</b> next moment, <b>Y</b> time speed</p>
+  <p class="dim">Every marker says whether a thing is <b>known</b> (archaeology, records), <b>inferred</b> (place known, form guessed), or <b>typical</b> (a stand-in where
+  what stood is unknown). The places on the guide list are all open from the start. Click to begin.</p>
+</div></div>
+""" + LN[i1:]
+out13 = HERE / "london1066.html"
+out13.write_text(LN.replace("__THREE__", three).replace("__SCENE__", (HERE / "london1066.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out13.name}, {out13.stat().st_size // 1024} KB")
