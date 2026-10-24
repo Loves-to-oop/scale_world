@@ -432,6 +432,9 @@ LN = LN[:i0] + """<div id="intro"><div class="card">
   treat you by your rank: greetings, bows, Norman guards, doors closed to you. The world stays open: go anywhere.</p>
   <p>Around London: the Domesday villages (Islington, St Pancras, Stepney, Kensington, Chelsea, Battersea, Bermondsey and more) with their farms, open fields in strips,
   meadows, woods, water mills and the Roman roads; ploughing, threshing and herding; and on the Thames, ships from Rouen and Flanders below the bridge, barges and boats above it.</p>
+  <p>Or go forward to <b>summer 1100</b>, a generation after the Conquest: the White Tower finished, Baynard's Castle and Montfichet's Tower in the west of
+  the City, William Rufus's Westminster Hall, the new St Paul's rising after the fire of 1087, St Mary-le-Bow, the abbey's nave complete, Southwark rebuilt,
+  and the harvest beginning on Lammas Day.</p>
   <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>E</kbd> read a marker, a person, or go into a house &nbsp;&middot;&nbsp;
   <kbd>N</kbd> next moment &nbsp;&middot;&nbsp; <kbd>T</kbd> time speed &nbsp;&middot;&nbsp; <kbd>L</kbd> markers &nbsp;&middot;&nbsp; <kbd>F</kbd> fly<br>
   In VR: left stick walk, right stick turn, <b>A</b> read / go in, <b>B</b> next place, <b>X</b> next moment, <b>Y</b> time speed</p>
