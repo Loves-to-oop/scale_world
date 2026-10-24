@@ -1404,7 +1404,7 @@ mark("Passing the bridge", ...THAMES.at(BRIDGE_S - 60).slice(0, 2), "inferred", 
 // hauled firewood, hay, grain, stone and goods into London, and packhorses carried loads on the roads. Norman knights rode about the
 // occupied town. On a holy day there was little hauling.
 const HORSE_G = mergeG([[new THREE.CapsuleGeometry(0.3, 0.85, 4, 10).rotateX(Math.PI / 2), MT(0, 1.12, 0, 0.9, 1, 1)], [new THREE.CylinderGeometry(0.13, 0.2, 0.7, 8).rotateX(-0.75), MT(0, 1.42, 0.62)], [new THREE.CapsuleGeometry(0.11, 0.38, 3, 8).rotateX(Math.PI / 2 + 0.9), MT(0, 1.62, 0.92)],
-  ...[[0.17, 0.48], [-0.17, 0.48], [0.17, -0.48], [-0.17, -0.48]].map(([x, z]) => [new THREE.CylinderGeometry(0.06, 0.045, 0.88, 6), MT(x, 0.44, z)]), [new THREE.ConeGeometry(0.09, 0.6, 6), MT(0, 0.92, -0.75, 1, 1, 1, 0.5, 0)],
+  ...[[0.17, 0.48], [-0.17, 0.48], [0.17, -0.48], [-0.17, -0.48]].map(([x, z]) => [new THREE.CylinderGeometry(0.08, 0.055, 0.9, 7), MT(x, 0.45, z)]), [new THREE.ConeGeometry(0.09, 0.6, 6), MT(0, 0.92, -0.75, 1, 1, 1, 0.5, 0)],
   [new THREE.ConeGeometry(0.035, 0.12, 4), MT(0.06, 1.88, 0.86)], [new THREE.ConeGeometry(0.035, 0.12, 4), MT(-0.06, 1.88, 0.86)], [new THREE.BoxGeometry(0.06, 0.32, 0.5), MT(0, 1.62, 0.6, 1, 1, 1, -0.75, 0)]]);   // body, neck, head, legs, tail, ears, mane
 const CART_G = mergeG([[new THREE.BoxGeometry(1.3, 0.12, 2.3), MT(0, 0.75, 0)], [new THREE.BoxGeometry(0.06, 0.45, 2.3), MT(0.62, 0.98, 0)], [new THREE.BoxGeometry(0.06, 0.45, 2.3), MT(-0.62, 0.98, 0)], [new THREE.BoxGeometry(1.3, 0.45, 0.06), MT(0, 0.98, -1.12)],
   [new THREE.BoxGeometry(0.07, 0.07, 2.4), MT(0.45, 0.78, 2.2)], [new THREE.BoxGeometry(0.07, 0.07, 2.4), MT(-0.45, 0.78, 2.2)], [new THREE.CylinderGeometry(0.05, 0.05, 1.7, 6).rotateZ(Math.PI / 2), MT(0, 0.55, 0)]]);   // bed, sides, shafts, axle
@@ -1792,7 +1792,7 @@ function drawGuide() { const TD = self.TODO_LIST || []; GUIDE.innerHTML = (MARKE
   `<div style="color:#c8b898;font-size:11.5px;margin-top:6px"><span style="color:${TAGC.known}">●</span> known &nbsp;<span style="color:${TAGC.inferred}">●</span> inferred &nbsp;<span style="color:${TAGC.typical}">●</span> typical &nbsp;<span style="color:${TAGC.absent}">●</span> not yet built &nbsp;<span style="color:${TAGC.person}">●</span> people</div>`; }
 GUIDE.addEventListener("click", e => { e.stopPropagation(); const d = e.target.closest("[data-i],[data-m],[data-r],[data-l],[data-t],[data-day],[data-home]"); if (!d) return; if (d.dataset.home) { start(); const p = homeDoor(); if (p) teleport(p[0], p[1], HOME ? HOME.x : SHELTER.fire[0], HOME ? HOME.z : SHELTER.fire[1]); return; } if (d.dataset.day) { const q = new URLSearchParams(location.search); if (MARKET) q.delete("day"); else q.set("day", "market"); location.search = q.toString(); return; } if (d.dataset.t) return goTodo(+d.dataset.t); if (d.dataset.i) goPlace(PLACES[+d.dataset.i]); else if (d.dataset.m) goMoment(+d.dataset.m); else if (d.dataset.r) cycleRate(); else { labelsOn = !labelsOn; drawGuide(); } });
 drawGuide();
-function interact(skipTasks) { if (!started) return start(); if (RIDE || busy) return; if (MENU) return closeMenu();
+function interact(skipTasks) { if (!started) return start(); if (RIDE || busy) return; if (MENU) return closeMenu(); if (mountToggle()) return;
   if (!skipTasks) { const avail = MY_TASKS.filter(t => t.test()); if (avail.length) return tasksMenu(avail, () => interact(true)); }
   if (INSIDE_H) return insideInteract();
   const PR = nearPier(); if (PR) return boatMenu(PR); const ST = nearStall(); if (ST) return stallMenu(ST);
@@ -1907,19 +1907,20 @@ function frame() {
   else { camera.rotation.set(pitch, yaw, 0, "YXZ"); camera.getWorldDirection(fwd); if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD) mx += 1; if (keys.KeyA) mx -= 1;
     if (keys.ShiftLeft || keys.ShiftRight) run = 3; if (keys.ArrowLeft) yaw += 1.6 * dt; if (keys.ArrowRight) yaw -= 1.6 * dt; if (flying) up = (keys.Space ? 1 : 0) - (keys.KeyC ? 1 : 0); }
   fwd.y = 0; fwd.normalize(); side.crossVectors(fwd, UP).normalize();
-  const sp = (INSIDE_H || inAbbey(P_.x, P_.z) ? Math.min(SPEEDS[speedI][0], 1.4) : SPEEDS[speedI][0]) * run;
+  const sp = MOUNT.ridden && !flying ? (run > 1 ? 8.5 : 3.8) * Math.max(1, SPEEDS[speedI][0] / 1.4) : (INSIDE_H || inAbbey(P_.x, P_.z) ? Math.min(SPEEDS[speedI][0], 1.4) : SPEEDS[speedI][0]) * run;   // on horseback: a trot, a canter
   if (RIDE) { mx = my = 0; rideStep(dt); }
   if ((mx || my) && SITTING_DOWN) SITTING_DOWN = false;
   if (mx || my) { const ox = P_.x, oz = P_.z; P_.x += (fwd.x * -my + side.x * mx) * sp * dt; P_.z += (fwd.z * -my + side.z * mx) * sp * dt;
     const high = flying && P_.y > groundAt(P_.x, P_.z) + 6; if (!high && !INSIDE_H) pushOut(P_);
     if (!flying && !INSIDE_H && groundAt(P_.x, P_.z) < -0.7) { P_.x = ox; P_.z = oz; }
-    if (!flying && !allowedAt(P_.x, P_.z) && allowedAt(ox, oz)) { P_.x = ox; P_.z = oz; } }   // the river is too deep to wade: use the bridge
+    if (!flying && !allowedAt(P_.x, P_.z) && allowedAt(ox, oz)) { P_.x = ox; P_.z = oz; }
+    if (MOUNT.ridden && zoneOf(P_.x, P_.z) && !zoneOf(ox, oz)) { P_.x = ox; P_.z = oz; if (clock.elapsedTime - blockT > 4) { blockT = clock.elapsedTime; say("You'll have to get down from the horse to go in (E).", 4); } } }   // the river is too deep to wade: use the bridge
   if (INSIDE_H) { flying = false; insideStep(t); }
   const g = RIDE ? P_.y : groundAt(P_.x, P_.z);
   if (RIDE) { } else if (flying) P_.y = Math.max(g, P_.y + up * Math.max(4, sp) * dt); else P_.y = g > P_.y ? Math.min(g, P_.y + Math.max(3.2, sp * 1.2) * dt) : Math.max(g, P_.y - Math.max(7, sp) * dt);
-  rig.position.set(P_.x, P_.y + (vr && SITTING ? 0.45 : 0) - (SITTING_DOWN || RIDE ? 0.65 : 0), P_.z);
+  rig.position.set(P_.x, P_.y + (vr && SITTING ? 0.45 : 0) - (SITTING_DOWN || RIDE ? 0.65 : 0) + (MOUNT.ridden ? 1.05 + (MOUNT.gait > 0.3 ? Math.abs(Math.sin(t * (MOUNT.gait > 5 ? 9 : 7))) * 0.07 : 0) : 0), P_.z);
   updateGround(P_.x, P_.z);
-  lifeStep(dt, t); fireStep(dt, t); beastStep(t); reactStep(t); countryStep(t); vehStep(t, dt); boatsStep(t, dt * Math.min(timeRate, 10));
+  lifeStep(dt, t); fireStep(dt, t); beastStep(t); reactStep(t); countryStep(t); vehStep(t, dt); mountStep(dt, t); boatsStep(t, dt * Math.min(timeRate, 10));
   // the sun, low in the south all day; sky and light
   const hour = SIM / 3600, S = sunAt(hour), el = S.el, day = clampN(el * 7 + 0.35, 0, 1), dusk = clampN(1 - el * 9, 0, 1) * (el > -0.12 ? 1 : 0);
   sun.position.copy(rig.position).addScaledVector(S.dir, 800); sun.target.position.copy(rig.position);
@@ -2095,3 +2096,23 @@ function roleStart() { const p = homeDoor(); if (p) { teleport(p[0], p[1], HOME 
 function tasksMenu(avail, fallback) { showMenu(`What will you do? (${Math.floor(SIM / 3600)}:${String(Math.floor(SIM / 60) % 60).padStart(2, "0")})`, [...avail.map(t => ({ label: t.name, fn: () => doTask(t) })), ...(fallback ? [{ label: "something else: look around here", fn: fallback }] : [])]); }
 
 self.ROLES_READY = true; drawGuide();
+// ---------- your horse ----------
+// A saddled horse tethered near where you start. Horses of the time were small (about 13-14 hands); saddles had a high pommel and cantle,
+// and stirrups were in use in England by the 11th century (the Bayeux Tapestry shows both). Thegns and knights rode; most townsfolk walked.
+const MOUNT = (() => { const g = new THREE.Group(), body = new THREE.Mesh(HORSE_G, M(WHO === "thegn" ? 0x3a2a20 : 0x6a4a30, { vertexColors: true })); g.add(body);
+  const tack = M(0x4a3020); for (const [w, h, d, x, y, z] of [[0.62, 0.12, 0.7, 0, 1.46, 0.05], [0.5, 0.22, 0.08, 0, 1.56, 0.4], [0.5, 0.26, 0.08, 0, 1.58, -0.3], [0.04, 0.5, 0.04, 0.33, 1.2, 0.05], [0.04, 0.5, 0.04, -0.33, 1.2, 0.05]]) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), tack); m.position.set(x, y, z); g.add(m); }   // saddle, pommel, cantle, stirrup leathers
+  for (const s of [-1, 1]) { const st = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 4, 8), MAT.iron); st.position.set(s * 0.33, 0.93, 0.05); g.add(st); }
+  const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.4, 0.95), M(WHO === "thegn" ? 0x8a2a24 : 0x6a5a48)); cloth.position.set(0, 1.28, 0.05); g.add(cloth);
+  scene.add(g); return { g, x: 0, z: 0, h: 0, ridden: false, gait: 0 }; })();
+{ let x, z, h; if (UNSEEN) { x = START.x + 6; z = START.z - 3; h = 0; } else { const p = homeDoor(); const a = HOME?.dp ? HOME.dp[2] : 0; x = p[0] + Math.cos(a) * 3.5 + Math.sin(a) * 2; z = p[1] - Math.sin(a) * 3.5 + Math.cos(a) * 2; h = a + Math.PI / 2; const q = { x, z }; pushOut(q, 1.2); x = q.x; z = q.z; }
+  Object.assign(MOUNT, { x, z, h }); }
+mark(WHO === "thegn" || UNSEEN ? "Your horse" : "A neighbour's pony", MOUNT.x, MOUNT.z, "typical", (WHO === "thegn" ? "Your riding horse. A thegn rode; his horse and his weapons were part of his rank (the heriot owed at his death included them)." : UNSEEN ? "A horse to get about on." : "Your neighbour's pony, lent for the day: most townsfolk walked, and horses belonged to the better-off.") + " Small by modern standards, about 13-14 hands. High saddle and stirrups, as in the Bayeux Tapestry. Press E beside it to mount; E again to get down; shift (or the trigger) to canter.", { y: 2.4, r: 3, range: 120 });
+const MOUNT_MARK = MARKS[MARKS.length - 1];
+function mountToggle() { if (MOUNT.ridden) { MOUNT.ridden = false; MOUNT_MARK.x = MOUNT.x; MOUNT_MARK.z = MOUNT.z; MOUNT_MARK.hidden = false; say("You get down and tie the horse.", 4); return true; }
+  if (Math.hypot(MOUNT.x - P_.x, MOUNT.z - P_.z) < 3 && !INSIDE_H && !zoneOf(P_.x, P_.z)) { MOUNT.ridden = true; MOUNT_MARK.hidden = true; SITTING_DOWN = false; P_.x = MOUNT.x; P_.z = MOUNT.z; say("You swing up into the saddle. Walk on: shift (or the trigger) to canter; E to get down. You'll need to get down to go indoors.", 7); return true; } return false; }
+let mountPrev = [0, 0];
+function mountStep(dt, t, moving) { const M_ = MOUNT; if (M_.ridden) { const dx = P_.x - mountPrev[0], dz = P_.z - mountPrev[1], v = Math.hypot(dx, dz) / Math.max(dt, 1e-3);
+    if (v > 0.3) { const target = Math.atan2(dx, dz); let d = target - M_.h; d = Math.atan2(Math.sin(d), Math.cos(d)); M_.h += d * Math.min(1, dt * 5); }
+    M_.gait = lerpN(M_.gait, v, Math.min(1, dt * 3)); M_.x = P_.x; M_.z = P_.z; }
+  mountPrev = [P_.x, P_.z]; const gy = Math.max(groundH(M_.x, M_.z), spanY(M_.x, M_.z)), sp = M_.gait, bob = sp > 0.3 ? Math.abs(Math.sin(t * (sp > 5 ? 9 : 7))) * (sp > 5 ? 0.09 : 0.05) : 0;
+  M_.g.position.set(M_.x - Math.sin(M_.h) * 0.15, gy + bob, M_.z - Math.cos(M_.h) * 0.15); M_.g.rotation.set(sp > 5 ? Math.sin(t * 9) * 0.04 : 0, M_.h, 0); }
