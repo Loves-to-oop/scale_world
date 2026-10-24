@@ -53580,10 +53580,6 @@ const SC = {
   [NOW - 66.0e6]: (K, P) => { const [x, gy, z] = P(-400, 1500); K.add("ball", "glow", x, gy + 1800, z, 120, 120, 120, 0, 0xfff0c0); for (let k = 1; k < 12; k++) K.add("ball", "glow", x - k * 90, gy + 1800 + k * 60, z - k * 40, 120 - k * 8, 120 - k * 8, 120 - k * 8, 0, k < 4 ? 0xffb050 : 0xc86a3a);   // the asteroid's fireball
     for (let k = 0; k < 6; k++) { const [ax, ag, az, ar] = P(-20 + k * 8, 60 + (k % 2) * 8); animal(K, "hadrosaur", ax, ag, az, ar + 0.5, 1); } } };
 const SCENEOBJ = new Map();
-function updateScenes(xT) { for (const ev of EVENTS) { const f = SC[ev[0]]; if (!f) continue; const ex = xOfYear(ev[0]), d = ex - xT, on = d > -1200 && d < 2400, has = SCENEOBJ.has(ev[0]);
-    if (on && !has) { const K = new Kit(), P = (along, dz) => { const x = ex + along, z = trackZ(x) + dz; return [x - ex, Math.max(terrainH(x, z), dz < -RIVER0 ? 0 : -1e9), z, trackH(x)]; };
-      f(K, P, ev[0]); SCENEOBJ.set(ev[0], anchor(K.build(), ex, 0, 0)); }
-    else if (!on && has) { const g = SCENEOBJ.get(ev[0]); unanchor(g); g.traverse(o => o.isInstancedMesh && o.dispose()); SCENEOBJ.delete(ev[0]); } } }
 // ordinary people of each period, about their business beside the line
 function periodFolk(K, x0, r) { for (let k = 0; k < 10; k++) { const x = x0 + r() * TILE, y = yearAt(x), E = era(y); if (!["modern", "postwar", "early20", "railway", "colonial"].includes(E)) continue; const dz = 30 + r() * 120, z = trackZ(x) + dz, gy = terrainH(x, z); if (gy < 0.5) continue;
     const C = COLS(y), n = 1 + Math.floor(r() * 3); for (let q = 0; q < n; q++) person(K, x - x0 + (r() - 0.5) * 4, gy, z + (r() - 0.5) * 4, r() * 6, C[(r() * C.length) | 0]); } }
@@ -53959,6 +53955,57 @@ function updateLeaders(xT) { const near = LEAD.filter(L => { const x = xOfYear(L
     g.fillStyle = "#e8eef8"; g.font = "32px Georgia, serif"; g.fillText(L.cn.replace(/ \(c\.\)/, ""), 22, 136); g.fillStyle = "#9ab8e8"; g.fillText(`${fy(L.y0)} – ${L.y1 >= NOW ? "now" : fy(L.y1)}`, 22, 186); B.t.needsUpdate = true; }
   const laneW = Math.min(4.5, 36 / Math.max(1, TL.countries.nl));
   for (const B of LBOARDS) { B.g.visible = !!B.L; if (!B.L) continue; const x = xOfYear(B.L.y0) - 3, z = trackZ(x) + TL.countries.dz0 - B.L.it.lane * laneW + 3, h = Math.max(terrainH(x, z), 0.2); B.g.position.set(x - ORIGIN.x, h, z - ORIGIN.z); B.g.rotation.y = trackH(x) + Math.PI / 2; } }   // facing the line from the river side
+
+// ---------- a scene for every event: chosen by what kind of event it is (battle, voyage, crowning, founding, plague, learning...) ----------
+// Events with their own hand-made scene (SC) keep it; every other event from the last 12,000 years gets one of these tableaux,
+// in the dress and buildings of its age and region.
+function crane(K, x, gy, z, ry) { K.add("box", "wood", x, gy, z, 0.6, 30, 0.6, ry); K.add("box", "wood", x + Math.sin(ry) * 6, gy + 29, z + Math.cos(ry) * 6, 0.4, 0.4, 14, ry); K.add("cyl", "wood", x, gy, z + 2, 4, 1, 4, 0); }
+const hcol = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
+const BANNER = [0xb8302a, 0x2a4a9a, 0xd8b83a, 0x2a7a3a, 0x7a2a7a, 0xe8e0d0, 0x1a1a1a, 0xc86a2a];
+function soldierCol(y, txt) { if (/Mongol|Khan|Yuan/.test(txt)) return 0x6a4a2a; if (/Chin|Tang|Han|Qin|Song|Ming|Japan|shogun|Korea/.test(txt)) return 0x6a2a2a; if (/Viking|Norse|Danish|Cnut/.test(txt)) return 0x6a6a5a;
+  if (y < 500) return /Rom|Caesar|legion|Carthag|Hannibal/.test(txt) ? 0xa8302a : 0xa88a4a; if (y < 1500) return 0x8a8a90; return 0x3a3a4a; }
+function regOf(y, txt) { return /Ital|Rom|Greek|Athen|Sparta|Egypt|Persia|Carthag|Byzant|Constantinople|Baghdad|Mecca|Cairo|Jerusalem|Babylon|Ottoman|Indus|India|Gupta|Maya|Aztec|Inca|Teotihuacan|Mali|Zimbabwe/.test(txt) || y < 600 ? "italy" : "france"; }
+function scSoldiers(K, P, along, dz, rows, cols, col, face, y) { for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) { const [x, gy, z, ry] = P(along + j * 1.7, dz + i * 1.7); person(K, x, gy, z, ry + face, col);
+    K.add("box", "wood", x + 0.35, gy + 0.4, z, 0.06, y < 1500 ? 3.2 : 1.6, 0.06, 0); if (y < 1500) K.add("box", "wall", x - 0.3 * Math.cos(ry), gy + 0.9, z + 0.3 * Math.sin(ry), 0.1, 1.0, 0.8, ry + face, BANNER[(i + j) % 3]); } }
+function longship(K, x, z, ry, sail) { K.add("box", "wood", x, -0.4, z, 4.5, 1.6, 22, ry, 0x5a3a24); K.add("box", "wood", x, 1, z, 0.4, 12, 0.4, 0); K.add("box", "wall", x, 4, z + 0.4, 0.1, 7, 8, ry + Math.PI / 2, sail); }
+function bigShip(K, x, z, ry, y, sail) { if (y < 1300) return longship(K, x, z, ry, sail); K.add("box", "wood", x, -0.8, z, 7, 4, 26, ry, 0x5a3a24); K.add("box", "wood", x, 2, z, 6, 3, 7, ry, 0x6a4a2c);
+  for (const m of [-6, 2, 8]) { const c = Math.cos(ry), s = Math.sin(ry); K.add("box", "wood", x + s * m, 1, z + c * m, 0.5, 20, 0.5, 0); K.add("box", "wall", x + s * m + c * 0.4, 8, z + c * m - s * 0.4, 0.1, 10, 9, ry + Math.PI / 2, sail); } }
+function throne(K, P, y, txt, col) { const [x, gy, z, ry] = P(0, 95); K.add("box", "wall", x, gy, z, 12, 1.2, 8, ry, 0x9a8a72); K.add("box", "wood", x, gy + 1.2, z, 2, 2.6, 1.5, ry, 0x7a2a2a); person(K, x, gy + 1.2, z, ry + Math.PI / 2, col, 1.15); K.add("cyl", "glow", x, gy + 3.2, z, 0.35, 0.2, 0.35, 0, 0xffd84a);
+  for (const e of [-5, 5]) flag(K, P, e, 92, [col, BANNER[(hcol(txt) + 3) % 8]], 9); crowd(K, P, 0, 78, 34, 14, y, Math.PI / 2 * 0); }
+function building(K, P, y, txt) { const reg = regOf(y, txt), [x, gy, z, ry] = P(0, 110), r = seeded(hcol(txt));
+  if (/cathedral|church|abbey|Saint|Notre|choir|Gothic|Salisbury/i.test(txt)) { church(K, x, gy, z, ry, "france", 2.2); crane(K, x + 14, gy, z + 6, ry); }
+  else if (/temple|mosque|Hagia|Parthenon|pyramid|Pyramid|Stonehenge|Newgrange|mound|Persepolis|palace|Forbidden/i.test(txt)) { if (/pyramid/i.test(txt)) K.add("pyr", "wall", x, gy, z, 60, 40, 60, ry, 0xd8c8a0); else if (/mound|Newgrange|Stonehenge|Poverty|Adena|earthwork/i.test(txt)) K.add("dome", "wall", x, gy, z, 40, 12, 40, 0, 0x5a7a3a); else { K.add("box", "wall", x, gy, z, 22, 2, 36, ry, 0xe8e0d0); for (let k = 0; k < 6; k++) for (const e of [-1, 1]) { const [cx, cg, cz] = P(-14 + k * 5.6, 110 + e * 9); K.add("cyl", "wall", cx, cg + 2, cz, 1.4, 9, 1.4, 0, 0xf0ece0); } K.add("gable", "roof", x, gy + 11, z, 23, 4, 37, ry, reg === "italy" ? 0xa85a3a : 0xe0d8c8); } }
+  else if (/wall|Wall/.test(txt)) { for (let k = -6; k <= 6; k++) { const [wx, wg, wz] = P(k * 10, 105 + Math.sin(k) * 4); K.add("box", "wall", wx, wg, wz, 10.5, 6, 3, ry, 0xa89a80); if (k % 3 === 0) K.add("box", "wall", wx, wg, wz, 6, 10, 6, ry, 0xa89a80); } }
+  else { for (let k = 0; k < 18; k++) { const a = r() * 6.28, d = 6 + r() * 30, [hx, hg, hz] = P(Math.cos(a) * d, 115 + Math.sin(a) * d * 0.7); house(K, hx, hg, hz, 6 + r() * 3, 8 + r() * 4, ry + (r() < 0.5 ? 0 : Math.PI / 2), reg, r); } church(K, x, gy, z, ry, reg, 1.2); }
+  crowd(K, P, -20, 88, 10, 8, y); }
+const TEMPLATES = [
+  [/battle|Battle|war\b|War\b|defeat|sack|siege|besieg|conquer|invad|destroy|revolt|rebellion|massacre|raid|turned back|stops? an|halt|overthrow|deposes|takes |falls?\b|fall of|assassinat|murder|burned at/i, (K, P, y, txt) => {
+    const a = soldierCol(y, txt), b = BANNER[(hcol(txt) + 1) % 8]; scSoldiers(K, P, -9, 70, 3, 10, a, Math.PI / 2, y); scSoldiers(K, P, -9, 92, 3, 10, b === a ? 0x5a5a3a : b, -Math.PI / 2, y); flag(K, P, -12, 66, [a, 0xe8e0d0], 8); flag(K, P, 12, 98, [b, 0x1a1a1a], 8);
+    if (/sack|burn|fire|destroy/i.test(txt)) for (let k = 0; k < 5; k++) { const [x, gy, z] = P(-20 + k * 10, 120); house(K, x, gy, z, 7, 9, 0, regOf(y, txt), seeded(k)); K.add("cone", "glow", x, gy + 4, z, 4, 6, 4, 0, 0xff8a2a); } }],
+  [/sail|reach(es)?|voyage|fleet|ships?\b|crosses|cross into|rounds|lands|settle|smuggled|explor|discover|Polynesian/i, (K, P, y, txt) => { const sail = /Viking|Norse|Erik/.test(txt) ? 0xb8302a : 0xe8dcc0, ships = /fleet/i.test(txt) ? 5 : 3;
+    for (let k = 0; k < ships; k++) { const [x, , z, ry] = P(-40 + k * 22, -300 - (k % 2) * 60); bigShip(K, x, z, ry, y, sail); } crowd(K, P, 0, -175, 10, 10, y); }],
+  [/crowned|becomes (king|queen|emperor|pharaoh|caliph|pope|shogun|the first)|king of|emperor|rules|dynasty|unites|unif|caliphate|empire is founded|becomes ruler|reign|proclaimed|Empire's rise|regent/i, (K, P, y, txt) => throne(K, P, y, txt, soldierCol(y, txt) === 0x3a3a4a ? 0x7a2a6a : BANNER[hcol(txt) % 8])],
+  [/plague|Black Death|pandemic|famine|coldest|dims|volcan|eruption/i, (K, P, y, txt) => { if (/volcan|eruption|dims|coldest/i.test(txt)) { const [x, gy, z] = P(0, 1800); K.add("cone", "wall", x, gy, z, 1400, 700, 1400, 0, 0x5a5048); K.add("ball", "wall", x, gy + 1200, z, 800, 900, 800, 0, 0x8a8278); K.add("cone", "glow", x, gy + 600, z, 120, 120, 120, 0, 0xff6a2a); return; }
+    const reg = regOf(y, txt); for (let k = 0; k < 6; k++) { const [x, gy, z, ry] = P(-25 + k * 10, 110); house(K, x, gy, z, 7, 9, ry, reg, seeded(k)); K.add("box", "wall", x + 3, gy + 1, z - 5, 0.1, 1.2, 1.2, ry, 0xc8201a); }
+    for (let k = 0; k < 8; k++) { const [x, gy, z, ry] = P(-14 + k * 4, 85); K.add("box", "wall", x, gy + 0.2, z, 0.5, 0.35, 1.7, ry, 0xd8d0c0); } const [cx, cg, cz, cr] = P(-25, 80); wagon(K, cx, cg, cz, cr); crowd(K, P, 20, 82, 5, 6, y, 0, 0x2a2a2a); }],
+  [/found(s|ed)|capital|city|cities|town|builds?\b|built|begun|completed|consecrated|great houses|walls|tower|Wall\b|grows into|height|flourish|largest/i, building],
+  [/book|writ(es|ten)|printed|paper|law|code|university|Academy|library|Library|Elements|Principia|algebra|calendar|alphabet|novel|Epic|Tales|Comedy|Sutra|Kells|Beowulf|constitution|Domesday|measures|zero|decimal|philosoph|Art of War|Iliad/i, (K, P, y, txt) => {
+    const [x, gy, z, ry] = P(0, 100); K.add("box", "wall", x, gy, z, 16, 8, 12, ry, y < 600 ? 0xe8e0d0 : 0xc8b898); K.add("gable", "roof", x, gy + 8, z, 17, 4, 13, ry, 0xa85a3a); for (let k = 0; k < 4; k++) { const [cx, cg, cz] = P(-6 + k * 4, 93); K.add("cyl", "wall", cx, cg, cz, 0.9, 8, 0.9, 0, 0xf0ece0); }
+    for (let k = 0; k < 4; k++) { const [tx, tg, tz, tr] = P(-12 + k * 8, 80); K.add("box", "wood", tx, tg + 0.5, tz, 2.4, 0.15, 1.2, tr, 0x6a4a2c); K.add("box", "white", tx, tg + 0.62, tz, 0.9, 0.06, 0.6, tr, 0xf0e8d0); person(K, tx, tg, tz + 1.2, tr + Math.PI, 0x5a3a6a); } }],
+  [/preach|baptiz|Christianity|Buddh|Islam|religion|Council|church|pope|saint|St |mission|enlighten|crucif|born|god|Hijra|worship|Schism|Guru/i, (K, P, y, txt) => { const [x, gy, z, ry] = P(0, 90); K.add("dome", "wall", x, gy - 0.5, z, 10, 3, 10, 0, 0x6a7a4a); person(K, x, gy + 2.3, z, ry + Math.PI / 2, 0xe8e0d0, 1.1);
+    for (let k = 0; k < 40; k++) { const a = Math.PI * (0.15 + 0.7 * (k / 40)) + Math.PI, r = 10 + (k % 4) * 2.5, [px, pg, pz] = P(Math.cos(a) * r * 1.6, 90 + Math.sin(a) * r); person(K, px, pg, pz, Math.atan2(x - px, z - pz), COLS(y)[k % COLS(y).length]); } }],
+  [/domesticat|farming|maize|rice|cattle|horses|harnessed|silkworm|coins|copper|bronze|iron|smelt|pottery/i, (K, P, y, txt) => { for (let k = 0; k < 10; k++) { const [x, gy, z, ry] = P(0, 90 + k * 4); K.add("box", "wall", x, gy - 0.1, z, 2.6, 0.3, 50, ry, /rice/.test(txt) ? 0x6a9a7a : 0x6a8a3a); }
+    const kind = /horse/i.test(txt) ? "horse" : /cattle/i.test(txt) ? "cow" : null; if (kind) for (let k = 0; k < 6; k++) { const [x, gy, z, ry] = P(-15 + k * 6, 140); animal(K, kind, x, gy, z, ry + k, 1); }
+    crowd(K, P, 0, 100, 8, 20, y); const [hx, hg, hz, hr] = P(25, 130); house(K, hx, hg, hz, 8, 10, hr, regOf(y, txt), seeded(3)); }],
+  [/./, (K, P, y, txt) => { crowd(K, P, 0, 85, 24, 14, y); flag(K, P, 0, 92, [BANNER[hcol(txt) % 8], BANNER[(hcol(txt) >> 3) % 8]], 9); const [x, gy, z, ry] = P(0, 110); house(K, x, gy, z, 10, 14, ry, regOf(y, txt), seeded(hcol(txt))); }]];
+const isCustom = ev => SC[ev[0]] && EVENTS.find(e => e[0] === ev[0]) === ev;
+function templateFor(ev) { if (BP(ev[0]) > 12000 || / completed\.$/.test(ev[1])) return null; for (const [re, f] of TEMPLATES) if (re.test(ev[1])) return f; return null; }
+const SCENEOBJ2 = new Map();
+function updateScenes(xT) { for (const ev of EVENTS) { const custom = isCustom(ev), f = custom ? SC[ev[0]] : templateFor(ev); if (!f) continue;
+    const same = custom ? 0 : EVENTS.filter(e => Math.round(e[0]) === Math.round(ev[0]) && !isCustom(e)).indexOf(ev), ex = xOfYear(ev[0]) + same * 40, d = ex - xT, on = d > -1000 && d < 2000, has = SCENEOBJ2.has(ev);
+    if (on && !has) { const K = new Kit(), P = (along, dz0) => { const dz = !custom && dz0 > 0 ? Math.max(22, dz0 - 45) : dz0, x = ex + along, z = trackZ(x) + dz; return [x - ex, Math.max(terrainH(x, z), dz < -RIVER0 ? 0 : -1e9), z, trackH(x)]; };
+      f(K, P, ev[0], ev[1]); SCENEOBJ2.set(ev, anchor(K.build(), ex, 0, 0)); }
+    else if (!on && has) { const g = SCENEOBJ2.get(ev); unanchor(g); g.traverse(o => o.isInstancedMesh && o.dispose()); SCENEOBJ2.delete(ev); } } }
 
 // ---------- the journey ----------
 // A year passes every second, so days and seasons would flicker past 365 times a second: the light is held at a summer afternoon.
