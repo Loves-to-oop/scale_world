@@ -76,6 +76,11 @@ function headGeo() { const g = new THREE.SphereGeometry(0.1, 16, 12), p = g.attr
     p.setXYZ(i, x * 0.1, y * 0.1, z * 0.1); } g.computeVertexNormals();
   return mergeG([[g, MT(0, 0.67, 0)], [new THREE.ConeGeometry(0.016, 0.05, 4).rotateX(-Math.PI / 2 - 0.35), MT(0, 0.663, 0.104)], [new THREE.SphereGeometry(0.02, 6, 4), MT(0.087, 0.668, -0.005, 0.35, 1.2, 0.9)], [new THREE.SphereGeometry(0.02, 6, 4), MT(-0.087, 0.668, -0.005, 0.35, 1.2, 0.9)],
     [new THREE.CylinderGeometry(0.045, 0.05, 0.1, 10), MT(0, 0.55, -0.005)]]); }
+// a cap of hair or cloth over the head that stops at the hairline in front (leaving the face open) and comes lower at the sides and back
+function faceCap(r, backT, frontT, width, segs = 14) { const g = new THREE.SphereGeometry(r, segs, 9, 0, Math.PI * 2, 0, backT), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), th = Math.acos(clampN(y / r, -1, 1)), a = Math.atan2(x, z), f = clampN(1 - Math.abs(a) / width, 0, 1), fs = f * f * (3 - 2 * f), mt = backT + (frontT - backT) * fs;
+    if (th > mt) p.setXYZ(i, r * Math.sin(mt) * Math.sin(a), r * Math.cos(mt), r * Math.sin(mt) * Math.cos(a)); }
+  g.computeVertexNormals(); return g; }
 const HIPY = 0.92, THIGH = 0.44, SHIN = 0.42, UARM = 0.28, FARM = 0.26;
 const PG = {
   thigh: G1(new THREE.CylinderGeometry(0.078, 0.058, THIGH, 9).translate(0, -THIGH / 2, 0)),
@@ -90,13 +95,13 @@ const PG = {
   eyeW: mergeG([[new THREE.SphereGeometry(0.014, 6, 4), MT(0.033, 0.694, 0.089, 1, 0.75, 0.55)], [new THREE.SphereGeometry(0.014, 6, 4), MT(-0.033, 0.694, 0.089, 1, 0.75, 0.55)]]),
   eyes: mergeG([[new THREE.SphereGeometry(0.0065, 5, 4), MT(0.033, 0.694, 0.096)], [new THREE.SphereGeometry(0.0065, 5, 4), MT(-0.033, 0.694, 0.096)], [new THREE.BoxGeometry(0.03, 0.004, 0.008), MT(0, 0.632, 0.097)]]),   // pupils and the line of the mouth
   brows: mergeG([[new THREE.BoxGeometry(0.03, 0.005, 0.008), MT(0.033, 0.712, 0.097, 1, 1, 1, 0, -0.12)], [new THREE.BoxGeometry(0.03, 0.005, 0.008), MT(-0.033, 0.712, 0.097, 1, 1, 1, 0, 0.12)]]),
-  hairEng: mergeG([[new THREE.SphereGeometry(0.108, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.52), MT(0, 0.675, -0.012, 0.9, 1.12, 1.05)], [foldTube(0.085, 0.095, 0.16, 12, 9, 0.12, Math.PI * 0.8, Math.PI * 0.4), MT(0, 0.6, -0.02)]]),   // worn long, to the collar
-  hairLong: mergeG([[new THREE.SphereGeometry(0.108, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.52), MT(0, 0.675, -0.012, 0.9, 1.12, 1.05)], [foldTube(0.085, 0.11, 0.36, 12, 9, 0.12, Math.PI * 0.85, Math.PI * 0.425), MT(0, 0.5, -0.025)]]),
-  hairNor: new THREE.SphereGeometry(0.108, 12, 4, 0, Math.PI * 2, 0, Math.PI * 0.3).scale(0.9, 1.12, 1.04).translate(0, 0.676, 0.008).rotateX(-0.18),
+  hairEng: mergeG([[faceCap(0.108, Math.PI * 0.56, Math.PI * 0.3, Math.PI * 0.42), MT(0, 0.672, -0.006, 0.9, 1.12, 1.04)], [foldTube(0.085, 0.095, 0.16, 12, 9, 0.12, Math.PI * 0.8, Math.PI * 0.4), MT(0, 0.6, -0.02)]]),   // worn long, to the collar
+  hairLong: mergeG([[faceCap(0.108, Math.PI * 0.56, Math.PI * 0.3, Math.PI * 0.42), MT(0, 0.672, -0.006, 0.9, 1.12, 1.04)], [foldTube(0.085, 0.11, 0.36, 12, 9, 0.12, Math.PI * 0.85, Math.PI * 0.425), MT(0, 0.5, -0.025)]]),
+  hairNor: faceCap(0.108, Math.PI * 0.3, Math.PI * 0.27, Math.PI * 0.4).rotateX(-0.25).scale(0.9, 1.12, 1.04).translate(0, 0.674, 0.004),   // cropped, the back of the head shaved: tilted about the head, not the feet
   tonsure: G1(new THREE.SphereGeometry(0.108, 12, 3, Math.PI * 0.85, Math.PI * 1.3, Math.PI * 0.24, Math.PI * 0.24).scale(0.9, 1.12, 1.04).translate(0, 0.675, -0.005)),
   moustache: mergeG([[new THREE.CapsuleGeometry(0.007, 0.035, 2, 4).rotateZ(Math.PI / 2), MT(0.02, 0.64, 0.1, 1, 1, 1, 0, -0.45)], [new THREE.CapsuleGeometry(0.007, 0.035, 2, 4).rotateZ(Math.PI / 2), MT(-0.02, 0.64, 0.1, 1, 1, 1, 0, 0.45)]]),
   beard: G1(new THREE.SphereGeometry(0.07, 10, 6, 0, Math.PI * 2, Math.PI * 0.38, Math.PI * 0.62).scale(0.9, 1.2, 0.8).translate(0, 0.625, 0.04)),
-  headrail: mergeG([[new THREE.SphereGeometry(0.117, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.6), MT(0, 0.675, -0.012, 0.93, 1.13, 1.07)], [foldTube(0.1, 0.19, 0.32, 16, 7, 0.1, Math.PI * 0.5, Math.PI * 0.25), MT(0, 0.5, -0.015, 1, 1, 0.85)]]),
+  headrail: mergeG([[faceCap(0.117, Math.PI * 0.66, Math.PI * 0.27, Math.PI * 0.5), MT(0, 0.673, -0.008, 0.93, 1.13, 1.06)], [foldTube(0.1, 0.19, 0.32, 16, 7, 0.1, Math.PI * 0.5, Math.PI * 0.25), MT(0, 0.5, -0.015, 1, 1, 0.85)]]),
   tunic: G1(foldTube(0.17, 0.27, 0.54, 20, 7, 0.07, 0, 0, 1).scale(1, 1, 0.8).translate(0, -0.2, 0)),
   trim: G1(new THREE.CylinderGeometry(0.27, 0.275, 0.045, 20, 1, true).scale(1, 1, 0.8).translate(0, -0.45, 0)),
   belt: mergeG([[new THREE.CylinderGeometry(0.142, 0.142, 0.035, 14, 1, true), MT(0, 0.07, 0, 1, 1, 0.72)], [new THREE.BoxGeometry(0.07, 0.08, 0.03), MT(0.11, 0.02, 0.08)]]),   // and a pouch
@@ -112,7 +117,7 @@ const PG = {
   pallium: mergeG([[new THREE.TorusGeometry(0.15, 0.018, 4, 14).rotateX(Math.PI / 2), MT(0, 0.44, 0, 1, 1, 0.8)], [new THREE.BoxGeometry(0.05, 0.42, 0.012), MT(0, 0.2, 0.2)], [new THREE.BoxGeometry(0.05, 0.42, 0.012), MT(0, 0.2, -0.17)]]),
   crozier: mergeG([[new THREE.CylinderGeometry(0.012, 0.012, 1.85, 5), MT(0, -0.12, 0)], [new THREE.TorusGeometry(0.06, 0.013, 4, 10, Math.PI * 1.5), MT(0, 0.86, 0)]]),
   cowl: G1(new THREE.TorusGeometry(0.11, 0.05, 6, 14).rotateX(Math.PI / 2).scale(1, 1, 0.9).translate(0, 0.5, -0.02)),
-  hood: G1(new THREE.SphereGeometry(0.13, 10, 5, 0, Math.PI * 2, 0, Math.PI * 0.62).scale(1, 1.1, 1.1).translate(0, 0.68, -0.025)),
+  hood: G1(faceCap(0.13, Math.PI * 0.64, Math.PI * 0.27, Math.PI * 0.52).scale(1, 1.1, 1.08).translate(0, 0.676, -0.012)),
   cap: G1(new THREE.ConeGeometry(0.105, 0.17, 10).rotateX(0.35).translate(0, 0.79, 0.02)),
   crown: mergeG(Array.from({ length: 6 }, (_, k) => [new THREE.BoxGeometry(0.035, 0.07, 0.012), new THREE.Matrix4().makeRotationY(k / 6 * Math.PI * 2).multiply(MT(0, 0.79, 0.098))]).concat([[new THREE.TorusGeometry(0.1, 0.012, 3, 12).rotateX(Math.PI / 2), MT(0, 0.76, 0)]])),
   sceptre: mergeG([[new THREE.CylinderGeometry(0.012, 0.012, 0.8, 5), MT(0, 0.3, 0)], [new THREE.SphereGeometry(0.03, 6, 4), MT(0, 0.72, 0)]]),
@@ -627,8 +632,8 @@ function lineStreet(S, dens, opts = {}) { const R = seeded(S.name.length * 977 +
 // in stone rubble or timber. All Hallows by the Tower keeps a 7th-century arch; St Bride's was excavated after the Blitz.
 const CHURCHES = [];
 function addChurch(x, z, o = {}) { const nw = o.nw || 6.5, nl = o.nl || 14, cw = o.cw || 4.5, cl = o.cl || 5, wh = o.wh || 5.5, mat = o.mat || "rag", roof = o.roof || "shingle";
-  gChurch(x, z, { nl, nw, cl, cw, wh, mat, roof }); const cx = x + nl / 2 + cl / 2;
-  solid(x, z, nl, nw, 0); solid(cx, z, cl, cw, 0); rRect(x + 3, z, nl + cl + 18, nw + 16, 0, 4);
+  gChurchWalk(x, z, { nl, nw, cl, cw, wh, mat, roof }); const cx = x + nl / 2 + cl / 2;   // walls and their doorways are solid; you can walk in
+  rRect(x + 3, z, nl + cl + 18, nw + 16, 0, 4);
   const C = { x, z, nl, ...o }; CHURCHES.push(C); return C; }
 
 // ---------- the Roman wall and its gates ----------
@@ -743,7 +748,12 @@ function archGeo(w, h) { const s = new THREE.Shape(), r = w / 2; s.moveTo(-r, -h
 function windowAt(x, y, z, w, h, axis, nrm, th) { const ry = axis === "z" ? (nrm > 0 ? 0 : Math.PI) : (nrm > 0 ? Math.PI / 2 : -Math.PI / 2);
   const ox = axis === "x" ? nrm * (th / 2 + 0.02) : 0, oz = axis === "z" ? nrm * (th / 2 + 0.02) : 0;
   const pl = (mat, sx, sz, r) => { const g = archGeo(w, h); AG[mat].push([g, new THREE.Matrix4().compose(V3(x + sx, y + h / 2, z + sz), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, r, 0)), V3(1, 1, 1))]); };
-  pl("dark", ox, oz, ry); pl("glow", -ox, -oz, ry + Math.PI); }
+  pl("dark", ox, oz, ry); pl("glow", -ox, -oz, ry + Math.PI); archFrame(x + ox, y, z + oz, w, h, ry); }
+// the moulded frame round a window or arch outside: a roll moulding over the arch and a small shaft each side (as at Jumièges)
+function archFrame(x, y, z, w, h, ry, depth = 0.12) { const r = w / 2, ys = y + h - r, s = new THREE.Shape(); s.absarc(0, 0, r + 0.24, 0, Math.PI, false); s.lineTo(-r - 0.06, 0); s.absarc(0, 0, r + 0.06, Math.PI, 0, true); s.lineTo(r + 0.24, 0);
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false, curveSegments: 10 }); AG.ashlar.push([g, new THREE.Matrix4().compose(V3(x, ys, z), q, V3(1, 1, 1))]);
+  for (const sx of [-1, 1]) { const c = new THREE.CylinderGeometry(0.075, 0.075, h - r, 7), off = V3(sx * (r + 0.15), 0, 0.08).applyQuaternion(q); AG.ashlar.push([c, new THREE.Matrix4().makeTranslation(x + off.x, y + (h - r) / 2, z + off.z)]);
+    const cap = new THREE.BoxGeometry(0.26, 0.14, 0.2), co = V3(sx * (r + 0.15), 0, 0.08).applyQuaternion(q); AG.paintc.push([cap, new THREE.Matrix4().compose(V3(x + co.x, ys - 0.02, z + co.z), q, V3(1, 1, 1))]); } }
 // walls with gaps for doors: along x at z (th thick) or along z at x
 function wallX(x0, x1, z, th, y0, h, gaps = [], mat = "ashlar") { let a = x0; for (const [g0, g1, gh] of [...gaps, [x1, x1, 0]]) { if (g0 > a) slab(mat, (a + g0) / 2, y0, z, g0 - a, h, th, 0, 0, true); if (g1 > g0) slab(mat, (g0 + g1) / 2, y0 + gh, z, g1 - g0, h - gh, th); a = g1; } }
 function wallZ(z0, z1, x, th, y0, h, gaps = [], mat = "ashlar") { let a = z0; for (const [g0, g1, gh] of [...gaps, [z1, z1, 0]]) { if (g0 > a) slab(mat, x, y0, (a + g0) / 2, th, h, g0 - a, 0, 0, true); if (g1 > g0) slab(mat, x, y0 + gh, (g0 + g1) / 2, th, h - gh, g1 - g0); a = g1; } }
@@ -808,7 +818,8 @@ function wallZ(z0, z1, x, th, y0, h, gaps = [], mat = "ashlar") { let a = z0; fo
   for (const zs of [-1, 1]) put("r:lead", GABLE_G, MAT.lead, 0, Y + 19 * HS, 16.7 * zs, 12.8, 7, 22.4, 0);
   { const g = new THREE.ConeGeometry(6.4, 6.5, 12, 1, true, 0, Math.PI); put("apseroof", g, new THREE.MeshStandardMaterial({ map: leadT, roughness: 0.6, metalness: 0.3, side: THREE.DoubleSide }), CHOIR_E, Y + 19 * HS + 3.25, 0, 1, 1, 1, 0); }
   slab("ashlar", 0, Y + 19, 0, 12.6, 17, 12.6); for (const [x, z, a] of [[6.32, 0, 0], [-6.32, 0, 0], [0, 6.32, 1], [0, -6.32, 1]]) for (const o of [-2.4, 0, 2.4]) slab("dark", x + (a ? o : 0), Y + 30, z + (a ? 0 : o), a ? 1.0 : 0.05, 3.2, a ? 0.05 : 1.0);
-  put("cap", CONE4_G, MAT.lead, 0, Y + 36 * HS, 0, 13.2, 6, 13.2); put("vane", CYL_G, MAT.iron, 0, Y + 36 * HS + 6, 0, 0.1, 2.4, 0.1);
+  put("cap", CONE4_G, MAT.lead, 0, Y + 36 * HS, 0, 13.2, 6, 13.2);
+  for (const [cx, cz, ry] of [[0, 28.0, 0], [0, -28.0, 0], [CHOIR_E + 6.2, 0, Math.PI / 2]]) { const top = Y + 19 * HS + (cx > CHOIR_E ? 5.8 : 6.9); put("gcross", BOX_G, AMAT.ashlar, cx, top, cz, 0.22, 1.6, 0.22, ry); put("gcross", BOX_G, AMAT.ashlar, cx, top + 1.0, cz, 0.9, 0.22, 0.22, ry); }   // stone crosses on the gables put("vane", CYL_G, MAT.iron, 0, Y + 36 * HS + 6, 0, 0.1, 2.4, 0.1);
   put("vane", BOX_G, new THREE.MeshStandardMaterial({ color: 0xd8b04a, metalness: 0.8, roughness: 0.3 }), 0, Y + 36 * HS + 7.9, 0, 1.2, 0.7, 0.12);   // the weathercock: in the Bayeux Tapestry a man is fixing it to the new church
   // scaffolding and stone at the unfinished west end: putlog scaffolds of poles lashed together, and a hoist
   { const R = seeded(5); for (let k = 6; k < 12; k++) { const xc = -5 - BAY * (k + 0.5); for (const zs of [-1, 1]) for (const zo of [9.2, 12.0]) { const z = zo * zs;
@@ -838,9 +849,12 @@ function wallZ(z0, z1, x, th, y0, h, gaps = [], mat = "ashlar") { let a = z0; fo
       for (let x = x0 + 0.4; x < x1; x += 0.9) { slab("ashlar", x, Y + 12.1, 11.35 * zs, 0.28, 0.25, 0.3); slab("ashlar", x, Y + 18.7, 5.85 * zs, 0.28, 0.25, 0.3); } }
     for (const x of [-6.4, 6.4]) { const sx = Math.sign(x); for (const z of [11.6, 19, 27.35]) PIL(x, z * zs, sx, 0, 0, 18.8, 1.0); for (let z = 11.6; z < 27.6; z += 0.9) slab("ashlar", x + sx * 0.15, Y + 18.7, z * zs, 0.3, 0.25, 0.28); slab("ashlar", x + sx * 0.12, Y + 2.8, 19.4 * zs, 0.24, 0.18, 16); slab("ashlar", x + sx * 0.12, Y + 13.1, 19.4 * zs, 0.24, 0.18, 16); }
     for (const x of [-6.4, 0, 6.4]) PIL(x, 27.7 * zs, 0, zs, 0, 18.8, 1.0); slab("ashlar", 0, Y + 10.6, 27.82 * zs, 12.8, 0.18, 0.24); }
+  // blind arcading across the foot of each transept front: a row of shallow round arches on shafts, the recesses shadowed
+  for (const zs of [-1, 1]) for (let k = 0; k < 6; k++) { const ax = -4.6 + k * 1.84; if (zs < 0 && Math.abs(ax) < 2.8) continue; const ry = zs > 0 ? 0 : Math.PI, z = (27.7 + 0.01) * zs;
+    const g = new THREE.PlaneGeometry(1.3, 2.6); AG.shade.push([g, new THREE.Matrix4().compose(V3(ax, Y + 1.0 + 1.3, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), V3(1, 1, 1))]); archFrame(ax, Y + 1.0, z, 1.3, 3.25, ry, 0.1); }
   // the north door: a round arch of two orders with a plain tympanum
   { const ring = (ri, ro, d, zo) => { const s = new THREE.Shape(); s.absarc(0, 0, ro, 0, Math.PI, false); s.lineTo(-ri, 0); s.absarc(0, 0, ri, Math.PI, 0, true); s.lineTo(ro, 0); const g = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: false, curveSegments: 12 }); AG.ashlar.push([g, new THREE.Matrix4().makeTranslation(0, Y + 4.2, -27.7 - zo)]); };
-    ring(1.7, 2.1, 0.25, 0.25); ring(2.1, 2.5, 0.15, 0.15); const t = new THREE.Shape(); t.absarc(0, 0, 1.7, 0, Math.PI, false); t.lineTo(1.7, 0); AG.ashlar.push([new THREE.ShapeGeometry(t, 12).rotateY(Math.PI), new THREE.Matrix4().makeTranslation(0, Y + 4.2, -27.75)]);
+    ring(1.7, 2.1, 0.25, 0.25); ring(2.1, 2.5, 0.15, 0.15); const t = new THREE.Shape(); t.absarc(0, 0, 1.7, 0, Math.PI, false); t.lineTo(1.7, 0); AG.paintc.push([new THREE.ShapeGeometry(t, 12).rotateY(Math.PI), new THREE.Matrix4().makeTranslation(0, Y + 4.2, -27.75)]);   // the tympanum, painted
     for (const sx of [-1, 1]) { const g = new THREE.CylinderGeometry(0.17, 0.17, 4.2, 10); AG.ashlar.push([g, new THREE.Matrix4().makeTranslation(sx * 1.9, Y + 2.1, -27.85)]); } }
   // the crossing tower: blind arcading on the lower stage, two pairs of round-headed belfry openings above, string courses, corbels
   for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const fx = nx * 6.32, fz = nz * 6.32, ry = nx ? (nx > 0 ? Math.PI / 2 : -Math.PI / 2) : (nz > 0 ? 0 : Math.PI);
@@ -902,7 +916,8 @@ function surfAt(x, z) { let best = -1e9; for (const S of SURF) { const dx = x - 
   if (lx < Math.min(S.x0, S.x1) || lx > Math.max(S.x0, S.x1) || lz < Math.min(S.z0, S.z1) || lz > Math.max(S.z0, S.z1)) continue;
   const f = S.alongZ ? (lz - S.z0) / (S.z1 - S.z0 || 1) : (lx - S.x0) / (S.x1 - S.x0 || 1), h = S.F.gy + S.y0 + (S.y1 - S.y0) * clampN(f, 0, 1); if (h > best) best = h; } return best; }
 const ZONES = [];   // rooms: for light and for who you can see
-function zoneOf(x, z) { if (inAbbey(x, z)) return "abbey"; for (const Z of ZONES) { const dx = x - Z.F.x, dz = z - Z.F.z, lx = dx * Z.F.c - dz * Z.F.s, lz = dx * Z.F.s + dz * Z.F.c; if (Math.abs(lx) < Z.w / 2 && Math.abs(lz) < Z.d / 2) return Z.name; } return null; }
+let ZONE_HIT = null;
+function zoneOf(x, z) { ZONE_HIT = null; if (inAbbey(x, z)) return "abbey"; for (const Z of ZONES) { const dx = x - Z.F.x, dz = z - Z.F.z, lx = dx * Z.F.c - dz * Z.F.s, lz = dx * Z.F.s + dz * Z.F.c; if (Math.abs(lx) < Z.w / 2 && Math.abs(lz) < Z.d / 2) { ZONE_HIT = Z; return Z.name; } } return null; }
 // walls with doorways, solid both sides; doors = [[side, u (centre along the wall), width, height]]; extra = [y0, y1] spans kept within a door gap
 function gWalls(F, mat, w, d, h, th, doors = [], keep = []) { const ry = Math.atan2(F.s, F.c);
   for (const side of ["+x", "-x", "+z", "-z"]) { const onX = side[1] === "x", sg = side[0] === "+" ? 1 : -1, L = onX ? d : w, gaps = doors.filter(D => D[0] === side).sort((a, b) => a[1] - b[1]);
@@ -993,6 +1008,27 @@ const PAL = {}, hearthFireM = new THREE.MeshBasicMaterial({ color: 0xff9a3a, tra
   const [gx, gz] = [PALACE[0] + 4 - 70, PALACE[1] + 4]; for (const s of [-1, 1]) { put("gatepost", BOX_G, MAT.wood, gx, groundH(gx, gz) - 0.2, gz + s * 3.2, 0.6, 5.2, 0.6); solid(gx, gz + s * 3.2, 0.6, 0.6, 0); } put("gatepost", BOX_G, MAT.wood, gx, groundH(gx, gz) + 4.4, gz, 0.7, 0.5, 7.2); put("r:shingle", GABLE_G, MAT.shingle, gx, groundH(gx, gz) + 4.9, gz, 2, 1.4, 7.6, 0);   // the gate
   for (let k = 0; k < 4; k++) { const [x, z] = P(-39 - 9 + k * 6, -24.5); } }
 const HALL_IN = (x, z) => zoneOf(x, z) === "hall";
+// ---------- churches you can walk into ----------
+// A Late Saxon parish church: a nave for the people, a smaller chancel for the altar beyond a narrow chancel arch, walls plastered and
+// limewashed inside (often painted), an earth or mortar floor, no seats. Each is a room: its own light, and people inside seen through the door.
+function gChurchWalk(x, z, o) { const gy = groundH(x, z) - 0.3, nl = o.nl, nw = o.nw, cl = o.cl, cw = o.cw, wh = o.wh, wm = o.mat === "plank" ? "stave" : "rubble", rf = o.roof, ah = Math.min(wh * 0.7, 4.2);
+  const NF = FR(x, z, Math.PI / 2, gy), CF = FR(x + nl / 2 + cl / 2, z, Math.PI / 2, gy, NF.key);
+  GTINT = wm === "rubble" ? [1.05, 1.03, 1.0] : [1, 1, 1];
+  gWalls(NF, wm, nw, nl, wh, 0.6, [["-z", 0, 1.3, 2.4], ["+z", 0, cw - 1.2, ah]]);   // west door; the chancel arch
+  gWalls(CF, wm, cw, cl, wh * 0.8, 0.6, [["-z", 0, cw + 0.7, 0, []]]); gGableBoth(NF, wm, nw, nl, wh, nw * 0.6); gGableBoth(CF, wm, cw, cl, wh * 0.8, cw * 0.6);
+  if (wm === "rubble") { GTINT = [1.25, 1.2, 1.1]; for (const sx of [-1, 1]) for (const sz of [-1, 1]) gbox(NF, "rubble", sx * (nw / 2 + 0.08), wh / 2, sz * (nl / 2 + 0.08), 0.5, wh, 0.5); }   // dressed quoins
+  GTINT = [1, 1, 1]; for (const sx of [-1, 1]) for (const f of [0.25, 0.7]) { garch(NF, "dark", sx * (nw / 2 + 0.3), wh * 0.45, -nl / 2 + nl * f, 0.4, 1.1, [sx, 0, 0]); GTINT = [1.7, 1.7, 1.75]; garch(NF, "plain", sx * (nw / 2 - 0.33), wh * 0.45, -nl / 2 + nl * f, 0.4, 1.1, [-sx, 0, 0]); GTINT = [1, 1, 1]; }   // windows: dark outside, daylight within
+  garch(CF, "dark", 0, wh * 0.35, cl / 2 + 0.3, 0.4, 1.0, [0, 0, 1]); GTINT = [1.7, 1.7, 1.75]; garch(CF, "plain", 0, wh * 0.35, cl / 2 - 0.33, 0.4, 1.0, [0, 0, -1]); GTINT = [1, 1, 1];
+  groof(NF, rf, nw, nl, wh, nw * 0.6, { e: 0.3, g: 0.25, under: "plank" }); groof(CF, rf, cw, cl, wh * 0.8, cw * 0.6, { e: 0.3, g: 0.2, under: "plank" });
+  const by = wh + nw * 0.6; gbox(NF, wm, 0, by + 0.7, -nl / 2 + 0.3, 1.3, 1.4, 0.6, "b"); garch(NF, "dark", 0, by + 0.2, -nl / 2, 0.55, 0.9, [0, 0, -1]); groof(FR(x - nl / 2 + 0.3, z, Math.PI / 2, gy + by + 1.4, NF.key), "shingle", 1.5, 0.8, 0, 0.6, { e: 0.1, g: 0.1 });   // the bellcote
+  gbox(NF, "oak", 0, by + 2.4, -nl / 2 + 0.3, 0.1, 0.9, 0.1); gbox(NF, "oak", 0, by + 2.55, -nl / 2 + 0.3, 0.5, 0.1, 0.1);
+  // inside: limewashed plaster with a painted band, a floor, the altar with its cloth, cross and candles
+  GTINT = [1.32, 1.3, 1.24]; for (const sx of [-1, 1]) gpoly(NF, "daub", [[sx * (nw / 2 - 0.31), 0, -nl / 2 + 0.31], [sx * (nw / 2 - 0.31), 0, nl / 2 - 0.31], [sx * (nw / 2 - 0.31), wh, nl / 2 - 0.31], [sx * (nw / 2 - 0.31), wh, -nl / 2 + 0.31]], [[0, 0], [nl, 0], [nl, wh], [0, wh]], [-sx, 0, 0]);
+  GTINT = [0.9, 0.3, 0.22]; for (const sx of [-1, 1]) gpoly(NF, "plain", [[sx * (nw / 2 - 0.32), wh * 0.78, -nl / 2 + 0.31], [sx * (nw / 2 - 0.32), wh * 0.78, nl / 2 - 0.31], [sx * (nw / 2 - 0.32), wh * 0.83, nl / 2 - 0.31], [sx * (nw / 2 - 0.32), wh * 0.83, -nl / 2 + 0.31]], [[0, 0], [1, 0], [1, 1], [0, 1]], [-sx, 0, 0]);
+  GTINT = [0.75, 0.72, 0.68]; gpoly(NF, "rush", [[-nw / 2, 0.32, -nl / 2], [nw / 2, 0.32, -nl / 2], [nw / 2, 0.32, nl / 2], [-nw / 2, 0.32, nl / 2]], [[0, 0], [nw, 0], [nw, nl], [0, nl]], [0, 1, 0]); gpoly(CF, "rush", [[-cw / 2, 0.36, -cl / 2], [cw / 2, 0.36, -cl / 2], [cw / 2, 0.36, cl / 2], [-cw / 2, 0.36, cl / 2]], [[0, 0], [cw, 0], [cw, cl], [0, cl]], [0, 1, 0]);
+  GTINT = [1.1, 1.08, 1.02]; gbox(CF, "rubble", 0, 0.8, cl / 2 - 1.0, 1.6, 1.0, 0.8, "b"); GTINT = [1.4, 1.38, 1.32]; gbox(CF, "plain", 0, 1.32, cl / 2 - 1.0, 1.7, 0.04, 0.9, "b"); GTINT = [1, 0.85, 0.4]; gbox(CF, "plain", 0, 1.65, cl / 2 - 1.2, 0.06, 0.6, 0.06, ""); gbox(CF, "plain", 0, 1.8, cl / 2 - 1.2, 0.35, 0.06, 0.06, "");
+  for (const sx of [-0.6, 0.6]) { const [px, , pz] = gw(CF, sx, 0, cl / 2 - 1.0); put("candle", CYL_G, M(0xe8e0c8), px, gy + 1.34, pz, 0.04, 0.22, 0.04); put("flame", FLAME_G, flameM, px, gy + 1.57, pz, 1.2, 1.2, 1.2); }
+  GTINT = [1, 1, 1]; ZONES.push({ name: "church", F: NF, w: nw - 0.6, d: nl - 0.6, light: [0, wh * 0.6, 0], doors: [[0, -nl / 2]] }, { name: "church", F: CF, w: cw - 0.6, d: cl - 0.6, light: [0, wh * 0.5, 0], doors: [] }); }
 
 // ---------- markers: what things are, and how well we know them ----------
 // tag: "known" (from excavation or written record), "inferred" (the place is known, the form is a reasoned guess),
@@ -1011,25 +1047,36 @@ function findFree(x, z, w, d, ry = 0) { for (let r = 0; r < 60; r += 3) for (let
   const NF = FR(x, z, Math.PI / 2, gy), lime = [1.32, 1.3, 1.24], dress = [1.22, 1.18, 1.1];
   const gtri = (F, cx, y0, cz, w, h, out) => { const along = out[0] ? [0, 0, 1] : [1, 0, 0], P = (u, y) => [cx + along[0] * u + out[0] * 0.03, y, cz + along[2] * u + out[2] * 0.03], r = w / 2, ys = y0 + h - r;
     gpoly(F, "dark", [P(-r, y0), P(r, y0), P(r, ys), P(-r, ys)], [[0, 0], [1, 0], [1, 1], [0, 1]], out); gpoly(F, "dark", [P(-r, ys), P(r, ys), P(0, y0 + h)], [[0, 0], [1, 0], [0.5, 1]], out); };
-  GTINT = lime; gbox(NF, "daub", 0, 6.5, 0, 9, 13, 40); for (const sx of [-1, 1]) gbox(NF, "daub", sx * 6.75, 3.5, 0, 4.5, 7, 40);   // the nave and its aisles
-  GTINT = [0.9, 0.9, 0.9]; for (const sx of [-1, 1]) gpoly(NF, "shingle", [[sx * 9.3, 7.2, -20.2], [sx * 9.3, 7.2, 20.2], [sx * 4.5, 9.7, 20.2], [sx * 4.5, 9.7, -20.2]], [[0, 0], [40, 0], [40, 5], [0, 5]], [sx, 1, 0]);
-  groof(NF, "shingle", 9, 40, 13, 5, { e: 0.4, g: 0.3 });
-  GTINT = [1, 1, 1]; for (const sx of [-1, 1]) for (let zz = -16; zz <= 16; zz += 4) { garch(NF, "dark", sx * 4.5, 10.2, zz, 0.6, 1.5, [sx, 0, 0]); garch(NF, "dark", sx * 9, 3.2, zz, 0.5, 1.3, [sx, 0, 0]); }
-  GTINT = dress; for (const sx of [-1, 1]) for (let zz = -18; zz <= 18; zz += 4) gbox(NF, "rubble", sx * 4.55, 10.0, zz, 0.1, 6, 0.32, "bt");   // pilaster strips on the clerestory
+  // walk-in: an aisled nave (arcades of square piers carrying the clerestory), a north door, the west door through the tower, the chancel and apse
+  GTINT = lime; gWalls(NF, "daub", 18, 40, 7, 0.7, [["+x", -12, 1.6, 2.9], ["-z", 0, 1.8, 3.4], ["+z", 0, 7.6, 6.2, [[6.2, 7]]]]);
+  for (const sx of [-1, 1]) { gbox(NF, "daub", sx * 4.5, 10, 0, 0.8, 6, 40, ""); for (let zz = -16; zz <= 16; zz += 4) { gbox(NF, "daub", sx * 4.5, 3.5, zz, 1.0, 7, 1.0, "b"); const [px, , pz] = gw(NF, sx * 4.5, 0, zz); solid(px, pz, 1.0, 1.0, Math.PI / 2); } }   // the clerestory walls on their piers
+  for (const sz of [-1, 1]) gbox(NF, "daub", 0, sz > 0 ? 9.6 : 10, sz * 20, 8.2, sz > 0 ? 6.8 : 6, 0.7, "");   // the central vessel's end walls above the aisles
+  GTINT = [0.9, 0.9, 0.9]; for (const sx of [-1, 1]) { gpoly(NF, "shingle", [[sx * 9.3, 7.2, -20.2], [sx * 9.3, 7.2, 20.2], [sx * 4.9, 9.7, 20.2], [sx * 4.9, 9.7, -20.2]], [[0, 0], [40, 0], [40, 5], [0, 5]], [sx, 1, 0]); gpoly(NF, "plank", [[sx * 9, 6.95, -20], [sx * 9, 6.95, 20], [sx * 4.9, 9.4, 20], [sx * 4.9, 9.4, -20]], [[0, 0], [40, 0], [40, 5], [0, 5]], [0, -1, 0]); }
+  groof(NF, "shingle", 9, 40, 13, 5, { e: 0.4, g: 0.3, under: "plank" }); gGableBoth(NF, "daub", 9, 40, 13, 5);
+  GTINT = [1, 1, 1]; for (const sx of [-1, 1]) for (let zz = -14; zz <= 14; zz += 4) { garch(NF, "dark", sx * 4.92, 10.2, zz, 0.6, 1.5, [sx, 0, 0]); garch(NF, "dark", sx * 9.38, 3.2, zz, 0.5, 1.3, [sx, 0, 0]); GTINT = [1.7, 1.7, 1.75]; garch(NF, "plain", sx * 4.08, 10.2, zz, 0.6, 1.5, [-sx, 0, 0]); garch(NF, "plain", sx * 8.63, 3.2, zz, 0.5, 1.3, [-sx, 0, 0]); GTINT = [1, 1, 1]; }
+  GTINT = dress; for (const sx of [-1, 1]) for (let zz = -18; zz <= 18; zz += 4) gbox(NF, "rubble", sx * 4.95, 10.0, zz, 0.1, 6, 0.32, "bt");   // pilaster strips outside
+  GTINT = [0.75, 0.72, 0.68]; gpoly(NF, "rush", [[-9, 0.33, -20], [9, 0.33, -20], [9, 0.33, 20], [-9, 0.33, 20]], [[0, 0], [18, 0], [18, 40], [0, 40]], [0, 1, 0]);
+  GTINT = [0.9, 0.3, 0.22]; for (const sx of [-1, 1]) gpoly(NF, "plain", [[sx * 4.08, 8.2, -20], [sx * 4.08, 8.2, 20], [sx * 4.08, 8.6, 20], [sx * 4.08, 8.6, -20]], [[0, 0], [1, 0], [1, 1], [0, 1]], [-sx, 0, 0]);   // a painted band along the clerestory
   for (const sx of [-1, 1]) { const [px, , pz] = gw(NF, sx * 12, 0, 14), PF = FR(px, pz, 0, gy, NF.key); GTINT = lime; gbox(PF, "daub", 0, 3.5, 0, 6, 7, 6); GTINT = [0.9, 0.9, 0.9]; groof(PF, "shingle", 6, 6, 7, 3.5, { e: 0.3 });   // side chapels
     GTINT = [1, 1, 1]; garch(PF, "dark", 0, 3, -3 * sx, 0.5, 1.3, [0, 0, -sx]); solid(px, pz, 6, 6, 0); }
-  { const [cx, , cz] = gw(NF, 0, 0, 26), CF = FR(cx, cz, Math.PI / 2, gy, NF.key); GTINT = lime; gbox(CF, "daub", 0, 5.5, 0, 9, 11, 12); GTINT = [0.9, 0.9, 0.9]; groof(CF, "shingle", 9, 12, 11, 4.5, { e: 0.35 });   // the chancel and apse
-    GTINT = [1, 1, 1]; for (const sx of [-1, 1]) garch(CF, "dark", sx * 4.5, 6, 0, 0.55, 1.5, [sx, 0, 0]);
-    const [ax, , az] = gw(NF, 0, 0, 32); GTINT = lime; for (let k = 0; k < 7; k++) { const a = -Math.PI / 2 + (k + 0.5) / 7 * Math.PI, SF = FR(ax + Math.cos(a) * 4.1, az + Math.sin(a) * 4.1, -a, gy, NF.key); gbox(SF, "daub", 0, 4.5, 0, 0.8, 9, 2.0); if (k === 3) { GTINT = [1, 1, 1]; garch(SF, "dark", 0.4, 4.5, 0, 0.5, 1.4, [1, 0, 0]); GTINT = lime; } }
-    put("spapse", new THREE.ConeGeometry(4.8, 4, 10, 1, true, 0, Math.PI), new THREE.MeshStandardMaterial({ map: shingleT, roughness: 0.95, side: THREE.DoubleSide }), ax, gy + 9 + 2, az, 1, 1, 1); solid(cx, cz, 12, 9, 0); solid(ax + 2, az, 4, 8, 0); }
-  { const [tx, , tz] = gw(NF, 0, 0, -25), TF = FR(tx, tz, Math.PI / 2, gy, NF.key), H = 28; GTINT = lime; gbox(TF, "daub", 0, H / 2, 0, 10, H, 10);   // the west tower
+  { const [cx, , cz] = gw(NF, 0, 0, 26), CF = FR(cx, cz, Math.PI / 2, gy, NF.key); GTINT = lime; gWalls(CF, "daub", 9, 12, 11, 0.7, [["-z", 0, 9.8, 0, []], ["+z", 0, 8.2, 0, []]]); gGableBoth(CF, "daub", 9, 12, 11, 4.5); GTINT = [0.9, 0.9, 0.9]; groof(CF, "shingle", 9, 12, 11, 4.5, { e: 0.35, under: "plank" });   // the chancel
+    GTINT = [1, 1, 1]; for (const sx of [-1, 1]) { garch(CF, "dark", sx * 4.85, 6, 0, 0.55, 1.5, [sx, 0, 0]); GTINT = [1.7, 1.7, 1.75]; garch(CF, "plain", sx * 4.15, 6, 0, 0.55, 1.5, [-sx, 0, 0]); GTINT = [1, 1, 1]; }
+    GTINT = [0.75, 0.72, 0.68]; gpoly(CF, "rush", [[-4.5, 0.36, -6], [4.5, 0.36, -6], [4.5, 0.36, 7.5], [-4.5, 0.36, 7.5]], [[0, 0], [9, 0], [9, 13], [0, 13]], [0, 1, 0]);
+    GTINT = [1.1, 1.08, 1.02]; gbox(CF, "rubble", 0, 0.85, 3.6, 2.2, 1.0, 1.0, "b"); GTINT = [1, 0.85, 0.4]; gbox(CF, "plain", 0, 0.85, 3.08, 2.0, 0.9, 0.04, ""); GTINT = [1.4, 1.38, 1.32]; gbox(CF, "plain", 0, 1.37, 3.6, 2.3, 0.04, 1.1, "b");   // the high altar, a gilded frontal
+    GTINT = [1, 0.85, 0.4]; gbox(CF, "plain", 0, 1.8, 3.9, 0.07, 0.8, 0.07, ""); gbox(CF, "plain", 0, 2.0, 3.9, 0.45, 0.07, 0.07, ""); GTINT = [0.6, 0.45, 0.3]; gbox(CF, "oak", 0, 0.9, 7.6, 1.0, 1.6, 0.6, "b");   // cross; the bishop's chair (cathedra) in the apse
+    for (const sx of [-0.8, 0.8]) { const [px, , pz] = gw(CF, sx, 0, 3.6); put("candle", CYL_G, M(0xe8e0c8), px, gy + 1.39, pz, 0.05, 0.3, 0.05); put("flame", FLAME_G, flameM, px, gy + 1.7, pz, 1.4, 1.4, 1.4); }
+    const [ax, , az] = gw(NF, 0, 0, 32); GTINT = lime; for (let k = 0; k < 7; k++) { const a = -Math.PI / 2 + (k + 0.5) / 7 * Math.PI, sxp = ax + Math.cos(a) * 4.1, szp = az + Math.sin(a) * 4.1, SF = FR(sxp, szp, -a, gy, NF.key); gbox(SF, "daub", 0, 4.5, 0, 0.8, 9, 2.0); solid(sxp, szp, 0.8, 2.0, -a); if (k === 3) { GTINT = [1, 1, 1]; garch(SF, "dark", 0.42, 4.5, 0, 0.5, 1.4, [1, 0, 0]); GTINT = lime; } }
+    put("spapse", new THREE.ConeGeometry(4.8, 4, 10, 1, true, 0, Math.PI), new THREE.MeshStandardMaterial({ map: shingleT, roughness: 0.95, side: THREE.DoubleSide }), ax, gy + 9 + 2, az, 1, 1, 1);
+    ZONES.push({ name: "church", F: CF, w: 8.3, d: 11.3, light: [0, 6, 2], doors: [] }); }
+  { const [tx, , tz] = gw(NF, 0, 0, -25), TF = FR(tx, tz, Math.PI / 2, gy, NF.key), H = 28; GTINT = lime; gWalls(TF, "daub", 10, 10, H, 1.0, [["-z", 0, 1.8, 3.4], ["+z", 0, 1.8, 3.4]]); gbox(TF, "plank", 0, 6, 0, 9, 0.2, 9, "");   // the west tower, its ground floor a porch
     GTINT = dress; for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (let y = 0; y < H - 1; y += 1.5) { gbox(TF, "rubble", sx * 5, y + 0.6, sz * 5, 0.42, 1.2, 0.42, ""); gbox(TF, "rubble", sx * 4.75, y + 1.32, sz * 4.75, 0.95, 0.24, 0.95, ""); }   // long-and-short quoins
-    for (const [ox, oz, o] of [[5, 0, [1, 0, 0]], [-5, 0, [-1, 0, 0]], [0, 5, [0, 0, 1]], [0, -5, [0, 0, -1]]]) { const strip = (u, y0, y1) => gbox(TF, "rubble", ox + (o[2] ? u : 0) + o[0] * 0.05, (y0 + y1) / 2, oz + (o[0] ? u : 0) + o[2] * 0.05, o[0] ? 0.1 : 0.3, y1 - y0, o[0] ? 0.3 : 0.1, "bt");
+    for (const [ox, oz, o] of [[5.5, 0, [1, 0, 0]], [-5.5, 0, [-1, 0, 0]], [0, 5.5, [0, 0, 1]], [0, -5.5, [0, 0, -1]]]) { const strip = (u, y0, y1) => gbox(TF, "rubble", ox + (o[2] ? u : 0) + o[0] * 0.05, (y0 + y1) / 2, oz + (o[0] ? u : 0) + o[2] * 0.05, o[0] ? 0.1 : 0.3, y1 - y0, o[0] ? 0.3 : 0.1, "bt");
       GTINT = dress; for (const u of [-2.6, 2.6]) strip(u, 1.5, 19.5); for (const y of [10, 19.6]) gbox(TF, "rubble", ox + o[0] * 0.06, y, oz + o[2] * 0.06, o[0] ? 0.12 : 10, 0.25, o[0] ? 10 : 0.12, "");
       GTINT = [1, 1, 1]; gtri(TF, ox, 13, oz, 0.7, 1.9, o); for (const u of [-1.0, 1.0]) garch(TF, "dark", ox + (o[2] ? u : 0), 22, oz + (o[0] ? u : 0), 1.3, 2.6, o);
       GTINT = dress; gbox(TF, "rubble", ox + o[0] * 0.12, 23.2, oz + o[2] * 0.12, o[0] ? 0.25 : 0.32, 2.4, o[0] ? 0.32 : 0.25, ""); }
-    GTINT = [1, 1, 1]; garch(TF, "dark", 0, 0, -5, 1.8, 3.6, [0, 0, -1]); put("cap", CONE4_G, MAT.shingle, tx, gy + H, tz, 11, 5, 11); solid(tx, tz, 10, 10, 0); }
-  GTINT = [1, 1, 1]; solid(x, z, 40, 18.6, 0);
+    GTINT = [1, 1, 1]; put("cap", CONE4_G, MAT.shingle, tx, gy + H, tz, 11, 5, 11); ZONES.push({ name: "church", F: TF, w: 9, d: 9, light: [0, 2.5, 0], doors: [[0, -5]] }); }
+  ZONES.push({ name: "church", F: NF, w: 17.3, d: 39.3, light: [0, 6, 6], doors: [[9, -12], [0, -20]] });
+  GTINT = [1, 1, 1];
   for (const [dx, dz] of [[-10, 26], [6, 28], [22, -24], [-16, -26]]) addHouse(x + dx, z + dz, 6, 10, 0, { wall: "plank", roof: "shingle", door: "-z" });   // canons' houses
   mark("St Paul's Cathedral", x, z, "inferred", "London's cathedral since Bishop Mellitus founded it in 604, on the top of Ludgate Hill. The church that stood here in 1066 was rebuilt after a fire in 962 and burned down in 1087, when the great Norman cathedral (Old St Paul's) was begun. No trace of the Saxon building has been found, so it is shown as a Late Saxon great church, quite unlike the new Norman abbey at Westminster: an aisled nave with side chapels and an apse (as in the excavated Anglo-Saxon cathedral at Canterbury), a big west tower (like Winchester Old Minster's westwork), rendered and limewashed walls with pilaster strips, long-and-short corner stones and small round- and triangular-headed openings (as at Earls Barton, Deerhurst and Brixworth), in a precinct with the canons' houses. The bishop of London in 1066 was William, a Norman appointed by Edward the Confessor in 1051.", { big: true, range: 3000, y: 34, r: 45 });
 }
@@ -1727,6 +1774,7 @@ mark("The unfinished nave", -48, 0, "inferred", "Most historians (Gem, Fernie) t
 mark("The north door", 0, -30, "inferred", "With the nave unfinished, the way in was probably by a transept door. The north transept front became the abbey's main entrance in the 13th-century church.", { y: 6, r: 8, range: 250 });
 mark("The high altar", 18.5, 0, "known", "The high altar of St Peter, in the presbytery before the apse. The coronation was performed here: the oath, the anointing, the crowning.", { y: 3.2, r: 4, range: 60 });
 mark("King Edward's tomb", 13.8, 0, "known", "Edward the Confessor, died 5 January 1066, buried the next day in a stone coffin before the high altar of his new church. His tomb would have been covered with a costly silk pall and ringed with candles; 12th-century writers say William soon gave it a covering of gold and silver. Edward was made a saint in 1161 and moved to a shrine in 1163; Henry III rebuilt the whole abbey around his shrine. The tomb's form here is inferred.", { y: 1.9, r: 3, range: 50 });
+mark("The exterior", -6, -34, "inferred", "Outside, Norman great churches of the 1060s were mostly plain, finely cut stone: their richness was in proportion and mouldings, not ornament (zigzag chevron and dense carving came in only about 1100-1120). Shown: roll mouldings and small shafts framing the windows, flat pilaster buttresses, string courses, a corbel table under the eaves, blind arcading across the foot of the transept fronts, a painted tympanum over the north door, stone crosses on the gables. Details inferred from Jumièges and the surviving fragments of Edward's church.", { y: 8, r: 14, range: 200 });
 mark("The paintings", 0, 20, "inferred", "Norman and English great churches were plastered and painted inside: whitewash with red lines imitating masonry, patterned friezes, a painted curtain along the foot of the walls, figure scenes, and in the apse Christ in Majesty with angels and saints; capitals were painted too. Edward's paintings are lost; these follow surviving Romanesque schemes (St Albans, Kempley, the Norman churches).", { y: 9, r: 10, range: 60 });
 mark("The rood", -5.2, 0, "inferred", "The rood: a great crucifix with Mary and John, on a beam across the crossing arch, facing the people in the nave. Great churches had them; Archbishop Stigand gave great roods of gold and silver to several churches. Its form here is inferred.", { y: 15.5, r: 8, range: 60 });
 mark("The throne", 3.4, 0, "inferred", "After the crowning the king was enthroned. Where the throne stood in 1066 is not recorded; at later coronations it was on a raised stage at the crossing.", { y: 2.6, r: 3, range: 50 });
@@ -1925,7 +1973,7 @@ function frame() {
   const hour = SIM / 3600, S = sunAt(hour), el = S.el, day = clampN(el * 7 + 0.35, 0, 1), dusk = clampN(1 - el * 9, 0, 1) * (el > -0.12 ? 1 : 0);
   sun.position.copy(rig.position).addScaledVector(S.dir, 800); sun.target.position.copy(rig.position);
   sun.intensity = 2.2 * clampN(el * 6, 0, 1); sun.color.setRGB(1, 0.88 - 0.25 * dusk, 0.74 - 0.4 * dusk); hemi.intensity = 0.2 + 1.45 * day;
-  const inA = inAbbey(P_.x, P_.z) && !flying, zn = flying ? null : zoneOf(P_.x, P_.z), Z = zn && zn !== "abbey" ? ZONES.find(q => q.name === zn) : null;
+  const inA = inAbbey(P_.x, P_.z) && !flying, zn = flying ? null : zoneOf(P_.x, P_.z), Z = zn && zn !== "abbey" ? ZONE_HIT : null;
   hemi.groundColor.setHex(inA ? 0x9a8c78 : 0x7a7060); if (INSIDE_H) { sun.intensity *= 0.1; hemi.intensity *= 0.12; } else if (inA) { sun.intensity *= 0.12; hemi.intensity *= 0.6; } else if (Z) { sun.intensity *= 0.1; hemi.intensity *= 0.3; }
   if (Z) { const up = Z.light0 && P_.y < Z.F.gy + 2.5, lp = gw(Z.F, ...(up ? Z.light0 : Z.light)); houseLight.position.set(...lp); houseLight.distance = Z.name === "hall" ? 34 : 14; houseLight.intensity = (Z.name === "hall" ? 65 : 16) * (0.88 + 0.08 * Math.sin(t * 13) + 0.04 * Math.sin(t * 29)); } else if (!INSIDE_H) houseLight.intensity = 0;
   abbeyLight.intensity = Math.hypot(P_.x, P_.z) < 90 ? (inA ? 260 : 30) * (0.9 + 0.1 * Math.sin(t * 7)) : 0;
@@ -1939,7 +1987,7 @@ function frame() {
   hudT -= dt; if (hudT <= 0) { hudT = 0.3;
     const hh = Math.floor(SIM / 3600), mi = Math.floor(SIM / 60) % 60, DH = INSIDE_H ? null : nearDoorHouse();
     let nearM = null, nd = 1e9; for (const m of MARKS) { if (m.follow || m.hidden) continue; const d = Math.hypot(m.x - P_.x, m.z - P_.z); if (d < m.r && d < nd) { nd = d; nearM = m; } }
-    const room = { hall: "in the great hall of Edward's palace", chamber: P_.y > PAL.chamber.gy + 2 ? "upstairs in the king's chamber" : "in the chamber block's ground floor (the stair is outside)", kitchen: "in the palace kitchen" }[zoneOf(P_.x, P_.z)];
+    const room = { hall: "in the great hall of Edward's palace", chamber: P_.y > PAL.chamber.gy + 2 ? "upstairs in the king's chamber" : "in the chamber block's ground floor (the stair is outside)", kitchen: "in the palace kitchen", church: "inside the church" }[zoneOf(P_.x, P_.z)];
     const where = INSIDE_H ? "inside a house · E near things to read; E at the doorway to go out" : DH ? "at a doorway · <b>E: go inside</b>" : nearM ? `at <b>${nearM.name}</b> · E to read` : inA ? "inside Westminster Abbey" : room || (CITY.inside(P_.x, P_.z) ? "inside the walls of London" : "");
     HUD.innerHTML = `<b>London and Westminster, ${MARKET ? "a market day, December" : "Christmas Day"} 1066</b> · ${hh}:${String(mi).padStart(2, "0")}${timeRate > 1 ? ` (time ×${timeRate})` : ""} · ${flying ? "flying" : SPEEDS[speedI][1] + (run > 1 ? ", running" : "")}<br>${where}<br>
       <span style="color:#e8dcc0">${UNSEEN ? "time traveller (unseen)" : "you: " + LIFE.short}${combs ? " · combs " + combs : ""}${eels ? " · eels " + eels : ""}${ale ? " · ale brewed" : ""} · purse ${fmtD(PURSE)}${BASKET.length ? " · basket: " + BASKET.slice(-6).join(", ") + (BASKET.length > 6 ? " …" : "") : ""}${RIDE ? " · in the boat to " + RIDE.Q.name : ""}</span><br><span style="color:#c8b898;font-size:12.5px">WASD walk · drag to look · shift run · − / = pace · E read / go in · N next moment · T time speed · L markers · F fly · M map</span>`;
