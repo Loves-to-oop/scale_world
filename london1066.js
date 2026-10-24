@@ -176,6 +176,7 @@ function poseOf(kind, t, ph, walkAmt = 1) { const c = t * 7 + ph, w = Math.sin(c
     case "bless": Object.assign(P, { aL: -0.25, eL: -0.7, aR: -1.0 - 0.15 * Math.sin(t * 1.5), eR: -1.25 }); break;
     case "hammer": { const q = (t * 1.6 + ph) % 1, up = q < 0.6 ? q / 0.6 : 1 - (q - 0.6) / 0.4; Object.assign(P, { lean: 0.22, lL: -0.1, lR: 0.12, kL: 0.15, kR: 0.1, aL: -0.55, eL: -0.9, aR: -0.5 - 1.9 * up, eR: -0.4 - 0.6 * up }); break; }
     case "talk": Object.assign(P, { aL: 0.05, eL: -0.25, aR: -0.35 - 0.3 * Math.max(0, Math.sin(t * 1.3 + ph)), eR: -1.0 - 0.3 * Math.sin(t * 2.1 + ph) }); break;
+    case "ride": Object.assign(P, { drop: HIPY - 0.5, lL: -0.4, lR: -0.4, kL: 0.95, kR: 0.95, spr: 0.42, aL: -0.45, aR: -0.45, eL: -0.95, eR: -0.95, lean: 0.05 }); break;
     case "bow": Object.assign(P, { lean: 0.38, aL: -0.15, aR: -0.15, eL: -0.3, eR: -0.3 }); break;
     case "sell": Object.assign(P, { lean: 0.1, aL: -0.45, eL: -0.8, aR: -0.5 - 0.25 * Math.sin(t * 2 + ph), eR: -0.9 }); break; }
   return P; }
@@ -183,7 +184,8 @@ const _b = new THREE.Matrix4(), _hm = new THREE.Matrix4(), _sk = new THREE.Matri
 const _M = {}, LIMB = new Set(["legL", "legR", "shinL", "shinR", "shoeL", "shoeR", "armL", "armR", "foreL", "foreR", "handL", "handR", "spear", "shield", "crozier", "sceptre"]), SKIRT = new Set(["tunic", "trim", "gown"]);
 function partMatrices(x, y, z, h, L, P, out) { _e2.set(0, h, 0); _q2.setFromEuler(_e2); _b.compose(_p.set(x, y, z), _q2, _s.set(L.s, L.s, L.s));
   _hm.copy(_b).multiply(_tmp.makeTranslation(0, HIPY - P.drop, 0)).multiply(_j.makeRotationX(P.lean)); _sk.copy(_hm).multiply(_j.makeRotationX(P.sk - P.lean * 0.5));
-  const leg = (sx, l, k, side) => { const th = _b.clone().multiply(_tmp.makeTranslation(sx, HIPY - P.drop, 0)).multiply(_j.makeRotationX(l)), sh = th.clone().multiply(_tmp.makeTranslation(0, -THIGH, 0)).multiply(_j.makeRotationX(k));
+  const leg = (sx, l, k, side) => { const th = _b.clone().multiply(_tmp.makeTranslation(sx, HIPY - P.drop, 0)); if (P.spr) th.multiply(_tmp.makeRotationZ(P.spr * Math.sign(sx))); th.multiply(_j.makeRotationX(l));   // (legs apart astride a horse)
+    const sh = th.clone().multiply(_tmp.makeTranslation(0, -THIGH, 0)).multiply(_j.makeRotationX(k));
     _M["leg" + side] = th; _M["shin" + side] = sh; _M["shoe" + side] = sh.clone().multiply(_tmp.makeTranslation(0, -SHIN, 0)).multiply(_j.makeRotationX(-(l + k) * 0.85)); };
   leg(0.085, P.lL, P.kL, "L"); leg(-0.085, P.lR, P.kR, "R");
   const arm = (sx, a, e, sp, side) => { const u = _hm.clone().multiply(_tmp.makeTranslation(sx, 0.43, 0)).multiply(_j.makeRotationX(a)).multiply(_tmp.makeRotationZ(sp)), f = u.clone().multiply(_tmp.makeTranslation(0, -UARM, 0)).multiply(_j.makeRotationX(e)), hd = f.clone().multiply(_tmp.makeTranslation(0, -FARM, 0));
@@ -702,15 +704,31 @@ const AMAT = { ashlar: new THREE.MeshStandardMaterial({ map: abT, roughness: 0.8
   floor: new THREE.MeshStandardMaterial({ map: tex(256, 256, (g, w, h) => { speckle("#a8a090", 2000, ["#b8b0a0", "#989080", "#a09888"])(g, w, h); g.fillStyle = "rgba(70,60,50,.5)"; for (let k = 0; k < w; k += 64) { g.fillRect(k, 0, 2, h); g.fillRect(0, k, w, 2); } }, [1, 1]), roughness: 0.8 }),
   glow: new THREE.MeshBasicMaterial({ color: 0x9aa4ae, side: THREE.DoubleSide, toneMapped: true }), dark: MAT.dark, shade: new THREE.MeshStandardMaterial({ color: 0x8a8070, roughness: 0.9, side: THREE.DoubleSide }), lead: new THREE.MeshStandardMaterial({ map: leadT, roughness: 0.6, metalness: 0.3, side: THREE.DoubleSide }), red: M(0x8a1a1a), gold: M(0xc8a040, { metalness: 0.7, roughness: 0.35 }), wood: M(0x4e3a28), cloth: M(0xe8e0c8) };
 AMAT.floor.map.repeat.set(1 / 3, 1 / 3);
+// paint: Romanesque church walls were plastered and painted: whitewash with red lines imitating masonry, patterned bands, a painted
+// curtain along the foot of the walls, and figure scenes; in the apse, usually Christ in Majesty. Edward's paintings are lost; these are typical.
+AMAT.paint = new THREE.MeshStandardMaterial({ roughness: 0.9, side: THREE.DoubleSide, map: tex(256, 512, (g, w, h) => { g.fillStyle = "#e6dcc8"; g.fillRect(0, 0, w, h);
+  g.strokeStyle = "rgba(150,40,30,.75)"; g.lineWidth = 2; for (let y = 60; y < 360; y += 30) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.moveTo(0, y + 4); g.lineTo(w, y + 4); g.stroke(); const o = ((y / 30) % 2) * 32; for (let x = o; x < w; x += 64) { g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x, y + 30); g.stroke(); } }
+  g.fillStyle = "#8a2a20"; g.fillRect(0, 20, w, 26); g.fillStyle = "#c8a040"; for (let x = 0; x < w; x += 24) { g.beginPath(); g.moveTo(x, 44); g.lineTo(x + 12, 22); g.lineTo(x + 24, 44); g.fill(); }   // a zigzag frieze
+  g.fillStyle = "#2a4a6a"; g.fillRect(0, 372, w, 10); for (let x = 0; x < w; x += 22) { const gr = g.createLinearGradient(x, 0, x + 22, 0); gr.addColorStop(0, "#7a2a22"); gr.addColorStop(0.5, "#a8443a"); gr.addColorStop(1, "#6a2018"); g.fillStyle = gr; g.fillRect(x, 382, 22, h - 382); }   // the painted curtain below
+  g.fillStyle = "rgba(255,255,255,.15)"; for (let x = 0; x < w; x += 22) { g.beginPath(); g.moveTo(x + 4, 382); g.quadraticCurveTo(x + 11, 400, x + 18, 382); g.fill(); } }) });
+AMAT.mural = new THREE.MeshStandardMaterial({ roughness: 0.9, side: THREE.DoubleSide, map: tex(1024, 256, (g, w, h) => { g.fillStyle = "#1e3a6a"; g.fillRect(0, 0, w, h); g.fillStyle = "#c8a040"; g.fillRect(0, 0, w, 10); g.fillRect(0, h - 10, w, 10);
+  for (let k = 0; k < 60; k++) { g.fillStyle = "rgba(255,240,200,.5)"; g.beginPath(); g.arc(Math.random() * w, 14 + Math.random() * (h - 28), 1.5, 0, 6.283); g.fill(); }
+  const cx = w / 2; g.fillStyle = "#d8b850"; g.beginPath(); g.ellipse(cx, h / 2, 62, 112, 0, 0, 6.283); g.fill(); g.fillStyle = "#e8dcb8"; g.beginPath(); g.ellipse(cx, h / 2, 54, 104, 0, 0, 6.283); g.fill();   // Christ in Majesty in a mandorla
+  g.fillStyle = "#c8a040"; g.beginPath(); g.arc(cx, 62, 22, 0, 6.283); g.fill(); g.fillStyle = "#e0b898"; g.beginPath(); g.arc(cx, 64, 14, 0, 6.283); g.fill(); g.fillStyle = "#8a2a24"; g.beginPath(); g.moveTo(cx - 10, 80); g.lineTo(cx + 10, 80); g.lineTo(cx + 38, 210); g.lineTo(cx - 38, 210); g.fill();
+  g.fillStyle = "#2a4a8a"; g.beginPath(); g.moveTo(cx - 6, 84); g.lineTo(cx + 30, 200); g.lineTo(cx + 10, 205); g.lineTo(cx - 14, 96); g.fill(); g.fillStyle = "#e8e0c8"; g.fillRect(cx + 16, 120, 18, 24);   // robe, mantle, the book
+  for (const sx of [-1, 1]) for (const [dx, col] of [[150, "#8a2a24"], [290, "#3a6a3a"]]) { const x = cx + sx * dx; g.fillStyle = "#c8a040"; g.beginPath(); g.arc(x, 90, 14, 0, 6.283); g.fill(); g.fillStyle = "#e0b898"; g.beginPath(); g.arc(x, 92, 9, 0, 6.283); g.fill(); g.fillStyle = col; g.beginPath(); g.moveTo(x - 8, 102); g.lineTo(x + 8, 102); g.lineTo(x + 24, 220); g.lineTo(x - 24, 220); g.fill();
+    g.fillStyle = "rgba(230,220,190,.85)"; g.beginPath(); g.moveTo(x - sx * 6, 108); g.quadraticCurveTo(x - sx * 60, 80, x - sx * 46, 170); g.fill(); } }) });   // angels and saints
+AMAT.silk = new THREE.MeshStandardMaterial({ roughness: 0.6, side: THREE.DoubleSide, map: G_TEX.hang.clone() }); AMAT.silk.map.repeat.set(1, 1); AMAT.silk.map.needsUpdate = true;
+AMAT.paintc = M(0xb8783a); AMAT.linen = M(0xeee8dc);
 const AG = {}; for (const k in AMAT) AG[k] = [];
 // a box with its texture laid at real size (1 unit of texture = 1 m), base at y
-function slab(mat, x, y, z, sx, sy, sz, ry = 0, rx = 0, coll = false) { const g = new THREE.BoxGeometry(sx, sy, sz), uv = g.attributes.uv;
+function slab(mat, x, y, z, sx, sy, sz, ry = 0, rx = 0, coll = false) { AG[mat] = AG[mat] || []; const g = new THREE.BoxGeometry(sx, sy, sz), uv = g.attributes.uv;
   const dims = [[sz, sy], [sz, sy], [sx, sz], [sx, sz], [sx, sy], [sx, sy]]; for (let f = 0; f < 6; f++) for (let v = 0; v < 4; v++) { const i = f * 4 + v; uv.setXY(i, uv.getX(i) * dims[f][0], uv.getY(i) * dims[f][1]); }
   const m = new THREE.Matrix4().compose(V3(x, y + sy / 2, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, 0)), V3(1, 1, 1)); AG[mat].push([g, m]);
   if (coll) solid(x, z, sx, sz, ry); }
-function shapeG(mat, shape, depth, x, y, z, ry) { const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 10 }); g.translate(0, 0, -depth / 2);
+function shapeG(mat, shape, depth, x, y, z, ry) { AG[mat] = AG[mat] || []; const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 10 }); g.translate(0, 0, -depth / 2);
   AG[mat].push([g, new THREE.Matrix4().compose(V3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), V3(1, 1, 1))]); }
-function flushAG(sy = 1) { for (const k in AG) if (AG[k].length) { const m = new THREE.Mesh(mergeUV(AG[k]), AMAT[k]); m.scale.y = sy; m.position.y = AB_Y * (1 - sy); m.frustumCulled = false; scene.add(m); AG[k].length = 0; } }   // sy: the church's height, stretched from the floor
+function flushAG(sy = 1) { for (const k in AMAT) AG[k] = AG[k] || []; for (const k in AG) if (AG[k].length) { const m = new THREE.Mesh(mergeUV(AG[k]), AMAT[k]); m.scale.y = sy; m.position.y = AB_Y * (1 - sy); m.frustumCulled = false; scene.add(m); AG[k].length = 0; } }   // sy: the church's height, stretched from the floor
 function mergeUV(parts) { let n = 0; const gs = parts.map(([g, m]) => { const q = (g.index ? g.toNonIndexed() : g).applyMatrix4(m); n += q.attributes.position.count; return q; });
   const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2); let o = 0;
   for (const q of gs) { pos.set(q.attributes.position.array, o * 3); nor.set(q.attributes.normal.array, o * 3); if (q.attributes.uv) uv.set(q.attributes.uv.array, o * 2); o += q.attributes.position.count; }
@@ -777,10 +795,11 @@ function wallZ(z0, z1, x, th, y0, h, gaps = [], mat = "ashlar") { let a = z0; fo
   flushAG(HS);
   // the choir: monks' stalls under the crossing and in the first bays of the nave; the high altar; King Edward's tomb before it
   for (const zs of [-1, 1]) { slab("wood", -6, Y + 0.2, 3.6 * zs, 16, 0.5, 0.5, 0, 0, true); slab("wood", -6, Y + 0.2, 4.2 * zs, 16, 2.4, 0.15); slab("wood", -6, Y + 0.2, 2.6 * zs, 16, 0.9, 0.4); }
-  slab("ashlar", 17.5, Y + 0.2, 0, 4, 0.35, 6); slab("ashlar", 18.5, Y + 0.55, 0, 1.2, 1.0, 2.6); slab("red", 18.5, Y + 1.55, 0, 1.3, 0.05, 2.7); slab("red", 17.88, Y + 0.85, 0, 0.04, 0.7, 2.7);
+  slab("ashlar", 17.5, Y + 0.2, 0, 4, 0.35, 6); slab("ashlar", 18.5, Y + 0.55, 0, 1.2, 1.0, 2.6); slab("linen", 18.5, Y + 1.55, 0, 1.3, 0.05, 2.7); slab("gold", 17.88, Y + 0.6, 0, 0.05, 0.95, 2.5); for (let k = 0; k < 7; k++) slab("red", 17.85, Y + 0.85 + (k % 2) * 0.3, -1.05 + k * 0.35, 0.03, 0.08, 0.08);   // a gold altar frontal set with gems (Edward gave rich ornaments; its form inferred)
   slab("gold", 18.8, Y + 1.6, 0, 0.08, 0.9, 0.08); slab("gold", 18.8, Y + 2.2, 0, 0.08, 0.08, 0.5);
   for (const zs of [-1, 1]) { slab("gold", 18.6, Y + 1.6, 1.05 * zs, 0.1, 0.45, 0.1); }
-  slab("ashlar", 13.8, Y + 0.2, 0, 2.4, 0.45, 1.1, 0, 0, true);   // Edward's tomb: a plain raised slab (his shrine came in 1163)
+  slab("ashlar", 13.8, Y + 0.2, 0, 2.4, 0.85, 1.1, 0, 0, true); slab("silk", 13.8, Y + 1.05, 0, 2.6, 0.04, 1.3); for (const s of [-1, 1]) slab("silk", 13.8, Y + 0.35, s * 0.66, 2.6, 0.72, 0.03); for (const s of [-1, 1]) slab("silk", 13.8 + s * 1.31, Y + 0.35, 0, 0.03, 0.72, 1.3);   // Edward's tomb, a stone chest under a silk pall
+  for (const [dx, dz] of [[-1.5, -0.9], [-1.5, 0.9], [1.5, -0.9], [1.5, 0.9]]) { slab("gold", 13.8 + dx, Y + 0.2, dz, 0.08, 1.3, 0.08); slab("gold", 13.8 + dx, Y + 1.5, dz, 0.3, 0.04, 0.3); slab("linen", 13.8 + dx, Y + 1.54, dz, 0.07, 0.4, 0.07); }
   // the throne for the enthronement, set at the crossing, facing west: placing inferred
   slab("ashlar", 3, Y + 0.2, 0, 3, 0.5, 4); slab("wood", 3.4, Y + 0.7, 0, 0.8, 0.5, 0.9); slab("wood", 3.85, Y + 0.7, 0, 0.12, 1.6, 0.9); slab("red", 3.4, Y + 1.21, 0, 0.8, 0.06, 0.9);
   flushAG();
@@ -798,6 +817,17 @@ function wallZ(z0, z1, x, th, y0, h, gaps = [], mat = "ashlar") { let a = z0; fo
       for (const zs of [-1, 1]) for (let h = 2; h < 10 - (k - 6); h += 2) put("plankS", BOX_G, MAT.wood, xc, Y + h + 0.1, 10.6 * zs, BAY, 0.08, 2.4);
       for (let n = 0; n < 5; n++) { const x = xc + (R() - 0.5) * 3, z = (R() - 0.5) * 7; put("block", BOX_G, AMAT.ashlar, x, Y - 0.1, z, 0.6 + R() * 0.3, 0.4, 0.4 + R() * 0.3, R()); } }
     put("pole", CYL_G, MAT.wood, -50, Y, 0, 0.3, 12, 0.3); put("pole", BOX_G, MAT.wood, -48, Y + 12, 0, 5, 0.25, 0.25); put("pole", CYL_G, MAT.wood, -46, Y, 0, 0.06, 12, 0.06); }
+  // inside: painted walls behind the windows' light, the apse's Christ in Majesty, painted cushion capitals, the rood, silk hangings
+  const panel = (x, z, w, h, y0, ry) => { const g = new THREE.PlaneGeometry(w, h); AG.paint = AG.paint || []; AG.paint.push([g, new THREE.Matrix4().compose(V3(x, Y + y0 + h / 2, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), V3(1, 1, 1))]); };
+  for (const zs of [-1, 1]) { for (let x = NAVE_DONE + BAY / 2; x < -5.7; x += BAY) panel(x, (ZA - 0.705) * zs, BAY, 12.1, 0.2, zs > 0 ? Math.PI : 0); for (let x = 8.2; x < CHOIR_E; x += 5) panel(x, (ZA - 0.705) * zs, 5, 12.1, 0.2, zs > 0 ? Math.PI : 0);
+    for (const xs of [-1, 1]) for (let z = 13.6; z < 26; z += 5) panel(xs * 4.995, z * zs, 5, 18.6, 0.2, xs > 0 ? -Math.PI / 2 : Math.PI / 2); panel(0, 26.295 * zs, 10, 18.6, 0.2, zs > 0 ? Math.PI : 0); }
+  { const g = new THREE.CylinderGeometry(4.98, 4.98, 6.2, 18, 1, true, 0, Math.PI); AG.mural = [[g, new THREE.Matrix4().makeTranslation(CHOIR_E, Y + 12.4 + 3.1, 0)]]; }
+  for (let k = 0; k < 11; k += 2) for (const zs of [-5, 5]) slab("paintc", -5 - BAY * (k + 1), Y + 5.0, zs, 1.85, 0.4, 1.85);
+  for (const zs of [-5, 5]) for (const x of [10, 15, 20]) slab("paintc", x, Y + 5.0, zs, 1.9, 0.4, 1.9);
+  slab("wood", -5.2, Y + 12.2, 0, 0.4, 0.45, 9.6); slab("paintc", -5.2, Y + 12.65, 0, 0.12, 4.2, 0.35); slab("paintc", -5.2, Y + 15.0, 0, 0.12, 0.35, 2.6);   // the rood beam and the great cross
+  slab("linen", -5.35, Y + 13.4, 0, 0.08, 1.4, 0.35); slab("linen", -5.35, Y + 14.5, 0, 0.08, 0.28, 1.9); slab("gold", -5.36, Y + 14.9, 0, 0.06, 0.35, 0.35);   // Christ on the cross, crowned
+  for (const zs of [-1, 1]) { slab("red", -5.3, Y + 12.65, 2.3 * zs, 0.4, 1.7, 0.45); slab("linen", -5.3, Y + 14.35, 2.3 * zs, 0.35, 0.3, 0.3); }   // Mary and John
+  for (const zs of [-1, 1]) for (const x of [7.5, 12.5, 17.5]) slab("silk", x, Y + 0.6, zs * 5.2, 3.2, 4.6, 0.04);   // silk hangings between the presbytery piers for the crowning
   // Romanesque exterior detail, as at Jumièges and in the Bayeux Tapestry's picture: flat pilaster buttresses between the bays, string
   // courses under the windows, a corbel table under the eaves, a round-arched north door, a two-stage crossing tower with blind arcading
   // below and paired belfry openings above, small apses ending the choir aisles (Gem's reconstruction)
@@ -852,8 +882,8 @@ const abbeyLight = new THREE.PointLight(0xffd0a0, 0, 70, 1.0); abbeyLight.positi
 flushAG();
 // Edward's palace stood by the river east of the abbey (its buildings: see the palace section); a palisade round it.
 const PALACE = LL(51.4990, -0.1250);
-rRect(PALACE[0] + 5, PALACE[1], 80, 60, 0, 4);
-{ const R = seeded(61); for (let a = 0; a < Math.PI * 2; a += 0.06) { const x = PALACE[0] + 5 + Math.cos(a) * 42, z = PALACE[1] + Math.sin(a) * 32; if (Math.abs(a - Math.PI) < 0.12) continue; put("pale", BOX_G, MAT.paleWood || (MAT.paleWood = M(0x8a7a64)), x, groundH(x, z) - 0.2, z, 0.25, 2.4, 2.4, -a); solid(x, z, 0.3, 2.4, -a); } }
+rRect(PALACE[0] + 4, PALACE[1] + 4, 150, 120, 0, 4);
+{ const R = seeded(61); for (let a = 0; a < Math.PI * 2; a += 0.035) { const x = PALACE[0] + 4 + Math.cos(a) * 70, z = PALACE[1] + 4 + Math.sin(a) * 55; if (Math.abs(a - Math.PI) < 0.06) continue; put("pale", BOX_G, MAT.paleWood || (MAT.paleWood = M(0x8a7a64)), x, groundH(x, z) - 0.2, z, 0.25, 2.4, 2.4, -a); solid(x, z, 0.3, 2.4, -a); } }
 // the wharf on the Thames side of Thorney, where barges brought Caen stone, shipped across the Channel and up the river
 { const [wx, wz] = LL(51.4993, -0.1243); put("deck", BOX_G, MAT.wood, wx + 18, 0.8, wz, 36, 0.4, 5, 0); for (let k = 0; k < 4; k++) addBoat(wx + 26 + k * 4, wz + (k % 2 ? 6 : -6), Math.PI / 2, 13, k === 0);
   for (let n = 0; n < 14; n++) put("block", BOX_G, AMAT.ashlar, wx + 2 + (n % 3) * 1.1, 1.0, wz - 8 + Math.floor(n / 3) * 1.1, 0.8, 0.5, 0.6, 0); }
@@ -953,6 +983,15 @@ const PAL = {}, hearthFireM = new THREE.MeshBasicMaterial({ color: 0xff9a3a, tra
   for (let k = 0; k < 3; k++) { const [x, , z] = gw(F, 0.8, 0, -1.8 + k * 0.6); put("ham", new THREE.SphereGeometry(0.16, 8, 5).scale(0.8, 1.4, 0.8), M(0x8a5a3a), x, F.gy + wh - 0.75, z, 1, 1, 1); put("hamcord", CYL_G, M(0x6a5a40), x, F.gy + wh - 0.55, z, 0.02, 0.6, 0.02); }
   PAL.kitchenDoor = gw(F, 0, 0, -d / 2 - 1.5); PAL.inKitchen = gw(F, 0, 0, -d / 2 + 1.5); PAL.cookSpots = [gw(F, 1.2, 0, -0.8), gw(F, -1.3, 0, 1.6), gw(F, 1.6, 0, 2.2)];
 }
+// the rest of the royal household's buildings, inside the palisade: the queen's chamber (Queen Edith kept her own household), a chapel,
+// the housecarls' hall (the king's guard), stables, a bakehouse and a brewhouse, a strong-house for the treasure, a guest house, the gate
+{ const P = (dx, dz) => [PALACE[0] + dx, PALACE[1] + dz];
+  for (const [[x, z], w, d, ry, o, name] of [[P(36, 28), 8, 14, 0, { wall: "plank", roof: "shingle", wh: 4.6 }, "queen"], [P(46, -26), 9, 24, 0, { wall: "plank", roof: "thatch", wh: 3.2 }, "housecarls"], [P(-39, -29), 7, 26, Math.PI / 2, { wall: "plank", roof: "thatch", wh: 2.8 }, "stables"],
+    [P(-24, 18), 6, 9, 0, { wall: "daub", roof: "thatch" }, "bake"], [P(-34, 26), 6, 9, 0, { wall: "daub", roof: "thatch" }, "brew"], [P(58, 6), 6, 8, 0, { wall: "plank", roof: "shingle", wh: 3 }, "treasury"], [P(-49, 34), 7, 16, 0, { wall: "plank", roof: "shingle", wh: 3 }, "guest"]]) {
+    const H = addHouse(x, z, w, d, ry, { door: "-z", kind: "palace-" + name, ...o }); H.noEnter = true; }
+  const [cx, cz] = P(-29, 44); addChurch(cx, cz, { mat: "rag", roof: "shingle", nl: 12, nw: 6 });   // the king's chapel
+  const [gx, gz] = [PALACE[0] + 4 - 70, PALACE[1] + 4]; for (const s of [-1, 1]) { put("gatepost", BOX_G, MAT.wood, gx, groundH(gx, gz) - 0.2, gz + s * 3.2, 0.6, 5.2, 0.6); solid(gx, gz + s * 3.2, 0.6, 0.6, 0); } put("gatepost", BOX_G, MAT.wood, gx, groundH(gx, gz) + 4.4, gz, 0.7, 0.5, 7.2); put("r:shingle", GABLE_G, MAT.shingle, gx, groundH(gx, gz) + 4.9, gz, 2, 1.4, 7.6, 0);   // the gate
+  for (let k = 0; k < 4; k++) { const [x, z] = P(-39 - 9 + k * 6, -24.5); } }
 const HALL_IN = (x, z) => zoneOf(x, z) === "hall";
 
 // ---------- markers: what things are, and how well we know them ----------
@@ -1063,7 +1102,7 @@ markLL("London Bridge", 51.5080, -0.0875, "known", "A timber bridge on piles: ti
 markLL("No Tower of London", 51.5081, -0.0765, "absent", "The Tower does not exist yet. Soon after the coronation William had 'fortifications' built in the City 'against the fickleness of the huge and fierce population' (William of Poitiers): a ditch and rampart in this south-east corner of the Roman wall, where the White Tower was built about 1075-1100.", { range: 1500 });
 markLL("No Guildhall, no castles", 51.5155, -0.0920, "absent", "Not yet built: the Guildhall (first recorded about 1128), Baynard's and Montfichet castles in the west of the City (after 1066), and Moorgate (1415). Saxon London was governed by its folkmoot, which met in the open air by St Paul's, and by the husting court.", { range: 500 });
 markLL("Westminster Hall: not yet", 51.4986, -0.1246, "absent", "Westminster Hall was built by William's son William Rufus in 1097-99. Edward's palace stood about here; nothing of it is known, so its hall, chamber and kitchen are typical buildings of a royal residence, in timber.", { range: 400 });
-markLL("Edward's palace", 51.4994, -0.1252, "inferred", "Edward the Confessor moved his main residence here from the City to watch his abbey being built. He died in the palace on 5 January 1066; Harold was crowned the next day. William is staying here. Nothing of it has been found, so its buildings follow what royal residences of the time had: a great hall, a two-storey chamber block, a kitchen, inside a palisade. Walk in: the hall's doors are on its long sides near the west end; the chamber has an outside stair.", { range: 1500, y: 14 });
+markLL("Edward's palace", 51.4994, -0.1252, "inferred", "Edward the Confessor moved his main residence here from the City to watch his abbey being built. He died in the palace on 5 January 1066; Harold was crowned the next day. William is staying here. Nothing of it has been found, so its buildings follow what a royal household needed: a great aisled hall; a two-storey chamber block for the king; Queen Edith's own chamber; a chapel; the hall of the housecarls, the king's guard; stables; kitchen, bakehouse and brewhouse; a strong-house for the treasure; a guest house; inside a palisade with a gate. Royal halls of the time ran to 25-40 m long. Walk in: the hall's doors are on its long sides near the west end; the chamber has an outside stair.", { range: 1500, y: 14 });
 markLL("The monastery", 51.4990, -0.1280, "inferred", "Edward refounded the abbey for a larger community of Benedictine monks (perhaps about 70 by 1100) under Abbot Edwin. The new stone buildings south of the church were under way (part of the dormitory's undercroft of about 1070-1100 survives); older buildings were timber. Layout inferred.", { range: 600 });
 markLL("The wharf", 51.4993, -0.1237, "inferred", "Barges brought Caen stone, quarried in Normandy and shipped across the Channel and up the Thames, for the abbey.", { range: 500 });
 
@@ -1360,6 +1399,47 @@ mark("Ships below the bridge", ...THAMES.at(BRIDGE_S + 260).slice(0, 2), "known"
 mark("River traffic", ...THAMES.at(BRIDGE_S - 700).slice(0, 2), "typical", "Above the bridge: barges rowed and poled with grain, stone (Caen stone for the abbey, Kentish rag), timber and firewood; ferries and passenger boats; fishermen at their weirs. " + (MARKET ? "A busy market day." : "Christmas Day, a holy day: few boats are out."), { y: 6, range: 1500, r: 80 });
 mark("Passing the bridge", ...THAMES.at(BRIDGE_S - 60).slice(0, 2), "inferred", "The timber bridge stood on rows of trestles a few metres apart, its deck only a few metres above high water. Barges and boats rowed through the gaps (at the turn of the tide, when the current was slack). How seagoing ships reached Queenhithe above the bridge is not known: ships of the Scandinavian kind could lower the mast and row through, and the bridge may have had a section that could be raised, as the stone bridge later had a drawbridge. Most unloaded below it, at Billingsgate.", { y: 6, range: 800, r: 40 });
 
+// ---------- carts, packhorses and riders in the streets ----------
+// Anglo-Saxon calendars (the 11th-century Cotton Julius A.vi and Tiberius B.v) show two-wheeled carts drawn by oxen and horses; carters
+// hauled firewood, hay, grain, stone and goods into London, and packhorses carried loads on the roads. Norman knights rode about the
+// occupied town. On a holy day there was little hauling.
+const HORSE_G = mergeG([[new THREE.CapsuleGeometry(0.3, 0.85, 4, 10).rotateX(Math.PI / 2), MT(0, 1.12, 0, 0.9, 1, 1)], [new THREE.CylinderGeometry(0.13, 0.2, 0.7, 8).rotateX(-0.75), MT(0, 1.42, 0.62)], [new THREE.CapsuleGeometry(0.11, 0.38, 3, 8).rotateX(Math.PI / 2 + 0.9), MT(0, 1.62, 0.92)],
+  ...[[0.17, 0.48], [-0.17, 0.48], [0.17, -0.48], [-0.17, -0.48]].map(([x, z]) => [new THREE.CylinderGeometry(0.06, 0.045, 0.88, 6), MT(x, 0.44, z)]), [new THREE.ConeGeometry(0.09, 0.6, 6), MT(0, 0.92, -0.75, 1, 1, 1, 0.5, 0)],
+  [new THREE.ConeGeometry(0.035, 0.12, 4), MT(0.06, 1.88, 0.86)], [new THREE.ConeGeometry(0.035, 0.12, 4), MT(-0.06, 1.88, 0.86)], [new THREE.BoxGeometry(0.06, 0.32, 0.5), MT(0, 1.62, 0.6, 1, 1, 1, -0.75, 0)]]);   // body, neck, head, legs, tail, ears, mane
+const CART_G = mergeG([[new THREE.BoxGeometry(1.3, 0.12, 2.3), MT(0, 0.75, 0)], [new THREE.BoxGeometry(0.06, 0.45, 2.3), MT(0.62, 0.98, 0)], [new THREE.BoxGeometry(0.06, 0.45, 2.3), MT(-0.62, 0.98, 0)], [new THREE.BoxGeometry(1.3, 0.45, 0.06), MT(0, 0.98, -1.12)],
+  [new THREE.BoxGeometry(0.07, 0.07, 2.4), MT(0.45, 0.78, 2.2)], [new THREE.BoxGeometry(0.07, 0.07, 2.4), MT(-0.45, 0.78, 2.2)], [new THREE.CylinderGeometry(0.05, 0.05, 1.7, 6).rotateZ(Math.PI / 2), MT(0, 0.55, 0)]]);   // bed, sides, shafts, axle
+const WHEEL2_G = (() => { const p = [[new THREE.TorusGeometry(0.55, 0.05, 4, 14), MT(0, 0, 0)], [new THREE.CylinderGeometry(0.1, 0.1, 0.2, 8).rotateX(Math.PI / 2), MT(0, 0, 0)]]; for (let k = 0; k < 6; k++) p.push([new THREE.BoxGeometry(0.05, 1.05, 0.04), new THREE.Matrix4().makeRotationZ(k / 6 * Math.PI)]); return mergeG(p).rotateY(Math.PI / 2); })();
+const LOAD_G = { wood: mergeG(Array.from({ length: 6 }, (_, k) => [new THREE.CylinderGeometry(0.12, 0.12, 2.1, 6).rotateX(Math.PI / 2), MT((k % 3 - 1) * 0.3, 0.95 + Math.floor(k / 3) * 0.22, 0)])), hay: G1(new THREE.SphereGeometry(0.8, 8, 5).scale(0.85, 0.55, 1.4).translate(0, 1.2, 0)),
+  sacks: mergeG(Array.from({ length: 4 }, (_, k) => [new THREE.SphereGeometry(0.28, 6, 4).scale(1, 0.8, 1.3), MT((k % 2 - 0.5) * 0.55, 1.05, (Math.floor(k / 2) - 0.5) * 0.9)])), barrels: mergeG(Array.from({ length: 3 }, (_, k) => [new THREE.CylinderGeometry(0.28, 0.28, 0.75, 8), MT(0, 1.2, (k - 1) * 0.7)])) };
+const PACK_G = mergeG([[new THREE.BoxGeometry(0.32, 0.4, 0.6), MT(0.38, 1.1, 0)], [new THREE.BoxGeometry(0.32, 0.4, 0.6), MT(-0.38, 1.1, 0)], [new THREE.BoxGeometry(0.85, 0.08, 0.7), MT(0, 1.42, 0)]]);
+const VEH = []; { const R = seeded(808), n = MARKET ? (IS_HEADSET ? 14 : 22) : 6;
+  for (let k = 0; k < n; k++) { const r = R(), type = !MARKET ? (k < 3 ? "rider" : k < 5 ? "pack" : "horsecart") : r < 0.3 ? "oxcart" : r < 0.55 ? "horsecart" : r < 0.75 ? "pack" : "rider";
+    VEH.push({ type, load: ["wood", "hay", "sacks", "barrels"][(R() * 4) | 0], mode: "off", S: null, s: 0, dir: 1, v: type === "oxcart" ? 0.8 : type === "rider" ? 1.6 : 1.1, x: 0, z: 0, h: 0, ph: R() * 10, nr: (k % 3) + 1 }); } }
+const VIM = { horse: new THREE.InstancedMesh(HORSE_G, M(0x6a4a30, { vertexColors: true }), VEH.length * 2), ox: new THREE.InstancedMesh(COW_G, M(0x8a6a4a, { vertexColors: true }), VEH.length * 2), cart: new THREE.InstancedMesh(CART_G, MAT.wood, VEH.length), wheel: new THREE.InstancedMesh(WHEEL2_G, MAT.wood, VEH.length * 2), pack: new THREE.InstancedMesh(PACK_G, M(0x7a6a4e, { vertexColors: true }), VEH.length) };
+const LIM = {}; for (const k in LOAD_G) LIM[k] = new THREE.InstancedMesh(LOAD_G[k], M({ wood: 0x5a4632, hay: 0xb8a060, sacks: 0xb8a888, barrels: 0x6a4e32 }[k], { vertexColors: true }), VEH.length);
+for (const m of [...Object.values(VIM), ...Object.values(LIM)]) { m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); }
+{ const c = new THREE.Color(); VEH.forEach((V, i) => { for (const j of [0, 1]) VIM.horse.setColorAt(i * 2 + j, c.setHex([0x6a4a30, 0x3a2a20, 0x8a6a4a, 0x9a9488, 0x2a2018][(i + j) % 5])); }); VIM.horse.instanceColor.needsUpdate = true; }
+function placeVehicle(V, px, pz) { for (let t = 0; t < 20; t++) { const S = STREETS[(Math.random() * STREETS.length) | 0], s = Math.random() * S.L.L, [x, z] = S.L.at(s); const d = Math.hypot(x - px, z - pz); if (d > 380 || d < (V.mode === "off" ? 0 : 120) || baseH(x, z) < 0.5) continue;
+  V.S = S; V.s = s; V.dir = Math.random() < 0.5 ? 1 : -1; V.mode = "go"; return; } V.mode = "off"; }
+const hideI = (im, i) => im.setMatrixAt(i, ZEROM);
+function vehStep(t, dt) { const counts = { horse: 0, ox: 0, cart: 0, wheel: 0, pack: 0 }, lc = { wood: 0, hay: 0, sacks: 0, barrels: 0 }, rate = Math.min(timeRate, 8);
+  for (const V of VEH) { if (V.mode === "off" || Math.hypot(V.x - P_.x, V.z - P_.z) > 420) { if (Math.random() < 0.05) placeVehicle(V, P_.x, P_.z); }
+    if (V.mode === "go") { V.s += V.dir * V.v * dt * rate; if (V.s < 0 || V.s > V.S.L.L) { V.dir *= -1; V.s = clampN(V.s, 0, V.S.L.L); } const [x, z, a] = V.S.L.at(V.s), side = V.dir > 0 ? 1 : -1, lane = Math.min(1.4, V.S.w / 2 - 0.9);
+      V.h = V.dir > 0 ? a : a + Math.PI; V.x = x + Math.cos(a) * lane * side; V.z = z - Math.sin(a) * lane * side; }
+    const show = V.mode === "go" && Math.hypot(V.x - P_.x, V.z - P_.z) < 420, fx = Math.sin(V.h), fz = Math.cos(V.h), y = show ? Math.max(groundH(V.x, V.z), spanY(V.x, V.z)) : 0, bob = Math.abs(Math.sin(t * 5 + V.ph)) * 0.03;
+    const beast = (kind, ox, oz, k) => { const im = VIM[kind], i = counts[kind]++; if (!show) return hideI(im, i); O3.position.set(V.x + fx * oz + fz * ox, y + bob, V.z + fz * oz - fx * ox); O3.rotation.set(0, V.h, 0); O3.scale.set(1, 1, 1); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); };
+    if (V.type === "oxcart") { beast("ox", 0.55, 3.0); beast("ox", -0.55, 3.0); counts.horse += 2; } else if (V.type === "horsecart") { beast("horse", 0, 2.6); counts.horse++; counts.ox += 2; } else { beast("horse", 0, 0.4); counts.horse++; counts.ox += 2; }
+    const cart = V.type === "oxcart" || V.type === "horsecart", ci = counts.cart++, wi = counts.wheel; counts.wheel += 2;
+    if (show && cart) { O3.position.set(V.x, y, V.z); O3.rotation.set(0, V.h, 0); O3.updateMatrix(); VIM.cart.setMatrixAt(ci, O3.matrix); for (const s of [-1, 1]) { O3.position.set(V.x + fz * 0.8 * s, y + 0.55, V.z - fx * 0.8 * s); O3.rotation.set(-V.s * 1.8 * V.dir, V.h, 0, "YXZ"); O3.updateMatrix(); VIM.wheel.setMatrixAt(wi + (s > 0), O3.matrix); }
+      const li = lc[V.load]++; O3.position.set(V.x, y, V.z); O3.rotation.set(0, V.h, 0); O3.updateMatrix(); LIM[V.load].setMatrixAt(li, O3.matrix); }
+    else { hideI(VIM.cart, ci); hideI(VIM.wheel, wi); hideI(VIM.wheel, wi + 1); }
+    const pi = counts.pack++; if (show && V.type === "pack") { O3.position.set(V.x + fx * 0.4, y + bob, V.z + fz * 0.4); O3.rotation.set(0, V.h, 0); O3.updateMatrix(); VIM.pack.setMatrixAt(pi, O3.matrix); } else hideI(VIM.pack, pi);
+    V.show = show; }
+  for (const k in LIM) { for (let i = lc[k]; i < VEH.length; i++) hideI(LIM[k], i); LIM[k].instanceMatrix.needsUpdate = true; }
+  for (const k in VIM) VIM[k].instanceMatrix.needsUpdate = true; }
+// where the driver walks (beside the beasts' heads) or the rider sits
+function driverAt(V) { const fx = Math.sin(V.h), fz = Math.cos(V.h); if (V.type === "rider") return [V.x + fx * 0.25, V.z + fz * 0.25, V.h, "ride"]; const d = V.type === "oxcart" ? 4.2 : V.type === "horsecart" ? 3.4 : 1.4; return [V.x + fx * d - fz * 0.9, V.z + fz * d + fx * 0.9, V.h, "walk"]; }
+
 // ---------- the day's clock ----------
 // The hour of the coronation is not recorded. Mass on a great feast was in the morning; here the procession sets out at 10:00 and
 // the events the chroniclers describe follow in their order, at a plausible pace. SIM is seconds after midnight.
@@ -1396,7 +1476,7 @@ function routeAt(P, s) { let i = 1; for (; i < P.length; i++) { const l = Math.h
 const face = (x, z, tx, tz) => Math.atan2(tx - x, tz - z);
 const ND = [0, -27.7], WD = [NAVE_DONE - 0.3, 0];   // the north transept door and the temporary west door
 const PAL_DOOR = [PAL.northDoor[0], PAL.northDoor[2]], PAL_IN = [PAL.inNorth[0], PAL.inNorth[2]];
-const PROC_PATH = [PAL_DOOR, [PAL_DOOR[0] - 13, PAL_DOOR[1] + 4], [PALACE[0] - 47, PALACE[1]], [110, 10], [90, -45], [30, -45], [0, -40], ND, [0, -12], [0, -2]];   // out of the hall, through the palisade gate, round to the north door
+const PROC_PATH = [PAL_DOOR, [PAL_DOOR[0] - 13, PAL_DOOR[1] + 6], [PALACE[0] - 50, PALACE[1] + 4], [PALACE[0] - 72, PALACE[1] + 4], [95, -10], [70, -45], [30, -45], [0, -40], ND, [0, -12], [0, -2]];   // out of the hall, through the palisade gate, round to the north door
 // the procession and the principals
 const PRIN = {};
 if (!MARKET) { const order = [["cleric", "cross"], ["cleric", "candle"], ["cleric", "candle"], ["cleric", "book"], ["cleric"], ["cleric"], ["monk", "edwin"], ["bishop", "geoffrey"], ["archbishop", "ealdred"], ["duke", "william"],
@@ -1434,7 +1514,7 @@ const GUARDS = [];
   PAL.cookSpots.forEach(([x, , z], k) => agent(k === 1 ? "woman" : "eng", { fixed: [x, z, face(x, z, PAL.kitchen.x, PAL.kitchen.z + 0.5)], kind: k === 1 ? "sell" : "hammer", palace: true }));
   for (let k = 0; k < 8; k++) { const t = PAL.seat(k % 2 ? 4.0 : -4.0, -7 + k * 2), path = [KI, KD, SD, SI, [t[0], t[2]]]; agent(k % 3 === 1 ? "woman" : "eng", { loop: path, phase: k * 23, speed: 1.0 + (k % 3) * 0.15, palace: true }); }
   for (let k = 0; k < 3; k++) { const [x, , z] = PAL.seat(-2 + k * 2, 11.4); agent(k === 1 ? "woman" : "eng", { fixed: [x, z, Math.PI / 2], kind: "sell", palace: true }); }
-  const [gx, gz] = [PALACE[0] - 44, PALACE[1]]; for (const o of [-3, 3]) { const A = agent("soldier", { fixed: [gx, gz + o, -Math.PI / 2], kind: "guard" }); GUARDS.push(A); } }
+  const [gx, gz] = [PALACE[0] - 70, PALACE[1] + 4]; for (const o of [-4, 4]) { const A = agent("soldier", { fixed: [gx, gz + o, -Math.PI / 2], kind: "guard" }); GUARDS.push(A); } }
 // the houses that burn: the nearest of the Westminster vill
 const FIRE_H = MARKET ? [] : HOUSES.filter(H => H.kind === "vill" && !H.burnt).sort((a, b) => Math.hypot(a.x, a.z + 40) - Math.hypot(b.x, b.z + 40)).slice(0, 7);
 FIRE_H.forEach((H, k) => { H.ignite = T.fire + k * 45; H.state = 0; const G = GUARDS[k * 2 + 1] || GUARDS[k]; if (G) { G.torch = H; G.torchAt = H.ignite; } });
@@ -1442,6 +1522,7 @@ FIRE_H.forEach((H, k) => { H.ignite = T.fire + k * 45; H.state = 0; const G = GU
 // the stallholders, and a boatman for hire
 for (const S of STALLS) { const [x, z, h] = S.seller; S.agent = agent(S.kind === "butcher" || S.kind === "iron" ? "eng" : hash(x | 0, z | 0) < 0.45 ? "woman" : "eng", { fixed: [x, z, h], kind: S.kind === "butcher" ? "hammer" : "sell", seller: true }); }
 const ROWER = agent("eng", { rower: true });
+for (const V of VEH) agent(V.type === "rider" ? (V.nr === 1 ? "noble" : "soldier") : "eng", { veh: V });   // carters walking at their beasts' heads; riders: Norman knights, or an English thegn
 if (MARKET) for (const [x, z, h] of [[-68, -27, 0], [-73, 29, Math.PI], [-63, 31, Math.PI], [-102, 4.5, Math.PI / 2], [-106, 2.5, -Math.PI / 2], [-50, 10, -Math.PI / 2]]) agent("eng", { fixed: [x, z, h], kind: "hammer", farm: true });   // masons dressing stone, sawyers at the sawpit
 // farm folk at their winter work: threshing with flails in the barn doorways, in the yards, herding, and the ploughman behind his team
 for (const F of [...FARM_SPOTS.filter(f => f.plough), ...FARM_SPOTS.filter(f => !f.plough).filter((f, i) => i % 2 === 0)].slice(0, 64)) agent(F.role, F.plough ? { plough: F.plough, farm: true } : { fixed: [F.x, F.z, F.h], kind: F.kind, farm: true });
@@ -1518,6 +1599,7 @@ function agentState(A) { const S = SIM;
   if (A.loop) { const P = A.loop, L = A.loopL || (A.loopL = P.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - P[i][0], p[1] - P[i][1]), 0)), u = (S * A.speed + A.phase * 7) % (2 * L + 16);   // to the hall and back, a pause at each end
     if (u < L) { const [x, z, h] = routeAt(P, u); return [x, z, h, "carry", true]; } if (u < L + 8) { const [x, z, h] = routeAt(P, L); return [x, z, h, "sell"]; }
     if (u < 2 * L + 8) { const [x, z, h] = routeAt(P, 2 * L + 8 - u); return [x, z, h + Math.PI, "walk", true]; } const [x, z, h] = routeAt(P, 0); return [x, z, h + Math.PI, "stand"]; }
+  if (A.veh) { if (!A.veh.show) return null; const [x, z, h, k] = driverAt(A.veh); return [x, z, h, k, k === "walk", A.veh.v]; }
   if (A.plough) { const [x, z, h] = ploughAt(A.plough, SIM); return [x, z, h, "walk", true, 0.6]; }
   if (A.rower) { if (!RIDE) return null; return [RIDE.rx, RIDE.rz, RIDE.rh, "row"]; }
   if (A.fixed) return [...A.fixed, A.kind];
@@ -1539,7 +1621,7 @@ function lifeStep(dt, t) { frameN++; const px = P_.x, pz = P_.z, rate = Math.min
     if (!seen(x, z, d)) { if (A.shown) { crowd.hide(A.i); A.shown = false; } continue; }
     const step = d < 35 ? 1 : d < 120 ? 3 : 8; if ((frameN + A.i) % step && A.shown) continue;
     if (A.key === "william") { const crowned = SIM > T.crown + 20; if (crowned !== !!A.crowned) { A.crowned = crowned; A.L = looks(A.i, crowned ? "king" : "duke"); crowd.look(A.i, A.L); } }
-    let y = personY(x, z); if (A.key === "william" && kind === "sit" && inAbbey(x, z)) y = AB_Y + 0.76; if (A.rower) y = WATER + 0.05;
+    let y = personY(x, z); if (A.key === "william" && kind === "sit" && inAbbey(x, z)) y = AB_Y + 0.76; if (A.rower) y = WATER + 0.05; if (kind === "ride") y = Math.max(groundH(x, z), spanY(x, z)) + 0.92;
     crowd.set(A.i, x, y, z, h, kind, t, moving ? Math.min(2, (sp || 0.9) / 1.2) * Math.min(rate, 3) : 1); A.shown = true; }
   crowd.done(); }
 
@@ -1644,7 +1726,9 @@ mark("The building site", -82, 0, "inferred", "The abbey was still being built. 
 mark("The unfinished nave", -48, 0, "inferred", "Most historians (Gem, Fernie) think the nave was completed only in the 1080s or later, and the two western towers later still. So here the western bays stand at arcade and gallery height in scaffolding, and a timber wall closes the finished part. How far the work had got in 1066 is not known.", { y: 14, r: 18, range: 400 });
 mark("The north door", 0, -30, "inferred", "With the nave unfinished, the way in was probably by a transept door. The north transept front became the abbey's main entrance in the 13th-century church.", { y: 6, r: 8, range: 250 });
 mark("The high altar", 18.5, 0, "known", "The high altar of St Peter, in the presbytery before the apse. The coronation was performed here: the oath, the anointing, the crowning.", { y: 3.2, r: 4, range: 60 });
-mark("King Edward's tomb", 13.8, 0, "known", "Edward the Confessor, died 5 January 1066, buried the next day before the high altar of his new church. A plain tomb until he was made a saint (1161) and moved to a shrine (1163); Henry III rebuilt the abbey around his shrine.", { y: 1.8, r: 3, range: 50 });
+mark("King Edward's tomb", 13.8, 0, "known", "Edward the Confessor, died 5 January 1066, buried the next day in a stone coffin before the high altar of his new church. His tomb would have been covered with a costly silk pall and ringed with candles; 12th-century writers say William soon gave it a covering of gold and silver. Edward was made a saint in 1161 and moved to a shrine in 1163; Henry III rebuilt the whole abbey around his shrine. The tomb's form here is inferred.", { y: 1.9, r: 3, range: 50 });
+mark("The paintings", 0, 20, "inferred", "Norman and English great churches were plastered and painted inside: whitewash with red lines imitating masonry, patterned friezes, a painted curtain along the foot of the walls, figure scenes, and in the apse Christ in Majesty with angels and saints; capitals were painted too. Edward's paintings are lost; these follow surviving Romanesque schemes (St Albans, Kempley, the Norman churches).", { y: 9, r: 10, range: 60 });
+mark("The rood", -5.2, 0, "inferred", "The rood: a great crucifix with Mary and John, on a beam across the crossing arch, facing the people in the nave. Great churches had them; Archbishop Stigand gave great roods of gold and silver to several churches. Its form here is inferred.", { y: 15.5, r: 8, range: 60 });
 mark("The throne", 3.4, 0, "inferred", "After the crowning the king was enthroned. Where the throne stood in 1066 is not recorded; at later coronations it was on a raised stage at the crossing.", { y: 2.6, r: 3, range: 50 });
 mark("The arcades", -20, 5, "known", "Arcade, gallery and clerestory in three storeys, with piers alternating between compound piers (with a shaft running up the wall) and round columns, as at Jumièges in Normandy. Bases of the piers were found in excavation. Caen stone, pale cream. The flat painted timber ceiling is inferred.", { y: 9, r: 10, range: 80 });
 
@@ -1835,7 +1919,7 @@ function frame() {
   if (RIDE) { } else if (flying) P_.y = Math.max(g, P_.y + up * Math.max(4, sp) * dt); else P_.y = g > P_.y ? Math.min(g, P_.y + Math.max(3.2, sp * 1.2) * dt) : Math.max(g, P_.y - Math.max(7, sp) * dt);
   rig.position.set(P_.x, P_.y + (vr && SITTING ? 0.45 : 0) - (SITTING_DOWN || RIDE ? 0.65 : 0), P_.z);
   updateGround(P_.x, P_.z);
-  lifeStep(dt, t); fireStep(dt, t); beastStep(t); reactStep(t); countryStep(t); boatsStep(t, dt * Math.min(timeRate, 10));
+  lifeStep(dt, t); fireStep(dt, t); beastStep(t); reactStep(t); countryStep(t); vehStep(t, dt); boatsStep(t, dt * Math.min(timeRate, 10));
   // the sun, low in the south all day; sky and light
   const hour = SIM / 3600, S = sunAt(hour), el = S.el, day = clampN(el * 7 + 0.35, 0, 1), dusk = clampN(1 - el * 9, 0, 1) * (el > -0.12 ? 1 : 0);
   sun.position.copy(rig.position).addScaledVector(S.dir, 800); sun.target.position.copy(rig.position);
