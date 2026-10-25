@@ -435,6 +435,7 @@ LN = LN[:i0] + """<div id="intro"><div class="card">
   <p>Or go forward to <b>summer 1100</b>, a generation after the Conquest: the White Tower finished, Baynard's Castle and Montfichet's Tower in the west of
   the City, William Rufus's Westminster Hall, the new St Paul's rising after the fire of 1087, St Mary-le-Bow, the abbey's nave complete, Southwark rebuilt,
   and the harvest beginning on Lammas Day.</p>
+  <p>Or to <b>Michaelmas 1285</b>, under Edward I: London Bridge rebuilt in stone, nineteen arches lined with houses, with its chapel of St Thomas and the Great Stone Gate, on an autumn market day. (1285 is still being built: more of its city is to come.)</p>
   <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>E</kbd> read a marker, a person, or go into a house &nbsp;&middot;&nbsp;
   <kbd>N</kbd> next moment &nbsp;&middot;&nbsp; <kbd>T</kbd> time speed &nbsp;&middot;&nbsp; <kbd>L</kbd> markers &nbsp;&middot;&nbsp; <kbd>F</kbd> fly<br>
   In VR: left stick walk, right stick turn, <b>A</b> read / go in, <b>B</b> next place, <b>X</b> next moment, <b>Y</b> time speed</p>

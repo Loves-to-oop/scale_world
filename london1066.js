@@ -9,8 +9,8 @@
 // typical buildings of the time, and every marker says whether a thing is known, inferred, or typical.
 const IS_HEADSET = /OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent);
 const Q = new URLSearchParams(location.search), SEED = Math.max(1, Number(Q.get("seed") || 1) | 0);
-const ERA = Q.get("era") === "1100" ? 1100 : 1066, SUMMER = ERA === 1100;   // 1066 (winter), or Lammas Day, 1 August 1100
-const MARKET = Q.get("day") === "market" || ERA === 1100;   // which day: Christmas Day (the coronation) or a market day a few days before
+const ERA = Q.get("era") === "1285" ? 1285 : Q.get("era") === "1100" ? 1100 : 1066, SUMMER = ERA === 1100, AUTUMN = ERA === 1285, LEAFY = SUMMER || AUTUMN;   // 1066 (winter), Lammas Day 1 August 1100, or Michaelmas 29 September 1285
+const MARKET = Q.get("day") === "market" || ERA >= 1100;   // which day: Christmas Day (the coronation) or a market day a few days before
 const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: !IS_HEADSET });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0; renderer.xr.enabled = true;
@@ -272,7 +272,7 @@ function baseHL(x, z) { const s = THAMES.side(x, z), d = Math.abs(s); let h;
   if (FLEET.near(x, z, 60)) { const fw = clampN(26 - (-z - 1270) / 560 * 18, 5, 26), dd = FLEET.d(x, z); if (dd < fw + 22) { if (z > -2150) h = Math.min(h, lerpN(-2.2, h, sstepN(dd, fw * 0.6, fw + 22))); else h -= 1.6 * (1 - sstepN(dd, fw * 0.5, fw + 30)); } }   // the Fleet: about 50 m across at its mouth, 15 m by Fleet Street; tidal to Holborn, a brook above   // tidal to Holborn, a brook in its valley above
   for (const B of BROOKS) if (B.near(x, z, 30)) { const dd = B.d(x, z); if (dd < 30) h -= (h > 1.2 ? 1.2 : 0.4) * (1 - sstepN(dd, 2, 30)); }   // brooks in their valleys
   carve(WALBROOK, 3, -0.4, 30); carve(TYB_N, 7, -1.2, 10); carve(TYB_S, 7, -1.2, 10); carve(TYB_W, 6, -1.0, 10);
-  if (ERA === 1100 && TOWER_DITCH.near(x, z, 14)) { const dd = TOWER_DITCH.d(x, z); if (dd < 12) h -= 2.6 * (1 - sstepN(dd, 3, 12)); }   // the Tower's ditch (by 1100)
+  if (ERA >= 1100 && TOWER_DITCH.near(x, z, 14)) { const dd = TOWER_DITCH.d(x, z); if (dd < 12) h -= 2.6 * (1 - sstepN(dd, 3, 12)); }   // the Tower's ditch (by 1100)
   if (WALL.near(x, z, 30) && !CITY.inside(x, z)) { const wd = WALL.d(x, z); if (wd > 3 && wd < 18) h -= 2.4 * Math.sin((wd - 3) / 15 * Math.PI); }                     // the city ditch outside the wall
   return h; }
 // ---------- the lower Thames, from Limehouse to the sea ----------
@@ -353,12 +353,12 @@ const skyMat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: fals
   vertexShader: "varying vec3 vp; void main(){ vp = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }",
   fragmentShader: "uniform vec3 up, hor; varying vec3 vp; void main(){ float y = max(vp.y, 0.0); gl_FragColor = vec4(mix(hor, up, pow(y, 0.6)), 1.0);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}" });
 const sky = new THREE.Mesh(new THREE.SphereGeometry(30000, 32, 16), skyMat); sky.renderOrder = -1; scene.add(sky);
-scene.fog = new THREE.FogExp2(0xb8bcc0, (IS_HEADSET ? 0.00055 : 0.00042) * (SUMMER ? 0.55 : 1));   // a summer haze is lighter than winter smoke and mist
+scene.fog = new THREE.FogExp2(0xb8bcc0, (IS_HEADSET ? 0.00055 : 0.00042) * (SUMMER ? 0.55 : AUTUMN ? 0.75 : 1));   // a summer haze is lighter than winter smoke and mist
 const sun = new THREE.DirectionalLight(0xfff0d8, 1.6); scene.add(sun, sun.target);
 const hemi = new THREE.HemisphereLight(0xc4ccd6, 0x5a5444, 1.1); scene.add(hemi);
 const sunDisc = new THREE.Mesh(new THREE.CircleGeometry(260, 24), new THREE.MeshBasicMaterial({ color: 0xfff0d0, fog: false, toneMapped: false })); scene.add(sunDisc);
 // the sun's place for latitude 51.5 N, declination -23.1 degrees, by the hour of local solar time
-function sunAt(hour) { const lat = 51.5 * Math.PI / 180, dec = (SUMMER ? 17.9 : -23.1) * Math.PI / 180, H = (hour - 12) * 15 * Math.PI / 180;
+function sunAt(hour) { const lat = 51.5 * Math.PI / 180, dec = (SUMMER ? 17.9 : AUTUMN ? -5.2 : -23.1) * Math.PI / 180, H = (hour - 12) * 15 * Math.PI / 180;
   const el = Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(H)), az = Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(lat) - Math.tan(dec) * Math.cos(lat));   // az from south, west positive
   return { el, dir: V3(Math.sin(az) * Math.cos(el) * -1, Math.sin(el), Math.cos(az) * Math.cos(el)).normalize() }; }
 const WATER = 0;
@@ -401,7 +401,7 @@ function updateGround(x, z, budget = 3) { const moved = [];
 // midwinter colours: dun grass, bare mud and gravel where people walk, reeds on the marsh, ploughed strips
 function groundColor(x, z, h, c) {
   const n1 = fbm(x / 40, z / 40, 3), n2 = fbm(x / 600 + 5, z / 600, 3);
-  if (SUMMER) c.setRGB(0.27 + 0.08 * n2, 0.42 + 0.08 * n1, 0.17 + 0.03 * n1); else c.setRGB(0.36 + 0.10 * n2, 0.37 + 0.08 * n1, 0.22 + 0.04 * n1);   // summer grass, or winter pasture                                                           // winter pasture
+  if (LEAFY) c.setRGB(0.27 + 0.08 * n2, 0.42 + 0.08 * n1, 0.17 + 0.03 * n1); else c.setRGB(0.36 + 0.10 * n2, 0.37 + 0.08 * n1, 0.22 + 0.04 * n1);   // summer grass, or winter pasture                                                           // winter pasture
   if (h < 1.6 && (x > 6700 || riverSide(x, z) > 0)) c.lerp(SUMMER ? _c1.setRGB(0.32 + 0.06 * n1, 0.44 + 0.06 * n1, 0.2) : _c1.setRGB(0.48 + 0.08 * n1, 0.42 + 0.06 * n1, 0.28), 0.7);                    // dead reeds and sedge on the southern marsh
   if (h < WATER + 0.5) c.lerp(_c1.setRGB(0.30, 0.27, 0.22), clampN((WATER + 0.5 - h) * 1.5, 0, 0.9));                       // mud at the water's edge
   const v = rGet(x, z);
@@ -694,6 +694,7 @@ for (const B of SPANS) { const [ax0, az0, bx0, bz0] = B.L.S[0], len0 = Math.hypo
   let ea = 4, eb = 4; while (ea < 60 && baseH(ax0 - ux * ea, az0 - uz * ea) < B.y - 1.1) ea += 3; while (eb < 60 && baseH(bx0 + ux * eb, bz0 + uz * eb) < B.y - 1.1) eb += 3;   // walk out until the bank is near deck height
   B.ax = ax0 - ux * ea; B.az = az0 - uz * ea; B.ux = ux; B.uz = uz; B.len = len0 + ea + eb; B.gA = baseH(B.ax, B.az); B.gB = baseH(B.ax + ux * B.len, B.az + uz * B.len); B.R = Math.max(14, Math.min(ea, eb) + 10);
   B.yAt = s => { const ra = Math.max(0, 1 - s / B.R), rb = Math.max(0, 1 - (B.len - s) / B.R); return B.y + (B.gA + 0.15 - B.y) * ra * ra * (3 - 2 * ra) + (B.gB + 0.15 - B.y) * rb * rb * (3 - 2 * rb); };
+  if (ERA === 1285 && B.name === "London Bridge") continue;
   const ry = Math.atan2(ux, uz), n = Math.ceil(B.len / 3);
   for (let k = 0; k < n; k++) { const s0 = B.len * k / n, s1 = B.len * (k + 1) / n, sm = (s0 + s1) / 2, x = B.ax + ux * sm, z = B.az + uz * sm, y0 = B.yAt(s0), y1 = B.yAt(s1), ym = (y0 + y1) / 2, seg = Math.hypot(s1 - s0, y1 - y0);
     put("deck", BOX_G, MAT.wood, x, ym - 0.35, z, B.hw * 2, 0.35, seg + 0.05, ry, Math.atan2(y0 - y1, s1 - s0));
@@ -725,7 +726,7 @@ function addBoat(x, z, ry, len, ship) { const gy = Math.max(WATER - 0.35, ground
 // completed only in the 1080s or later, so here its western half is still being built, closed off by a temporary timber wall.
 // Its axis runs east-west; x here is metres east of the centre of the crossing.
 const AB_Y = groundH(0, 0) + 0.05, AB_F = AB_Y + 0.2;   // the floor
-const NAVE_W = -62, NAVE_DONE = ERA === 1100 ? -62.7 : -33.5,   // by 1100 the nave was finished
+const NAVE_W = -62, NAVE_DONE = ERA >= 1100 ? -62.7 : -33.5,   // by 1100 the nave was finished
   CHOIR_E = 25, BAY = 4.75, HS = 1.22;   // HS: heights scaled to Jumièges' proportions (nave walls about 23 m)
 const abT = ashlarT.clone(); abT.repeat.set(1 / 5.6, 1 / 5.6); abT.needsUpdate = true;
 const pnT = plankT.clone(); pnT.repeat.set(1 / 4, 1 / 2); pnT.needsUpdate = true;
@@ -804,7 +805,7 @@ function wallZ(z0, z1, x, th, y0, h, gaps = [], mat = "ashlar") { let a = z0; fo
       if (done) { slab("plank", xc, Y + 7.9, 7.85 * zs, BAY + 0.02, 0.15, 4.9); slab("plank", xc, Y + 12.4, 8.05 * zs, BAY + 0.02, 0.25, 6.6, 0, zs * 0.36); } } }   // aisle ceiling (the gallery floor) and the lean-to roof over the gallery
   slab("ceil", (NAVE_DONE - 5) / 2, Y + 19, 0, -5 - NAVE_DONE, 0.25, 11.4);   // the nave's flat boarded ceiling
   // the temporary west wall of timber, across the unfinished nave, with its door
-  if (ERA === 1100) { wallZ(-11.2, 11.2, NAVE_W - 0.5, 1.4, Y, 19, [[-2, 2, 5]], "ashlar"); for (const zz of [-7.8, 7.8]) windowAt(NAVE_W - 0.5, Y + 4, zz, 1.1, 2.4, "x", -1, 1.4); windowAt(NAVE_W - 0.5, Y + 12, 0, 1.6, 3.6, "x", -1, 1.4); }   // the west front
+  if (ERA >= 1100) { wallZ(-11.2, 11.2, NAVE_W - 0.5, 1.4, Y, 19, [[-2, 2, 5]], "ashlar"); for (const zz of [-7.8, 7.8]) windowAt(NAVE_W - 0.5, Y + 4, zz, 1.1, 2.4, "x", -1, 1.4); windowAt(NAVE_W - 0.5, Y + 12, 0, 1.6, 3.6, "x", -1, 1.4); }   // the west front
   else wallZ(-11.2, 11.2, NAVE_DONE - 0.3, 0.3, Y, 19, [[-1.6, 1.6, 3.6]], "plank");
   // the western end as laid out: the west wall's footings
   if (ERA === 1066) slab("ashlar", NAVE_W, Y - 0.5, 0, 1.6, 2.2, ZA * 2 + TH, 0, 0, true);
@@ -873,7 +874,7 @@ function wallZ(z0, z1, x, th, y0, h, gaps = [], mat = "ashlar") { let a = z0; fo
   // courses under the windows, a corbel table under the eaves, a round-arched north door, a two-stage crossing tower with blind arcading
   // below and paired belfry openings above, small apses ending the choir aisles (Gem's reconstruction)
   const PIL = (x, z, nx, nz, y0, y1, wd = 0.8) => slab("ashlar", x + nx * 0.17, Y + y0, z + nz * 0.17, nx ? 0.34 : wd, y1 - y0, nz ? 0.34 : wd);
-  const nb = [], cb = []; for (let k = 0; k <= (ERA === 1100 ? 12 : 6); k++) nb.push(-5.7 - BAY * k); for (let k = 0; k <= 4; k++) cb.push(5.7 + 5 * k);
+  const nb = [], cb = []; for (let k = 0; k <= (ERA >= 1100 ? 12 : 6); k++) nb.push(-5.7 - BAY * k); for (let k = 0; k <= 4; k++) cb.push(5.7 + 5 * k);
   for (const zs of [-1, 1]) { for (const x of [...nb, ...cb]) { PIL(x, 11.2 * zs, 0, zs, 0, 12.3); PIL(x, 5.7 * zs, 0, zs, 14.5, 19); }
     for (const [x0, x1] of [[NAVE_DONE, -6.4], [6.4, CHOIR_E + 0.7]]) { for (const y of [2.8, 8.2]) slab("ashlar", (x0 + x1) / 2, Y + y, 11.32 * zs, x1 - x0, 0.18, 0.24); slab("ashlar", (x0 + x1) / 2, Y + 14.9, 5.82 * zs, x1 - x0, 0.15, 0.24);
       for (let x = x0 + 0.4; x < x1; x += 0.9) { slab("ashlar", x, Y + 12.1, 11.35 * zs, 0.28, 0.25, 0.3); slab("ashlar", x, Y + 18.7, 5.85 * zs, 0.28, 0.25, 0.3); } }
@@ -1069,7 +1070,7 @@ const markLL = (name, lat, lon, tag, text, o) => { const [x, z] = LL(lat, lon); 
 // A generation after the Conquest: the White Tower finished (begun about 1075-80, done about 1100) in its bailey in the corner of the Roman
 // walls; Baynard's Castle and Montfichet's Tower guarding the west of the City; William Rufus's great hall at Westminster (1097-99); the new
 // St Paul's rising after the fire of 1087; St Mary-le-Bow on Cheapside (about 1080); the abbey's nave finished; Southwark rebuilt.
-if (ERA === 1100) {
+if (ERA >= 1100) {
   const rect = (lat0, lon0, lat1, lon1, v) => { const [x0, z0] = LL(lat0, lon0), [x1, z1] = LL(lat1, lon1); rRect((x0 + x1) / 2, (z0 + z1) / 2, Math.abs(x1 - x0), Math.abs(z1 - z0), 0, v); };
   rect(51.5073, -0.0783, 51.5093, -0.0755, 4);   // the Tower's bailey, kept clear of houses
   // the White Tower: about 36 x 32.5 m and 27.5 m to the battlements, Kentish ragstone with Caen stone dressings; turrets at the corners
@@ -1089,12 +1090,12 @@ if (ERA === 1100) {
     GTINT = [0.55, 0.42, 0.3]; for (let k = 0; k < 12; k++) gbox(F, "oak", -8 - k * 0.55, 6 - k * 0.5, D / 2 + 1.4, 0.55, 0.12, 2.0, ""); gbox(F, "oak", -6.5, 6.2, D / 2 + 1.4, 3, 0.2, 2.2, ""); GTINT = [1, 1, 1]; garch(F, "dark", -6.5, 6.3, D / 2, 1.4, 2.6, [0, 0, 1]);   // the timber stair to the first-floor door
     GTINT = [1, 1, 1];
     mark("The White Tower", tx, tz, "known", "William the Conqueror's great stone keep, begun about 1075-80 under Gundulf, bishop of Rochester, and finished about 1100: about 36 by 32.5 m and 27.5 m high, of Kentish ragstone with Caen stone dressings, walls up to 4.5 m thick. Inside, a great hall and chambers, and St John's Chapel (its apse projects at the south-east corner). The door was at first-floor level, up a timber stair. It stood in a bailey in the angle of the Roman walls, with a ditch and palisade on the landward sides. It was first whitewashed in 1240, which gave it its name.", { big: true, range: 3500, y: 36, r: 40 }); }
-  { const R = seeded(1100), pts = TOWER_DITCH.P; for (let k = 1; k < pts.length; k++) { const [ax, az] = pts[k - 1], [bx, bz] = pts[k], len = Math.hypot(bx - ax, bz - az), n = Math.ceil(len / 1.2); for (let q = 0; q < n; q++) { const x = ax + (bx - ax) * q / n + (bz - az) / len * 10, z = az + (bz - az) * q / n - (bx - ax) / len * 10; if (k === 2 && Math.abs(q - n / 2) < 3) continue; put("pale", BOX_G, MAT.paleWood || (MAT.paleWood = M(0x8a7a64)), x, groundH(x, z) - 0.3, z, 0.3, 4, 0.3); solid(x, z, 0.4, 0.4, 0); } }   // the palisade inside the ditch, a gate in the north side
+  if (ERA === 1100) { const R = seeded(1100), pts = TOWER_DITCH.P; for (let k = 1; k < pts.length; k++) { const [ax, az] = pts[k - 1], [bx, bz] = pts[k], len = Math.hypot(bx - ax, bz - az), n = Math.ceil(len / 1.2); for (let q = 0; q < n; q++) { const x = ax + (bx - ax) * q / n + (bz - az) / len * 10, z = az + (bz - az) * q / n - (bx - ax) / len * 10; if (k === 2 && Math.abs(q - n / 2) < 3) continue; put("pale", BOX_G, MAT.paleWood || (MAT.paleWood = M(0x8a7a64)), x, groundH(x, z) - 0.3, z, 0.3, 4, 0.3); solid(x, z, 0.4, 0.4, 0); } }   // the palisade inside the ditch, a gate in the north side
     const [gx, gz] = TOWER_DITCH.at(TOWER_DITCH.cum[1] + (TOWER_DITCH.L - TOWER_DITCH.cum[1]) / 2); put("gatepost", BOX_G, MAT.wood, gx, groundH(gx, gz) + 3.8, gz + 10, 6, 0.5, 0.6); for (const s of [-3, 3]) put("gatepost", BOX_G, MAT.wood, gx + s, groundH(gx, gz) - 0.3, gz + 10, 0.6, 4.6, 0.6);
     const [hx, hz] = LL(51.5088, -0.0776); addHouse(hx, hz, 8, 18, 0, { wall: "plank", roof: "shingle", door: "+x", kind: "palace-towerhall" }).noEnter = true; const [sx2, sz2] = LL(51.5078, -0.0777); addHouse(sx2, sz2, 6, 10, 0, { wall: "plank", roof: "thatch", door: "+x" }).noEnter = true; }   // timber buildings in the bailey
   // Baynard's Castle and Montfichet's Tower: built after 1066 by Norman lords in the west of the City, by the Fleet. Their form is not known
   // (a large ditch found at Ludgate Hill in 1986 may be Montfichet's); shown as stone towers in ditched and palisaded enclosures.
-  for (const [name, lat, lon, s, text] of [["Baynard's Castle", 51.5117, -0.1024, 14, "Built after the Conquest by Ralph Baynard, a Norman lord who appears in Domesday Book, on the riverside in the south-west corner of the City, where the wall met the Fleet. Its form is unknown; King John destroyed it in 1213, and a later Baynard's Castle was built further east."],
+  if (ERA === 1100) for (const [name, lat, lon, s, text] of [["Baynard's Castle", 51.5117, -0.1024, 14, "Built after the Conquest by Ralph Baynard, a Norman lord who appears in Domesday Book, on the riverside in the south-west corner of the City, where the wall met the Fleet. Its form is unknown; King John destroyed it in 1213, and a later Baynard's Castle was built further east."],
     ["Montfichet's Tower", 51.5133, -0.1013, 12, "The fortified house of the Montfichet family, by Ludgate, recorded in the 12th century and pulled down in the 13th (the Blackfriars' friary took its site). A large ditch found in excavations at Ludgate Hill in 1986 may be its moat. Form inferred."]]) {
     const [x, z] = LL(lat, lon), gy = groundH(x, z) - 0.3; rRect(x, z, 70, 70, 0, 4); const F = FR(x, z, 0, gy, "tower"); GTINT = [0.95, 0.92, 0.86]; gbox(F, "rubble", 0, s * 0.6, 0, s, s * 1.2, s); solid(x, z, s, s, 0);
     for (let u = -s / 2; u < s / 2; u += 1.5) for (const sg of [-1, 1]) { gbox(F, "rubble", u + 0.4, s * 1.2 + 0.5, sg * (s / 2 - 0.4), 0.7, 1.0, 0.7, "b"); gbox(F, "rubble", sg * (s / 2 - 0.4), s * 1.2 + 0.5, u + 0.4, 0.7, 1.0, 0.7, "b"); }
@@ -1117,7 +1118,7 @@ if (ERA === 1100) {
     mark("Westminster Hall", hx, hz, "known", "Built by William Rufus in 1097-99: about 73 by 20 m inside, the largest hall in Europe. Its walls survive inside the present hall (the great roof is Richard II's, of the 1390s). Rufus held his first court in it at Whitsun 1099; he is said to have called it too big for a chamber, not big enough for a hall. The aisle posts and roof are inferred.", { big: true, range: 2500, y: 22, r: 40 }); }
   // the new St Paul's: after the great fire of 1087 burned the Saxon cathedral and much of the City, Bishop Maurice began a vast Norman
   // church (eventually some 180 m long). In 1100 its east end is rising: aisle walls, round piers, scaffolding, stone stacked on the site.
-  { const [x, z] = LL(51.5138, -0.0985), gy = groundH(x, z) - 0.3, F = FR(x, z, Math.PI / 2, gy, "pauls"), R = seeded(87); rRect(x, z, 150, 96, 0, 4);
+  if (ERA === 1100) { const [x, z] = LL(51.5138, -0.0985), gy = groundH(x, z) - 0.3, F = FR(x, z, Math.PI / 2, gy, "pauls"), R = seeded(87); rRect(x, z, 150, 96, 0, 4);
     GTINT = [1.2, 1.15, 1.02]; for (const sx of [-1, 1]) for (let zz = -10; zz < 46; zz += 4) { const top = 7 + 7 * Math.max(0, Math.sin((zz + 14) / 24)) + R() * 1.5; gbox(F, "rubble", sx * 15, top / 2, zz + 2, 2.2, top, 4.02); if (zz > -6 && zz < 30) { GTINT = [1, 1, 1]; garch(F, "dark", sx * 16.12, 3, zz + 2, 1.0, 2.2, [sx, 0, 0]); GTINT = [1.2, 1.15, 1.02]; } }
     for (const sx of [-1, 1]) for (let zz = -6; zz < 40; zz += 6) { const h2 = 4 + R() * 6; const c = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.25, h2, 14).translate(0, h2 / 2, 0), new THREE.MeshStandardMaterial({ map: G_TEX.rubble, color: 0xf0e8d8, roughness: 0.9 })); const [px, , pz] = gw(F, sx * 6, 0, zz); c.position.set(px, gy, pz); scene.add(c); solid(px, pz, 2.4, 2.4, 0); }   // the round piers of the choir arcades
     for (const sx of [-1, 1]) for (let zz = -10; zz < 46; zz += 3) { const [px, , pz] = gw(F, sx * 17.2, 0, zz); put("pole", CYL_G, MAT.wood, px, gy, pz, 0.16, 15, 0.16); for (let hh = 2; hh < 15; hh += 2.5) { const [qx, , qz] = gw(F, sx * 16.6, 0, zz + 1.5); put("pole", BOX_G, MAT.wood, qx, gy + hh, qz, 1.2, 0.12, 3, Math.PI / 2); } }   // scaffolding
@@ -1128,6 +1129,84 @@ if (ERA === 1100) {
   // St Mary-le-Bow: a new stone church of about 1080 on Cheapside, named for the arches ('bows') of its crypt, which survives
   { let [x, z] = LL(51.5136, -0.0937), ok = false; for (let r = 0; r < 70 && !ok; r += 3) for (let a = 0; a < 6.28 && !ok; a += 0.7) { const X = x + Math.cos(a) * r, Z = z + Math.sin(a) * r; if (rRect(X, Z, 36, 24, 0, 0, true)) { x = X; z = Z; ok = true; } }
     addChurch(x, z, { mat: "rag", roof: "shingle", nl: 20, nw: 9, cl: 8, cw: 7, wh: 9 }); mark("St Mary-le-Bow", x, z, "known", "A new stone church built about 1080 on Cheapside, by a Norman lord or merchant; named for the round arches ('bows') of its crypt, which still survives under Wren's church. In 1091 a great storm tore off its roof. Its form above ground is inferred.", { y: 14, range: 900, r: 20 }); }
+}
+
+// ---------- London in 1285: the stone bridge ----------
+// Peter of Colechurch's bridge, begun in 1176 and finished in 1209, a little downstream of the old timber one: about 270-280 m long,
+// nineteen pointed arches of very unequal span on massive piers, each pier standing on a 'starling', a boat-shaped platform of elm piles
+// filled with rubble, so wide that they choked the river to about a third of its width and the tide poured through in rapids. A wooden
+// drawbridge near the Southwark end let ships through to Queenhithe. On the middle pier stood the chapel of St Thomas Becket (Peter of
+// Colechurch was buried in it); timber houses and shops lined both sides, some overhanging the water; the Great Stone Gate stood near the
+// Southwark end (traitors' heads were not set on it until 1305). Spans are evened out here; the real ones ranged from about 4.5 to 10 m.
+const ARCH_S = [];
+function archSnap(x, z) { if (!ARCH_S.length) return [x, z]; const B = SPANS[0], dx = x - B.ax, dz = z - B.az, off = Math.abs(dx * B.uz - dz * B.ux); if (off > 60) return [x, z];
+  const s = dx * B.ux + dz * B.uz; let best = ARCH_S[0]; for (const a of ARCH_S) if (Math.abs(a - s) < Math.abs(best - s)) best = a; const w = 1 - sstepN(off, 18, 60), d = (best - s) * w; return [x + B.ux * d, z + B.uz * d]; }
+// a route over the river: add points just above and below the bridge, all steered through an arch
+function throughArch(path) { if (!ARCH_S.length) return path; const B = SPANS[0], side = p => (p[0] - B.ax) * B.uz - (p[1] - B.az) * B.ux, out = [];
+  for (let k = 0; k < path.length; k++) { if (k > 0) { const a = path[k - 1], b = path[k], sa = side(a), sb = side(b); if (sa * sb < 0) { const t = sa / (sa - sb); for (const dt of [-30, -12, 0, 12, 30]) { const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, u = clampN(t + dt / L, 0, 1); out.push([a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]); } } }
+    out.push(path[k]); }
+  return out.map(p => archSnap(p[0], p[1])); }
+if (ERA === 1285) {
+  const B = SPANS[0], hw = B.hw, W = hw * 2 + 2.4, Y = B.y, east = Math.sign(B.uz) || 1, at = s => [B.ax + B.ux * s, B.az + B.uz * s];
+  let sA = 0, sB = B.len; for (let s = 0; s < B.len; s += 0.5) if (baseH(...at(s)) < 0.4) { sA = s; break; } for (let s = B.len; s > 0; s -= 0.5) if (baseH(...at(s)) < 0.4) { sB = s; break; }
+  let bed = 0; for (let s = sA; s < sB; s += 2) bed = Math.min(bed, baseH(...at(s)));
+  const Lw = sB - sA, NA = 19, P = Lw * 0.36 / (NA - 1), A = (Lw - P * (NA - 1)) / NA, DRAW = NA - 7, yBot = bed - 2, ys = 0.7, yA = Y - 1.25;
+  const G = new THREE.Group(); G.position.set(at(sA)[0], 0, at(sA)[1]); G.rotation.y = Math.atan2(-B.uz, B.ux); scene.add(G);
+  const stoneT = G_TEX.rubble, stoneM = new THREE.MeshStandardMaterial({ map: stoneT, color: 0xd8ccb4, roughness: 0.95 }), slimeM = new THREE.MeshStandardMaterial({ map: stoneT, color: 0x6a6a52, roughness: 1 });
+  // the bridge's side elevation, pierced by pointed arches, extruded across its width; two pieces either side of the drawbridge gap
+  const archL = k => k * (A + P), shapes = [];
+  for (const [k0, k1, left, right] of [[0, DRAW, -8, archL(DRAW)], [DRAW + 1, NA, archL(DRAW) + A, Lw + 8]]) { const sh = new THREE.Shape();
+    sh.moveTo(left, yBot); sh.lineTo(right, yBot); sh.lineTo(right, Y - 0.02); sh.lineTo(left, Y - 0.02); sh.lineTo(left, yBot);
+    for (let k = k0; k < k1; k++) { const a0 = archL(k), a1 = a0 + A, m = (a0 + a1) / 2, h = new THREE.Path(), yb = yBot + 0.6;
+      h.moveTo(a0, yb); h.lineTo(a1, yb); h.lineTo(a1, ys); h.quadraticCurveTo(a1, ys + (yA - ys) * 0.8, m, yA); h.quadraticCurveTo(a0, ys + (yA - ys) * 0.8, a0, ys); h.lineTo(a0, yb); sh.holes.push(h); }
+    shapes.push(sh); }
+  const eg = new THREE.ExtrudeGeometry(shapes, { depth: W, bevelEnabled: false, curveSegments: 7 }); eg.translate(0, 0, -W / 2); { const uv = eg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 0.3, uv.getY(i) * 0.3); }
+  G.add(new THREE.Mesh(eg, stoneM));
+  // starlings round every pier, awash at high tide, green with weed
+  const st = []; for (let k = 1; k < NA; k++) { const u = archL(k) - P / 2, sw = P + 3, sl = W + 11, pt = 4, s2 = new THREE.Shape([[-sw / 2, -sl / 2 + pt], [0, -sl / 2], [sw / 2, -sl / 2 + pt], [sw / 2, sl / 2 - pt], [0, sl / 2], [-sw / 2, sl / 2 - pt]].map(([a, b]) => new THREE.Vector2(a, b)));
+    const g = new THREE.ExtrudeGeometry(s2, { depth: 0.25 - yBot, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(u, yBot, 0); st.push(g); }
+  for (const g of st) G.add(new THREE.Mesh(g, slimeM));
+  // the roadway: rammed gravel between the parapets and house fronts
+  { const rd = new THREE.Mesh(new THREE.BoxGeometry(Lw + 16, 0.08, hw * 2), M(0x7a6c58, { roughness: 1 })); rd.position.set(Lw / 2, Y + 0.01, 0); G.add(rd); }
+  // the drawbridge: a heavy timber leaf across the gap, with its lifting beams overhead
+  { const u0 = archL(DRAW), wM = MAT.wood; for (let q = 0; q < 6; q++) { const b = new THREE.Mesh(new THREE.BoxGeometry(A + 0.6, 0.35, W / 6 - 0.05), wM); b.position.set(u0 + A / 2, Y - 0.2, -W / 2 + (q + 0.5) * W / 6); G.add(b); }
+    for (const sz of [-1, 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.5, 7, 0.5), wM); p.position.set(u0 - 0.6, Y + 3.5, sz * (hw + 0.6)); G.add(p); const bm = new THREE.Mesh(new THREE.BoxGeometry(A + 2, 0.4, 0.4), wM); bm.position.set(u0 + A / 2 - 0.6, Y + 6.8, sz * (hw + 0.6)); bm.rotation.z = -0.12; G.add(bm); } }
+  const L2W = (u, v) => { const s = sA + u, [x, z] = at(s); return [x + B.uz * v, z - B.ux * v]; };
+  for (let k = 0; k < NA; k++) ARCH_S.push(sA + archL(k) + A / 2);
+  // what stands on the bridge: [u0, u1, side] stretches taken by buildings; parapets fill the rest
+  const taken = [], CH = Math.floor(NA / 2), chU = archL(CH) - P / 2, gateU = archL(NA - 2) - P / 2, drU0 = archL(DRAW) - 3, drU1 = archL(DRAW) + A + 3;
+  taken.push([chU - 5, chU + 5, east], [gateU - 3.5, gateU + 3.5, 1], [gateU - 3.5, gateU + 3.5, -1], [drU0, drU1, 1], [drU0, drU1, -1]);
+  // the chapel of St Thomas: stone, two storeys, its undercroft down on the starling and the chapel at road level, built out to the east
+  { const [cx, cz] = L2W(chU, east * (hw + 7.5)), F = FR(cx, cz, Math.atan2(B.ux, B.uz) + Math.PI / 2, 0.25, "bridge"), w = 9, d = 15, wh = Y - 0.25 + 9;
+    GTINT = [1.15, 1.1, 1.0]; gbox(F, "rubble", 0, wh / 2, 0, w, wh, d); gGableBoth(F, "rubble", w, d, wh, 5); GTINT = [0.62, 0.64, 0.68]; groof(F, "shingle", w, d, wh, 5, { e: 0.3 });
+    GTINT = [1, 1, 1]; for (const sx of [-1, 1]) for (let z = -d / 2 + 2.5; z < d / 2 - 1; z += 3.2) { garch(F, "dark", sx * w / 2, Y + 1.5, z, 1.1, 4.2, [sx, 0, 0]); garch(F, "dark", sx * w / 2, 1.2, z, 0.8, 1.4, [sx, 0, 0]); }
+    garch(F, "dark", 0, Y + 1.4, east * d / 2, 3.4, 6.2, [0, 0, east]); garch(F, "dark", 0, Y - 0.25, -east * d / 2, 1.8, 3.2, [0, 0, -east]);
+    GTINT = [1.15, 1.1, 1.0]; for (const sx of [-1, 1]) for (const sz of [-1, 1]) gbox(F, "rubble", sx * (w / 2 + 0.3), wh / 2 + 1, sz * (d / 2 + 0.3), 0.9, wh + 2, 0.9); gbox(F, "rubble", 0, wh + 5.6, east * (d / 2 - 1.5), 1.4, 2.2, 1.4); GTINT = [1, 1, 1];
+    solid(cx, cz, w + 1, d + 1, Math.atan2(B.ux, B.uz) + Math.PI / 2);
+    mark("The chapel of St Thomas on the Bridge", cx, cz, "known", "Built on the bridge's central pier and dedicated to St Thomas Becket, the Londoner murdered at Canterbury in 1170 and made a saint. Two storeys: a lower chapel down on the starling, reached by a stair, and the chapel at road level. Peter of Colechurch, the priest who designed the bridge, was buried in it in 1205. Travellers stopped to pray here and give alms for the bridge's upkeep.", { y: 18, range: 1500, r: 25 }); }
+  // the Great Stone Gate: twin towers and a gatehouse over the road near the Southwark end, its gates shut at curfew
+  { const [gx, gz] = L2W(gateU, 0), F = FR(gx, gz, Math.atan2(B.ux, B.uz), Y, "bridge"), tw = 5.4, th = 15;
+    GTINT = [1.1, 1.06, 0.98]; for (const sx of [-1, 1]) { gbox(F, "rubble", sx * (hw + tw / 2), th / 2 - 1, 0, tw, th, 6.5); for (let u = -3; u < 3.2; u += 1.5) gbox(F, "rubble", sx * (hw + tw / 2), th - 0.4, u, tw, 1.0, 0.7, "b"); const [px, , pz] = gw(F, sx * (hw + tw / 2), 0, 0); solid(px, pz, tw, 6.5, Math.atan2(B.ux, B.uz)); }
+    gbox(F, "rubble", 0, 9, 0, hw * 2 + 0.1, 6, 6.5); for (let u = -hw; u < hw; u += 1.5) for (const sz of [-1, 1]) gbox(F, "rubble", u + 0.4, 12.5, sz * 3, 0.7, 1.0, 0.6, "b");
+    GTINT = [1, 1, 1]; for (const sz of [-1, 1]) for (const sx of [-1, 1]) garch(F, "dark", sx * (hw + tw / 2), 8, sz * 3.25, 0.7, 1.6, [0, 0, sz]); for (const sz of [-1, 1]) garch(F, "dark", 0, 9.2, sz * 3.25, 1.2, 2.2, [0, 0, sz]);
+    mark("The Great Stone Gate", gx, gz, "known", "The bridge's southern gatehouse, near the Southwark end: the gates were shut at curfew and the road could be held against attack (in 1263 the Londoners shut the bridge against Henry III's queen). From 1305, starting with William Wallace's, the heads of executed traitors were set on poles above it; in 1285 that grim custom had not begun.", { y: 18, range: 1500, r: 20 }); }
+  // timber houses and shops along both sides, their backs jutting out over the river on brackets; in 1285 not yet a continuous street
+  { const R = seeded(1285); for (const side of [1, -1]) { let u = -4; while (u < Lw + 4) { const w = 4.5 + R() * 2.5;
+      if (R() < 0.3 || taken.some(([a, b, sd]) => sd === side && u + w > a && u < b)) { u += w + 1 + R() * 4; continue; }
+      const d = 5 + R() * 1.2, h1 = 3.2, h2 = 2.8 + R() * 0.4, two = R() < 0.65, wh = h1 + (two ? h2 : 0), [hx, hz] = L2W(u + w / 2, side * (hw + d / 2)), rot = Math.atan2(B.ux, B.uz) + Math.PI / 2, F = FR(hx, hz, rot, Y, "bridge");
+      GTINT = [0.95 + R() * 0.15, 0.92 + R() * 0.12, 0.85 + R() * 0.1]; gbox(F, "daub", 0, h1 / 2, 0, w, h1, d); if (two) gbox(F, "daub", 0, h1 + h2 / 2, -side * 0.35, w, h2, d + 0.7);
+      GTINT = [0.5, 0.4, 0.3]; for (const sx of [-1, 1]) gbox(F, "oak", sx * (w / 2 - 0.1), wh / 2, -side * (d / 2 + (two ? 0.35 : 0)), 0.22, wh, 0.12, ""); gbox(F, "oak", 0, h1, -side * (d / 2 + 0.05), w, 0.22, 0.25, "");
+      for (const sx of [-1, 1]) gbox(F, "oak", sx * (w / 2 - 0.3), -1.4, side * (d / 2 - 1.2), 0.25, 2.8, 0.25, "");
+      GTINT = R() < 0.5 ? [1.05, 0.62, 0.48] : [0.75, 0.7, 0.62]; groof(F, "shingle", w, d + (two ? 0.7 : 0), wh, 2.6 + R(), { e: 0.3 });
+      GTINT = [1, 1, 1]; garch(F, "dark", w / 4, 0, -side * d / 2, 1.0, 2.0, [0, 0, -side]); gbox(F, "oak", -w / 5, 0.95, -side * (d / 2 + 0.35), 1.6, 0.1, 0.7, "");
+      solid(hx, hz, w, d, rot); taken.push([u, u + w, side]); u += w + (R() < 0.6 ? 0 : 1 + R() * 3); } } }
+  // parapets wherever no building stands
+  for (const side of [1, -1]) for (let u = -6; u < Lw + 6; u += 1) { if (taken.some(([a, b, sd]) => sd === side && u + 1 > a && u < b)) continue; const [px, pz] = L2W(u + 0.5, side * (hw + 0.3)); put("parapet", BOX_G, MAT.rag, px, Y, pz, 0.55, 1.0, 1.02, Math.atan2(B.ux, B.uz)); solid(px, pz, 0.55, 1.0, Math.atan2(B.ux, B.uz)); }
+  // the approaches on either bank: stone ramps
+  { const ry = Math.atan2(B.ux, B.uz), n = Math.ceil(B.len / 3); for (let k = 0; k < n; k++) { const s0 = B.len * k / n, s1 = B.len * (k + 1) / n, sm = (s0 + s1) / 2; if (sm > sA - 8 && sm < sB + 8) continue;
+      const [x, z] = at(sm), y0 = B.yAt(s0), y1 = B.yAt(s1), ym = (y0 + y1) / 2, gm = baseH(x, z); put("deck", BOX_G, MAT.rag, x, Math.min(gm, ym) - 0.4, z, W, ym - Math.min(gm, ym) + 0.4, Math.hypot(s1 - s0, y1 - y0) + 0.05, ry, Math.atan2(y0 - y1, s1 - s0)); } }
+  mark("London Bridge, in stone", ...L2W(Lw * 0.35, 0), "known", "Peter of Colechurch's stone bridge, begun in 1176 and finished in 1209: about 270 m long on nineteen pointed arches. The piers stand on 'starlings', boat-shaped platforms of piles and rubble so wide that they block about two thirds of the river; at the turn of the tide the water drops a metre or more through the arches in rapids, and many travellers land above the bridge and walk round rather than 'shoot' it. Houses and shops line the roadway; tolls and rents from them pay for its upkeep. It stood for over 600 years, until 1831.", { y: 12, range: 2500, r: 60 });
+  mark("The drawbridge", ...L2W(archL(DRAW) + A / 2, 0), "known", "A timber lifting span near the Southwark end, so that masted ships could pass upriver to Queenhithe, and so the bridge could be cut in war. By the late 13th century it was raised less and less, and the bridge's wardens were often in trouble for its decay.", { y: 9, range: 600, r: 14 });
 }
 
 // ---------- markers: what things are, and how well we know them ----------
@@ -1284,13 +1363,13 @@ function bareTreeGeo() { const parts = [[new THREE.CylinderGeometry(0.16, 0.32, 
     parts.push([new THREE.CylinderGeometry(0.04, 0.11, L, 3), m]);
     for (let q = 0; q < 1; q++) { const L2 = 1.2 + R(), m2 = m.clone().multiply(new THREE.Matrix4().makeTranslation(0, L * (0.1 + q * 0.4), 0)).multiply(new THREE.Matrix4().makeRotationZ((q ? -1 : 1) * (0.6 + R() * 0.4))).multiply(new THREE.Matrix4().makeTranslation(0, L2 / 2, 0)); parts.push([new THREE.CylinderGeometry(0.015, 0.04, L2, 3), m2]); } }
   return mergeG(parts); }
-const TREE_G = bareTreeGeo(), treeM = M(0x4a4038, { roughness: 1 }), CROWN_G = new THREE.IcosahedronGeometry(1, 0), crownLeafM = new THREE.MeshStandardMaterial({ color: 0x3a5a26, roughness: 0.95, flatShading: true });
+const TREE_G = bareTreeGeo(), treeM = M(0x4a4038, { roughness: 1 }), CROWN_G = new THREE.IcosahedronGeometry(1, 0), crownLeafM = new THREE.MeshStandardMaterial({ color: AUTUMN ? 0x7a6a2c : 0x3a5a26, roughness: 0.95, flatShading: true });
 { const R = seeded(71); let n = 0, cap = IS_HEADSET ? 1100 : 2000;
   for (let gz = RZ0; gz < RZ0 + RH * RC && n < cap; gz += 22) for (let gx = RX0; gx < RX0 + RW * RC && n < cap; gx += 22) { const x = gx + R() * 20, z = gz + R() * 20, h = baseH(x, z); if (h < 0.9) continue;
     const v = rGet(x, z); if (v === 1 || v === 2 || v === 7 || v === 4) continue; const inC = CITY.inside(x, z);
     const wet = (THAMES.side(x, z) > 0 && h < 2.3) || [TYB_N, TYB_S, TYB_W, FLEET, WALBROOK].some(L => L.near(x, z, 40) && L.d(x, z) < 40);
     const p = inC ? (v === 3 ? 0.03 : 0.01) : wet ? 0.26 : v === 3 ? 0.08 : 0.035 + 0.06 * sstepN(fbm(x / 400, z / 400, 2), 0.5, 0.7) + (x < -450 ? 0.04 + 0.2 * sstepN(fbm(x / 300 + 5, z / 300, 2), 0.45, 0.62) : 0);   // more wood west of the Tyburn
-    if (R() > p) continue; const s = wet ? 0.7 + R() * 0.4 : 0.8 + R() * 0.7; put("tree", TREE_G, treeM, x, h - 0.2, z, s, s * (wet ? 0.8 : 1), s, R() * 6.28); if (SUMMER) for (let q = 0; q < 2; q++) put("crown", CROWN_G, crownLeafM, x + (R() - 0.5) * 2.4 * s, h + (4.6 + R() * 1.6) * s * (wet ? 0.8 : 1), z + (R() - 0.5) * 2.4 * s, 2.3 * s, 1.9 * s, 2.3 * s, R() * 6);   // in leaf
+    if (R() > p) continue; const s = wet ? 0.7 + R() * 0.4 : 0.8 + R() * 0.7; put("tree", TREE_G, treeM, x, h - 0.2, z, s, s * (wet ? 0.8 : 1), s, R() * 6.28); if (LEAFY) for (let q = 0; q < 2; q++) put("crown", CROWN_G, crownLeafM, x + (R() - 0.5) * 2.4 * s, h + (4.6 + R() * 1.6) * s * (wet ? 0.8 : 1), z + (R() - 0.5) * 2.4 * s, 2.3 * s, 1.9 * s, 2.3 * s, R() * 6);   // in leaf
     n++; } }
 // boats: run up on the foreshore at the hithes, a few seagoing ships, small boats along the banks
 function bankPoint(lat, lon, out) { let [x, z] = LL(lat, lon), k = 0; while (baseH(x, z) > -0.3 && k++ < 120) z += 1.5; return [x, z + out]; }
@@ -1309,7 +1388,7 @@ mark("Boats on the foreshore", ...bankPoint(51.5112, -0.0948, 0), "typical", "Bo
   picks.forEach(([lat, lon], i) => { const [x, z] = LL(lat, lon); let best = null, bd = 1e9; for (const H of HOUSES) { const d = Math.hypot(H.x - x, H.z - z); if (d < bd) { bd = d; best = H; } }
     if (best) mark(["A town house", "Yards and plots", "Burnt Southwark", "A Westminster house"][i], best.x, best.z, "typical", txt[i], { y: 6, range: 200 }); }); }
 // fruit trees in the yards and crofts (apples, pears, plums, and cherries all occur in Late Saxon pits)
-{ const im = new THREE.InstancedMesh(TREE_G, treeM, Math.max(1, FRUIT.length)); FRUIT.forEach(([x, z, s], i) => { O3.position.set(x, groundH(x, z) - 0.1, z); O3.rotation.set(0, i * 1.7, 0); O3.scale.set(s, s * 0.7, s); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); if (SUMMER) put("crown", CROWN_G, crownLeafM, x, groundH(x, z) + 3.4 * s, z, 2.6 * s, 1.6 * s, 2.6 * s, i); }); im.count = FRUIT.length; im.computeBoundingSphere(); scene.add(im); }
+{ const im = new THREE.InstancedMesh(TREE_G, treeM, Math.max(1, FRUIT.length)); FRUIT.forEach(([x, z, s], i) => { O3.position.set(x, groundH(x, z) - 0.1, z); O3.rotation.set(0, i * 1.7, 0); O3.scale.set(s, s * 0.7, s); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); if (LEAFY) put("crown", CROWN_G, crownLeafM, x, groundH(x, z) + 3.4 * s, z, 2.6 * s, 1.6 * s, 2.6 * s, i); }); im.count = FRUIT.length; im.computeBoundingSphere(); scene.add(im); }
 // the St Paul's stone: the end of a tomb in St Paul's churchyard, carved in the Scandinavian Ringerike style and painted; its runes read
 // "Ginna and Toki had this stone laid". Found in 1852; now in the Museum of London. About 1030-1040, when Cnut's Danes were in London.
 { const [x, z] = LL(51.5133, -0.0972), gy = groundH(x, z), stoneT = tex(256, 160, (g, w, h) => { g.fillStyle = "#cfc6b2"; g.fillRect(0, 0, w, h);
@@ -1393,7 +1472,7 @@ const PIERS = [["Westminster wharf", 51.4994, -0.1240, -1], ["Lambeth", 51.4958,
   return { name, land: [ax, az], boat: [bx, bz] }; });
 // a river route between two piers: out to midstream, along the centre line, in to the other pier
 function riverRoute(A, B) { const sOf = (x, z) => { let best = 0, bd = 1e9; for (let s = 0; s <= THAMES.L; s += 20) { const [px, pz] = THAMES.at(s), d = Math.hypot(px - x, pz - z); if (d < bd) { bd = d; best = s; } } return best; };
-  const sA = sOf(...A.boat), sB = sOf(...B.boat), P = [A.boat], n = Math.max(2, Math.ceil(Math.abs(sB - sA) / 40)); for (let k = 0; k <= n; k++) { const [x, z] = THAMES.at(sA + (sB - sA) * k / n); P.push([x, z]); } P.push(B.boat); return P; }
+  const sA = sOf(...A.boat), sB = sOf(...B.boat), P = [A.boat], n = Math.max(2, Math.ceil(Math.abs(sB - sA) / 40)); for (let k = 0; k <= n; k++) { const [x, z] = THAMES.at(sA + (sB - sA) * k / n); P.push([x, z]); } P.push(B.boat); return throughArch(P); }
 // pigs and sheep: driven in to the Shambles on market days; pigs root in yards on any day. Medieval pigs were hairy, dark and long-legged,
 // sheep small, horned, many brown or dark-faced.
 const PIG_G = mergeG([[new THREE.SphereGeometry(0.3, 8, 6), MT(0, 0.5, 0, 0.75, 0.75, 1.5)], [new THREE.SphereGeometry(0.15, 6, 4), MT(0, 0.55, 0.48, 1, 0.9, 1.2)], [new THREE.CylinderGeometry(0.06, 0.07, 0.08, 6).rotateX(Math.PI / 2), MT(0, 0.52, 0.66)],
@@ -1535,9 +1614,9 @@ const TWIG_T = tex(256, 256, (g, w, h) => { g.clearRect(0, 0, w, h); const R = s
   br(w / 2, h, 0, h * 0.3, 9, 0); });
 const TWIG_G = (() => { const P = [], N = [], U = []; for (let k = 0; k < 6; k++) { const q = new THREE.PlaneGeometry(8, 8).translate(0, 4, 0).rotateY(k * Math.PI / 3 + (k >= 3 ? Math.PI : 0)).toNonIndexed(); P.push(...q.attributes.position.array); U.push(...q.attributes.uv.array); for (let i = 0; i < q.attributes.position.count; i++) N.push(0, 1, 0); }   // each plane both ways round, so both faces are lit from above
   const out = new THREE.BufferGeometry(); out.setAttribute("position", new THREE.Float32BufferAttribute(P, 3)); out.setAttribute("normal", new THREE.Float32BufferAttribute(N, 3)); out.setAttribute("uv", new THREE.Float32BufferAttribute(U, 2)); return out; })();   // (normals up: lit like a crown, not a board)
-const LEAF_T = SUMMER ? tex(256, 256, (g, w, h) => { g.drawImage(TWIG_T.image, 0, 0); const R = seeded(13); for (let k = 0; k < 900; k++) { const a = R() * 6.283, r = Math.sqrt(R()), x = w / 2 + Math.cos(a) * r * w * 0.46, y = h * 0.42 + Math.sin(a) * r * h * 0.36;   // in leaf: clusters of green over the branches
-    g.fillStyle = ["#2e4a1e", "#3a5a24", "#46682c", "#28401a", "#527a34"][(R() * 5) | 0]; g.beginPath(); g.arc(x, y, 4 + R() * 7, 0, 6.283); g.fill(); } }) : null;
-const twigM = new THREE.MeshStandardMaterial({ map: SUMMER ? LEAF_T : TWIG_T, alphaTest: 0.45, side: THREE.FrontSide, roughness: 1 });
+const LEAF_T = LEAFY ? tex(256, 256, (g, w, h) => { g.drawImage(TWIG_T.image, 0, 0); const R = seeded(13); for (let k = 0; k < 900; k++) { const a = R() * 6.283, r = Math.sqrt(R()), x = w / 2 + Math.cos(a) * r * w * 0.46, y = h * 0.42 + Math.sin(a) * r * h * 0.36;   // in leaf: clusters of green over the branches
+    g.fillStyle = (AUTUMN ? ["#5a6a24", "#8a7a2a", "#a8742a", "#7a4a1e", "#46602a"] : ["#2e4a1e", "#3a5a24", "#46682c", "#28401a", "#527a34"])[(R() * 5) | 0]; g.beginPath(); g.arc(x, y, 4 + R() * 7, 0, 6.283); g.fill(); } }) : null;
+const twigM = new THREE.MeshStandardMaterial({ map: LEAFY ? LEAF_T : TWIG_T, alphaTest: 0.45, side: THREE.FrontSide, roughness: 1 });
 const HOLLY_G = mergeG([[new THREE.IcosahedronGeometry(1, 1), MT(0, 1.1, 0, 1.1, 1.3, 1.1)]]), YEW_G = mergeG([[new THREE.CylinderGeometry(0.25, 0.35, 1.5, 6), MT(0, 0.75, 0)], [new THREE.IcosahedronGeometry(2.2, 1), MT(0, 3.4, 0, 1, 1.25, 1)]]);
 const hollyM = M(0x1e3a22, { vertexColors: true }), yewM = M(0x1a2e1c, { vertexColors: true });   // the winter evergreens: holly in the woods, yew in the churchyards
 const TREE_TILES = [];   // tiles of woodland, drawn only near you
@@ -1614,7 +1693,7 @@ const RIVER_BOATS = [];
   for (let k = 0; k < n; k++) { const r = R(), type = r < 0.28 ? "ship" : r < 0.6 ? "barge" : r < 0.88 ? "rowboat" : "fisher";
     const s0 = type === "ship" ? BRIDGE_S + 120 : 300, s1 = type === "ship" ? THAMES.L - 200 : THAMES.L - 300;   // ships stay below the bridge
     const len = type === "ship" ? 15 + R() * 6 : type === "barge" ? 11 + R() * 4 : type === "rowboat" ? 5.5 + R() * 1.5 : 6, speed = type === "ship" ? 1.4 : type === "barge" ? 0.9 : type === "rowboat" ? 1.8 : 0.15;
-    if (type === "ship" && k % 4 === 1) { RIVER_BOATS.push({ type, len, speed: 1.1, s0: BRIDGE_S - 640, s1: THAMES.L - 300, s: BRIDGE_S - 300 + R() * 900, dir: R() < 0.5 ? 1 : -1, lane: (R() - 0.5) * 120, ph: R() * 10, crew: 8, cargo: null, sail: sailM, through: true }); continue; }   // ships that lower their masts to pass the bridge
+    if (type === "ship" && k % 4 === 1 && ERA !== 1285) { RIVER_BOATS.push({ type, len, speed: 1.1, s0: BRIDGE_S - 640, s1: THAMES.L - 300, s: BRIDGE_S - 300 + R() * 900, dir: R() < 0.5 ? 1 : -1, lane: (R() - 0.5) * 120, ph: R() * 10, crew: 8, cargo: null, sail: sailM, through: true }); continue; }   // ships that lower their masts to pass the bridge
     if (k % 3 === 2) { RIVER_BOATS.push({ type, len, speed: speed * (0.8 + R() * 0.4), s0: 300, s1: LOWER.L - 2000, s: 300 + R() * (LOWER.L - 2300), dir: R() < 0.5 ? 1 : -1, lane: (R() - 0.5) * 300, ph: R() * 10, crew: type === "ship" ? 6 : 2, cargo: type === "barge" ? "grain" : null, sail: sailM, lower: true }); continue; }   // traffic on the lower river
     RIVER_BOATS.push({ type, len, speed: speed * (0.8 + R() * 0.4), s0, s1, s: s0 + R() * (s1 - s0), dir: R() < 0.5 ? 1 : -1, lane: (R() - 0.5) * 220, ph: R() * 10, crew: type === "ship" ? 6 : type === "barge" ? 3 : type === "rowboat" ? 2 : 2, cargo: type === "barge" ? ["stone", "grain", "wood", "barrels"][(R() * 4) | 0] : null, sail: type === "ship" && R() < 0.6 ? sailM : sailPlainM }); } }
 const RB = { hull: new THREE.InstancedMesh(BOAT_G, MAT.tar, RIVER_BOATS.length), crew: new THREE.InstancedMesh(CREW_G, M(0x6a5444, { vertexColors: true }), RIVER_BOATS.reduce((a, b) => a + b.crew, 0)), oar: new THREE.InstancedMesh(BOX_G, MAT.wood, RIVER_BOATS.reduce((a, b) => a + b.crew * 2, 0)),
@@ -1625,7 +1704,7 @@ const local = (x, y, z, h, lx, ly, lz) => [x + Math.cos(h) * lx + Math.sin(h) * 
 function setI(im, i, x, y, z, h, sx, sy, sz, rx = 0, rz = 0) { _be.set(rx, h, rz, "YXZ"); _bq.setFromEuler(_be); _bm.compose(_bv.set(x, y, z), _bq, _bs.set(sx, sy, sz)); im.setMatrixAt(i, _bm); }
 function boatsStep(t, dt) { let ci = 0, oi = 0, gi = 0, si = 0, pi = 0, pj = 0;
   RIVER_BOATS.forEach((B, i) => { if (B.type !== "fisher") { B.s += B.dir * B.speed * dt; if (B.s > B.s1 || B.s < B.s0) { B.dir *= -1; B.s = clampN(B.s, B.s0, B.s1); } } else B.s += Math.sin(t * 0.05 + B.ph) * 0.05 * dt;
-    const [cx, cz, a] = (B.lower ? LOWER : THAMES).at(B.s), nx = Math.cos(a), nz = -Math.sin(a), x = cx + nx * B.lane, z = cz + nz * B.lane, h = a + (B.dir < 0 ? Math.PI : 0), bob = Math.sin(t * 1.3 + B.ph) * 0.05, far = Math.abs(x - P_.x) > 1600 || Math.abs(z - P_.z) > 1600;
+    const [cx, cz, a] = (B.lower ? LOWER : THAMES).at(B.s), nx = Math.cos(a), nz = -Math.sin(a), [x, z] = B.lower ? [cx + nx * B.lane, cz + nz * B.lane] : archSnap(cx + nx * B.lane, cz + nz * B.lane), h = a + (B.dir < 0 ? Math.PI : 0), bob = Math.sin(t * 1.3 + B.ph) * 0.05, far = Math.abs(x - P_.x) > 1600 || Math.abs(z - P_.z) > 1600;
     const sc = far ? 0 : 1, beam = B.len * (B.type === "ship" ? 0.24 : B.type === "barge" ? 0.33 : 0.3), depth = B.type === "ship" ? 1.7 : 0.8, y = WATER - depth * 0.55 + bob;
     setI(RB.hull, i, x, y, z, h, beam * sc, depth * sc, B.len * sc, Math.sin(t * 0.9 + B.ph) * 0.02, Math.sin(t * 0.7 + B.ph) * 0.03); setI(RB.floor, i, x, WATER + 0.03 + bob, z, h, beam * 0.72 * sc, 0.05 * sc, B.len * 0.78 * sc);   // bottom boards, over the water
     for (const e of [-1, 1]) { const [px, py, pz] = local(x, y, z, h, 0, depth * 0.9, e * B.len * 0.48); setI(RB.post, pi++, px, py, pz, h, 0.18 * sc, (B.type === "ship" ? 1.4 : 0.6) * sc, 0.25 * sc, -e * 0.4); }   // stem and stern posts
@@ -1640,9 +1719,11 @@ function boatsStep(t, dt) { let ci = 0, oi = 0, gi = 0, si = 0, pi = 0, pj = 0;
     for (let k = 0; k < 4; k++) { if (!B.cargo) { setI(RB.cargo, gi++, 0, -999, 0, 0, 0, 0, 0); continue; } const [px, py, pz] = local(x, y, z, h, (k % 2 - 0.5) * beam * 0.4, depth * 0.55, (Math.floor(k / 2) - 0.5) * B.len * 0.3);
       const S = { stone: [0.8, 0.5, 0.7], grain: [0.7, 0.45, 0.9], wood: [0.6, 0.4, B.len * 0.28], barrels: [0.6, 0.7, 0.6] }[B.cargo]; setI(RB.cargo, gi++, px, py, pz, h, S[0] * sc, S[1] * sc, S[2] * sc); } });
   for (const k in RB) RB[k].instanceMatrix.needsUpdate = true; }
-mark("Ships below the bridge", ...THAMES.at(BRIDGE_S + 260).slice(0, 2), "known", "Seagoing ships could not pass the low timber bridge: they moored and unloaded at Billingsgate and along the shore below it. The tolls of about 1000 list wine ships from Rouen, ships from Flanders, Ponthieu, Normandy and France, and the emperor's men from Germany, who paid in pepper, gloves and vinegar at Christmas and Easter. Their sails were striped, as the Bayeux Tapestry shows.", { y: 8, range: 1500, r: 80 });
+if (ERA !== 1285) mark("Ships below the bridge", ...THAMES.at(BRIDGE_S + 260).slice(0, 2), "known", "Seagoing ships could not pass the low timber bridge: they moored and unloaded at Billingsgate and along the shore below it. The tolls of about 1000 list wine ships from Rouen, ships from Flanders, Ponthieu, Normandy and France, and the emperor's men from Germany, who paid in pepper, gloves and vinegar at Christmas and Easter. Their sails were striped, as the Bayeux Tapestry shows.", { y: 8, range: 1500, r: 80 });
 mark("River traffic", ...THAMES.at(BRIDGE_S - 700).slice(0, 2), "typical", "Above the bridge: barges rowed and poled with grain, stone (Caen stone for the abbey, Kentish rag), timber and firewood; ferries and passenger boats; fishermen at their weirs. " + (MARKET ? "A busy market day." : "Christmas Day, a holy day: few boats are out."), { y: 6, range: 1500, r: 80 });
-mark("Passing the bridge", ...THAMES.at(BRIDGE_S - 60).slice(0, 2), "inferred", "The timber bridge stood on rows of trestles a few metres apart. Its height is not known, but ships could row under it: the sagas tell how in 1014 King Olaf's ships, roofed over with wattle against the stones thrown down on them, rowed up beneath the bridge and tied ropes round its piles to pull it down. It also had to clear the highest tides and winter floods (the tidal range was smaller than today's 7 m). Here the deck is about 4.5 m above high water, more at low tide. Barges and boats rowed through the gaps, best at slack water; seagoing ships lowered their masts and rowed through, or unloaded below the bridge at Billingsgate.", { y: 6, range: 800, r: 40 });
+if (ERA !== 1285) mark("Passing the bridge", ...THAMES.at(BRIDGE_S - 60).slice(0, 2), "inferred", "The timber bridge stood on rows of trestles a few metres apart. Its height is not known, but ships could row under it: the sagas tell how in 1014 King Olaf's ships, roofed over with wattle against the stones thrown down on them, rowed up beneath the bridge and tied ropes round its piles to pull it down. It also had to clear the highest tides and winter floods (the tidal range was smaller than today's 7 m). Here the deck is about 4.5 m above high water, more at low tide. Barges and boats rowed through the gaps, best at slack water; seagoing ships lowered their masts and rowed through, or unloaded below the bridge at Billingsgate.", { y: 6, range: 800, r: 40 });
+if (ERA === 1285) mark("Ships below the bridge", ...THAMES.at(BRIDGE_S + 260).slice(0, 2), "known", "Seagoing ships moor below the bridge and unload at Billingsgate and the quays. The drawbridge can be raised to let ships up to Queenhithe, but by now it rarely is, and the City favours Billingsgate.", { y: 8, range: 1500, r: 80 });
+if (ERA === 1285) mark("Shooting the bridge", ...THAMES.at(BRIDGE_S - 60).slice(0, 2), "known", "The starlings under the piers block about two thirds of the river, so as the tide turns the water piles up on one side and pours through the arches in a fall of a metre or more. Watermen 'shoot the bridge' through the rapids; many passengers get out above it and walk round to meet the boat below. Boats were wrecked and people drowned here for centuries.", { y: 6, range: 800, r: 40 });
 
 // ---------- carts, packhorses and riders in the streets ----------
 // Anglo-Saxon calendars (the 11th-century Cotton Julius A.vi and Tiberius B.v) show two-wheeled carts drawn by oxen and horses; carters
@@ -1776,6 +1857,7 @@ const NARR = [
   [T.crown, "Ealdred sets the crown on his head (one source describes a crown with twelve gems), and gives him the sceptre and rod. The Anglo-Saxon Chronicle: 'and Archbishop Ealdred consecrated him king at Westminster'."],
   [T.throne, "King William is enthroned. Mass continues. Outside the houses of Westminster burn. Orderic, writing later, says the English never trusted the Normans after this day."],
   [T.leave, "The king and the bishops leave the church and go back to the palace. The smoke of the burnt houses drifts across Thorney."]];
+if (ERA === 1285) { NARR.length = 0; NARR.push([hms(9, 0), "Michaelmas, Saturday 29 September 1285: quarter day, when rents and dues are paid and servants hired, and a market day. Edward I is king; in June he seized the City's liberties and set a royal warden over it, and in October his Statute of Winchester will order the gates shut at dusk and a watch kept every night. London Bridge stands in stone. The harvest is in, and the ploughing for winter wheat has begun."]); }
 if (ERA === 1100) { NARR.length = 0; NARR.push([hms(9, 0), "Lammas Day, 1 August 1100. William Rufus, the Conqueror's son, is king (tomorrow he will be killed by an arrow while hunting in the New Forest, and his brother Henry crowned at Westminster three days later). A generation after the Conquest, London has the White Tower, finished this year; Baynard's Castle and Montfichet's Tower; Rufus's great hall at Westminster; a new St Paul's rising after the fire of 1087. The harvest is beginning in the fields."]); }
 else if (MARKET) { NARR.length = 0; NARR.push([hms(9, 0), "A market day a few days before Christmas 1066. William has come to London to be crowned on Christmas Day; his army is camped round the City. The streets are busy: stalls along Cheapside, butchers at the Shambles on Newgate Street and in Eastcheap, fish by the hithes. You have a purse of silver pennies: walk up to a stall and press E to buy. Boatmen wait at the hithes."]); }
 let narrI = -1;
@@ -2063,9 +2145,9 @@ const intro = document.getElementById("intro");
 let SITTING = localStorage.getItem("vrPosture") === "sitting";
 { const card = intro?.querySelector(".card"), row = document.createElement("p"); row.innerHTML = 'In VR, are you <button data-p="standing">🧍 standing</button> or <button data-p="sitting">🪑 sitting</button>?';
   const paint = () => row.querySelectorAll("button").forEach(b => { b.style.cssText = "font:600 14px -apple-system,sans-serif;padding:6px 12px;margin:0 4px;border-radius:8px;cursor:pointer;border:2px solid #5a3a1e;" + ((b.dataset.p === "sitting") === SITTING ? "background:#5a3a1e;color:#fff" : "background:#fff;color:#5a3a1e"); });
-  { const dr = document.createElement("p"); dr.innerHTML = 'When? <button data-d="xmas">👑 Christmas Day 1066: the coronation</button> <button data-d="market">🧺 A market day, December 1066</button> <button data-d="1100">☀️ Summer 1100: the Norman city</button>';
-    const cur = ERA === 1100 ? "1100" : MARKET ? "market" : "xmas", pd = () => dr.querySelectorAll("button").forEach(b => { b.style.cssText = "font:600 14px -apple-system,sans-serif;padding:6px 12px;margin:2px 4px;border-radius:8px;cursor:pointer;border:2px solid #5a3a1e;" + (b.dataset.d === cur ? "background:#5a3a1e;color:#fff" : "background:#fff;color:#5a3a1e"); });
-    dr.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); if (b.dataset.d !== cur) { const q = new URLSearchParams(location.search); q.delete("day"); q.delete("era"); if (b.dataset.d === "market") q.set("day", "market"); if (b.dataset.d === "1100") q.set("era", "1100"); location.search = q.toString(); } }); pd(); card?.insertBefore(dr, card.lastElementChild); }
+  { const dr = document.createElement("p"); dr.innerHTML = 'When? <button data-d="xmas">👑 Christmas Day 1066: the coronation</button> <button data-d="market">🧺 A market day, December 1066</button> <button data-d="1100">☀️ Summer 1100: the Norman city</button> <button data-d="1285">🍂 Michaelmas 1285: the stone bridge</button>';
+    const cur = ERA === 1285 ? "1285" : ERA === 1100 ? "1100" : MARKET ? "market" : "xmas", pd = () => dr.querySelectorAll("button").forEach(b => { b.style.cssText = "font:600 14px -apple-system,sans-serif;padding:6px 12px;margin:2px 4px;border-radius:8px;cursor:pointer;border:2px solid #5a3a1e;" + (b.dataset.d === cur ? "background:#5a3a1e;color:#fff" : "background:#fff;color:#5a3a1e"); });
+    dr.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); if (b.dataset.d !== cur) { const q = new URLSearchParams(location.search); q.delete("day"); q.delete("era"); if (b.dataset.d === "market") q.set("day", "market"); if (b.dataset.d === "1100") q.set("era", "1100"); if (b.dataset.d === "1285") q.set("era", "1285"); location.search = q.toString(); } }); pd(); card?.insertBefore(dr, card.lastElementChild); }
   { const wr = document.createElement("p"), cur = new URLSearchParams(location.search).get("who") || "traveller"; wr.innerHTML = "Who are you? " + [["traveller", "🎓 Time traveller (unseen)"], ["comb", "🦌 London comb-maker"], ["ale", "🍺 London alewife"], ["south", "🎣 Southwark fisherman"], ["thegn", "🛡 English thegn"]].map(([k, n]) => `<button data-w="${k}">${n}</button>`).join(" ");
     wr.querySelectorAll("button").forEach(b => b.style.cssText = "font:600 13.5px -apple-system,sans-serif;padding:5px 10px;margin:2px 3px;border-radius:8px;cursor:pointer;border:2px solid #5a3a1e;" + (b.dataset.w === cur ? "background:#5a3a1e;color:#fff" : "background:#fff;color:#5a3a1e"));
     wr.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); if (b.dataset.w !== cur) { const q = new URLSearchParams(location.search); if (b.dataset.w === "traveller") q.delete("who"); else q.set("who", b.dataset.w); location.search = q.toString(); } }); card?.insertBefore(wr, card.lastElementChild); }
@@ -2079,6 +2161,7 @@ document.body.append(HUD, MSG, GUIDE, MAPC);
 let msgT = 0, msgText = "", vrDirty = true;
 function say(t, secs = 12) { msgText = t; msgT = secs; MSG.innerHTML = t; MSG.style.display = "block"; vrDirty = true; }
 function start() { if (started) return; started = true; intro?.classList.add("gone"); if (!UNSEEN) return roleStart();
+  if (ERA === 1285) return say("Michaelmas, Saturday 29 September 1285, at Westminster: quarter day, when rents fall due, and a market day. Edward I is king; this summer he took the City into his own hands, removed its mayor and put a royal warden over it. Downriver, London Bridge now stands in stone, nineteen arches lined with houses, with its chapel of St Thomas and the Great Stone Gate. The leaves are turning and the harvest is in. (This 1285 London is still being built: the Gothic St Paul's and abbey, the Tower's new walls and the friaries are to come.) Walk anywhere, or take a boat.", 26);
   if (ERA === 1100) return say("Lammas Day, 1 August 1100, at Westminster: a summer morning a generation after the Conquest. Before you, the abbey, its nave finished; beyond the palace, William Rufus's new hall. Downriver, the White Tower rises over the City; Baynard's Castle and Montfichet's Tower guard the west; the new St Paul's is building. The markets are busy and the harvest is beginning. Walk anywhere, or take a boat.", 24);
   if (MARKET) return say("A market day a few days before Christmas 1066, at Westminster. The City is about 3 km east, along the Strand (or take a boat from the wharf, or use the guide's 'Things to do'). In the City: stalls on Cheapside, butchers at the Shambles and in Eastcheap, fish by the hithes. You carry 30 silver pennies: press E at a stall to buy.", 22);
   say("Westminster, Christmas morning 1066. Before you, Edward the Confessor's new abbey; to your right, the houses of the little vill. At 10:00 William's procession comes from the palace (to the south-east) to the north door. Walk anywhere: into the abbey, along the Strand to the City, across London Bridge. Markers name things and say how well we know them: press E near one to read it.", 22); }
@@ -2108,13 +2191,13 @@ function goMoment(k) { start(); const [name, tm] = MOMENTS[k]; SIM = tm; narrI =
 let momentI = 0; function nextMoment() { if (MARKET) { momentI = (momentI + 1) % TODO.length; return goTodo(momentI); } goMoment((momentI + 1) % MOMENTS.length); }
 const TAGC = { known: "#9ad87a", inferred: "#f0c060", typical: "#8ab8f0", absent: "#e08a8a", person: "#d8a8f0" }, TAGN = { known: "known", inferred: "inferred: place known, form guessed", typical: "typical: a stand-in", absent: "not there in 1066", person: "person" };
 function drawGuide() { const TD = self.TODO_LIST || []; GUIDE.innerHTML = (MARKET ? `<b>A market day, December 1066</b>` : `<b>Coronation</b> <span style="color:#c8b898">· click to go to the moment</span>` + MOMENTS.map(([n, tm], i) => `<div data-m="${i}" style="cursor:pointer;padding:1px 4px">${String(Math.floor(tm / 3600)).padStart(2, "0")}:${String(Math.floor(tm / 60) % 60).padStart(2, "0")} ${n}</div>`).join("")) +
-  `<div style="margin:4px 0">${[["xmas", "Christmas 1066"], ["market", "market day 1066"], ["1100", "summer 1100"]].filter(([k]) => k !== (ERA === 1100 ? "1100" : MARKET ? "market" : "xmas")).map(([k, n]) => `<span data-day="${k}" style="cursor:pointer;color:#ffe9a8;text-decoration:underline;margin-right:10px">go to ${n}</span>`).join("")}</div>` +
+  `<div style="margin:4px 0">${[["xmas", "Christmas 1066"], ["market", "market day 1066"], ["1100", "summer 1100"], ["1285", "Michaelmas 1285"]].filter(([k]) => k !== (ERA === 1285 ? "1285" : ERA === 1100 ? "1100" : MARKET ? "market" : "xmas")).map(([k, n]) => `<span data-day="${k}" style="cursor:pointer;color:#ffe9a8;text-decoration:underline;margin-right:10px">go to ${n}</span>`).join("")}</div>` +
   (UNSEEN || !self.ROLES_READY ? "" : `<b>Your day</b> <span style="color:#c8b898">· ${LIFE.short} · E where you are to do these</span>` + MY_TASKS.map(t => `<div style="padding:1px 4px">${DIARY.some(d => d[1] === t.name) ? "✓" : "·"} ${t.name} <span style="color:#c8b898">(${t.when}, ${t.where})</span></div>`).join("") + `<div data-home="1" style="cursor:pointer;padding:1px 4px;color:#ffe9a8">⌂ go home</div>`) +
   `<b>Things to do</b> <span style="color:#c8b898">· click to go</span>` + TD.map(([n], i) => `<div data-t="${i}" style="cursor:pointer;padding:1px 4px">✦ ${n}</div>`).join("") +
   `<div style="margin:6px 0 2px"><span data-r="1" style="cursor:pointer;padding:2px 8px;border-radius:6px;background:rgba(200,160,80,.25)">time ×${timeRate} (T)</span> <span data-l="1" style="cursor:pointer;padding:2px 8px;border-radius:6px;background:rgba(200,160,80,.25)">markers ${labelsOn ? "on" : "off"} (L)</span></div>` +
   `<b>Places</b> <span style="color:#c8b898">· click to go</span>` + PLACES.map((p, i) => `<div data-i="${i}" style="cursor:pointer;padding:1px 4px">${p.m ? `<span style="color:${TAGC[p.m.tag]}">●</span> ` : "◆ "}${p.name}</div>`).join("") +
   `<div style="color:#c8b898;font-size:11.5px;margin-top:6px"><span style="color:${TAGC.known}">●</span> known &nbsp;<span style="color:${TAGC.inferred}">●</span> inferred &nbsp;<span style="color:${TAGC.typical}">●</span> typical &nbsp;<span style="color:${TAGC.absent}">●</span> not yet built &nbsp;<span style="color:${TAGC.person}">●</span> people</div>`; }
-GUIDE.addEventListener("click", e => { e.stopPropagation(); const d = e.target.closest("[data-i],[data-m],[data-r],[data-l],[data-t],[data-day],[data-home]"); if (!d) return; if (d.dataset.home) { start(); const p = homeDoor(); if (p) teleport(p[0], p[1], HOME ? HOME.x : SHELTER.fire[0], HOME ? HOME.z : SHELTER.fire[1]); return; } if (d.dataset.day) { const q = new URLSearchParams(location.search); q.delete("day"); q.delete("era"); if (d.dataset.day === "market") q.set("day", "market"); if (d.dataset.day === "1100") q.set("era", "1100"); location.search = q.toString(); return; } if (d.dataset.t) return goTodo(+d.dataset.t); if (d.dataset.i) goPlace(PLACES[+d.dataset.i]); else if (d.dataset.m) goMoment(+d.dataset.m); else if (d.dataset.r) cycleRate(); else { labelsOn = !labelsOn; drawGuide(); } });
+GUIDE.addEventListener("click", e => { e.stopPropagation(); const d = e.target.closest("[data-i],[data-m],[data-r],[data-l],[data-t],[data-day],[data-home]"); if (!d) return; if (d.dataset.home) { start(); const p = homeDoor(); if (p) teleport(p[0], p[1], HOME ? HOME.x : SHELTER.fire[0], HOME ? HOME.z : SHELTER.fire[1]); return; } if (d.dataset.day) { const q = new URLSearchParams(location.search); q.delete("day"); q.delete("era"); if (d.dataset.day === "market") q.set("day", "market"); if (d.dataset.day === "1100") q.set("era", "1100"); if (d.dataset.day === "1285") q.set("era", "1285"); location.search = q.toString(); return; } if (d.dataset.t) return goTodo(+d.dataset.t); if (d.dataset.i) goPlace(PLACES[+d.dataset.i]); else if (d.dataset.m) goMoment(+d.dataset.m); else if (d.dataset.r) cycleRate(); else { labelsOn = !labelsOn; drawGuide(); } });
 drawGuide();
 function interact(skipTasks) { if (!started) return start(); if (busy) return; if (RIDE) { if (MENU) return closeMenu(); return RIDE.voyage ? voyageMenu() : say("On the way: − / = to change the pace.", 3); } if (MENU) return closeMenu(); if (mountToggle()) return;
   if (!skipTasks) { const avail = MY_TASKS.filter(t => t.test()); if (avail.length) return tasksMenu(avail, () => interact(true)); }
@@ -2248,12 +2331,12 @@ function frame() {
   // the sun, low in the south all day; sky and light
   const hour = SIM / 3600, S = sunAt(hour), el = S.el, day = clampN(el * 7 + 0.35, 0, 1), dusk = clampN(1 - el * 9, 0, 1) * (el > -0.12 ? 1 : 0);
   sun.position.copy(rig.position).addScaledVector(S.dir, 800); sun.target.position.copy(rig.position);
-  sun.intensity = (SUMMER ? 3.0 : 2.2) * clampN(el * 6, 0, 1); sun.color.setRGB(1, 0.88 - 0.25 * dusk, 0.74 - 0.4 * dusk); hemi.intensity = 0.2 + 1.45 * day;
+  sun.intensity = (SUMMER ? 3.0 : AUTUMN ? 2.6 : 2.2) * clampN(el * 6, 0, 1); sun.color.setRGB(1, 0.88 - 0.25 * dusk, 0.74 - 0.4 * dusk); hemi.intensity = 0.2 + 1.45 * day;
   const inA = inAbbey(P_.x, P_.z) && !flying, zn = flying ? null : zoneOf(P_.x, P_.z), Z = zn && zn !== "abbey" ? ZONE_HIT : null;
   hemi.groundColor.setHex(inA ? 0x9a8c78 : 0x7a7060); if (INSIDE_H) { sun.intensity *= 0.1; hemi.intensity *= 0.12; } else if (inA) { sun.intensity *= 0.12; hemi.intensity *= 0.6; } else if (Z) { sun.intensity *= 0.1; hemi.intensity *= 0.3; }
   if (Z) { const up = Z.light0 && P_.y < Z.F.gy + 2.5, lp = gw(Z.F, ...(up ? Z.light0 : Z.light)); houseLight.position.set(...lp); houseLight.distance = Z.ld || (Z.name === "hall" ? 34 : Z.name === "church" ? Math.max(14, Math.max(Z.w, Z.d) * 0.85) : 14); houseLight.intensity = (Z.lp || (Z.name === "hall" ? 65 : Z.name === "church" ? 14 + Z.w * Z.d * 0.06 : 16)) * (0.88 + 0.08 * Math.sin(t * 13) + 0.04 * Math.sin(t * 29)); } else if (!INSIDE_H) houseLight.intensity = 0;
   abbeyLight.intensity = Math.hypot(P_.x, P_.z) < 90 ? (inA ? 260 : 30) * (0.9 + 0.1 * Math.sin(t * 7)) : 0;
-  if (SUMMER) { dayUp.setRGB(0.22, 0.4, 0.75).multiplyScalar(0.05 + 0.95 * day); dayHor.setRGB(0.68, 0.74, 0.82).multiplyScalar(0.06 + 0.94 * day); } else { dayUp.setRGB(0.55, 0.62, 0.72).multiplyScalar(0.05 + 0.95 * day); dayHor.setRGB(0.80, 0.80, 0.80).multiplyScalar(0.06 + 0.94 * day); } dayHor.lerp(_c1.setRGB(0.95, 0.62, 0.40), dusk * 0.5);
+  if (LEAFY) { dayUp.setRGB(0.22, 0.4, 0.75).multiplyScalar(0.05 + 0.95 * day); dayHor.setRGB(0.68, 0.74, 0.82).multiplyScalar(0.06 + 0.94 * day); } else { dayUp.setRGB(0.55, 0.62, 0.72).multiplyScalar(0.05 + 0.95 * day); dayHor.setRGB(0.80, 0.80, 0.80).multiplyScalar(0.06 + 0.94 * day); } dayHor.lerp(_c1.setRGB(0.95, 0.62, 0.40), dusk * 0.5);
   skyMat.uniforms.up.value.copy(dayUp); skyMat.uniforms.hor.value.copy(dayHor); scene.fog.color.copy(dayHor); sky.position.copy(rig.position);
   sunDisc.position.copy(rig.position).addScaledVector(S.dir, 20000); sunDisc.lookAt(rig.position); sunDisc.visible = el > -0.03;
   water.position.x = Math.round(P_.x / 500) * 500; water.position.z = Math.round(P_.z / 500) * 500;
@@ -2265,7 +2348,7 @@ function frame() {
     let nearM = null, nd = 1e9; for (const m of MARKS) { if (m.follow || m.hidden) continue; const d = Math.hypot(m.x - P_.x, m.z - P_.z); if (d < m.r && d < nd) { nd = d; nearM = m; } }
     const room = { hall: "in the great hall of Edward's palace", chamber: P_.y > PAL.chamber.gy + 2 ? "upstairs in the king's chamber" : "in the chamber block's ground floor (the stair is outside)", kitchen: "in the palace kitchen", church: "inside the church", whall: "in Westminster Hall", tower: "in the Tower" }[zoneOf(P_.x, P_.z)];
     const where = INSIDE_H ? "inside a house · E near things to read; E at the doorway to go out" : DH ? "at a doorway · <b>E: go inside</b>" : nearM ? `at <b>${nearM.name}</b> · E to read` : inA ? "inside Westminster Abbey" : room || (CITY.inside(P_.x, P_.z) ? "inside the walls of London" : "");
-    HUD.innerHTML = `<b>London and Westminster, ${ERA === 1100 ? "Lammas Day, 1 August 1100" : MARKET ? "a market day, December 1066" : "Christmas Day 1066"}</b> · ${hh}:${String(mi).padStart(2, "0")}${timeRate > 1 ? ` (time ×${timeRate})` : ""} · ${flying ? "flying" : SPEEDS[speedI][1] + (run > 1 ? ", running" : "")}<br>${where}<br>
+    HUD.innerHTML = `<b>London and Westminster, ${ERA === 1285 ? "Michaelmas, 29 September 1285" : ERA === 1100 ? "Lammas Day, 1 August 1100" : MARKET ? "a market day, December 1066" : "Christmas Day 1066"}</b> · ${hh}:${String(mi).padStart(2, "0")}${timeRate > 1 ? ` (time ×${timeRate})` : ""} · ${flying ? "flying" : SPEEDS[speedI][1] + (run > 1 ? ", running" : "")}<br>${where}<br>
       <span style="color:#e8dcc0">${UNSEEN ? "time traveller (unseen)" : "you: " + LIFE.short}${combs ? " · combs " + combs : ""}${eels ? " · eels " + eels : ""}${ale ? " · ale brewed" : ""} · purse ${fmtD(PURSE)}${BASKET.length ? " · basket: " + BASKET.slice(-6).join(", ") + (BASKET.length > 6 ? " …" : "") : ""}${RIDE ? (RIDE.voyage ? " · on a voyage down the river" : " · in the boat to " + RIDE.Q.name) + (BOAT_PACE[boatPace] > 1 ? " (×" + BOAT_PACE[boatPace] + ")" : "") : ""}</span><br><span style="color:#c8b898;font-size:12.5px">WASD walk · drag to look · shift run · − / = pace · E read / go in · N next moment · T time speed · L markers · F fly · M map</span>`;
     if (vr && (vrDirty || ((t * 3) | 0) % 3 === 0)) { drawVR(`${hh}:${String(mi).padStart(2, "0")} · ${where.replace(/<[^>]+>/g, "")}`, msgText || "Left stick walk · right stick turn · trigger run · A read / go in · B next place · X next moment of the coronation · Y time speed"); vrDirty = false; } }
   renderer.render(scene, camera);
@@ -2301,9 +2384,9 @@ function startRide(P, Q) { if (INSIDE_H) leaveHouse(); if (MOUNT?.ridden) mountT
   say(`You step into the boat at ${P.name}. The boatman pushes off for ${Q.name}. Look around: the river was London's main road. (− / = to speed up the trip.)`, 10); }
 // a voyage down the river to the sea: along the Thames from the pier, then the lower river; E aboard to put ashore or turn back
 function startVoyage(P) { if (INSIDE_H) leaveHouse(); if (MOUNT?.ridden) mountToggle(); let sP = 0, bd = 1e9; for (let s = 0; s <= THAMES.L; s += 20) { const [x, z] = THAMES.at(s), d = Math.hypot(x - P.boat[0], z - P.boat[1]); if (d < bd) { bd = d; sP = s; } }
-  const path = [P.boat]; for (let s = sP; s < THAMES.L - 50; s += 60) { const [x, z] = THAMES.at(s); path.push([x, z]); } for (let s = 0; s <= LOWER.L; s += 80) { const [x, z] = LOWER.at(s); path.push([x, z]); }
+  const path = [P.boat]; for (let s = sP; s < THAMES.L - 50; s += 60) { const [x, z] = THAMES.at(s); path.push([x, z]); } for (let s = 0; s <= LOWER.L; s += 80) { const [x, z] = LOWER.at(s); path.push([x, z]); } path.splice(0, path.length, ...throughArch(path));
   const len = path.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - path[i][0], p[1] - path[i][1]), 0); RIDE = { P, Q: P, path, len, s: 0, rx: 0, rz: 0, rh: 0, voyage: true, seen: new Set() }; rideBoat.visible = true; flying = false; SITTING_DOWN = false; boatPace = 1;
-  say("You take passage down the river: past the bridge and the Tower's empty corner, round the Isle of Dogs, and on through the marshes to the estuary and the sea, about 70 km. Press E aboard to put ashore or turn back; − / = (B in VR) change the pace.", 14); }
+  say("You take passage down the river: past the bridge and " + (ERA >= 1100 ? "the White Tower" : "the Tower's empty corner") + ", round the Isle of Dogs, and on through the marshes to the estuary and the sea, about 70 km. Press E aboard to put ashore or turn back; − / = (B in VR) change the pace.", 14); }
 function voyageMenu() { showMenu("Aboard", [{ label: "keep going", fn: () => {} }, { label: "put ashore here", fn: putAshore }, { label: "turn back to London", fn: () => { const P = PIERS.find(p => p.name === "Queenhithe"); RIDE = null; rideBoat.visible = false; teleport(P.land[0], P.land[1], P.land[0] + 10, P.land[1] + 30); say("A day later, you are back at Queenhithe.", 6); } }]); }
 function putAshore() { const R = RIDE; if (!R) return; const x0 = rideBoat.position.x, z0 = rideBoat.position.z; let best = null;
   for (let r = 10; r < 9000 && !best; r += 15) for (let a = 0; a < 6.283; a += 0.2) { const x = x0 + Math.cos(a) * r, z = z0 + Math.sin(a) * r; if (baseH(x, z) > 0.6) { best = [x, z]; break; } }
@@ -2431,7 +2514,7 @@ if (HOME && !UNSEEN) mark("Your house", HOME.x, HOME.z, "person", "Your home. Pr
 if (SHELTER && !UNSEEN) mark("Your family's shelter", SHELTER.x, SHELTER.z, "person", "Your family's lean-to by the burnt house. Press E here for the day's tasks.", { y: 4, r: 6, range: 3000, big: true });
 buildKit(scene);
 function roleStart() { const p = homeDoor(); if (p) { teleport(p[0], p[1], HOME ? HOME.x : SHELTER.fire[0], HOME ? HOME.z : SHELTER.fire[1]); if (HOME && !SHELTER && HOME.dp) enterHouse(HOME); }
-  say(`<b>You are ${LIFE.title}.</b> ${LIFE.intro} ${ERA === 1100 ? "It is Lammas Day, 1 August 1100, a generation after the Conquest: the White Tower stands finished over the City." : MARKET ? "Today is a market day." : "Today is Christmas Day, 1066."} Press E at home for the day's tasks (all optional: go anywhere). The guide on the right lists your day.`, 26); }
+  say(`<b>You are ${LIFE.title}.</b> ${LIFE.intro} ${ERA === 1285 ? "It is Michaelmas, 29 September 1285: quarter day, when rents fall due. London Bridge stands in stone." : ERA === 1100 ? "It is Lammas Day, 1 August 1100, a generation after the Conquest: the White Tower stands finished over the City." : MARKET ? "Today is a market day." : "Today is Christmas Day, 1066."} Press E at home for the day's tasks (all optional: go anywhere). The guide on the right lists your day.`, 26); }
 function tasksMenu(avail, fallback) { showMenu(`What will you do? (${Math.floor(SIM / 3600)}:${String(Math.floor(SIM / 60) % 60).padStart(2, "0")})`, [...avail.map(t => ({ label: t.name, fn: () => doTask(t) })), ...(fallback ? [{ label: "something else: look around here", fn: fallback }] : [])]); }
 
 self.ROLES_READY = true; drawGuide();
