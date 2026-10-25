@@ -506,15 +506,16 @@ function groof(F, mat, w, d, wh, rh, o = {}) { const t = o.t ?? (mat === "thatch
     }
     if (mat === "thatch") gbox(F, "thatch", 0, yr + tv - 0.05, 0, 0.5, 0.25, 2 * Rz + 0.4); } }
 // the timber house: low walls on earth-fast oak posts, wattle-and-daub or planks; door in a frame; shuttered window openings
-function gHouse(H) { if (ERA === 1285 && H.roof === "thatch" && CITY.inside(H.x, H.z) && Math.abs((H.x * 31 + H.z * 17) | 0) % 10 < 7) { H.roof = "shingle"; H.tile = true; }
+function gHouse(H) { if (ERA === 1285 && H.roof === "thatch" && (H.dense || CITY.inside(H.x, H.z)) && Math.abs((H.x * 31 + H.z * 17) | 0) % 10 < 7) { H.roof = "shingle"; H.tile = true; }
   const F = FR(H.x, H.z, H.ry, H.gy, H.chunkKey), w = H.w, d = H.d, wh = H.wh, rh = H.rh, R = seeded((H.x * 7 + H.z * 13) | 0);
   const bw = 0.85 + R() * 0.25, br = 0.8 + R() * 0.3, tintW = H.wall === "daub" ? (R() < 0.3 ? [1.3, 1.3, 1.27] : [bw, bw * 0.98, bw * 0.95]) : [bw, bw * 0.97, bw * 0.94];   // some daub limewashed
   const tintR = H.tile ? [1.05 * br + 0.1, 0.58 * br, 0.44 * br] : H.roof === "thatch" ? (R() < 0.25 ? [1.15, 1.1, 0.95] : [br, br * 0.98, br * 0.93]) : [br, br, br];   // a few roofs new-thatched, most weathered
   GTINT = tintW; gbox(F, H.wall, 0, wh / 2 - 0.15, 0, w, wh + 0.3, d);
+  if (H.dense && wh > 3.6) { gbox(F, H.wall, 0, wh * 0.76, 0, w + 0.5, wh * 0.48, d + 0.5); GTINT = [0.55, 0.45, 0.35]; gbox(F, "oak", 0, wh * 0.52, 0, w + 0.56, 0.22, d + 0.56); GTINT = tintW; }   // a jettied upper storey
   if (!H.hip) for (const sz of [-1, 1]) gpoly(F, H.wall, [[-w / 2, wh, sz * d / 2], [w / 2, wh, sz * d / 2], [0, wh + rh, sz * d / 2]], [[0, wh], [w, wh], [w / 2, wh + rh]], [0, 0, sz]);   // the gable ends
   GTINT = [0.9 + R() * 0.2, 0.9, 0.9]; const post = (x, z) => gbox(F, "oak", x, wh / 2 - 0.1, z, 0.22, wh + 0.2, 0.22, "b");
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) post(sx * w / 2, sz * d / 2);
-  if (H.wall === "daub" && !IS_HEADSET) { const nz = Math.max(1, Math.round(d / 1.3)), nx = Math.max(1, Math.round(w / 1.3));
+  if (H.wall === "daub" && !IS_HEADSET) { const sp = H.dense ? 2.4 : 1.3, nz = Math.max(1, Math.round(d / sp)), nx = Math.max(1, Math.round(w / sp));
     for (let i = 1; i < nz; i++) for (const sx of [-1, 1]) gbox(F, "oak", sx * (w / 2 + 0.02), wh / 2 - 0.1, -d / 2 + d * i / nz, 0.05, wh + 0.2, 0.16, "bt");
     for (let i = 1; i < nx; i++) for (const sz of [-1, 1]) gbox(F, "oak", -w / 2 + w * i / nx, wh / 2 - 0.1, sz * (d / 2 + 0.02), 0.16, wh + 0.2, 0.05, "bt"); }
   for (const sx of [-1, 1]) gbox(F, "oak", sx * w / 2, wh - 0.08, 0, 0.26, 0.2, d + 0.1, "b");   // wall plates
@@ -621,8 +622,9 @@ function pushOut(p, rad = 0.3) { const L = COLL.get(Math.floor(p.x / CC) * 10000
 // (shingles on better buildings). They stood a little back from the street, often gable-end on, on long narrow plots with yards,
 // cesspits and wells behind. No stone houses are known in London before about 1100.
 const HOUSES = [];
-function addHouse(x, z, w, d, ry, o = {}) { const gy = o.gy ?? groundH(x, z), R = seeded((x * 31 + z * 17) | 0), wall = o.wall ?? (R() < 0.55 ? "daub" : "plank"), roof = o.roof ?? (R() < 0.88 ? "thatch" : "shingle");
-  const H = { x, z, w, d, ry, gy, wh: o.wh ?? 2.0 + R() * 0.6, rh: o.rh ?? w * (roof === "thatch" ? 0.62 + R() * 0.14 : 0.5), wall, roof, hip: o.hip ?? (roof === "thatch" && R() < 0.5), kind: o.kind || "house", burnt: !!o.burnt, door: o.door ?? "+z" };
+const LDN_C = LL(51.5110, -0.0960);
+function addHouse(x, z, w, d, ry, o = {}) { const gy = o.gy ?? groundH(x, z), R = seeded((x * 31 + z * 17) | 0), dense = ERA === 1285 && !o.burnt && (o.kind || "house") === "house" && Math.hypot(x - LDN_C[0], z - LDN_C[1]) < 1500, wall = o.wall ?? (R() < 0.55 ? "daub" : "plank"), roof = o.roof ?? (R() < 0.88 ? "thatch" : "shingle");
+  const H = { x, z, w, d, ry, gy, dense, wh: o.wh ?? (dense && R() < 0.8 ? 3.9 + R() * 2.8 : 2.0 + R() * 0.6), rh: o.rh ?? w * (roof === "thatch" ? 0.62 + R() * 0.14 : 0.5), wall, roof, hip: o.hip ?? (roof === "thatch" && R() < 0.5), kind: o.kind || "house", burnt: !!o.burnt, door: o.door ?? "+z" };
   H.lean = !H.burnt && R() < 0.2 ? (H.door === "+x" ? -1 : 1) : 0;
   if (!H.burnt) { const s = Math.sin(ry), c = Math.cos(ry), dr = H.door;   // the doorway: "+z"/"-z" a gable end, "+x"/"-x" a long side
     H.dp = dr === "+z" ? [x + s * (d / 2 + 0.03), z + c * (d / 2 + 0.03), ry] : dr === "-z" ? [x - s * (d / 2 + 0.03), z - c * (d / 2 + 0.03), ry + Math.PI] :
@@ -647,21 +649,21 @@ function yardThings(x, z, ry, R) { const c = Math.cos(ry), s = Math.sin(ry), at 
 // one side of a street: plots one after another, gable-end on or broadside, set back a little; a back building on some
 function lineStreet(S, dens, opts = {}) { const R = seeded(S.name.length * 977 + (opts.seed || 0));
   for (const sg of opts.sides || [-1, 1]) { let s = R() * 4;
-    while (s < S.L.L) { const [px, pz, a] = S.L.at(s), front = 4.5 + R() * 3.5, tx = Math.sin(a), tz = Math.cos(a), nx = tz * sg, nz = -tx * sg; s += front + 0.4 + R() * 2.5;
+    while (s < S.L.L) { const [px, pz, a] = S.L.at(s), front = ERA === 1285 ? 4 + R() * 2.5 : 4.5 + R() * 3.5, tx = Math.sin(a), tz = Math.cos(a), nx = tz * sg, nz = -tx * sg; s += front + (ERA === 1285 ? 0.15 + R() * 0.4 : 0.4 + R() * 2.5);
       const D = typeof dens === "function" ? dens(px, pz) : dens; if (R() > D) { s += R() * 6; continue; }
-      const gableOn = R() < 0.62, deep = 6 + R() * 6, back = S.w / 2 + 0.5 + R() * 2.5;
+      const tight = ERA === 1285 && D > 0.6, gableOn = tight || R() < (ERA === 1285 ? 0.88 : 0.62), deep = 6 + R() * 6, back = S.w / 2 + (ERA === 1285 ? 0.3 + R() * 0.6 : 0.5 + R() * 2.5);
       const hw = gableOn ? front : deep * 0.75, hd = gableOn ? deep : front, hry = gableOn ? Math.atan2(nx, nz) : Math.atan2(tx, tz), along = gableOn ? deep : hw;   // gable-on: ridge away from the street; broadside: along it
       const cx = px + nx * (back + along / 2), cz = pz + nz * (back + along / 2);
       if (baseH(cx, cz) < 1.0 || baseH(cx + nx * along / 2, cz + nz * along / 2) < 0.9) continue;
-      if (!rRect(cx, cz, hw + 1.2, hd + 1.2, hry, 0, true)) continue;
+      if (!rRect(cx, cz, tight ? hw - 1.8 : hw + 1.2, hd + (tight ? 0.4 : 1.2), hry, 0, true)) continue;
       const H = addHouse(cx, cz, hw, hd, hry, { burnt: opts.burnt && R() < 0.8, door: gableOn ? "-z" : sg > 0 ? "-x" : "+x", kind: opts.kind });
-      rRect(cx, cz, hw + 0.4, hd + 0.4, hry, 2);
+      rRect(cx, cz, tight ? hw - 0.6 : hw + 0.4, hd + 0.4, hry, 2);
       const yx = cx + nx * (along / 2 + 7), yz = cz + nz * (along / 2 + 7); rRect(yx, yz, front + 0.5, 13, Math.atan2(nx, nz), 3);   // the yard behind
       if (opts.yards !== false && R() < 0.35) { const bx = cx + nx * (along / 2 + 9 + R() * 4), bz = cz + nz * (along / 2 + 9 + R() * 4), bw = 3.5 + R() * 2, bd = 5 + R() * 3;
         if (baseH(bx, bz) > 1 && rRect(bx, bz, bw + 1, bd + 1, Math.atan2(nx, nz), 0, true)) { const B = addHouse(bx, bz, bw, bd, Math.atan2(nx, nz) + Math.PI, { burnt: opts.burnt && R() < 0.8, door: "+z", kind: opts.kind }); rRect(bx, bz, bw, bd, B.ry, 2); } }
-      if (opts.yards !== false && R() < 0.5) { const fx = cx + nx * (along / 2 + 7) + tx * (front / 2 + 0.3), fz = cz + nz * (along / 2 + 7) + tz * (front / 2 + 0.3);   // a wattle fence between plots
+      if (opts.yards !== false && !tight && R() < 0.5) { const fx = cx + nx * (along / 2 + 7) + tx * (front / 2 + 0.3), fz = cz + nz * (along / 2 + 7) + tz * (front / 2 + 0.3);   // a wattle fence between plots
         put("fence", BOX_G, MAT.wattle, fx, groundH(fx, fz) - 0.15, fz, 0.1, 1.25, 13, Math.atan2(nx, nz)); }
-      if (opts.yards !== false && !opts.burnt) yardThings(yx, yz, Math.atan2(nx, nz), R);
+      if (opts.yards !== false && !opts.burnt && (!tight || R() < 0.15)) yardThings(yx, yz, Math.atan2(nx, nz), R);
     } } }
 
 // ---------- churches ----------
@@ -1535,10 +1537,11 @@ const CH = [["All Hallows by the Tower", 51.5098, -0.0795, "known", "Founded by 
   ["Southwark minster", 51.5058, -0.0905, "inferred", "Domesday Book records a minster (monasterium) at Southwark, on the site of the later priory of St Mary Overie (now Southwark Cathedral). Form unknown."]];
 for (const [name, lat, lon, tag, text] of CH) { const [x0, z0] = LL(lat, lon), [x, z] = findFree(x0, z0, 30, 20), timber = name.includes("Holborn"); const C = addChurch(x, z, { mat: timber ? "plank" : "rag", roof: timber ? "thatch" : "shingle" }); mark(name, x, z, tag, text, { y: 14, range: 900 }); }
 { const R = seeded(19); let n = 0;   // other parish churches, where it is not known which ones existed
-  for (let tries = 0; tries < 400 && n < 20; tries++) { const S = STREETS[(R() * 15) | 0], [px, pz] = S.L.at(R() * S.L.L); if (!CITY.inside(px, pz)) continue; const x = px + (R() - 0.5) * 70, z = pz + (R() - 0.5) * 70;
-    if (!CITY.inside(x, z) || baseH(x, z) < 2 || !rRect(x, z, 30, 20, 0, 0, true) || CHURCHES.some(c => Math.hypot(c.x - x, c.z - z) < 120)) continue;
-    addChurch(x, z, { mat: R() < 0.6 ? "rag" : "plank", roof: R() < 0.6 ? "shingle" : "thatch", nl: 11 + R() * 6, nw: 5.5 + R() * 2 }); n++;
-    if (n % 4 === 1) mark("A parish church", x, z, "typical", "London had about 30-50 small parish churches by 1066, many founded by local lords or groups of neighbours in the 10th and 11th centuries, and more were added soon after (about 100 by 1200). Which ones existed in 1066 is mostly unknown. This stands for one: two cells, a nave for the people and a smaller chancel for the altar, of ragstone rubble (often reusing Roman stone and tile) or timber.", { y: 12, range: 300 }); } }
+  for (let tries = 0; tries < (ERA === 1285 ? 3000 : 400) && n < (ERA === 1285 ? 60 : 20); tries++) { const S = STREETS[(R() * 15) | 0], [px, pz] = S.L.at(R() * S.L.L); if (!CITY.inside(px, pz)) continue; const x = px + (R() - 0.5) * 70, z = pz + (R() - 0.5) * 70;
+    if (!CITY.inside(x, z) || baseH(x, z) < 2 || !rRect(x, z, 30, 20, 0, 0, true) || CHURCHES.some(c => Math.hypot(c.x - x, c.z - z) < (ERA === 1285 ? 62 : 120))) continue;
+    addChurch(x, z, ERA === 1285 ? { mat: "rag", roof: "shingle", nl: 13 + R() * 8, nw: 6 + R() * 2.5, wh: 6 + R() * 1.5 } : { mat: R() < 0.6 ? "rag" : "plank", roof: R() < 0.6 ? "shingle" : "thatch", nl: 11 + R() * 6, nw: 5.5 + R() * 2 }); n++;
+    if (ERA === 1285 && n % 6 === 1) mark("A parish church", x, z, "typical", "By 1285 the City has about a hundred parish churches inside the walls, more than any other city in England: most small, many rebuilt in stone in the 12th and 13th centuries, each serving a few streets and run by its own parishioners and priest. Their bells ring the hours and the curfew. This stands for one; which stood exactly where is known for many, but not modelled here.", { y: 14, range: 700 });
+    if (ERA !== 1285 && n % 4 === 1) mark("A parish church", x, z, "typical", "London had about 30-50 small parish churches by 1066, many founded by local lords or groups of neighbours in the 10th and 11th centuries, and more were added soon after (about 100 by 1200). Which ones existed in 1066 is mostly unknown. This stands for one: two cells, a nave for the people and a smaller chancel for the altar, of ragstone rubble (often reusing Roman stone and tile) or timber.", { y: 12, range: 300 }); } }
 
 // ---------- houses along the streets ----------
 const outsideDens = { "Fleet Street": (x, z) => 0.55 * (1 - sstepN(Math.hypot(x - GATES[0].x, z - GATES[0].z), 150, 700)) + 0.06, "the Strand": 0.07, "King Street": (x, z) => z > -330 ? 0.5 : 0.05,
@@ -1546,20 +1549,24 @@ const outsideDens = { "Fleet Street": (x, z) => 0.55 * (1 - sstepN(Math.hypot(x 
   "the road east from Aldgate": (x, z) => 0.4 * (1 - sstepN(Math.hypot(x - GATES[5].x, z - GATES[5].z), 80, 400)), "the road north from Cripplegate": (x, z) => 0.3 * (1 - sstepN(Math.hypot(x - GATES[3].x, z - GATES[3].z), 60, 300)),
   "Borough High Street": (x, z) => 0.75 * (1 - sstepN(Math.hypot(x - BRIDGE.P[1][0], z - BRIDGE.P[1][1]), 250, 650)), "the road to Lambeth": 0.03 };
 const [cheapX, cheapZ] = LL(51.5130, -0.0930);
-const cityDens = (x, z) => { if (!CITY.inside(x, z)) return 0; const d = Math.hypot(x - cheapX, (z - cheapZ) * 1.6); return 0.88 - 0.45 * sstepN(d, 500, 1300); };   // thickest round Cheapside and the waterfront, thinner toward the walls
+const cityDens = (x, z) => { if (!CITY.inside(x, z)) return 0; const d = Math.hypot(x - cheapX, (z - cheapZ) * 1.6); return ERA === 1285 ? (IS_HEADSET ? 0.82 : 0.98) - 0.18 * sstepN(d, 700, 1500) : 0.88 - 0.45 * sstepN(d, 500, 1300); };
+// by 1285, about 80,000 people: the suburbs run far out along the roads from the gates, and the Strand is nearly built up to Westminster
+if (ERA === 1285) { const gd = (G, x, z) => Math.hypot(x - G.x, z - G.z); Object.assign(outsideDens, { "Fleet Street": (x, z) => 0.7 * (1 - sstepN(gd(GATES[0], x, z), 700, 1500)) + 0.25, "the Strand": 0.5, "King Street": (x, z) => z > -520 ? 0.85 : 0.35,
+  "the road to Holborn": (x, z) => 0.88 * (1 - sstepN(gd(GATES[1], x, z), 400, 1100)), "Ermine Street": (x, z) => 0.85 * (1 - sstepN(gd(GATES[4], x, z), 300, 950)), "the road east from Aldgate": (x, z) => 0.8 * (1 - sstepN(gd(GATES[5], x, z), 300, 850)),
+  "the road north from Cripplegate": (x, z) => 0.7 * (1 - sstepN(gd(GATES[3], x, z), 200, 650)), "Borough High Street": (x, z) => 0.95 * (1 - sstepN(Math.hypot(x - BRIDGE.P[1][0], z - BRIDGE.P[1][1]), 500, 1150)), "the road to Lambeth": 0.15 }); }   // thickest round Cheapside and the waterfront, thinner toward the walls
 for (const S of STREETS) { const od = outsideDens[S.name], f = (x, z) => CITY.inside(x, z) ? cityDens(x, z) : typeof od === "function" ? od(x, z) : od || 0;
   if (S.name === "Thames Street") { lineStreet(S, f, { sides: [1] }); lineStreet(S, (x, z) => 0.3 * f(x, z), { sides: [-1], seed: 3, yards: false }); }
   else lineStreet(S, f, { burnt: S.name === "Borough High Street" && ERA === 1066, kind: S.name === "King Street" ? "vill" : "house" }); }
 { const R = seeded(23); let n = 0;   // houses back from the streets, on lanes and in yards
-  for (let tries = 0; tries < 6000 && n < 420; tries++) { const x = GATES[0].x + R() * (GATES[5].x - GATES[0].x + 60), z = -2200 + R() * 1300; if (!CITY.inside(x, z) || R() > cityDens(x, z) || baseH(x, z) < 1.2 || WALL.d(x, z) < 12) continue;
+  for (let tries = 0; tries < (ERA === 1285 ? 20000 : 6000) && n < (ERA === 1285 ? (IS_HEADSET ? 450 : 800) : 420); tries++) { const x = GATES[0].x + R() * (GATES[5].x - GATES[0].x + 60), z = -2200 + R() * 1300; if (!CITY.inside(x, z) || R() > cityDens(x, z) || baseH(x, z) < 1.2 || WALL.d(x, z) < 12) continue;
     const w = 4 + R() * 2, d = 6 + R() * 5, ry = (R() < 0.5 ? 0 : Math.PI / 2) + (R() - 0.5) * 0.3; if (!rRect(x, z, w + 2, d + 2, ry, 0, true)) continue;
     const H = addHouse(x, z, w, d, ry, { door: ["+z", "-z", "+x", "-x"][(R() * 4) | 0] }); rRect(x, z, w + 0.4, d + 0.4, ry, 2); rRect(x, z, w + 8, d + 8, ry, 3); n++; } }
 // small places outside: Charing, round St Clement Danes, Lambeth, and a few farmsteads
 function cluster(lat, lon, n, rad, seed, o = {}) { const [cx, cz] = LL(lat, lon), R = seeded(seed); let k = 0;
   for (let t = 0; t < n * 20 && k < n; t++) { const a = R() * 6.283, r = rad * Math.sqrt(R()), x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r, w = 4.5 + R() * 2, d = 7 + R() * 5, ry = R() * Math.PI;
     if (baseH(x, z) < 1.2 || !rRect(x, z, w + 3, d + 3, ry, 0, true)) continue; addHouse(x, z, w, d, ry, { door: "-z", ...o }); rRect(x, z, w + 0.4, d + 0.4, ry, 2); rRect(x, z, w + 14, d + 14, ry, 3); k++; } }
-cluster(51.5073, -0.1270, 6, 45, 41); cluster(51.5131, -0.1135, 10, 70, 42); cluster(51.4955, -0.1192, 7, 70, 43); cluster(51.5165, -0.1150, 3, 60, 44); cluster(51.5200, -0.1000, 3, 80, 45); cluster(51.4985, -0.1340, 4, 60, 46);
-cluster(51.5035, -0.0905, 10, 120, 47, { burnt: ERA === 1066 });   // Southwark: burned in 1066, rebuilt by 1100
+cluster(51.5073, -0.1270, ERA === 1285 ? 22 : 6, ERA === 1285 ? 110 : 45, 41); cluster(51.5131, -0.1135, ERA === 1285 ? 40 : 10, ERA === 1285 ? 160 : 70, 42); cluster(51.4955, -0.1192, 7, 70, 43); cluster(51.5165, -0.1150, 3, 60, 44); cluster(51.5200, -0.1000, 3, 80, 45); cluster(51.4985, -0.1340, 4, 60, 46);
+cluster(51.5035, -0.0905, ERA === 1285 ? 60 : 10, ERA === 1285 ? 320 : 120, 47, { burnt: ERA === 1066 });   // Southwark: burned in 1066, rebuilt by 1100
 markLL("Charing", 51.5073, -0.1277, "inferred", "A hamlet at the bend of the river road, where the Strand turns south to Westminster: its Old English name, cierring, means 'a turning'. The cross that gave Charing Cross its name was put up in 1294.", { range: 1200 });
 markLL("The Danish settlement", 51.5131, -0.1125, "known", "A small community of Danes, living outside the walls round St Clement's church: London had many Scandinavian residents after Cnut became king in 1016.", { range: 900 });
 markLL("Lambeth", 51.4958, -0.1188, "known", "A riverside manor on the Surrey shore opposite Westminster, held by Goda, King Edward's sister. The archbishops of Canterbury acquired it about 1200 and built Lambeth Palace.", { range: 1500 });
@@ -2105,7 +2112,7 @@ else if (MARKET) { NARR.length = 0; NARR.push([hms(9, 0), "A market day a few da
 let narrI = -1;
 
 // ---------- the people ----------
-const NC = IS_HEADSET ? 640 : 860, crowd = new Crowd(NC), AG2 = [];   // everyone, one instanced crowd
+const NC = ERA === 1285 ? (IS_HEADSET ? 740 : 1150) : IS_HEADSET ? 640 : 860, crowd = new Crowd(NC), AG2 = [];   // everyone, one instanced crowd
 let nextI = 0;
 function agent(role, o = {}) { const i = nextI++; if (i >= NC) return null; const L = looks(i, role); crowd.look(i, L); const A = { i, L, role: L.role, x: 0, z: 0, y: 0, h: 0, kind: "stand", walk: 0, shown: false, ...o }; AG2.push(A); return A; }
 // a route: points [x, z]; position at distance s
