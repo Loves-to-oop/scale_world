@@ -414,7 +414,7 @@ print(f"  wrote {out12.name}, {out12.stat().st_size // 1024} KB")
 
 
 # ---- the thirteenth page: London and Westminster on Christmas Day 1066 -----------------------------
-LN = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>London, Christmas Day 1066: the crowning of William</title>").replace("background:#c8d4d8", "background:#b8bcc0")
+LN = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>London, Christmas Day 1066: the crowning of William</title>").replace("background:#c8d4d8", "background:#b8bcc0").replace("#intro.gone{", "#intro{overflow-y:auto;align-items:flex-start;padding:16px 0;box-sizing:border-box} #intro .card{margin:auto} #intro.gone{", 1)
 i0, i1 = LN.index('<div id="intro">'), LN.index('<button id="vr">')
 LN = LN[:i0] + """<div id="intro"><div class="card">
   <h1>London, Christmas Day 1066</h1>
