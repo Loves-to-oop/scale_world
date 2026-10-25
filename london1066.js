@@ -125,12 +125,18 @@ const PG = {
   cowl: G1(new THREE.TorusGeometry(0.11, 0.05, 6, 14).rotateX(Math.PI / 2).scale(1, 1, 0.9).translate(0, 0.5, -0.02)),
   hood: G1(faceCap(0.13, Math.PI * 0.64, Math.PI * 0.27, Math.PI * 0.52).scale(1, 1.1, 1.08).translate(0, 0.676, -0.012)),
   cap: G1(new THREE.ConeGeometry(0.105, 0.17, 10).rotateX(0.35).translate(0, 0.79, 0.02)),
+  // 13th-century dress: the sleeveless surcoat over the tunic; the linen coif tied under the chin; the wimple round chin and throat; the
+  // barbette (a band under the chin and over the head) with the fillet (a stiff band round the brow), worn over the hair in a net
+  surcoat: G1(foldTube(0.178, 0.31, 0.8, 20, 7, 0.07, 0, 0, 6).scale(1, 1, 0.83).translate(0, -0.27, 0)),
+  lcoif: mergeG([[faceCap(0.113, Math.PI * 0.6, Math.PI * 0.27, Math.PI * 0.47), MT(0, 0.673, -0.006, 0.92, 1.12, 1.05)], [new THREE.TorusGeometry(0.082, 0.007, 3, 12, Math.PI).rotateZ(Math.PI), MT(0, 0.655, 0.03)]]),
+  wimple: mergeG([[new THREE.CylinderGeometry(0.084, 0.108, 0.13, 14, 1, true), MT(0, 0.585, 0.004, 1, 1, 0.95)], [new THREE.SphereGeometry(0.08, 12, 5, 0, Math.PI * 2, Math.PI * 0.56, Math.PI * 0.44), MT(0, 0.655, 0.012, 1, 1.05, 1)]]),
+  barbette: mergeG([[new THREE.TorusGeometry(0.104, 0.014, 4, 24), MT(0, 0.668, 0.005, 0.97, 1.16, 1)], [new THREE.CylinderGeometry(0.114, 0.116, 0.055, 18, 1, true), MT(0, 0.742, -0.006, 1, 1, 1.04)]]),
   crown: mergeG(Array.from({ length: 6 }, (_, k) => [new THREE.BoxGeometry(0.035, 0.07, 0.012), new THREE.Matrix4().makeRotationY(k / 6 * Math.PI * 2).multiply(MT(0, 0.79, 0.098))]).concat([[new THREE.TorusGeometry(0.1, 0.012, 3, 12).rotateX(Math.PI / 2), MT(0, 0.76, 0)]])),
   sceptre: mergeG([[new THREE.CylinderGeometry(0.012, 0.012, 0.8, 5), MT(0, 0.3, 0)], [new THREE.SphereGeometry(0.03, 6, 4), MT(0, 0.72, 0)]]),
   shield: mergeG([[new THREE.CylinderGeometry(0.28, 0.02, 0.95, 3, 1, false, -Math.PI / 6, Math.PI * 2).scale(1, 1, 0.12), MT(0.09, -0.05, 0.1)]]),
   spear: mergeG([[new THREE.CylinderGeometry(0.013, 0.013, 2.4, 5), MT(0, 0.2, 0)], [new THREE.ConeGeometry(0.03, 0.2, 5), MT(0, 1.5, 0)]]) };
 const PARTS = ["legL", "legR", "shinL", "shinR", "shoeL", "shoeR", "armL", "armR", "foreL", "foreR", "handL", "handR", "torso", "head", "eyeW", "eyes", "brows", "hairEng", "hairLong", "hairNor", "tonsure", "moustache", "beard", "headrail", "tunic", "trim", "belt", "gown", "cloak", "mantle", "brooch",
-  "helm", "coif", "sword", "mitre", "chasuble", "pallium", "crozier", "cowl", "hood", "cap", "crown", "sceptre", "shield", "spear"];
+  "helm", "coif", "sword", "mitre", "chasuble", "pallium", "crozier", "cowl", "hood", "cap", "crown", "sceptre", "shield", "spear", "surcoat", "lcoif", "wimple", "barbette"];
 const PGEO = { legL: PG.thigh, legR: PG.thigh, shinL: PG.shin, shinR: PG.shin, shoeL: PG.shoe, shoeR: PG.shoe, armL: PG.uarm, armR: PG.uarm, foreL: PG.farm, foreR: PG.farm, handL: PG.hand, handR: PG.hand };
 for (const k in PG) if (!PG[k].attributes.color) PG[k] = G1(PG[k]);
 const METAL = new Set(["helm", "crown", "brooch", "sceptre", "coif"]);
@@ -141,10 +147,13 @@ function looks(i, role) { const h = k => hash(i * 13 + k, 77), pick = (A, k) => 
   const poor = h(20) < 0.7, plain = k => poor ? (h(k + 40) < 0.72 ? pick(NATURAL, k) : pick(COMMON, k)) : (h(k + 40) < 0.5 ? pick(COMMON, k) : pick(RICH, k));
   const L = { role: r, s: 0.92 + h(5) * 0.12, skin: pick(SKINS, 4), hair: h(30) < 0.12 ? 0x8a8478 : pick(HAIRS, 6), tunic: plain(7), hose: plain(8), shoes: h(21) < 0.5 ? 0x3a2a1e : 0x4e3a28, cloak: plain(9), hasCloak: h(10) < 0.75,
     trim: null, belt: 0x3a2c20, rail: h(22) < 0.8 ? 0xe6e0d0 : pick([0xcfc4a8, 0xb8ab90, 0x9a8c70], 23), beard: h(24) < 0.25, mous: h(25) < 0.85, hood: h(26) < 0.18, cap: h(27) < 0.12, mantle: h(28) < 0.55, girl: h(29) < 0.5, chas: 0, pallium: false };
-  if (ERA === 1285) Object.assign(L, { mous: h(25) < 0.1, beard: h(24) < 0.3, hood: h(26) < 0.35, cap: h(27) < 0.4 });   // 1285: most men shaven or short-bearded, linen coifs and hoods common
+  // 1285: most men shaven or short-bearded; working men in linen coifs or hoods; many in surcoats, the better-off in long ones of dyed cloth;
+  // married women in veil and wimple, younger and fashionable women in barbette and fillet
+  if (ERA === 1285) Object.assign(L, { mous: h(25) < 0.1, beard: h(24) < 0.3, hood: h(26) < 0.3, cap: false, lcoif: h(27) < 0.5, hasCloak: h(10) < 0.22, mantle: h(28) < 0.25, surcoat: h(31) < 0.45 ? pick([0x7a3a2a, 0x3a4a6a, 0x5a6a3a, 0x8a6a3a, 0x6a5a4a, 0x4a3a5a], 32) : null, barb: r === "woman" && h(33) < 0.35 });
   if (SUMMER) Object.assign(L, { hasCloak: h(10) < 0.15, hood: false, cap: h(27) < 0.06, mantle: h(28) < 0.12 });   // summer: few cloaks or hoods
   if (r === "child") { L.s = 0.62 + h(5) * 0.14; L.hasCloak = h(10) < 0.4; L.tunic = plain(7); }
   if (r === "noble" || r === "norman") Object.assign(L, { tunic: pick(RICH, 11), cloak: pick(RICH, 12), hose: pick([0x8a2a2a, 0x2a3a6a, 0x5a4a3a, 0xa89a7a], 13), hasCloak: !SUMMER || h(10) < 0.5, trim: pick(TRIMS, 14), hood: false, cap: false, belt: 0x5a3a20 });
+  if (ERA === 1285 && (r === "noble" || r === "norman")) Object.assign(L, { surcoat: pick(RICH, 34), hasCloak: h(10) < 0.3 });
   if (r === "woman" && !poor) L.trim = pick(TRIMS, 14);
   if (r === "soldier") Object.assign(L, { tunic: 0x80838a, hose: plain(8), cloak: pick(RICH, 12), hasCloak: h(10) < 0.25, hood: false, cap: false });   // a mail hauberk over a padded tunic
   if (r === "monk") Object.assign(L, { tunic: 0x1c1816, hasCloak: false, belt: 0x2a2420 });
@@ -156,20 +165,21 @@ function looks(i, role) { const h = k => hash(i * 13 + k, 77), pick = (A, k) => 
 const adultMan = L => L.role === "eng" || L.role === "noble";
 function shows(L, p) { const r = L.role, girl = r === "child" && L.girl, robe = r === "woman" || girl || r === "monk" || r === "cleric" || r === "bishop" || r === "archbishop" || r === "duke" || r === "king", clergy = r === "monk" || r === "cleric" || r === "bishop" || r === "archbishop";
   switch (p) {
-    case "hairEng": return adultMan(L) || (r === "child" && !L.girl); case "hairLong": return girl; case "hairNor": return r === "norman" || r === "duke" || r === "king";
-    case "tonsure": return clergy; case "moustache": return adultMan(L) && L.mous; case "beard": return adultMan(L) && L.beard; case "headrail": return r === "woman";
+    case "hairEng": return adultMan(L) || (r === "child" && !L.girl) || (r === "woman" && L.barb); case "hairLong": return girl; case "hairNor": return r === "norman" || r === "duke" || r === "king";
+    case "tonsure": return clergy; case "moustache": return adultMan(L) && L.mous; case "beard": return adultMan(L) && L.beard; case "headrail": return r === "woman" && !L.barb;
     case "tunic": return !robe; case "trim": return L.trim !== null; case "belt": return r !== "bishop" && r !== "archbishop"; case "gown": return robe;
     case "cloak": return L.hasCloak && !clergy && r !== "woman" && !girl; case "mantle": return (r === "woman" && L.mantle) || (girl && L.hasCloak); case "brooch": return L.hasCloak && !clergy && r !== "woman" && !girl;
     case "helm": case "coif": case "sword": case "shield": case "spear": return r === "soldier";
     case "mitre": case "chasuble": case "crozier": return r === "bishop" || r === "archbishop"; case "pallium": return L.pallium; case "cowl": return r === "monk";
     case "hood": return L.hood && (adultMan(L) || r === "child") && !L.cap; case "cap": return L.cap && adultMan(L);
+    case "surcoat": return !!L.surcoat && !robe && r !== "child"; case "lcoif": return !!L.lcoif && adultMan(L) && !L.hood; case "wimple": return r === "woman" && ERA === 1285 && !L.barb; case "barbette": return r === "woman" && !!L.barb;
     case "crown": case "sceptre": return r === "king"; default: return true; } }
 function colorOf(L, p) { const robeLegs = L.role === "woman" || (L.role === "child" && L.girl);
   if (p.startsWith("leg") || p.startsWith("shin")) return robeLegs ? L.tunic : L.hose; if (p.startsWith("fore")) return L.role === "soldier" ? 0x6a5a48 : L.tunic; if (p.startsWith("shoe")) return L.shoes; if (p.startsWith("hand") || p === "head") return L.skin;
   switch (p) { case "armL": case "armR": case "torso": return L.tunic; case "eyes": return 0x3a2a20; case "eyeW": return 0xe8e4dc; case "brows": return L.hair; case "hairEng": case "hairLong": case "hairNor": case "tonsure": case "moustache": case "beard": return L.hair;
     case "headrail": return L.rail; case "tunic": case "gown": return L.tunic; case "trim": return L.trim ?? L.tunic; case "belt": return L.belt; case "cloak": case "mantle": return L.cloak;
     case "brooch": return L.trim ? 0xd8b84a : 0x9a9a90; case "helm": return 0x8a8a90; case "coif": return 0x80838a; case "sword": return 0x4a3a2a; case "mitre": return 0xf2eee2; case "chasuble": return L.chas;
-    case "pallium": return 0xf4f0e6; case "crozier": return 0xc8a040; case "cowl": return 0x1c1816; case "hood": case "cap": return L.cloak; case "crown": return 0xd8b84a; case "sceptre": return 0xd8b84a;
+    case "pallium": return 0xf4f0e6; case "crozier": return 0xc8a040; case "cowl": return 0x1c1816; case "hood": case "cap": return L.cloak; case "surcoat": return L.surcoat; case "lcoif": case "wimple": case "barbette": return 0xece6d8; case "crown": return 0xd8b84a; case "sceptre": return 0xd8b84a;
     case "shield": return [0xb8302a, 0x2a4a9a, 0xd8b83a, 0x3a6a3a][Math.floor(L.s * 37) % 4]; case "spear": return 0x6a4a2c; } return 0xffffff; }
 // poses: hip flex (l), knee bend (k), shoulder swing (a), elbow bend (e, negative = forearm forward), skirt tilt (sk)
 function poseOf(kind, t, ph, walkAmt = 1) { const c = t * 7 + ph, w = Math.sin(c), sway = 0.04 * Math.sin(t * 0.8 + ph);
@@ -196,7 +206,7 @@ function poseOf(kind, t, ph, walkAmt = 1) { const c = t * 7 + ph, w = Math.sin(c
     case "sell": Object.assign(P, { lean: 0.1, aL: -0.45, eL: -0.8, aR: -0.5 - 0.25 * Math.sin(t * 2 + ph), eR: -0.9 }); break; }
   return P; }
 const _b = new THREE.Matrix4(), _hm = new THREE.Matrix4(), _sk = new THREE.Matrix4(), _j = new THREE.Matrix4(), _tmp = new THREE.Matrix4(), _q2 = new THREE.Quaternion(), _e2 = new THREE.Euler(), ZEROM = new THREE.Matrix4().makeScale(0, 0, 0), _p = V3(0, 0, 0), _s = V3(1, 1, 1);
-const _M = {}, LIMB = new Set(["legL", "legR", "shinL", "shinR", "shoeL", "shoeR", "armL", "armR", "foreL", "foreR", "handL", "handR", "spear", "shield", "crozier", "sceptre"]), SKIRT = new Set(["tunic", "trim", "gown"]);
+const _M = {}, LIMB = new Set(["legL", "legR", "shinL", "shinR", "shoeL", "shoeR", "armL", "armR", "foreL", "foreR", "handL", "handR", "spear", "shield", "crozier", "sceptre"]), SKIRT = new Set(["tunic", "trim", "gown", "surcoat"]);
 function partMatrices(x, y, z, h, L, P, out) { _e2.set(0, h, 0); _q2.setFromEuler(_e2); _b.compose(_p.set(x, y, z), _q2, _s.set(L.s, L.s, L.s));
   _hm.copy(_b).multiply(_tmp.makeTranslation(0, HIPY - P.drop, 0)).multiply(_j.makeRotationX(P.lean)); _sk.copy(_hm).multiply(_j.makeRotationX(P.sk - P.lean * 0.5));
   const leg = (sx, l, k, side) => { const th = _b.clone().multiply(_tmp.makeTranslation(sx, HIPY - P.drop, 0)); if (P.spr) th.multiply(_tmp.makeRotationZ(P.spr * Math.sign(sx))); th.multiply(_j.makeRotationX(l));   // (legs apart astride a horse)
