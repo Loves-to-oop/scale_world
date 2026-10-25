@@ -45,6 +45,11 @@ const LIVES = {
   ale: { title: "an alewife of Eastcheap, London", short: "Alewife", rank: "common", woman: true, intro: "You brew ale and sell it from your house in Eastcheap; your husband is a carter. Brewing, spinning, cooking and the children fill your day." },
   south: { title: "a fisherman of Southwark", short: "Southwark fisherman", rank: "common", intro: "A month ago William's knights burned Southwark. Your house is a black shell; your family shelters in a lean-to beside it. You fish the Thames for eels and are rebuilding." },
   thegn: { title: "an English thegn with a town house in London", short: "Thegn", rank: "noble", intro: "You hold land in Middlesex and a 'haw', a town house, in the City, with servants. You submitted to William with the other English leaders at Berkhamsted. A thegn is expected at the crowning." } };
+if (ERA === 1285) { LIVES.comb.intro = "You make combs of antler, bone and horn in your house on Bread Street, with your wife, children and an apprentice. It is Michaelmas, quarter day: your rent is due to your landlord today. In June the king took the City into his own hands and removed its mayor.";
+  LIVES.ale.title = "a brewster of Eastcheap, London"; LIVES.ale.short = "Brewster"; LIVES.ale.intro = "You brew ale and sell it from your house in Eastcheap, with a pole and bush over the door when a brew is ready; the assize of ale fixes your price and the ale-conner tastes it. Your husband is a carter.";
+  LIVES.south.intro = "You fish the Thames for eels, salmon and flounder from Southwark, by the foot of the stone bridge. You know how to shoot the bridge when the tide runs through the arches, and you sell your catch at the fish market in Old Fish Street.";
+  LIVES.thegn = { title: "a mercer of Cheapside, a citizen of London", short: "Mercer", rank: "noble", intro: "You are a citizen and mercer, dealing in linen, silks and small wares from a shop and house on Cheapside, with servants and apprentices. You have served as alderman of your ward; this summer the king removed your mayor and put a royal warden over the City." }; }
+let mountPrev = [0, 0];   // the horse's last position (used by mountStep in the roles module, which can run before that module has finished loading)
 const WHO = LIVES[Q.get("who")] ? Q.get("who") : "traveller", LIFE = LIVES[WHO], UNSEEN = LIFE.rank === "unseen";
 
 // ---------- people of 1066 ----------
@@ -136,6 +141,7 @@ function looks(i, role) { const h = k => hash(i * 13 + k, 77), pick = (A, k) => 
   const poor = h(20) < 0.7, plain = k => poor ? (h(k + 40) < 0.72 ? pick(NATURAL, k) : pick(COMMON, k)) : (h(k + 40) < 0.5 ? pick(COMMON, k) : pick(RICH, k));
   const L = { role: r, s: 0.92 + h(5) * 0.12, skin: pick(SKINS, 4), hair: h(30) < 0.12 ? 0x8a8478 : pick(HAIRS, 6), tunic: plain(7), hose: plain(8), shoes: h(21) < 0.5 ? 0x3a2a1e : 0x4e3a28, cloak: plain(9), hasCloak: h(10) < 0.75,
     trim: null, belt: 0x3a2c20, rail: h(22) < 0.8 ? 0xe6e0d0 : pick([0xcfc4a8, 0xb8ab90, 0x9a8c70], 23), beard: h(24) < 0.25, mous: h(25) < 0.85, hood: h(26) < 0.18, cap: h(27) < 0.12, mantle: h(28) < 0.55, girl: h(29) < 0.5, chas: 0, pallium: false };
+  if (ERA === 1285) Object.assign(L, { mous: h(25) < 0.1, beard: h(24) < 0.3, hood: h(26) < 0.35, cap: h(27) < 0.4 });   // 1285: most men shaven or short-bearded, linen coifs and hoods common
   if (SUMMER) Object.assign(L, { hasCloak: h(10) < 0.15, hood: false, cap: h(27) < 0.06, mantle: h(28) < 0.12 });   // summer: few cloaks or hoods
   if (r === "child") { L.s = 0.62 + h(5) * 0.14; L.hasCloak = h(10) < 0.4; L.tunic = plain(7); }
   if (r === "noble" || r === "norman") Object.assign(L, { tunic: pick(RICH, 11), cloak: pick(RICH, 12), hose: pick([0x8a2a2a, 0x2a3a6a, 0x5a4a3a, 0xa89a7a], 13), hasCloak: !SUMMER || h(10) < 0.5, trim: pick(TRIMS, 14), hood: false, cap: false, belt: 0x5a3a20 });
@@ -272,7 +278,9 @@ function baseHL(x, z) { const s = THAMES.side(x, z), d = Math.abs(s); let h;
   if (FLEET.near(x, z, 60)) { const fw = clampN(26 - (-z - 1270) / 560 * 18, 5, 26), dd = FLEET.d(x, z); if (dd < fw + 22) { if (z > -2150) h = Math.min(h, lerpN(-2.2, h, sstepN(dd, fw * 0.6, fw + 22))); else h -= 1.6 * (1 - sstepN(dd, fw * 0.5, fw + 30)); } }   // the Fleet: about 50 m across at its mouth, 15 m by Fleet Street; tidal to Holborn, a brook above   // tidal to Holborn, a brook in its valley above
   for (const B of BROOKS) if (B.near(x, z, 30)) { const dd = B.d(x, z); if (dd < 30) h -= (h > 1.2 ? 1.2 : 0.4) * (1 - sstepN(dd, 2, 30)); }   // brooks in their valleys
   carve(WALBROOK, 3, -0.4, 30); carve(TYB_N, 7, -1.2, 10); carve(TYB_S, 7, -1.2, 10); carve(TYB_W, 6, -1.0, 10);
-  if (ERA >= 1100 && TOWER_DITCH.near(x, z, 14)) { const dd = TOWER_DITCH.d(x, z); if (dd < 12) h -= 2.6 * (1 - sstepN(dd, 3, 12)); }   // the Tower's ditch (by 1100)
+  if (ERA === 1100 && TOWER_DITCH.near(x, z, 14)) { const dd = TOWER_DITCH.d(x, z); if (dd < 12) h -= 2.6 * (1 - sstepN(dd, 3, 12)); }   // the Tower's ditch (by 1100)
+  if (ERA === 1285) { const mx = x - TOW_C[0], mz = z - TOW_C[1]; if (mx > -225 && mx < 100 && mz > -125 && mz < 92) h = Math.max(h, lerpN(h, 1.6, (1 - sstepN(mz, 78, 92)) * (1 - sstepN(mx, 88, 100)) * sstepN(mx, -225, -212)));
+    if (mx > -186 && mx < 130 && mz > -118 && mz < 66 && !(mx < -136 && mz > 38 && mz < 54)) { const dO = Math.max(-139 - mx, mx - 83, -72 - mz); if (dO > 0 && dO < 46) h = Math.min(h, lerpN(h, -2.4, sstepN(dO, 1, 6) * (1 - sstepN(dO, 40, 46)))); } }
   if (WALL.near(x, z, 30) && !CITY.inside(x, z)) { const wd = WALL.d(x, z); if (wd > 3 && wd < 18) h -= 2.4 * Math.sin((wd - 3) / 15 * Math.PI); }                     // the city ditch outside the wall
   return h; }
 // ---------- the lower Thames, from Limehouse to the sea ----------
@@ -292,6 +300,7 @@ function baseHE(x, z) { const R = lowerInfo(x, z), hw = lowerHW(R.s), north = R.
 function baseH(x, z) { if (x < 6200) return baseHL(x, z); const e = baseHE(x, z); if (x > 7200) return e; return lerpN(baseHL(x, z), e, (x - 6200) / 1000); }
 const riverSide = (x, z) => x < 6700 ? THAMES.side(x, z) : lowerInfo(x, z).side;
 const groundH = baseH;
+const TOW_C = LL(51.50815, -0.07595), inTowerYard = (x, z) => ERA === 1285 && x - TOW_C[0] > -190 && x - TOW_C[0] < 132 && z - TOW_C[1] > -120 && z - TOW_C[1] < 82;
 const TOWER_DITCH = line([[51.5072, -0.0784], [51.5094, -0.0784], [51.5094, -0.0752]]);   // west and north of the Norman Tower's bailey
 
 // ---------- streets of 1066 ----------
@@ -497,9 +506,10 @@ function groof(F, mat, w, d, wh, rh, o = {}) { const t = o.t ?? (mat === "thatch
     }
     if (mat === "thatch") gbox(F, "thatch", 0, yr + tv - 0.05, 0, 0.5, 0.25, 2 * Rz + 0.4); } }
 // the timber house: low walls on earth-fast oak posts, wattle-and-daub or planks; door in a frame; shuttered window openings
-function gHouse(H) { const F = FR(H.x, H.z, H.ry, H.gy, H.chunkKey), w = H.w, d = H.d, wh = H.wh, rh = H.rh, R = seeded((H.x * 7 + H.z * 13) | 0);
+function gHouse(H) { if (ERA === 1285 && H.roof === "thatch" && CITY.inside(H.x, H.z) && Math.abs((H.x * 31 + H.z * 17) | 0) % 10 < 7) { H.roof = "shingle"; H.tile = true; }
+  const F = FR(H.x, H.z, H.ry, H.gy, H.chunkKey), w = H.w, d = H.d, wh = H.wh, rh = H.rh, R = seeded((H.x * 7 + H.z * 13) | 0);
   const bw = 0.85 + R() * 0.25, br = 0.8 + R() * 0.3, tintW = H.wall === "daub" ? (R() < 0.3 ? [1.3, 1.3, 1.27] : [bw, bw * 0.98, bw * 0.95]) : [bw, bw * 0.97, bw * 0.94];   // some daub limewashed
-  const tintR = H.roof === "thatch" ? (R() < 0.25 ? [1.15, 1.1, 0.95] : [br, br * 0.98, br * 0.93]) : [br, br, br];   // a few roofs new-thatched, most weathered
+  const tintR = H.tile ? [1.05 * br + 0.1, 0.58 * br, 0.44 * br] : H.roof === "thatch" ? (R() < 0.25 ? [1.15, 1.1, 0.95] : [br, br * 0.98, br * 0.93]) : [br, br, br];   // a few roofs new-thatched, most weathered
   GTINT = tintW; gbox(F, H.wall, 0, wh / 2 - 0.15, 0, w, wh + 0.3, d);
   if (!H.hip) for (const sz of [-1, 1]) gpoly(F, H.wall, [[-w / 2, wh, sz * d / 2], [w / 2, wh, sz * d / 2], [0, wh + rh, sz * d / 2]], [[0, wh], [w, wh], [w / 2, wh + rh]], [0, 0, sz]);   // the gable ends
   GTINT = [0.9 + R() * 0.2, 0.9, 0.9]; const post = (x, z) => gbox(F, "oak", x, wh / 2 - 0.1, z, 0.22, wh + 0.2, 0.22, "b");
@@ -670,7 +680,7 @@ function addChurch(x, z, o = {}) { const nw = o.nw || 6.5, nl = o.nl || 14, cw =
 // The gates' 11th-century form is not known; they are shown as simple towered arches on their Roman footprints.
 { for (const [ax, az, bx, bz] of WALL.S) { const len = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(len / 4)), ry = Math.atan2(bx - ax, bz - az);
     for (let k = 0; k < n; k++) { const x = ax + (bx - ax) * (k + 0.5) / n, z = az + (bz - az) * (k + 0.5) / n;
-      if (GATES.some(G => Math.hypot(G.x - x, G.z - z) < 4.6)) continue;
+      if (GATES.some(G => Math.hypot(G.x - x, G.z - z) < 4.6) || inTowerYard(x, z)) continue;
       const gy = groundH(x, z); put("w:rag", BOX_G, MAT.rag, x, gy - 1.5, z, 2.6, 7.5, len / n + 0.05, ry); put("w:rag", BOX_G, MAT.rag, x, gy + 6, z, 3.0, 0.3, len / n + 0.05, ry);
       solid(x, z, 2.6, len / n + 0.2, ry); } }
   for (const [ax, az, bx, bz] of WALL.S) { const L = { S: [[ax, az, bx, bz]] }; rLine(L, 3, 7); }
@@ -728,6 +738,8 @@ function addBoat(x, z, ry, len, ship) { const gy = Math.max(WATER - 0.35, ground
 const AB_Y = groundH(0, 0) + 0.05, AB_F = AB_Y + 0.2;   // the floor
 const NAVE_W = -62, NAVE_DONE = ERA >= 1100 ? -62.7 : -33.5,   // by 1100 the nave was finished
   CHOIR_E = 25, BAY = 4.75, HS = 1.22;   // HS: heights scaled to Jumièges' proportions (nave walls about 23 m)
+// in 1285 Henry III's Gothic church has replaced everything from the fifth bay of the nave eastward: those parts are not built here (see the 1285 section)
+const AB_CUT = ERA === 1285 ? -5.7 - 5 * BAY : 1e9, abCut = (x, z) => x > AB_CUT && Math.abs(z) < 12.5 || ERA === 1285 && x > -7.5 && Math.abs(z) < 30 && x < 60, putAB = (k, g, m, x, y, z, ...r) => abCut(x, z) ? -1 : put(k, g, m, x, y, z, ...r);
 const abT = ashlarT.clone(); abT.repeat.set(1 / 5.6, 1 / 5.6); abT.needsUpdate = true;
 const pnT = plankT.clone(); pnT.repeat.set(1 / 4, 1 / 2); pnT.needsUpdate = true;
 const ceilT = tex(256, 256, (g, w, h) => { g.fillStyle = "#6a4a30"; g.fillRect(0, 0, w, h);   // a flat boarded ceiling, painted (as at Peterborough later): form and colours inferred
@@ -757,13 +769,13 @@ AMAT.silk = new THREE.MeshStandardMaterial({ roughness: 0.6, side: THREE.DoubleS
 AMAT.paintc = M(0xb8783a); AMAT.linen = M(0xeee8dc);
 const AG = {}; for (const k in AMAT) AG[k] = [];
 // a box with its texture laid at real size (1 unit of texture = 1 m), base at y
-function slab(mat, x, y, z, sx, sy, sz, ry = 0, rx = 0, coll = false) { AG[mat] = AG[mat] || []; const g = new THREE.BoxGeometry(sx, sy, sz), uv = g.attributes.uv;
+function slab(mat, x, y, z, sx, sy, sz, ry = 0, rx = 0, coll = false) { if (abCut(x, z)) return; AG[mat] = AG[mat] || []; const g = new THREE.BoxGeometry(sx, sy, sz), uv = g.attributes.uv;
   const dims = [[sz, sy], [sz, sy], [sx, sz], [sx, sz], [sx, sy], [sx, sy]]; for (let f = 0; f < 6; f++) for (let v = 0; v < 4; v++) { const i = f * 4 + v; uv.setXY(i, uv.getX(i) * dims[f][0], uv.getY(i) * dims[f][1]); }
   const m = new THREE.Matrix4().compose(V3(x, y + sy / 2, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, 0)), V3(1, 1, 1)); AG[mat].push([g, m]);
   if (coll) solid(x, z, sx, sz, ry); }
-function shapeG(mat, shape, depth, x, y, z, ry) { AG[mat] = AG[mat] || []; const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 10 }); g.translate(0, 0, -depth / 2);
+function shapeG(mat, shape, depth, x, y, z, ry) { if (abCut(x, z)) return; AG[mat] = AG[mat] || []; const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 10 }); g.translate(0, 0, -depth / 2);
   AG[mat].push([g, new THREE.Matrix4().compose(V3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), V3(1, 1, 1))]); }
-function flushAG(sy = 1) { for (const k in AMAT) AG[k] = AG[k] || []; for (const k in AG) if (AG[k].length) { const m = new THREE.Mesh(mergeUV(AG[k]), AMAT[k]); m.scale.y = sy; m.position.y = AB_Y * (1 - sy); m.frustumCulled = false; scene.add(m); AG[k].length = 0; } }   // sy: the church's height, stretched from the floor
+function flushAG(sy = 1) { for (const k in AMAT) AG[k] = AG[k] || []; if (ERA === 1285) for (const k in AG) AG[k] = AG[k].filter(([, m]) => !abCut(m.elements[12], m.elements[14])); for (const k in AG) if (AG[k].length) { const m = new THREE.Mesh(mergeUV(AG[k]), AMAT[k]); m.scale.y = sy; m.position.y = AB_Y * (1 - sy); m.frustumCulled = false; scene.add(m); AG[k].length = 0; } }   // sy: the church's height, stretched from the floor
 function mergeUV(parts) { let n = 0; const gs = parts.map(([g, m]) => { const q = (g.index ? g.toNonIndexed() : g).applyMatrix4(m); n += q.attributes.position.count; return q; });
   const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2); let o = 0;
   for (const q of gs) { pos.set(q.attributes.position.array, o * 3); nor.set(q.attributes.normal.array, o * 3); if (q.attributes.uv) uv.set(q.attributes.uv.array, o * 2); o += q.attributes.position.count; }
@@ -775,12 +787,12 @@ function windowPanel(w, y0, y1, open, ys, yb) { const s = new THREE.Shape(); s.m
 // a window: a dark opening outside, pale daylight inside; nrm is the outward direction (+1/-1) along `axis`
 // a round-headed opening, centred on its middle, in the xy plane facing +z
 function archGeo(w, h) { const s = new THREE.Shape(), r = w / 2; s.moveTo(-r, -h / 2); s.lineTo(r, -h / 2); s.lineTo(r, h / 2 - r); s.absarc(0, h / 2 - r, r, 0, Math.PI, false); s.lineTo(-r, -h / 2); return new THREE.ShapeGeometry(s, 8); }
-function windowAt(x, y, z, w, h, axis, nrm, th) { const ry = axis === "z" ? (nrm > 0 ? 0 : Math.PI) : (nrm > 0 ? Math.PI / 2 : -Math.PI / 2);
+function windowAt(x, y, z, w, h, axis, nrm, th) { if (abCut(x, z)) return; const ry = axis === "z" ? (nrm > 0 ? 0 : Math.PI) : (nrm > 0 ? Math.PI / 2 : -Math.PI / 2);
   const ox = axis === "x" ? nrm * (th / 2 + 0.02) : 0, oz = axis === "z" ? nrm * (th / 2 + 0.02) : 0;
   const pl = (mat, sx, sz, r) => { const g = archGeo(w, h); AG[mat].push([g, new THREE.Matrix4().compose(V3(x + sx, y + h / 2, z + sz), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, r, 0)), V3(1, 1, 1))]); };
   pl("dark", ox, oz, ry); pl("glow", -ox, -oz, ry + Math.PI); archFrame(x + ox, y, z + oz, w, h, ry); }
 // the moulded frame round a window or arch outside: a roll moulding over the arch and a small shaft each side (as at Jumièges)
-function archFrame(x, y, z, w, h, ry, depth = 0.12) { const r = w / 2, ys = y + h - r, s = new THREE.Shape(); s.absarc(0, 0, r + 0.24, 0, Math.PI, false); s.lineTo(-r - 0.06, 0); s.absarc(0, 0, r + 0.06, Math.PI, 0, true); s.lineTo(r + 0.24, 0);
+function archFrame(x, y, z, w, h, ry, depth = 0.12) { if (abCut(x, z)) return; const r = w / 2, ys = y + h - r, s = new THREE.Shape(); s.absarc(0, 0, r + 0.24, 0, Math.PI, false); s.lineTo(-r - 0.06, 0); s.absarc(0, 0, r + 0.06, Math.PI, 0, true); s.lineTo(r + 0.24, 0);
   const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false, curveSegments: 10 }); AG.ashlar.push([g, new THREE.Matrix4().compose(V3(x, ys, z), q, V3(1, 1, 1))]);
   for (const sx of [-1, 1]) { const c = new THREE.CylinderGeometry(0.075, 0.075, h - r, 7), off = V3(sx * (r + 0.15), 0, 0.08).applyQuaternion(q); AG.ashlar.push([c, new THREE.Matrix4().makeTranslation(x + off.x, y + (h - r) / 2, z + off.z)]);
     const cap = new THREE.BoxGeometry(0.26, 0.14, 0.2), co = V3(sx * (r + 0.15), 0, 0.08).applyQuaternion(q); AG.paintc.push([cap, new THREE.Matrix4().compose(V3(x + co.x, ys - 0.02, z + co.z), q, V3(1, 1, 1))]); } }
@@ -845,20 +857,20 @@ function wallZ(z0, z1, x, th, y0, h, gaps = [], mat = "ashlar") { let a = z0; fo
   slab("ashlar", 3, Y + 0.2, 0, 3, 0.5, 4); slab("wood", 3.4, Y + 0.7, 0, 0.8, 0.5, 0.9); slab("wood", 3.85, Y + 0.7, 0, 0.12, 1.6, 0.9); slab("red", 3.4, Y + 1.21, 0, 0.8, 0.06, 0.9);
   flushAG();
   // exterior roofs and the crossing tower
-  put("r:lead", GABLE_G, MAT.lead, (NAVE_DONE - 5) / 2, Y + 19 * HS, 0, 12.8, 7, -5 - NAVE_DONE + 0.4, Math.PI / 2); put("r:lead", GABLE_G, MAT.lead, 15, Y + 19 * HS, 0, 12.8, 7, 20.4, Math.PI / 2);
-  for (const zs of [-1, 1]) put("r:lead", GABLE_G, MAT.lead, 0, Y + 19 * HS, 16.7 * zs, 12.8, 7, 22.4, 0);
-  { const g = new THREE.ConeGeometry(6.4, 6.5, 12, 1, true, 0, Math.PI); put("apseroof", g, new THREE.MeshStandardMaterial({ map: leadT, roughness: 0.6, metalness: 0.3, side: THREE.DoubleSide }), CHOIR_E, Y + 19 * HS + 3.25, 0, 1, 1, 1, 0); }
+  put("r:lead", GABLE_G, MAT.lead, (NAVE_DONE + Math.min(-5, AB_CUT)) / 2, Y + 19 * HS, 0, 12.8, 7, Math.min(-5, AB_CUT) - NAVE_DONE + 0.4, Math.PI / 2); putAB("r:lead", GABLE_G, MAT.lead, 15, Y + 19 * HS, 0, 12.8, 7, 20.4, Math.PI / 2);
+  for (const zs of [-1, 1]) putAB("r:lead", GABLE_G, MAT.lead, 0, Y + 19 * HS, 16.7 * zs, 12.8, 7, 22.4, 0);
+  { const g = new THREE.ConeGeometry(6.4, 6.5, 12, 1, true, 0, Math.PI); putAB("apseroof", g, new THREE.MeshStandardMaterial({ map: leadT, roughness: 0.6, metalness: 0.3, side: THREE.DoubleSide }), CHOIR_E, Y + 19 * HS + 3.25, 0, 1, 1, 1, 0); }
   slab("ashlar", 0, Y + 19, 0, 12.6, 17, 12.6); for (const [x, z, a] of [[6.32, 0, 0], [-6.32, 0, 0], [0, 6.32, 1], [0, -6.32, 1]]) for (const o of [-2.4, 0, 2.4]) slab("dark", x + (a ? o : 0), Y + 30, z + (a ? 0 : o), a ? 1.0 : 0.05, 3.2, a ? 0.05 : 1.0);
-  put("cap", CONE4_G, MAT.lead, 0, Y + 36 * HS, 0, 13.2, 6, 13.2);
-  for (const [cx, cz, ry] of [[0, 28.0, 0], [0, -28.0, 0], [CHOIR_E + 6.2, 0, Math.PI / 2]]) { const top = Y + 19 * HS + (cx > CHOIR_E ? 5.8 : 6.9); put("gcross", BOX_G, AMAT.ashlar, cx, top, cz, 0.22, 1.6, 0.22, ry); put("gcross", BOX_G, AMAT.ashlar, cx, top + 1.0, cz, 0.9, 0.22, 0.22, ry); }   // stone crosses on the gables put("vane", CYL_G, MAT.iron, 0, Y + 36 * HS + 6, 0, 0.1, 2.4, 0.1);
-  put("vane", BOX_G, new THREE.MeshStandardMaterial({ color: 0xd8b04a, metalness: 0.8, roughness: 0.3 }), 0, Y + 36 * HS + 7.9, 0, 1.2, 0.7, 0.12);   // the weathercock: in the Bayeux Tapestry a man is fixing it to the new church
+  putAB("cap", CONE4_G, MAT.lead, 0, Y + 36 * HS, 0, 13.2, 6, 13.2);
+  for (const [cx, cz, ry] of [[0, 28.0, 0], [0, -28.0, 0], [CHOIR_E + 6.2, 0, Math.PI / 2]]) { const top = Y + 19 * HS + (cx > CHOIR_E ? 5.8 : 6.9); putAB("gcross", BOX_G, AMAT.ashlar, cx, top, cz, 0.22, 1.6, 0.22, ry); putAB("gcross", BOX_G, AMAT.ashlar, cx, top + 1.0, cz, 0.9, 0.22, 0.22, ry); }   // stone crosses on the gables putAB("vane", CYL_G, MAT.iron, 0, Y + 36 * HS + 6, 0, 0.1, 2.4, 0.1);
+  putAB("vane", BOX_G, new THREE.MeshStandardMaterial({ color: 0xd8b04a, metalness: 0.8, roughness: 0.3 }), 0, Y + 36 * HS + 7.9, 0, 1.2, 0.7, 0.12);   // the weathercock: in the Bayeux Tapestry a man is fixing it to the new church
   // scaffolding and stone at the unfinished west end: putlog scaffolds of poles lashed together, and a hoist
   if (ERA === 1066) { const R = seeded(5); for (let k = 6; k < 12; k++) { const xc = -5 - BAY * (k + 0.5); for (const zs of [-1, 1]) for (const zo of [9.2, 12.0]) { const z = zo * zs;
-      for (const xo of [-BAY / 2 + 0.3, BAY / 2 - 0.3]) put("pole", CYL_G, MAT.wood, xc + xo, Y, z, 0.16, 11 - (k - 6), 0.16);
-      for (let h = 2; h < 10 - (k - 6); h += 2) put("pole", BOX_G, MAT.wood, xc, Y + h, z, BAY, 0.12, 0.12); }
-      for (const zs of [-1, 1]) for (let h = 2; h < 10 - (k - 6); h += 2) put("plankS", BOX_G, MAT.wood, xc, Y + h + 0.1, 10.6 * zs, BAY, 0.08, 2.4);
-      for (let n = 0; n < 5; n++) { const x = xc + (R() - 0.5) * 3, z = (R() - 0.5) * 7; put("block", BOX_G, AMAT.ashlar, x, Y - 0.1, z, 0.6 + R() * 0.3, 0.4, 0.4 + R() * 0.3, R()); } }
-    put("pole", CYL_G, MAT.wood, -50, Y, 0, 0.3, 12, 0.3); put("pole", BOX_G, MAT.wood, -48, Y + 12, 0, 5, 0.25, 0.25); put("pole", CYL_G, MAT.wood, -46, Y, 0, 0.06, 12, 0.06); }
+      for (const xo of [-BAY / 2 + 0.3, BAY / 2 - 0.3]) putAB("pole", CYL_G, MAT.wood, xc + xo, Y, z, 0.16, 11 - (k - 6), 0.16);
+      for (let h = 2; h < 10 - (k - 6); h += 2) putAB("pole", BOX_G, MAT.wood, xc, Y + h, z, BAY, 0.12, 0.12); }
+      for (const zs of [-1, 1]) for (let h = 2; h < 10 - (k - 6); h += 2) putAB("plankS", BOX_G, MAT.wood, xc, Y + h + 0.1, 10.6 * zs, BAY, 0.08, 2.4);
+      for (let n = 0; n < 5; n++) { const x = xc + (R() - 0.5) * 3, z = (R() - 0.5) * 7; putAB("block", BOX_G, AMAT.ashlar, x, Y - 0.1, z, 0.6 + R() * 0.3, 0.4, 0.4 + R() * 0.3, R()); } }
+    putAB("pole", CYL_G, MAT.wood, -50, Y, 0, 0.3, 12, 0.3); putAB("pole", BOX_G, MAT.wood, -48, Y + 12, 0, 5, 0.25, 0.25); putAB("pole", CYL_G, MAT.wood, -46, Y, 0, 0.06, 12, 0.06); }
   // inside: painted walls behind the windows' light, the apse's Christ in Majesty, painted cushion capitals, the rood, silk hangings
   const panel = (x, z, w, h, y0, ry) => { const g = new THREE.PlaneGeometry(w, h); AG.paint = AG.paint || []; AG.paint.push([g, new THREE.Matrix4().compose(V3(x, Y + y0 + h / 2, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), V3(1, 1, 1))]); };
   for (const zs of [-1, 1]) { for (let x = NAVE_DONE + BAY / 2; x < -5.7; x += BAY) panel(x, (ZA - 0.705) * zs, BAY, 12.1, 0.2, zs > 0 ? Math.PI : 0); for (let x = 8.2; x < CHOIR_E; x += 5) panel(x, (ZA - 0.705) * zs, 5, 12.1, 0.2, zs > 0 ? Math.PI : 0);
@@ -900,18 +912,18 @@ function wallZ(z0, z1, x, th, y0, h, gaps = [], mat = "ashlar") { let a = z0; fo
   flushAG(HS); rRect(-25, -5, 190, 150, 0, 8); rRect(-36, -50, 48, 22, 0, 4); rRect(28, 44, 26, 30, 0, 4); rRect(62, 70, 46, 50, 0, 9);   // worksite and trodden ground; the lay cemetery north of the church, the monks' cemetery; the monks' garden
   // the masons' yard west of the unfinished nave: lodges, stacks of Caen stone, timber, a lime pit, a sawpit, handcarts
   if (ERA === 1066) { const R = seeded(77); for (const [x, z] of [[-84, -22], [-84, 20]]) { addHouse(x, z, 6, 12, 0, { wall: "plank", roof: "thatch", wh: 2.4, door: "+x", kind: "lodge" }).noEnter = true; }
-    for (let k = 0; k < 6; k++) { const bx = -70 - (k % 3) * 5, bz = (k < 3 ? -1 : 1) * (28 + R() * 6); for (let q = 0; q < 9; q++) put("block", BOX_G, AMAT.ashlar, bx + (q % 3) * 0.9, AB_Y - 0.1 + Math.floor(q / 3) * 0.45, bz + (R() - 0.5) * 0.4, 0.8, 0.42, 0.55, R() * 0.2); }
-    for (let k = 0; k < 10; k++) put("log", CYL_G, MAT.wood, -96, AB_Y + 0.2 + (k % 3) * 0.38, -6 + k * 0.45, 0.36, 7, 0.36, Math.PI / 2, Math.PI / 2);
-    put("limepit", CYL_G, M(0xd8d4c8), -98, AB_Y - 0.2, 24, 4, 0.3, 4); put("limepit", CYL_G, M(0x8a8478), -98, AB_Y - 0.25, 24, 4.6, 0.3, 4.6);
-    put("sawtrestle", BOX_G, MAT.wood, -104, AB_Y, 6, 0.3, 1.6, 0.3); put("sawtrestle", BOX_G, MAT.wood, -104, AB_Y, 1, 0.3, 1.6, 0.3); put("log", CYL_G, MAT.wood, -104, AB_Y + 1.7, 3.5, 0.5, 6, 0.5, 0, Math.PI / 2);
-    for (const [x, z] of [[-62, -40], [-58, 38]]) { put("cart", BOX_G, MAT.wood, x, AB_Y + 0.5, z, 1.3, 0.35, 2.4); for (const s of [-1, 1]) put("cartwheel", CYL_G, MAT.wood, x + s * 0.75, AB_Y + 0.55, z, 1.1, 0.12, 1.1, 0, Math.PI / 2); } }
+    for (let k = 0; k < 6; k++) { const bx = -70 - (k % 3) * 5, bz = (k < 3 ? -1 : 1) * (28 + R() * 6); for (let q = 0; q < 9; q++) putAB("block", BOX_G, AMAT.ashlar, bx + (q % 3) * 0.9, AB_Y - 0.1 + Math.floor(q / 3) * 0.45, bz + (R() - 0.5) * 0.4, 0.8, 0.42, 0.55, R() * 0.2); }
+    for (let k = 0; k < 10; k++) putAB("log", CYL_G, MAT.wood, -96, AB_Y + 0.2 + (k % 3) * 0.38, -6 + k * 0.45, 0.36, 7, 0.36, Math.PI / 2, Math.PI / 2);
+    putAB("limepit", CYL_G, M(0xd8d4c8), -98, AB_Y - 0.2, 24, 4, 0.3, 4); putAB("limepit", CYL_G, M(0x8a8478), -98, AB_Y - 0.25, 24, 4.6, 0.3, 4.6);
+    putAB("sawtrestle", BOX_G, MAT.wood, -104, AB_Y, 6, 0.3, 1.6, 0.3); putAB("sawtrestle", BOX_G, MAT.wood, -104, AB_Y, 1, 0.3, 1.6, 0.3); putAB("log", CYL_G, MAT.wood, -104, AB_Y + 1.7, 3.5, 0.5, 6, 0.5, 0, Math.PI / 2);
+    for (const [x, z] of [[-62, -40], [-58, 38]]) { putAB("cart", BOX_G, MAT.wood, x, AB_Y + 0.5, z, 1.3, 0.35, 2.4); for (const s of [-1, 1]) putAB("cartwheel", CYL_G, MAT.wood, x + s * 0.75, AB_Y + 0.55, z, 1.1, 0.12, 1.1, 0, Math.PI / 2); } }
 }
 function inAbbey(x, z) { return (x > NAVE_DONE && x < CHOIR_E && Math.abs(z) < 11.2) || (Math.abs(x) < 6.4 && Math.abs(z) < 27.7) || (x >= CHOIR_E && Math.hypot(x - CHOIR_E, z) < 5.7); }
 // lamps: candles on the altar and lamps hung in the crossing
 const flameM = new THREE.MeshBasicMaterial({ color: 0xffb050, toneMapped: false }), FLAME_G = new THREE.ConeGeometry(0.03, 0.12, 5).translate(0, 0.06, 0);
-for (const zs of [-1, 1]) put("flame", FLAME_G, flameM, 18.6, AB_Y + 2.05, 1.05 * zs, 1, 1, 1);
-for (const [x, z] of [[0, 0], [-12, 0], [-22, 0], [12, 0], [0, -16], [0, 16]]) { put("corona", new THREE.TorusGeometry(0.9, 0.04, 4, 16).rotateX(Math.PI / 2), MAT.iron, x, AB_Y + 6, z, 1, 1, 1); put("chain", CYL_G, MAT.iron, x, AB_Y + 6, z, 0.03, 19 * HS - 6, 0.03);
-  for (let k = 0; k < 6; k++) put("flame", FLAME_G, flameM, x + Math.cos(k) * 0.9, AB_Y + 6.03, z + Math.sin(k) * 0.9, 1.5, 1.5, 1.5); }
+for (const zs of [-1, 1]) putAB("flame", FLAME_G, flameM, 18.6, AB_Y + 2.05, 1.05 * zs, 1, 1, 1);
+for (const [x, z] of [[0, 0], [-12, 0], [-22, 0], [12, 0], [0, -16], [0, 16]]) { putAB("corona", new THREE.TorusGeometry(0.9, 0.04, 4, 16).rotateX(Math.PI / 2), MAT.iron, x, AB_Y + 6, z, 1, 1, 1); putAB("chain", CYL_G, MAT.iron, x, AB_Y + 6, z, 0.03, 19 * HS - 6, 0.03);
+  for (let k = 0; k < 6; k++) putAB("flame", FLAME_G, flameM, x + Math.cos(k) * 0.9, AB_Y + 6.03, z + Math.sin(k) * 0.9, 1.5, 1.5, 1.5); }
 const abbeyLight = new THREE.PointLight(0xffd0a0, 0, 70, 1.0); abbeyLight.position.set(2, AB_Y + 9, 0); scene.add(abbeyLight);
 
 // ---------- around the abbey: the monastery, the palace, the wharf ----------
@@ -1076,7 +1088,7 @@ if (ERA >= 1100) {
   // the White Tower: about 36 x 32.5 m and 27.5 m to the battlements, Kentish ragstone with Caen stone dressings; turrets at the corners
   // (the north-east one round, holding the stair); the apse of St John's Chapel projecting at the south-east; the door at first-floor level,
   // reached by a timber stair. Flat pilaster buttresses, round-headed windows, paired above. Not yet whitewashed (that came in 1240).
-  { const [tx, tz] = LL(51.50815, -0.07595), gy = groundH(tx, tz) - 0.4, F = FR(tx, tz, 0, gy, "tower"), W = 36, D = 32.5, H = 27.5, rag = [1.15, 1.1, 1.02], caen = [1.4, 1.34, 1.16];
+  { const [tx, tz] = LL(51.50815, -0.07595), gy = groundH(tx, tz) - 0.4, F = FR(tx, tz, 0, gy, "tower"), W = 36, D = 32.5, H = 27.5, rag = ERA === 1285 ? [1.95, 1.93, 1.88] : [1.15, 1.1, 1.02], caen = ERA === 1285 ? [2.0, 1.98, 1.92] : [1.4, 1.34, 1.16];
     GTINT = rag; gbox(F, "rubble", 0, H / 2, 0, W, H, D); solid(tx, tz, W, D, 0);
     GTINT = caen; for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (let y = 0; y < H; y += 1.2) gbox(F, "rubble", sx * W / 2, y + 0.5, sz * D / 2, (y / 1.2) % 2 ? 1.0 : 0.6, 0.6, (y / 1.2) % 2 ? 0.6 : 1.0, "");   // dressed quoins
     for (const [side, L] of [["x", D], ["z", W]]) for (const sg of [-1, 1]) for (let u = -L / 2 + L / 4; u < L / 2; u += L / 4) { const px = side === "x" ? sg * (W / 2 + 0.3) : u, pz = side === "x" ? u : sg * (D / 2 + 0.3); gbox(F, "rubble", px, H / 2, pz, side === "x" ? 0.6 : 1.4, H, side === "x" ? 1.4 : 0.6, "b"); }   // pilaster buttresses
@@ -1138,7 +1150,7 @@ if (ERA >= 1100) {
 // drawbridge near the Southwark end let ships through to Queenhithe. On the middle pier stood the chapel of St Thomas Becket (Peter of
 // Colechurch was buried in it); timber houses and shops lined both sides, some overhanging the water; the Great Stone Gate stood near the
 // Southwark end (traitors' heads were not set on it until 1305). Spans are evened out here; the real ones ranged from about 4.5 to 10 m.
-const ARCH_S = [];
+const ARCH_S = [], STONEK = new THREE.MeshStandardMaterial({ map: G_TEX.rubble, color: 0xd8ccb4, roughness: 0.95 }), LEADK = new THREE.MeshStandardMaterial({ color: 0x8a9096, roughness: 0.55, metalness: 0.25 });
 function archSnap(x, z) { if (!ARCH_S.length) return [x, z]; const B = SPANS[0], dx = x - B.ax, dz = z - B.az, off = Math.abs(dx * B.uz - dz * B.ux); if (off > 60) return [x, z];
   const s = dx * B.ux + dz * B.uz; let best = ARCH_S[0]; for (const a of ARCH_S) if (Math.abs(a - s) < Math.abs(best - s)) best = a; const w = 1 - sstepN(off, 18, 60), d = (best - s) * w; return [x + B.ux * d, z + B.uz * d]; }
 // a route over the river: add points just above and below the bridge, all steered through an arch
@@ -1207,6 +1219,236 @@ if (ERA === 1285) {
       const [x, z] = at(sm), y0 = B.yAt(s0), y1 = B.yAt(s1), ym = (y0 + y1) / 2, gm = baseH(x, z); put("deck", BOX_G, MAT.rag, x, Math.min(gm, ym) - 0.4, z, W, ym - Math.min(gm, ym) + 0.4, Math.hypot(s1 - s0, y1 - y0) + 0.05, ry, Math.atan2(y0 - y1, s1 - s0)); } }
   mark("London Bridge, in stone", ...L2W(Lw * 0.35, 0), "known", "Peter of Colechurch's stone bridge, begun in 1176 and finished in 1209: about 270 m long on nineteen pointed arches. The piers stand on 'starlings', boat-shaped platforms of piles and rubble so wide that they block about two thirds of the river; at the turn of the tide the water drops a metre or more through the arches in rapids, and many travellers land above the bridge and walk round rather than 'shoot' it. Houses and shops line the roadway; tolls and rents from them pay for its upkeep. It stood for over 600 years, until 1831.", { y: 12, range: 2500, r: 60 });
   mark("The drawbridge", ...L2W(archL(DRAW) + A / 2, 0), "known", "A timber lifting span near the Southwark end, so that masted ships could pass upriver to Queenhithe, and so the bridge could be cut in war. By the late 13th century it was raised less and less, and the bridge's wardens were often in trouble for its decay.", { y: 9, range: 600, r: 14 });
+}
+
+// ---------- London in 1285: St Paul's ----------
+// Old St Paul's, rebuilt after the fire of 1087: a Norman nave of twelve bays with round arches (finished in the 12th century), Norman
+// transepts, and over the crossing a tower with a lead-covered timber spire finished in 1221, about 149 m by later reckoning, among the
+// tallest in Europe. In 1285 the 'New Work', a Gothic choir of tall pointed windows begun in 1256, is going up at the east end and will
+// not be finished until 1314. The whole church was some 180 m long. In 1285 Edward I licensed the canons to wall the churchyard; Paul's
+// Cross, the open-air pulpit where Londoners met in folkmoot and heard sermons and proclamations, stood in its north-east corner.
+if (ERA === 1285) {
+  const [Cx, Cz] = LL(51.5138, -0.0987); let gy = 1e9; for (let u = -95; u <= 95; u += 19) for (const v of [-16, 0, 16]) gy = Math.min(gy, groundH(Cx + u, Cz + v)); gy -= 0.3;
+  rRect(Cx, Cz, 240, 150, 0, 4);
+  const CF = FR(Cx, Cz, Math.PI / 2, gy, "pauls"), sub = lz => { const [X, , Z] = gw(CF, 0, 0, lz); return FR(X, Z, Math.PI / 2, gy, "pauls"); }, caen = [1.5, 1.44, 1.28], lead = [0.62, 0.64, 0.68];
+  GTINT = [0.9, 0.88, 0.84]; gbox(CF, "rubble", 0, -1.5, -3, 34, 3.4, 186, "");
+  GTINT = [0.9, 0.88, 0.84]; gbox(FR(Cx - 3, Cz, 0, gy, "pauls"), "rubble", 0, -1.5, 0, 16, 3.4, 94, "");
+  // the nave, Paul's Walk: walls, arcades of round piers, triforium and clerestory, painted screen at the east end
+  { const NF = sub(-50), w = 31, d = 80, ah = 12, ch = 28;
+    GTINT = caen; gWalls(NF, "rubble", w, d, ah, 1.6, [["-z", 0, 4.5, 8], ["+x", 22, 3, 5]]);
+    for (const sx of [-1, 1]) { gbox(NF, "rubble", sx * 6.5, (ah + ch) / 2 + 0.01, 0, 1.4, ch - ah, d, "");
+      for (let z = -d / 2 + 6.67; z < d / 2 - 1; z += 6.67) { const [px, , pz] = gw(NF, sx * 6.5, 0, z); put("pier", CYL_G, AMAT.ashlar, px, gy, pz, 2.6, ah + 0.05, 2.6); solid(px, pz, 2.4, 2.4, 0); }
+      for (let z = -d / 2 + 3.33; z < d / 2; z += 6.67) { GTINT = [1, 1, 1]; garch(NF, "dark", sx * (6.5 + 0.72), 18.5, z, 1.7, 5, [sx, 0, 0]); garch(NF, "dark", sx * (6.5 - 0.72), 13, z - 1, 0.9, 2.2, [-sx, 0, 0]); garch(NF, "dark", sx * (6.5 - 0.72), 13, z + 1, 0.9, 2.2, [-sx, 0, 0]);
+        GTINT = [1.7, 1.7, 1.75]; garch(NF, "plain", sx * (6.5 - 0.72), 18.5, z, 1.7, 5, [-sx, 0, 0]); garch(NF, "plain", sx * (w / 2 - 0.82), 4.5, z, 1.4, 3.6, [-sx, 0, 0]); GTINT = [1, 1, 1]; garch(NF, "dark", sx * (w / 2 + 0.82), 4.5, z, 1.4, 3.6, [sx, 0, 0]);
+        GTINT = caen; gbox(NF, "rubble", sx * (w / 2 + 1.1), ah / 2, z + 3.33, 0.8, ah, 1.4, "b"); }
+      const [rx, , rz] = gw(NF, sx * 11.2, 0, 0); put("aisleroof", BOX_G, LEADK, rx, gy + 14.4, rz, 10.6, 0.35, d + 1, Math.PI / 2, 0, -sx * Math.atan2(5.2, 9)); }
+    GTINT = caen; gGableBoth(NF, "rubble", 14.4, d, ch, 9); GTINT = lead; groof(NF, "shingle", 14.4, d, ch, 9, { e: 0.4, t: 0.3 });
+    GTINT = caen; for (const sx of [-1, 1]) gbox(NF, "rubble", sx * 8.2, 20, -d / 2 - 0.9, 3.2, 40, 3.2, "b");
+    GTINT = [1, 1, 1]; garch(NF, "dark", 0, 0, -d / 2 - 0.82, 6.2, 9.5, [0, 0, -1]); garch(NF, "dark", 0, 16, -d / 2 - 0.82, 3, 7, [0, 0, -1]); for (const sx of [-1, 1]) garch(NF, "dark", sx * 3.4, 17, -d / 2 - 0.82, 1.6, 5, [0, 0, -1]);
+    GTINT = [0.72, 0.7, 0.66]; gpoly(NF, "rush", [[-w / 2, 0.32, -d / 2], [w / 2, 0.32, -d / 2], [w / 2, 0.32, d / 2], [-w / 2, 0.32, d / 2]], [[0, 0], [w, 0], [w, d], [0, d]], [0, 1, 0]);
+    GTINT = [0.95, 0.3, 0.22]; gbox(NF, "plain", 0, 4, d / 2 - 1.2, 12, 8, 0.6, ""); GTINT = [1.5, 1.25, 0.6]; gbox(NF, "plain", 0, 9.5, d / 2 - 1.3, 0.4, 3, 0.3, ""); gbox(NF, "plain", 0, 10.4, d / 2 - 1.3, 2, 0.35, 0.3, ""); GTINT = [0.2, 0.15, 0.12]; garch(NF, "dark", 0, 0.3, d / 2 - 1.55, 2.4, 4, [0, 0, -1]);
+    GTINT = [1, 1, 1]; surfRect(NF, -w / 2, w / 2, -d / 2, d / 2, 0.32);
+    ZONES.push({ name: "pauls", F: NF, w: w - 3, d: d - 2, light: [0, 10, 0], doors: [[0, -d / 2]], lp: 220, ld: 95 }); }
+  // the transepts and crossing, solid from outside
+  { const TF = FR(...gw(CF, 0, 0, -3).filter((_, i) => i !== 1), 0, gy, "pauls"), w = 14, d = 92, h = 28;
+    GTINT = caen; gbox(TF, "rubble", 0, h / 2, 0, w, h, d); gGableBoth(TF, "rubble", w, d, h, 9); GTINT = lead; groof(TF, "shingle", w, d, h, 9, { e: 0.4, t: 0.3 });
+    GTINT = [1, 1, 1]; for (const sz of [-1, 1]) { garch(TF, "dark", 0, 14, sz * (d / 2 + 0.02), 4.5, 9, [0, 0, sz]); for (const sx of [-1, 1]) garch(TF, "dark", sx * 3.8, 4, sz * (d / 2 + 0.02), 1.6, 4, [0, 0, sz]); }
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const k of [0, 1]) garch(TF, "dark", sx * (w / 2 + 0.02), 16 - k * 10, sz * (d / 2 - 8 - k * 10), 1.6, 4.5, [sx, 0, 0]);
+    solid(TF.x, TF.z, w, d, 0); }
+  // the crossing tower and its spire
+  { const [tx, , tz] = gw(CF, 0, 0, -3), TF = FR(tx, tz, 0, gy, "pauls"), H = 87;
+    GTINT = caen; gbox(TF, "rubble", 0, H / 2, 0, 15, H, 15); for (const sx of [-1, 1]) for (const sz of [-1, 1]) gbox(TF, "rubble", sx * 7.2, H / 2 + 1, sz * 7.2, 1.8, H + 2, 1.8);
+    GTINT = [1, 1, 1]; for (const o of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]]) for (const u of [-3.2, 0, 3.2]) { const px = o[0] ? o[0] * 7.52 : u, pz = o[2] ? o[2] * 7.52 : u; garch(TF, "dark", px, H - 14, pz, 1.8, 8, o); garch(TF, "dark", px, H - 30, pz, 1.4, 5, o); }
+    const sp = new THREE.Mesh(new THREE.ConeGeometry(7.2, 62, 8).translate(0, 31, 0), new THREE.MeshStandardMaterial({ color: 0x8a9096, roughness: 0.5, metalness: 0.25 })); sp.position.set(tx, gy + H, tz); scene.add(sp);
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.9, 10, 8), new THREE.MeshStandardMaterial({ color: 0xc8a040, metalness: 0.7, roughness: 0.35 })); ball.position.set(tx, gy + H + 62.5, tz); scene.add(ball);
+    put("cross", BOX_G, MAT.wood, tx, gy + H + 63, tz, 0.25, 3, 0.25); put("cross", BOX_G, MAT.wood, tx, gy + H + 64.6, tz, 1.6, 0.25, 0.25);
+    mark("St Paul's Cathedral", tx, tz, "known", "Old St Paul's, rebuilt after the fire of 1087: a Norman nave of twelve bays (walk in by the great west door: its aisles are 'Paul's Walk', where Londoners meet, gossip, do business and hire servants), Norman transepts, and over the crossing a tower with a lead-covered timber spire finished in 1221, by later reckoning about 149 m, among the tallest in Europe. The whole church is some 180 m long, one of the largest in Christendom. At the east end the Gothic 'New Work' is building.", { y: 100, range: 6000, r: 60, big: true }); }
+  // the choir: the Gothic New Work, tall pointed windows between buttresses; its eastern bays still under scaffolding
+  { const QF = sub(33), w = 31, d = 58, ah = 14, ch = 31;
+    GTINT = [1.25, 1.2, 1.08]; gbox(QF, "rubble", 0, ah / 2, 0, w, ah, d); gbox(QF, "rubble", 0, ch / 2, 0, 14.4, ch, d); GTINT = lead; groof(QF, "shingle", 14.4, d, ch, 10, { e: 0.4, t: 0.3 });
+    for (const sx of [-1, 1]) { const [rx, , rz] = gw(QF, sx * 11.2, 0, 0); put("aisleroof", BOX_G, LEADK, rx, gy + ah + 2.3, rz, 10.6, 0.35, d, Math.PI / 2, 0, -sx * Math.atan2(4.6, 9));
+      for (let z = -d / 2 + 4; z < d / 2 - 1; z += 6.5) { GTINT = [1, 1, 1]; garch(QF, "dark", sx * (7.22 + 0.01), ah + 4, z, 2.2, 10, [sx, 0, 0]); garch(QF, "dark", sx * (w / 2 + 0.02), 3, z, 2.2, 8.5, [sx, 0, 0]);
+        GTINT = [1.25, 1.2, 1.08]; gbox(QF, "rubble", sx * (w / 2 + 1.0), ah / 2, z + 3.25, 1.6, ah, 1.4, "b"); gbox(QF, "rubble", sx * (w / 2 + 1.0), ah + 1.6, z + 3.25, 0.8, 3.2, 0.8, "b"); } }
+    GTINT = [1, 1, 1]; solid(QF.x, QF.z, w + 2, d, Math.PI / 2); }
+  // the eastern bays of the New Work, half built: walls at uneven heights, scaffolding, a hoist, stone stacked on the site
+  { const EF = sub(76), R = seeded(1256), d = 28, w = 31;
+    GTINT = [1.25, 1.2, 1.08]; for (const sx of [-1, 1]) for (let z = -d / 2; z < d / 2; z += 3.5) { const top = 14 - (z + d / 2) * 0.32 + R() * 2.5; gbox(EF, "rubble", sx * (w / 2 - 0.8), top / 2, z + 1.75, 1.6, top, 3.52); const top2 = Math.max(0, 22 - (z + d / 2) * 0.9 + R() * 3); if (top2 > 1) gbox(EF, "rubble", sx * 7.2, top2 / 2, z + 1.75, 1.4, top2, 3.52); }
+    gbox(EF, "rubble", 0, 2, d / 2 - 0.8, w, 4, 1.6);
+    for (const sx of [-1, 1]) for (let z = -d / 2; z < d / 2; z += 3) { const [px, , pz] = gw(EF, sx * (w / 2 + 1.5), 0, z); put("pole", CYL_G, MAT.wood, px, gy, pz, 0.18, 18, 0.18); for (let hh = 3; hh < 18; hh += 3) { const [qx, , qz] = gw(EF, sx * (w / 2 + 1.5), 0, z + 1.5); put("pole", BOX_G, MAT.wood, qx, gy + hh, qz, 0.12, 0.12, 3.1, Math.PI / 2); } }
+    const [hx, , hz] = gw(EF, 0, 0, 0); put("pole", CYL_G, MAT.wood, hx, gy, hz, 0.4, 24, 0.4); put("pole", BOX_G, MAT.wood, hx + 4, gy + 24, hz, 8, 0.35, 0.35);
+    for (let k = 0; k < 50; k++) { const [px, , pz] = gw(EF, (R() - 0.5) * 60, 0, d / 2 + 6 + R() * 18); put("block", BOX_G, AMAT.ashlar, px, groundH(px, pz) + (k % 3) * 0.45, pz, 0.9, 0.44, 0.6, R()); }
+    solid(EF.x, EF.z, w, d, Math.PI / 2);
+    mark("The New Work", ...gw(EF, 0, 0, 0).filter((_, i) => i !== 1), "known", "The new Gothic choir, begun in 1256 to replace the Norman east end: tall pointed windows, slender shafts, and in the end a great rose window in the east wall. In 1285 its eastern bays are still rising behind scaffolding; it was not finished until 1314. It was paid for by gifts, indulgences and the offerings of pilgrims to the shrine of St Erkenwald.", { y: 26, range: 1200, r: 30 }); }
+  // the churchyard wall, licensed by Edward I in 1285, with gates where the streets come in
+  { const W2 = 115, D2 = 72, gates = []; for (const S of STREETS) for (let s = 0; s < S.L.L; s += 3) { const [x, z] = S.L.at(s); if (Math.abs(Math.abs(x - Cx) - W2) < 4 && Math.abs(z - Cz) < D2 || Math.abs(Math.abs(z - Cz) - D2) < 4 && Math.abs(x - Cx) < W2) gates.push([x, z]); }
+    const seg = (x0, z0, x1, z1) => { const L = Math.hypot(x1 - x0, z1 - z0), n = Math.ceil(L / 3); for (let k = 0; k < n; k++) { const x = x0 + (x1 - x0) * (k + 0.5) / n, z = z0 + (z1 - z0) * (k + 0.5) / n; if (gates.some(([gx, gz]) => Math.hypot(gx - x, gz - z) < 6)) continue; const ry = Math.atan2(x1 - x0, z1 - z0); put("w:rag", BOX_G, MAT.rag, x, groundH(x, z) - 0.3, z, 0.8, 3.2, L / n + 0.05, ry); solid(x, z, 0.8, L / n, ry); } };
+    seg(Cx - W2, Cz - D2, Cx + W2, Cz - D2); seg(Cx + W2, Cz - D2, Cx + W2, Cz + D2); seg(Cx + W2, Cz + D2, Cx - W2, Cz + D2); seg(Cx - W2, Cz + D2, Cx - W2, Cz - D2); }
+  // Paul's Cross: an open-air pulpit with a cross, in the north-east of the churchyard
+  { const px = Cx + 62, pz = Cz - 40, py = groundH(px, pz); put("pcross", CYL_G, MAT.rag, px, py - 0.2, pz, 5, 1.4, 5); put("pcross", CYL_G, MAT.wood, px, py + 1.2, pz, 3.6, 1.2, 3.6); put("pcross", CONE4_G, LEADK, px, py + 4.6, pz, 4.4, 2.2, 4.4); for (const [ox, oz] of [[1.4, 1.4], [-1.4, 1.4], [1.4, -1.4], [-1.4, -1.4]]) put("pcross", BOX_G, MAT.wood, px + ox, py + 2.4, pz + oz, 0.2, 2.3, 0.2);
+    put("cross", BOX_G, MAT.wood, px + 4, py, pz, 0.3, 5, 0.3); put("cross", BOX_G, MAT.wood, px + 4, py + 3.8, pz, 1.6, 0.3, 0.3); solid(px, pz, 5, 5, 0);
+    mark("Paul's Cross", px, pz, "known", "An open-air pulpit by a cross in the churchyard: the place of the folkmoot, where the citizens met at the sound of St Paul's bell, and where sermons, royal proclamations and excommunications were read out to the crowd. In 1285 the king's warden, not a mayor, rules the City.", { y: 7, range: 500, r: 12 }); }
+}
+
+// ---------- London in 1285: the Tower ----------
+// Henry III (from 1238) and Edward I (1275-85) turned the Conqueror's keep into a concentric castle, about 12 acres: an inner curtain with
+// thirteen towers, pushed east beyond the old Roman wall; an outer curtain with St Thomas's Tower over the new water gate (1275-79, later
+// called Traitors' Gate); a moat about 40 m wide, flooded from the Thames; the entrance on the west through the Lion Tower, the Middle Tower
+// and the Byward Tower. Henry III had the White Tower whitewashed in 1240, which gave it its name, and kept a menagerie: lions, a leopard,
+// a polar bear (1252) that fished in the Thames on a chain, an elephant (1255). Edward I spent about £21,000 here, more than on any castle
+// in Wales. Plan simplified from the present layout.
+if (ERA === 1285) {
+  const TP = (rx, rz) => [TOW_C[0] + rx, TOW_C[1] + rz], TOW_M = new THREE.MeshStandardMaterial({ color: 0xbab2a2, roughness: 0.95 });
+  rRect(TOW_C[0] - 28, TOW_C[1] - 19, 318, 200, 0, 4);
+  const curtain = (pts, h, th, gaps) => { for (let i = 0; i < pts.length - 1; i++) { const [ax, az] = TP(...pts[i]), [bx, bz] = TP(...pts[i + 1]), len = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(len / 2.5)), ry = Math.atan2(bx - ax, bz - az);
+    for (let k = 0; k < n; k++) { const x = ax + (bx - ax) * (k + 0.5) / n, z = az + (bz - az) * (k + 0.5) / n; if (gaps.some(([gx, gz, r]) => { const [X, Z] = TP(gx, gz); return Math.hypot(X - x, Z - z) < r; })) continue;
+      const gy = groundH(x, z); put("tw:wall", BOX_G, TOW_M, x, gy - 1.5, z, th, h + 1.5, len / n + 0.05, ry); if (k % 2 === 0) put("tw:wall", BOX_G, TOW_M, x, gy + h, z, th, 1.3, len / n * 0.55, ry); solid(x, z, th, len / n + 0.2, ry); } } };
+  const tower = (rx, rz, d, h) => { const [x, z] = TP(rx, rz), gy = groundH(x, z); put("tw:tower", CYL_G, TOW_M, x, gy - 1.5, z, d, h + 1.5, d); for (let a = 0; a < 6.28; a += 6.28 / 10) put("tw:wall", BOX_G, TOW_M, x + Math.cos(a) * (d / 2 - 0.5), gy + h, z + Math.sin(a) * (d / 2 - 0.5), 1.2, 1.3, 1.2, -a); solid(x, z, d * 0.8, d * 0.8, 0); };
+  // the inner curtain and its towers; its gate (the Garden Tower, later the Bloody Tower) on the south
+  curtain([[-117, -52], [61, -52], [61, 48], [-117, 48], [-117, -52]], 11, 3, [[-55, 48, 6]]);
+  for (const [x, z] of [[-117, -52], [61, -52], [61, 48], [-117, 48], [-60, -52], [-20, -52], [20, -52], [-117, -2], [61, -15], [61, 18], [-30, 48], [15, 48]]) tower(x, z, 13, 17);
+  // the outer curtain, lower, with rounded bastions; the Byward gate in its south-west corner
+  curtain([[-139, 40], [-139, -72], [83, -72], [83, 68], [-139, 68], [-139, 54]], 7, 2.6, [[-48, 68, 13]]);
+  for (const [x, z] of [[-139, -72], [83, -72], [-30, -72], [83, 0], [83, 68]]) tower(x, z, 16, 9);
+  // gatehouses: the Byward Tower and the Middle Tower astride the causeway over the moat, and beyond them the Lion Tower
+  for (const gx of [-139, -162]) { tower(gx, 36, 11, 14); tower(gx, 56, 11, 14); const [x, z] = TP(gx, 46), F = FR(x, z, 0, groundH(x, z), "tower"); GTINT = [1.1, 1.06, 0.98]; gbox(F, "rubble", 0, 10, 0, 9, 8.5, 16, ""); for (let u = -7; u < 8; u += 2) gbox(F, "rubble", 4, 14.8, u, 1, 1.2, 1, "b"); GTINT = [1, 1, 1]; for (const sx of [-1, 1]) garch(F, "dark", sx * 4.52, 5.8, 0, 3.2, 4.2, [sx, 0, 0]); }
+  tower(-198, 26, 24, 9);
+  // the inner gate over the gap in the south curtain
+  { const [x, z] = TP(-55, 48), F = FR(x, z, 0, groundH(x, z), "tower"); GTINT = [1.1, 1.06, 0.98]; gbox(F, "rubble", 0, 11, 0, 12, 11, 9, ""); GTINT = [1, 1, 1]; for (const sz of [-1, 1]) garch(F, "dark", 0, 5.4, sz * 4.52, 3.6, 4.4, [0, 0, sz]); }
+  // St Thomas's Tower over the water gate: a broad arch where boats come in from the river under the outer curtain
+  { const [x, z] = TP(-48, 70), gy = groundH(x, z), F = FR(x, z, 0, gy, "tower"); GTINT = [1.12, 1.08, 1.0]; gbox(F, "rubble", 0, 8.5, 0, 26, 17, 13); for (const sx of [-1, 1]) gbox(F, "rubble", sx * 12.5, 10, 6, 4.5, 20, 4.5);
+    for (let u = -12; u < 13; u += 2) gbox(F, "rubble", u, 17.6, 6.2, 1, 1.3, 0.8, "b"); GTINT = [1, 1, 1]; garch(F, "dark", 0, -1.5, 6.52, 17, 9, [0, 0, 1]); for (const u of [-6, 0, 6]) garch(F, "dark", u, 11, 6.52, 1.4, 3.2, [0, 0, 1]); solid(x, z, 26, 13, 0);
+    mark("St Thomas's Tower and the water gate", x, z, "known", "Built by Edward I in 1275-79 over a new water gate in the outer curtain, so that the king could come and go by river. Later it was the way prisoners were brought in by boat after trial at Westminster, and it became known as Traitors' Gate. In 1285 it is brand new, and its upper floor holds a royal chamber with an oratory dedicated to St Thomas Becket.", { y: 20, range: 1500, r: 25 }); }
+  // inside: Henry III's great hall by the inner curtain, and the chapel of St Peter ad Vincula
+  { const [x, z] = TP(-15, 30), gy = groundH(x, z) - 0.2, F = FR(x, z, Math.PI / 2, gy, "tower"); GTINT = [1.1, 1.06, 0.98]; gbox(F, "rubble", 0, 4.5, 0, 12, 9, 30); gGableBoth(F, "rubble", 12, 30, 9, 5); GTINT = [0.95, 0.92, 0.88]; groof(F, "shingle", 12, 30, 9, 5, { e: 0.4 });
+    GTINT = [1, 1, 1]; for (const sx of [-1, 1]) for (let u = -11; u < 12; u += 5.5) garch(F, "dark", sx * 6.02, 3.5, u, 1.4, 3.6, [sx, 0, 0]); solid(x, z, 30, 12, Math.PI / 2); }
+  { const [x, z] = TP(-88, -30); addChurch(x, z, { mat: "rag", roof: "shingle", nl: 16, nw: 7, cl: 7, cw: 5.5, wh: 7 }); mark("St Peter ad Vincula", x, z, "known", "The chapel of the Tower's inner ward. Edward I will rebuild it in 1286-87; in 1285 it is still the old chapel that Henry III had glazed and painted.", { y: 12, range: 500, r: 12 }); }
+  { const [x, z] = TP(-20, -40); mark("The Tower of London", x, z, "known", "A concentric castle by 1285. Henry III enlarged the Conqueror's White Tower with an inner curtain and towers, pushed east beyond the old Roman wall (the Londoners were furious, and when the new gate collapsed in 1240-41 they said St Thomas Becket had knocked it down). Edward I added the outer curtain, the great moat and the new entrance in 1275-85, at a cost of about £21,000. The White Tower has been whitewashed since 1240: hence its name.", { y: 40, range: 4000, r: 70, big: true }); }
+  { const [x, z] = TP(-198, 26); mark("The Lion Tower: the king's beasts", x, z, "known", "The outermost gate, a round barbican west of the moat, where the royal menagerie was kept: lions, leopards and other gifts to the king. Henry III was sent a polar bear by the king of Norway in 1252; the sheriffs of London had to pay 4 pence a day for its keep and a muzzle and chain so it could fish in the Thames. An elephant from Louis IX arrived in 1255 and died two years later.", { y: 14, range: 800, r: 20 }); }
+  { const [x, z] = TP(-160, -95); mark("The moat", x, z, "known", "Edward I's moat, dug in 1275-81 by Flemish engineers under Walter of Flanders: some 40 m wide, filled from the Thames and held by sluices.", { y: 4, range: 600, r: 25 }); }
+}
+
+// ---------- London in 1285: Henry III's Westminster Abbey ----------
+// From 1245 Henry III pulled down the Confessor's east end and built a Gothic church in the French manner (Reims, the Sainte-Chapelle):
+// the highest vault in England, about 31 m; flying buttresses; an apse with an ambulatory and radiating chapels; transepts, the north one
+// with a rose window over a triple porch ('Solomon's Porch'); and the first five bays of a new nave, consecrated on 13 October 1269 when
+// the Confessor's body was moved to a golden shrine behind the high altar, on a Cosmati base of porphyry and glass mosaic (Italian work,
+// 1268-69), with the Cosmati pavement before the altar. Henry III was buried by the shrine in 1272. West of the new work, the Romanesque
+// nave still stands, lower, and will until the 1370s-1500s. The Lady Chapel at the east end is Henry's of 1220.
+if (ERA === 1285) {
+  const Y0 = AB_Y, X0 = AB_CUT, XA = 30, XM = (X0 + XA) / 2, L = XA - X0, stone = [1.45, 1.4, 1.28], lead = [0.62, 0.64, 0.68];
+  const gT = G_TEX.rubble.clone(); gT.repeat.set(14, 5); gT.needsUpdate = true; const gM = new THREE.MeshStandardMaterial({ map: gT, color: 0xe8dcc6, roughness: 0.9 }), leadM = new THREE.MeshStandardMaterial({ color: 0x8a9096, roughness: 0.55, metalness: 0.25, side: THREE.DoubleSide });
+  // the main vessel (the new nave bays and the choir), its aisles, clerestory and aisle windows
+  { const MF = FR(XM, 0, Math.PI / 2, Y0, "abbeyG");
+    GTINT = stone; gbox(MF, "rubble", 0, 16, 0, 14.6, 32, L); for (const sx of [-1, 1]) gbox(MF, "rubble", sx * 10.4, 7.5, 0, 7.2, 15, L);
+    GTINT = lead; groof(MF, "shingle", 14.6, L, 32, 11, { e: 0.4, t: 0.3 });
+    for (const sx of [-1, 1]) { const [rx, , rz] = gw(MF, sx * 10.6, 0, 0); put("abroof", BOX_G, LEADK, rx, Y0 + 17.2, rz, 8.2, 0.35, L, Math.PI / 2, 0, -sx * Math.atan2(4.4, 7.2));
+      for (let u = -L / 2 + 3; u < L / 2 - 1; u += 5.6) { if (Math.abs(u + XM) < 8) continue; GTINT = [1, 1, 1]; garch(MF, "dark", sx * 7.32, 19.5, u, 3.0, 10.5, [sx, 0, 0]); garch(MF, "dark", sx * 14.02, 3.2, u, 2.6, 8.5, [sx, 0, 0]);
+        const [px, , pz] = gw(MF, sx * 15.6, 0, u + 2.8); put("abbutt", BOX_G, STONEK, px, Y0, pz, 1.6, 23, 2.2); put("abpin", CONE4_G, STONEK, px, Y0 + 23, pz, 1.7, 4.5, 1.7); solid(px, pz, 1.6, 2.2, 0);
+        const fy = 21.5, ty = 28, dz = 7.6, fl = Math.hypot(dz, ty - fy); const [qx, , qz] = gw(MF, sx * 11.8, 0, u + 2.8); put("abfly", BOX_G, STONEK, qx, Y0 + (fy + ty) / 2 - 0.45, qz, 0.8, 0.9, fl, 0, -sx * Math.asin((ty - fy) / fl)); } }
+    GTINT = [1, 1, 1]; solid(XM, 0, L, 29, 0); }
+  // the transepts and the low lantern over the crossing; the north front with its rose window over the triple porch
+  { const TF = FR(0, 0, 0, Y0, "abbeyG"), d = 61;
+    GTINT = stone; gbox(TF, "rubble", 0, 16, 0, 14.6, 32, d); gGableBoth(TF, "rubble", 14.6, d, 32, 11); GTINT = lead; groof(TF, "shingle", 14.6, d, 32, 11, { e: 0.4, t: 0.3 });
+    GTINT = stone; gbox(TF, "rubble", 0, 36, 0, 15.4, 9, 15.4); for (const sx of [-1, 1]) for (const sz of [-1, 1]) { gbox(TF, "rubble", sx * 8.4, 21, sz * (d / 2 + 0.6), 2.4, 42, 2.4); put("abpin", CONE4_G, STONEK, sx * 8.4, Y0 + 42, sz * (d / 2 + 0.6), 2.6, 7, 2.6); }
+    put("abcap", CONE4_G, MAT.lead, 0, Y0 + 40.5, 0, 15.8, 5, 15.8);
+    GTINT = [1, 1, 1]; for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const k of [0, 1]) garch(TF, "dark", sx * 7.32, k ? 19.5 : 3.2, sz * (d / 2 - 9), k ? 3 : 2.6, k ? 10.5 : 8.5, [sx, 0, 0]);
+    for (const u of [-4.6, 0, 4.6]) garch(TF, "dark", u, 0, -d / 2 - 0.02, u ? 2.8 : 3.6, u ? 7 : 8.5, [0, 0, -1]); for (const u of [-4.6, 0, 4.6]) garch(TF, "dark", u, 10, -d / 2 - 0.02, 1.2, 5, [0, 0, -1]);
+    garch(TF, "dark", 0, 4, d / 2 + 0.02, 3, 9, [0, 0, 1]); garch(TF, "dark", 0, 17, d / 2 + 0.02, 5, 12, [0, 0, 1]);
+    const rose = new THREE.Group(); rose.add(new THREE.Mesh(new THREE.CircleGeometry(5.2, 32), MAT.dark)); const trM = new THREE.MeshStandardMaterial({ color: 0xe0d6c2, roughness: 0.9 }); rose.add(new THREE.Mesh(new THREE.TorusGeometry(5.3, 0.3, 6, 32), trM)); rose.add(new THREE.Mesh(new THREE.TorusGeometry(2.0, 0.18, 6, 24), trM));
+    for (let k = 0; k < 16; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.16, 3.3, 0.12), trM); const a = k / 16 * Math.PI * 2; b.position.set(Math.sin(a) * 3.6, Math.cos(a) * 3.6, 0.05); b.rotation.z = -a; rose.add(b); }
+    rose.position.set(0, Y0 + 22, -d / 2 - 0.08); rose.rotation.y = Math.PI; scene.add(rose); solid(0, 0, 14.6, d, 0);
+    mark("Solomon's Porch: the north front", 0, -d / 2, "known", "Henry III's great north transept front, the abbey's state entrance from the palace and the town: a triple porch with sculpted figures under a huge rose window, in the manner of the new French cathedrals. Londoners called the porch 'Solomon's Porch'. Much restored since.", { y: 30, range: 1000, r: 25 }); }
+  // the apse with its ambulatory and radiating chapels, and the Lady Chapel beyond
+  { const cyl = (r, h, y, x, z, t0, tl) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 14, 1, false, t0, tl).translate(0, h / 2, 0), gM); m.position.set(x, Y0 + y, z); scene.add(m); return m; };
+    cyl(7.3, 32, 0, XA, 0, 0, Math.PI); cyl(14, 15, 0, XA, 0, 0, Math.PI);
+    { const r1 = new THREE.Mesh(new THREE.ConeGeometry(8.2, 9, 14, 1, true, 0, Math.PI).translate(0, 4.5, 0), leadM); r1.position.set(XA, Y0 + 32, 0); scene.add(r1); const r2 = new THREE.Mesh(new THREE.ConeGeometry(14.6, 4.8, 14, 1, true, 0, Math.PI).translate(0, 2.4, 0), leadM); r2.position.set(XA, Y0 + 15, 0); scene.add(r2); }
+    for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + (k + 0.5) / 5 * Math.PI, cx = XA + Math.cos(a) * 16.5, cz = Math.sin(a) * 16.5; cyl(4.2, 13, 0, cx, cz, 0, Math.PI * 2); const c = new THREE.Mesh(new THREE.ConeGeometry(4.6, 4, 10).translate(0, 2, 0), leadM); c.position.set(cx, Y0 + 13, cz); scene.add(c); solid(cx, cz, 7, 7, 0);
+      for (const rr of [7.35, 14.05]) { const wa = -Math.PI / 2 + (k + 0.5) / 5 * Math.PI + 0.32, wx = XA + Math.cos(wa) * rr, wz = Math.sin(wa) * rr; put("abwin", BOX_G, MAT.dark, wx, Y0 + (rr < 10 ? 19.5 : 3.5), wz, 0.12, rr < 10 ? 10 : 8, 2.2, -wa); } }
+    solid(XA + 7, 0, 14, 28, 0);
+    const LF = FR(XA + 30, 0, Math.PI / 2, Y0, "abbeyG"); GTINT = stone; gbox(LF, "rubble", 0, 9, 0, 11, 18, 26); gGableBoth(LF, "rubble", 11, 26, 18, 6); GTINT = lead; groof(LF, "shingle", 11, 26, 18, 6, { e: 0.4 });
+    GTINT = [1, 1, 1]; for (const sx of [-1, 1]) for (let u = -10; u < 11; u += 5) garch(LF, "dark", sx * 5.52, 4, u, 2.2, 9, [sx, 0, 0]); solid(XA + 30, 0, 26, 11, 0);
+    mark("The Lady Chapel", XA + 30, 0, "known", "Henry III laid its foundation stone in 1220, before he began the new church; it stood at the east end until Henry VII replaced it in 1503 with the chapel that bears his name.", { y: 22, range: 800, r: 14 }); }
+  // inside the old nave, its east end: the stone screen (pulpitum) before the monks' choir, painted, with its door and the rood above
+  { const PF = FR(X0 - 0.5, 0, Math.PI / 2, AB_F, "abbeyG"); GTINT = [1.3, 1.24, 1.12]; gbox(PF, "rubble", 0, 3.5, 0, 12, 7, 0.9, ""); GTINT = [0.9, 0.3, 0.22]; gbox(PF, "plain", 0, 1.5, -0.5, 12, 3, 0.1, ""); GTINT = [0.25, 0.42, 0.62]; gbox(PF, "plain", 0, 6.4, -0.5, 12, 0.5, 0.1, "");
+    GTINT = [1, 1, 1]; garch(PF, "dark", 0, 0, -0.58, 1.8, 3.4, [0, 0, -1]); for (const u of [-4.2, -2.4, 2.4, 4.2]) garch(PF, "dark", u, 3.6, -0.58, 1.1, 2.2, [0, 0, -1]);
+    GTINT = [1.5, 1.25, 0.6]; gbox(PF, "plain", 0, 7, 0, 0.35, 4.5, 0.3, ""); gbox(PF, "plain", 0, 10, 0, 2.6, 0.35, 0.3, ""); GTINT = [1, 1, 1]; }
+  // the inside, unseen: notes for the shrine and the tombs
+  mark("Westminster Abbey", -40, -18, "known", "Half old, half new. East of here rises Henry III's Gothic church, begun in 1245 and consecrated in 1269: the highest vault in England, flying buttresses, a ring of chapels round the east end. West of it the Confessor's Romanesque nave still stands, lower and older; it will be rebuilt to match only from the 1370s, and not finished until about 1500. Henry spent some £45,000 on the work, more than on anything else in his reign.", { y: 40, range: 3000, r: 40, big: true });
+  mark("St Edward's shrine", 22, 0, "known", "Behind the high altar, raised on a base of Italian Cosmati work, inlaid porphyry and glass mosaic, the golden feretory of St Edward the Confessor, to which his body was moved on 13 October 1269. Pilgrims kneel in the niches of the base, hoping for healing. Henry III lies beside it, buried in 1272 (his bronze effigy was made in 1291). Before the high altar, the Cosmati pavement of 1268. (Inside is not built here: the old nave is open.)", { y: 36, range: 900, r: 20 });
+  mark("The old nave", X0 - 14, 0, "known", "The Romanesque nave of the Confessor's church, still standing west of Henry III's new work and visibly lower; the monks use the new choir, the townsfolk this nave. Walk in by the west door.", { y: 28, range: 900, r: 18 });
+}
+
+// ---------- London in 1285: the City ----------
+// The friars came in the 13th century and took big precincts: the Franciscans (Greyfriars, 1225) by Newgate, the Austin friars (1253) by
+// Broad Street, the Carmelites (Whitefriars, 1247) off Fleet Street, the Crutched Friars (about 1269) near Tower Hill, and the Dominicans
+// (Blackfriars), who in 1276 moved to the site of Baynard's Castle and Montfichet's Tower; for them the City wall is being carried west
+// from Ludgate to the Fleet and down to the Thames. The Templars' round church (1185) stands by Fleet Street; the Guildhall in the north
+// of the City; the Great Conduit (1236-45) brings water in lead pipes from the Tyburn springs to Cheapside. The Jewry lies round Old Jewry:
+// in 1285 a dwindling, heavily taxed community, five years before Edward I expelled all Jews from England (1290).
+const CONDUITS = [];
+if (ERA === 1285) {
+  const near = (lat, lon, w, d) => { let [x, z] = LL(lat, lon); for (let r = 0; r < 90; r += 4) for (let a = 0; a < 6.28; a += 0.5) { const X = x + Math.cos(a) * r, Z = z + Math.sin(a) * r; if (rRect(X, Z, w, d, 0, 0, true)) return [X, Z]; } return [x, z]; };
+  for (const [name, lat, lon, text] of [["Greyfriars", 51.5160, -0.0995, "The Franciscans, the Friars Minor, came to London in 1224 and settled here by Newgate, in the poorest quarter by the Shambles. They live by begging and preach in the streets; their church is being enlarged with the gifts of Londoners, and in 1306 Queen Margaret will rebuild it on a grand scale."],
+    ["Blackfriars", 51.5122, -0.1028, "The Dominicans, the Friars Preachers, moved here in 1276 from Holborn, given the sites of Baynard's Castle and Montfichet's Tower by the City and the archbishop. Edward I and Queen Eleanor are their patrons; their great church is rising, and the City wall is being carried round their precinct to the Fleet."],
+    ["Austin Friars", 51.5160, -0.0858, "The Augustinian friars (Austin friars), settled here in 1253 by Humphrey de Bohun, earl of Hereford."],
+    ["Whitefriars", 51.5132, -0.1078, "The Carmelites, the White Friars from their white cloaks, settled between Fleet Street and the river in 1247."],
+    ["Crutched Friars", 51.5121, -0.0775, "The friars of the Holy Cross, called 'crutched' (crossed) from the red cross on their habits, settled near Tower Hill about 1269."]]) {
+    const [x, z] = near(lat, lon, 64, 34); addChurch(x, z, { mat: "rag", roof: "shingle", nl: 30, nw: 11, cl: 12, cw: 8, wh: 9 }); rRect(x + 6, z + 22, 40, 22, 0, 4);
+    mark(name, x, z, "known", text, { y: 16, range: 1500, r: 20 }); }
+  // the Temple: the Knights Templar's round church, modelled on the Holy Sepulchre, consecrated 1185, with the chancel of 1240
+  { const [x, z] = near(51.5131, -0.1100, 50, 28), gy = groundH(x, z) - 0.3, sM = new THREE.MeshStandardMaterial({ map: G_TEX.rubble.clone(), color: 0xe0d6c0, roughness: 0.9 }); sM.map.repeat.set(10, 3); sM.map.needsUpdate = true;
+    const lM = new THREE.MeshStandardMaterial({ color: 0x8a9096, roughness: 0.55, metalness: 0.25 }), drum = (r, h, y) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 16).translate(0, h / 2, 0), sM); m.position.set(x - 10, gy + y, z); scene.add(m); };
+    drum(9.5, 8, 0); drum(6, 13, 0); { const c = new THREE.Mesh(new THREE.ConeGeometry(7, 5, 16).translate(0, 2.5, 0), lM); c.position.set(x - 10, gy + 13, z); scene.add(c); const c2 = new THREE.Mesh(new THREE.ConeGeometry(10.2, 2.4, 16, 1, true).translate(0, 1.2, 0), lM); c2.position.set(x - 10, gy + 8, z); c2.material.side = THREE.DoubleSide; scene.add(c2); }
+    for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; put("tewin", BOX_G, MAT.dark, x - 10 + Math.cos(a) * 9.55, gy + 3, z + Math.sin(a) * 9.55, 0.1, 2.6, 1.0, -a); put("tewin", BOX_G, MAT.dark, x - 10 + Math.cos(a + 0.26) * 6.05, gy + 9.5, z + Math.sin(a + 0.26) * 6.05, 0.1, 2.2, 0.9, -a - 0.26); }
+    const F = FR(x + 6, z, Math.PI / 2, gy, "temple"); GTINT = [1.45, 1.4, 1.28]; gbox(F, "rubble", 0, 5, 0, 18, 10, 24); gGableBoth(F, "rubble", 18, 24, 10, 6); GTINT = [0.62, 0.64, 0.68]; groof(F, "shingle", 18, 24, 10, 6, { e: 0.3 });
+    GTINT = [1, 1, 1]; for (const sx of [-1, 1]) for (let u = -9; u < 10; u += 4.5) garch(F, "dark", sx * 9.02, 2.5, u, 1.2, 5, [sx, 0, 0]); garch(F, "dark", 0, 2, 12.02, 4, 6, [0, 0, 1]);
+    solid(x - 10, z, 17, 17, 0); solid(x + 6, z, 24, 18, 0); rRect(x, z, 60, 50, 0, 4);
+    mark("The Temple Church", x - 10, z, "known", "The church of the Knights Templar, its round nave modelled on the church of the Holy Sepulchre in Jerusalem, consecrated in 1185 by Heraclius, patriarch of Jerusalem; the long chancel was added in 1240. The New Temple is also a bank: kings and nobles keep treasure here, and in 1263 the future Edward I broke in and took £10,000 of it. Stone effigies of knights lie on the floor of the round.", { y: 20, range: 1500, r: 20 }); }
+  // the Guildhall: the hall of the City's government, though in 1285 the king's warden, not a mayor, rules
+  { const [x, z] = near(51.5157, -0.0919, 34, 18), gy = groundH(x, z) - 0.3, F = FR(x, z, Math.PI / 2, gy, "guild"); GTINT = [1.3, 1.25, 1.12]; gbox(F, "rubble", 0, 5, 0, 13, 10, 28); gGableBoth(F, "rubble", 13, 28, 10, 5); GTINT = [0.95, 0.6, 0.48]; groof(F, "shingle", 13, 28, 10, 5, { e: 0.4 });
+    GTINT = [1, 1, 1]; for (const sx of [-1, 1]) for (let u = -10; u < 11; u += 5) garch(F, "dark", sx * 6.52, 4, u, 1.4, 3.8, [sx, 0, 0]); garch(F, "dark", 0, 0, -14.02, 2.2, 3.6, [0, 0, -1]); solid(x, z, 28, 13, 0); rRect(x, z, 36, 20, 0, 4);
+    mark("The Guildhall", x, z, "known", "Where the City's courts and the folk of the wards meet: the hustings court, the mayor and aldermen. In June 1285 Edward I, angry at the City's disorder, seized its liberties when the mayor Gregory de Rokesley refused to appear before his justices; the City will be ruled by royal wardens until 1298.", { y: 15, range: 1200, r: 15 }); }
+  // the Great Conduit at the east end of Cheapside: a stone cistern house where water arrives in lead pipes from the Tyburn springs
+  { const [x, z] = near(51.5139, -0.0922, 9, 7), gy = groundH(x, z), F = FR(x, z, 0, gy, "conduit"); GTINT = [1.35, 1.3, 1.18]; gbox(F, "rubble", 0, 2, 0, 7, 4, 4.5); GTINT = [0.7, 0.72, 0.76]; groof(F, "shingle", 7, 4.5, 4, 1.6, { e: 0.2 }); GTINT = [1, 1, 1]; garch(F, "dark", 0, 0.3, 2.27, 1.4, 2.4, [0, 0, 1]);
+    put("trough", BOX_G, MAT.lead, x, gy, z + 3.2, 3.2, 0.7, 1.0); solid(x, z, 7, 4.5, 0); CONDUITS.push([x, z + 4]);
+    mark("The Great Conduit", x, z, "known", "Built in 1236-45: London's first piped water, brought nearly 5 km in lead pipes from springs by the Tyburn (near today's Bond Street) to this stone cistern house at the head of Cheapside. Water-carriers ('cobs') fill their tankards here to sell water about the town; brewers and fishmongers were forbidden to use it for their trades.", { y: 7, range: 600, r: 10 }); }
+  // the Jewry
+  { const [x, z] = LL(51.5146, -0.0908); for (const [dx, dz] of [[-14, 6], [10, -8]]) { const [hx, hz] = near(51.5146 - dz * 9e-6, -0.0908 + dx * 1.44e-5, 12, 10); addHouse(hx, hz, 8, 11, 0, { wall: "rubble", roof: "shingle", door: "+x" }).noEnter = true; }
+    mark("The Jewry", x, z, "known", "The Jewish quarter round Old Jewry and Gresham Street, with its synagogue. Jews came to England with the Conqueror; some built stone houses, safer from fire and from mobs. They were the king's property, taxed at his will; in 1264 hundreds were killed here in riots, in 1275 Edward I forbade them to lend at interest, and in 1278-79 about 300 Jews were hanged in London on charges of clipping coin. In 1290 he will expel all Jews from England.", { y: 10, range: 600, r: 18 }); }
+  // the City wall carried west round the Blackfriars, from Ludgate to the Fleet and down towards the Thames: in 1285 still building
+  { const pts = [LL(51.5139, -0.1028), LL(51.5137, -0.1046), LL(51.5106, -0.1049)], R = seeded(1282);
+    for (let i = 0; i < 2; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], len = Math.hypot(bx - ax, bz - az), n = Math.round(len / 3), ry = Math.atan2(bx - ax, bz - az);
+      for (let k = 0; k < n; k++) { const f = (k + 0.5) / n, x = ax + (bx - ax) * f, z = az + (bz - az) * f, gy = groundH(x, z), h = i === 0 || f < 0.45 ? 7.5 : Math.max(1, 7.5 * (1 - (f - 0.45) * 2.4)) + R() * 0.6; put("w:rag", BOX_G, MAT.rag, x, gy - 1.5, z, 2.6, h + 1.5, len / n + 0.05, ry); solid(x, z, 2.6, len / n + 0.2, ry);
+        if (i === 1 && f > 0.4 && f < 0.75 && k % 2 === 0) for (const s of [-1, 1]) put("pole", CYL_G, MAT.wood, x + Math.cos(ry) * 2.2 * s, gy, z - Math.sin(ry) * 2.2 * s, 0.15, h + 3, 0.15); } }
+    mark("The new wall", ...pts[1], "known", "In 1282 Edward I licensed the archbishop and the Dominicans to pull down the old wall by Ludgate and carry a new one west and south along the Fleet to the Thames, enclosing the Blackfriars' precinct. Here it is half built; it was finished in the 1320s.", { y: 10, range: 800, r: 15 }); }
+}
+
+// ---------- London in 1285: round about ----------
+// Southwark: the priory church of St Mary Overie, rebuilt in Gothic after the fire of 1212 (today Southwark Cathedral); the Bishop of
+// Winchester's palace, his London house, by the river; St Thomas's Hospital. Smithfield: the 'smooth field' outside the wall, with its
+// Friday horse market, and the priory and hospital of St Bartholomew (founded 1123 by Rahere). Along the Strand, the great men's riverside
+// inns: the Savoy (Peter of Savoy's, 1246; now Edmund, earl of Lancaster's) and the bishops' houses. Clerkenwell: the priory of St John
+// of Jerusalem, the Knights Hospitallers' English headquarters, with a round church (1185), and the nunnery of St Mary.
+if (ERA === 1285) {
+  const near = (lat, lon, w, d) => { let [x, z] = LL(lat, lon); for (let r = 0; r < 120; r += 4) for (let a = 0; a < 6.28; a += 0.5) { const X = x + Math.cos(a) * r, Z = z + Math.sin(a) * r; if (rRect(X, Z, w, d, 0, 0, true)) return [X, Z]; } return [x, z]; };
+  const hall = (x, z, w, d, h, roofT, name) => { const gy = groundH(x, z) - 0.3, F = FR(x, z, Math.PI / 2, gy, name); GTINT = [1.3, 1.25, 1.12]; gbox(F, "rubble", 0, h / 2, 0, w, h, d); gGableBoth(F, "rubble", w, d, h, w * 0.4); GTINT = roofT; groof(F, "shingle", w, d, h, w * 0.4, { e: 0.4 });
+    GTINT = [1, 1, 1]; for (const sx of [-1, 1]) for (let u = -d / 2 + 3; u < d / 2 - 1; u += 5) garch(F, "dark", sx * (w / 2 + 0.02), h * 0.35, u, 1.3, h * 0.4, [sx, 0, 0]); garch(F, "dark", 0, 0, -d / 2 - 0.02, 2, 3.4, [0, 0, -1]); solid(x, z, d, w, 0); rRect(x, z, d + 10, w + 10, 0, 4); };
+  const gothic = (x, z, nl, nw, h, name) => { const gy = groundH(x, z) - 0.3, F = FR(x, z, Math.PI / 2, gy, name); GTINT = [1.4, 1.35, 1.22]; gbox(F, "rubble", 0, h / 2, 0, nw, h, nl); gGableBoth(F, "rubble", nw, nl, h, nw * 0.45); GTINT = [0.62, 0.64, 0.68]; groof(F, "shingle", nw, nl, h, nw * 0.45, { e: 0.4 });
+    GTINT = [1.4, 1.35, 1.22]; for (const sx of [-1, 1]) gbox(F, "rubble", sx * (nw / 2 + 3), h * 0.3, 0, 6, h * 0.6, nl - 6); gbox(F, "rubble", 0, h * 0.9, -nl / 2 + 4, 7, h * 1.8, 7); GTINT = [0.62, 0.64, 0.68]; put("cap", CONE4_G, MAT.lead, ...gw(F, 0, h * 1.8, -nl / 2 + 4), 7.4, 6, 7.4);
+    GTINT = [1, 1, 1]; for (const sx of [-1, 1]) for (let u = -nl / 2 + 8; u < nl / 2 - 2; u += 5) { garch(F, "dark", sx * (nw / 2 + 0.02), h * 0.62, u, 1.6, h * 0.3, [sx, 0, 0]); garch(F, "dark", sx * (nw / 2 + 6.02), 1.5, u, 1.4, h * 0.38, [sx, 0, 0]); } garch(F, "dark", 0, h * 0.3, nl / 2 + 0.02, 3, h * 0.55, [0, 0, 1]);
+    solid(x, z, nl, nw + 12, 0); rRect(x, z, nl + 16, nw + 26, 0, 4); };
+  { const [x, z] = near(51.5060, -0.0905, 70, 40); gothic(x, z, 60, 11, 18, "overie"); mark("St Mary Overie", x, z, "known", "The church of the Augustinian canons of Southwark, 'St Mary over the river', burned in the great fire of 1212 that swept across London Bridge, and rebuilt since in the new Gothic manner; today it is Southwark Cathedral, and its choir of the 1220s survives.", { y: 26, range: 2000, r: 25 }); }
+  { const [x, z] = near(51.5070, -0.0925, 44, 24); hall(x, z, 14, 34, 11, [0.95, 0.6, 0.48], "winch"); mark("Winchester Palace", x, z, "known", "The London house of the bishops of Winchester, built in the 1140s by Bishop Henry of Blois, King Stephen's brother: a great hall by the river with its own wharf, cellars and gardens. The bishop owns this part of Southwark (the 'Liberty of the Clink', after his prison) and licenses its bathhouses.", { y: 16, range: 1200, r: 18 }); }
+  { const [x, z] = near(51.5040, -0.0875, 40, 24); hall(x, z, 10, 30, 7, [0.95, 0.6, 0.48], "stthomas"); mark("St Thomas's Hospital", x, z, "known", "A hospital for the sick poor, run by the canons of St Mary Overie and refounded here after the fire of 1212, dedicated to St Thomas Becket.", { y: 11, range: 800, r: 14 }); }
+  { const [x, z] = near(51.5188, -0.1000, 80, 40); gothic(x, z, 50, 10, 15, "barts"); mark("St Bartholomew's Priory", x, z, "known", "Founded in 1123 by Rahere, a courtier of Henry I turned canon, after a vision of St Bartholomew in Rome: a priory of Augustinian canons and, beside it, a hospital for the sick, which still stands as Barts. Its great Norman choir survives as the church of St Bartholomew the Great.", { y: 22, range: 1500, r: 20 }); }
+  { const [x, z] = LL(51.5182, -0.1022); rRect(x, z, 120, 80, 0, 4); const R = seeded(1123); for (let k = 0; k < 16; k++) { const px = x + (R() - 0.5) * 80, pz = z + (R() - 0.5) * 50; put("pale", BOX_G, MAT.paleWood, px, groundH(px, pz), pz, 0.2, 1.2, 0.2); put("pale", BOX_G, MAT.paleWood, px, groundH(px, pz) + 0.9, pz + 2, 0.12, 0.12, 4); }
+    mark("Smithfield", x, z, "known", "The 'smooth field' outside the wall by Aldersgate and Newgate: every Friday a horse fair, described about 1173 by William FitzStephen, where earls and knights come to buy, and the horses are raced to show their paces; cattle, pigs and sheep are sold here too. Also a place of jousts, and of executions: William Wallace will die here in 1305.", { y: 6, range: 1000, r: 40 }); }
+  { const [x, z] = near(51.5105, -0.1205, 60, 40); hall(x, z, 15, 40, 12, [0.62, 0.64, 0.68], "savoy"); mark("The Savoy", x, z, "known", "The riverside palace built by Peter of Savoy, uncle of Queen Eleanor of Provence, on land Henry III gave him in 1246; it now belongs to Edmund Crouchback, earl of Lancaster, the king's brother. Along the Strand between London and Westminster the bishops and great lords have built their London inns, with gardens and water-gates to the river.", { y: 18, range: 1500, r: 20 }); }
+  for (const [lat, lon, name] of [[51.5098, -0.1160, "the bishop of Exeter's inn"], [51.5093, -0.1240, "the bishop of Durham's inn"]]) { const [x, z] = near(lat, lon, 40, 24); hall(x, z, 11, 26, 9, [0.95, 0.6, 0.48], "inn"); mark(name[0].toUpperCase() + name.slice(1), x, z, "known", "One of the bishops' London houses along the Strand: a stone hall and chapel round a court, with gardens running down to the river and a water-gate for the bishop's barge.", { y: 13, range: 700, r: 14 }); }
+  { const [x, z] = near(51.5225, -0.1030, 60, 40), gy = groundH(x, z) - 0.3, sM = new THREE.MeshStandardMaterial({ map: G_TEX.rubble.clone(), color: 0xd8ccb4, roughness: 0.9 }); sM.map.repeat.set(10, 3); sM.map.needsUpdate = true;
+    const d = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 9, 16).translate(0, 4.5, 0), sM); d.position.set(x - 8, gy, z); scene.add(d); const c = new THREE.Mesh(new THREE.ConeGeometry(8.6, 5, 16).translate(0, 2.5, 0), new THREE.MeshStandardMaterial({ color: 0x8a9096, roughness: 0.55, metalness: 0.25 })); c.position.set(x - 8, gy + 9, z); scene.add(c); solid(x - 8, z, 14, 14, 0);
+    hall(x + 10, z, 10, 20, 9, [0.62, 0.64, 0.68], "stjohn"); mark("The Priory of St John, Clerkenwell", x - 8, z, "known", "The English headquarters of the Knights Hospitaller, the Order of St John of Jerusalem, who nurse pilgrims and fight in the Holy Land: a round church consecrated in 1185 by Heraclius, patriarch of Jerusalem (the same week as the Temple), and the prior's great house. Its crypt survives.", { y: 15, range: 1500, r: 20 }); }
+  { const [x, z] = near(51.5236, -0.1058, 50, 30); gothic(x, z, 34, 9, 12, "stmary"); mark("St Mary's nunnery, Clerkenwell", x, z, "known", "A priory of Augustinian nuns, founded about 1144 beside the 'clerks' well' where London's parish clerks performed mystery plays.", { y: 18, range: 1000, r: 16 }); }
 }
 
 // ---------- markers: what things are, and how well we know them ----------
@@ -1772,7 +2014,7 @@ function driverAt(V) { const fx = Math.sin(V.h), fz = Math.cos(V.h); if (V.type 
 // children played in the streets. On working days the crafts were done at the house door for the light: smiths, carpenters, coopers,
 // shoemakers, wheelwrights, weavers, bakers; on the shore, boatbuilders and fishermen mending nets; porters carried goods up from the
 // hithes. Christmas Day was a holy day: the work stops, but water, fire and food do not.
-const WELLS = (KIT.well?.list || []).map(([x, , z]) => [x, z]);
+const WELLS = [...(KIT.well?.list || []).map(([x, , z]) => [x, z]), ...CONDUITS];
 const PROP_G = { yoke: mergeG([[new THREE.BoxGeometry(1.25, 0.05, 0.06), MT(0, 1.47, -0.02)], [new THREE.CylinderGeometry(0.14, 0.12, 0.32, 9), MT(0.6, 0.72, 0)], [new THREE.CylinderGeometry(0.14, 0.12, 0.32, 9), MT(-0.6, 0.72, 0)], [new THREE.CylinderGeometry(0.006, 0.006, 0.6, 3), MT(0.6, 1.17, 0)], [new THREE.CylinderGeometry(0.006, 0.006, 0.6, 3), MT(-0.6, 1.17, 0)]]),   // a shoulder-yoke with two pails
   faggot: mergeG(Array.from({ length: 9 }, (_, k) => [new THREE.CylinderGeometry(0.035, 0.035, 1.2, 4), MT((k % 3 - 1) * 0.08, 1.15 + Math.floor(k / 3) * 0.07, -0.2, 1, 1, 1, 0.2, 0.15 * (k % 3 - 1))])),   // a bundle of firewood on the back
   distaff: mergeG([[new THREE.CylinderGeometry(0.012, 0.012, 0.75, 4), MT(0.2, 1.25, 0.12, 1, 1, 1, 0.25, -0.3)], [new THREE.SphereGeometry(0.07, 6, 4), MT(0.3, 1.58, 0.2, 1, 1.6, 1)], [new THREE.CylinderGeometry(0.008, 0.008, 0.25, 3), MT(-0.12, 0.85, 0.2)], [new THREE.CylinderGeometry(0.035, 0.035, 0.03, 8), MT(-0.12, 0.74, 0.2)]]),   // distaff with wool, spindle and whorl
@@ -2124,17 +2366,17 @@ function nearDoorHouse() { let best = null, bd = 2.2; const L = []; for (let i =
   for (const r of L) { const H = r.tag; if (!H || !H.dp || H.burnt || H.state === 2 || H.noEnter) continue; const d = Math.hypot(H.dp[0] - P_.x, H.dp[1] - P_.z); if (d < bd) { bd = d; best = H; } } return best; }
 
 // ---------- the abbey's own markers ----------
-mark("Westminster Abbey", -14, -14, "known", "Edward the Confessor's abbey church of St Peter: the first Romanesque church in England, built in the new Norman manner from about 1050, consecrated on 28 December 1065. Edward was buried here on 6 January; Harold was probably crowned here the same day; today William. The plan is known from foundations found under the present church (rebuilt by Henry III from 1245); the look of it from the Bayeux Tapestry (with a crossing tower and a man fixing the weathercock) and the Life of King Edward. The crossing tower, transepts and east end were finished; the nave was still being built. Finished, it was about 98 m long, longer than any other church in England, with an aisled nave about 22 m wide. Its heights are not known; they are shown in the proportions of Jumièges in Normandy, its model: nave walls about 23 m, the crossing tower about 45 m to its cap.", { big: true, range: 5000, y: 58, r: 45 });
+if (ERA !== 1285) mark("Westminster Abbey", -14, -14, "known", "Edward the Confessor's abbey church of St Peter: the first Romanesque church in England, built in the new Norman manner from about 1050, consecrated on 28 December 1065. Edward was buried here on 6 January; Harold was probably crowned here the same day; today William. The plan is known from foundations found under the present church (rebuilt by Henry III from 1245); the look of it from the Bayeux Tapestry (with a crossing tower and a man fixing the weathercock) and the Life of King Edward. The crossing tower, transepts and east end were finished; the nave was still being built. Finished, it was about 98 m long, longer than any other church in England, with an aisled nave about 22 m wide. Its heights are not known; they are shown in the proportions of Jumièges in Normandy, its model: nave walls about 23 m, the crossing tower about 45 m to its cap.", { big: true, range: 5000, y: 58, r: 45 });
 if (ERA === 1066) mark("The building site", -82, 0, "inferred", "The abbey was still being built. West of the church, the masons' yard: their timber lodges, where they cut and dressed the stone; stacks of Caen stone shipped from Normandy (and Reigate stone from Surrey); timber and scaffold poles; a pit of slaked lime for mortar; a sawpit. The ground round the church is trampled mud, not lawn: the grass is in the burial grounds, the lay cemetery north of the church and the monks' cemetery to the south-east. The monks' garden lies beyond." + (MARKET ? " Today the masons are at work." : " Today, a holy day, the site is still."), { y: 6, r: 25, range: 400 });
 if (ERA === 1066) mark("The unfinished nave", -48, 0, "inferred", "Most historians (Gem, Fernie) think the nave was completed only in the 1080s or later, and the two western towers later still. So here the western bays stand at arcade and gallery height in scaffolding, and a timber wall closes the finished part. How far the work had got in 1066 is not known.", { y: 14, r: 18, range: 400 });
-mark("The north door", 0, -30, "inferred", "With the nave unfinished, the way in was probably by a transept door. The north transept front became the abbey's main entrance in the 13th-century church.", { y: 6, r: 8, range: 250 });
-mark("The high altar", 18.5, 0, "known", "The high altar of St Peter, in the presbytery before the apse. The coronation was performed here: the oath, the anointing, the crowning.", { y: 3.2, r: 4, range: 60 });
-mark("King Edward's tomb", 13.8, 0, "known", "Edward the Confessor, died 5 January 1066, buried the next day in a stone coffin before the high altar of his new church. His tomb would have been covered with a costly silk pall and ringed with candles; 12th-century writers say William soon gave it a covering of gold and silver. Edward was made a saint in 1161 and moved to a shrine in 1163; Henry III rebuilt the whole abbey around his shrine. The tomb's form here is inferred.", { y: 1.9, r: 3, range: 50 });
-mark("The exterior", -6, -34, "inferred", "Outside, Norman great churches of the 1060s were mostly plain, finely cut stone: their richness was in proportion and mouldings, not ornament (zigzag chevron and dense carving came in only about 1100-1120). Shown: roll mouldings and small shafts framing the windows, flat pilaster buttresses, string courses, a corbel table under the eaves, blind arcading across the foot of the transept fronts, a painted tympanum over the north door, stone crosses on the gables. Details inferred from Jumièges and the surviving fragments of Edward's church.", { y: 8, r: 14, range: 200 });
-mark("The paintings", 0, 20, "inferred", "Norman and English great churches were plastered and painted inside: whitewash with red lines imitating masonry, patterned friezes, a painted curtain along the foot of the walls, figure scenes, and in the apse Christ in Majesty with angels and saints; capitals were painted too. Edward's paintings are lost; these follow surviving Romanesque schemes (St Albans, Kempley, the Norman churches).", { y: 9, r: 10, range: 60 });
-mark("The rood", -5.2, 0, "inferred", "The rood: a great crucifix with Mary and John, on a beam across the crossing arch, facing the people in the nave. Great churches had them; Archbishop Stigand gave great roods of gold and silver to several churches. Its form here is inferred.", { y: 15.5, r: 8, range: 60 });
-mark("The throne", 3.4, 0, "inferred", "After the crowning the king was enthroned. Where the throne stood in 1066 is not recorded; at later coronations it was on a raised stage at the crossing.", { y: 2.6, r: 3, range: 50 });
-mark("The arcades", -20, 5, "known", "Arcade, gallery and clerestory in three storeys, with piers alternating between compound piers (with a shaft running up the wall) and round columns, as at Jumièges in Normandy. Bases of the piers were found in excavation. Caen stone, pale cream. The flat painted timber ceiling is inferred.", { y: 9, r: 10, range: 80 });
+if (ERA !== 1285) mark("The north door", 0, -30, "inferred", "With the nave unfinished, the way in was probably by a transept door. The north transept front became the abbey's main entrance in the 13th-century church.", { y: 6, r: 8, range: 250 });
+if (ERA !== 1285) mark("The high altar", 18.5, 0, "known", "The high altar of St Peter, in the presbytery before the apse. The coronation was performed here: the oath, the anointing, the crowning.", { y: 3.2, r: 4, range: 60 });
+if (ERA !== 1285) mark("King Edward's tomb", 13.8, 0, "known", "Edward the Confessor, died 5 January 1066, buried the next day in a stone coffin before the high altar of his new church. His tomb would have been covered with a costly silk pall and ringed with candles; 12th-century writers say William soon gave it a covering of gold and silver. Edward was made a saint in 1161 and moved to a shrine in 1163; Henry III rebuilt the whole abbey around his shrine. The tomb's form here is inferred.", { y: 1.9, r: 3, range: 50 });
+if (ERA !== 1285) mark("The exterior", -6, -34, "inferred", "Outside, Norman great churches of the 1060s were mostly plain, finely cut stone: their richness was in proportion and mouldings, not ornament (zigzag chevron and dense carving came in only about 1100-1120). Shown: roll mouldings and small shafts framing the windows, flat pilaster buttresses, string courses, a corbel table under the eaves, blind arcading across the foot of the transept fronts, a painted tympanum over the north door, stone crosses on the gables. Details inferred from Jumièges and the surviving fragments of Edward's church.", { y: 8, r: 14, range: 200 });
+if (ERA !== 1285) mark("The paintings", 0, 20, "inferred", "Norman and English great churches were plastered and painted inside: whitewash with red lines imitating masonry, patterned friezes, a painted curtain along the foot of the walls, figure scenes, and in the apse Christ in Majesty with angels and saints; capitals were painted too. Edward's paintings are lost; these follow surviving Romanesque schemes (St Albans, Kempley, the Norman churches).", { y: 9, r: 10, range: 60 });
+if (ERA !== 1285) mark("The rood", -5.2, 0, "inferred", "The rood: a great crucifix with Mary and John, on a beam across the crossing arch, facing the people in the nave. Great churches had them; Archbishop Stigand gave great roods of gold and silver to several churches. Its form here is inferred.", { y: 15.5, r: 8, range: 60 });
+if (ERA !== 1285) mark("The throne", 3.4, 0, "inferred", "After the crowning the king was enthroned. Where the throne stood in 1066 is not recorded; at later coronations it was on a raised stage at the crossing.", { y: 2.6, r: 3, range: 50 });
+if (ERA !== 1285) mark("The arcades", -20, 5, "known", "Arcade, gallery and clerestory in three storeys, with piers alternating between compound piers (with a shaft running up the wall) and round columns, as at Jumièges in Normandy. Bases of the piers were found in excavation. Caen stone, pale cream. The flat painted timber ceiling is inferred.", { y: 9, r: 10, range: 80 });
 
 // ---------- you ----------
 const SPEEDS = [[1.4, "walking"], [4, "jogging"], [12, "fast"], [40, "very fast"]];
@@ -2148,7 +2390,7 @@ let SITTING = localStorage.getItem("vrPosture") === "sitting";
   { const dr = document.createElement("p"); dr.innerHTML = 'When? <button data-d="xmas">👑 Christmas Day 1066: the coronation</button> <button data-d="market">🧺 A market day, December 1066</button> <button data-d="1100">☀️ Summer 1100: the Norman city</button> <button data-d="1285">🍂 Michaelmas 1285: the stone bridge</button>';
     const cur = ERA === 1285 ? "1285" : ERA === 1100 ? "1100" : MARKET ? "market" : "xmas", pd = () => dr.querySelectorAll("button").forEach(b => { b.style.cssText = "font:600 14px -apple-system,sans-serif;padding:6px 12px;margin:2px 4px;border-radius:8px;cursor:pointer;border:2px solid #5a3a1e;" + (b.dataset.d === cur ? "background:#5a3a1e;color:#fff" : "background:#fff;color:#5a3a1e"); });
     dr.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); if (b.dataset.d !== cur) { const q = new URLSearchParams(location.search); q.delete("day"); q.delete("era"); if (b.dataset.d === "market") q.set("day", "market"); if (b.dataset.d === "1100") q.set("era", "1100"); if (b.dataset.d === "1285") q.set("era", "1285"); location.search = q.toString(); } }); pd(); card?.insertBefore(dr, card.lastElementChild); }
-  { const wr = document.createElement("p"), cur = new URLSearchParams(location.search).get("who") || "traveller"; wr.innerHTML = "Who are you? " + [["traveller", "🎓 Time traveller (unseen)"], ["comb", "🦌 London comb-maker"], ["ale", "🍺 London alewife"], ["south", "🎣 Southwark fisherman"], ["thegn", "🛡 English thegn"]].map(([k, n]) => `<button data-w="${k}">${n}</button>`).join(" ");
+  { const wr = document.createElement("p"), cur = new URLSearchParams(location.search).get("who") || "traveller"; wr.innerHTML = "Who are you? " + [["traveller", "🎓 Time traveller (unseen)"], ["comb", "🦌 London comb-maker"], ["ale", ERA === 1285 ? "🍺 London brewster" : "🍺 London alewife"], ["south", "🎣 Southwark fisherman"], ["thegn", ERA === 1285 ? "🧵 London mercer" : "🛡 English thegn"]].map(([k, n]) => `<button data-w="${k}">${n}</button>`).join(" ");
     wr.querySelectorAll("button").forEach(b => b.style.cssText = "font:600 13.5px -apple-system,sans-serif;padding:5px 10px;margin:2px 3px;border-radius:8px;cursor:pointer;border:2px solid #5a3a1e;" + (b.dataset.w === cur ? "background:#5a3a1e;color:#fff" : "background:#fff;color:#5a3a1e"));
     wr.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); if (b.dataset.w !== cur) { const q = new URLSearchParams(location.search); if (b.dataset.w === "traveller") q.delete("who"); else q.set("who", b.dataset.w); location.search = q.toString(); } }); card?.insertBefore(wr, card.lastElementChild); }
   row.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; e.stopPropagation(); SITTING = b.dataset.p === "sitting"; localStorage.setItem("vrPosture", b.dataset.p); paint(); }); paint(); card?.insertBefore(row, card.lastElementChild); }
@@ -2161,7 +2403,7 @@ document.body.append(HUD, MSG, GUIDE, MAPC);
 let msgT = 0, msgText = "", vrDirty = true;
 function say(t, secs = 12) { msgText = t; msgT = secs; MSG.innerHTML = t; MSG.style.display = "block"; vrDirty = true; }
 function start() { if (started) return; started = true; intro?.classList.add("gone"); if (!UNSEEN) return roleStart();
-  if (ERA === 1285) return say("Michaelmas, Saturday 29 September 1285, at Westminster: quarter day, when rents fall due, and a market day. Edward I is king; this summer he took the City into his own hands, removed its mayor and put a royal warden over it. Downriver, London Bridge now stands in stone, nineteen arches lined with houses, with its chapel of St Thomas and the Great Stone Gate. The leaves are turning and the harvest is in. (This 1285 London is still being built: the Gothic St Paul's and abbey, the Tower's new walls and the friaries are to come.) Walk anywhere, or take a boat.", 26);
+  if (ERA === 1285) return say("Michaelmas, Saturday 29 September 1285, at Westminster: quarter day, when rents fall due, and a market day. Edward I is king; this summer he took the City into his own hands. Before you, Henry III's soaring Gothic abbey joined to the old Romanesque nave. Downriver: St Paul's with its great spire, the stone London Bridge lined with houses, the whitewashed Tower in its new walls and moat; friaries, the Temple's round church, the Great Conduit in Cheapside. The leaves are turning and the harvest is in. Walk anywhere, or take a boat.", 26);
   if (ERA === 1100) return say("Lammas Day, 1 August 1100, at Westminster: a summer morning a generation after the Conquest. Before you, the abbey, its nave finished; beyond the palace, William Rufus's new hall. Downriver, the White Tower rises over the City; Baynard's Castle and Montfichet's Tower guard the west; the new St Paul's is building. The markets are busy and the harvest is beginning. Walk anywhere, or take a boat.", 24);
   if (MARKET) return say("A market day a few days before Christmas 1066, at Westminster. The City is about 3 km east, along the Strand (or take a boat from the wharf, or use the guide's 'Things to do'). In the City: stalls on Cheapside, butchers at the Shambles and in Eastcheap, fish by the hithes. You carry 30 silver pennies: press E at a stall to buy.", 22);
   say("Westminster, Christmas morning 1066. Before you, Edward the Confessor's new abbey; to your right, the houses of the little vill. At 10:00 William's procession comes from the palace (to the south-east) to the north door. Walk anywhere: into the abbey, along the Strand to the City, across London Bridge. Markers name things and say how well we know them: press E near one to read it.", 22); }
@@ -2346,7 +2588,7 @@ function frame() {
   hudT -= dt; if (hudT <= 0) { hudT = 0.3;
     const hh = Math.floor(SIM / 3600), mi = Math.floor(SIM / 60) % 60, DH = INSIDE_H ? null : nearDoorHouse();
     let nearM = null, nd = 1e9; for (const m of MARKS) { if (m.follow || m.hidden) continue; const d = Math.hypot(m.x - P_.x, m.z - P_.z); if (d < m.r && d < nd) { nd = d; nearM = m; } }
-    const room = { hall: "in the great hall of Edward's palace", chamber: P_.y > PAL.chamber.gy + 2 ? "upstairs in the king's chamber" : "in the chamber block's ground floor (the stair is outside)", kitchen: "in the palace kitchen", church: "inside the church", whall: "in Westminster Hall", tower: "in the Tower" }[zoneOf(P_.x, P_.z)];
+    const room = { hall: "in the great hall of Edward's palace", chamber: P_.y > PAL.chamber.gy + 2 ? "upstairs in the king's chamber" : "in the chamber block's ground floor (the stair is outside)", kitchen: "in the palace kitchen", church: "inside the church", whall: "in Westminster Hall", tower: "in the Tower", pauls: "inside St Paul's, in Paul's Walk" }[zoneOf(P_.x, P_.z)];
     const where = INSIDE_H ? "inside a house · E near things to read; E at the doorway to go out" : DH ? "at a doorway · <b>E: go inside</b>" : nearM ? `at <b>${nearM.name}</b> · E to read` : inA ? "inside Westminster Abbey" : room || (CITY.inside(P_.x, P_.z) ? "inside the walls of London" : "");
     HUD.innerHTML = `<b>London and Westminster, ${ERA === 1285 ? "Michaelmas, 29 September 1285" : ERA === 1100 ? "Lammas Day, 1 August 1100" : MARKET ? "a market day, December 1066" : "Christmas Day 1066"}</b> · ${hh}:${String(mi).padStart(2, "0")}${timeRate > 1 ? ` (time ×${timeRate})` : ""} · ${flying ? "flying" : SPEEDS[speedI][1] + (run > 1 ? ", running" : "")}<br>${where}<br>
       <span style="color:#e8dcc0">${UNSEEN ? "time traveller (unseen)" : "you: " + LIFE.short}${combs ? " · combs " + combs : ""}${eels ? " · eels " + eels : ""}${ale ? " · ale brewed" : ""} · purse ${fmtD(PURSE)}${BASKET.length ? " · basket: " + BASKET.slice(-6).join(", ") + (BASKET.length > 6 ? " …" : "") : ""}${RIDE ? (RIDE.voyage ? " · on a voyage down the river" : " · in the boat to " + RIDE.Q.name) + (BOAT_PACE[boatPace] > 1 ? " (×" + BOAT_PACE[boatPace] + ")" : "") : ""}</span><br><span style="color:#c8b898;font-size:12.5px">WASD walk · drag to look · shift run · − / = pace · E read / go in · N next moment · T time speed · L markers · F fly · M map</span>`;
@@ -2421,7 +2663,7 @@ const nearestHouse = (lat, lon, test = H => !H.burnt) => { const [x, z] = LL(lat
 if (WHO === "comb") HOME = nearestHouse(51.5122, -0.0950, H => !H.burnt && !H.ale && H.dp);
 if (WHO === "ale") HOME = ALEHOUSES[1] || ALEHOUSES[0];
 if (WHO === "thegn") { const [x, z] = LL(51.5160, -0.0925); HOME = HOUSES.filter(H => !H.burnt && !H.ale && H.dp && Math.hypot(H.x - x, H.z - z) < 220).sort((a, b) => b.w * b.d - a.w * a.d)[0]; }
-if (WHO === "south") { HOME = nearestHouse(51.5040, -0.0895, H => H.burnt); if (HOME) { const c = Math.cos(HOME.ry), s = Math.sin(HOME.ry), ox = HOME.w / 2 + 2.2, sx = HOME.x + c * ox, sz = HOME.z - s * ox, gy = groundH(sx, sz);
+if (WHO === "south") { HOME = nearestHouse(51.5040, -0.0895, H => ERA === 1066 ? H.burnt : !H.burnt && !H.noEnter); if (HOME && ERA === 1066) { const c = Math.cos(HOME.ry), s = Math.sin(HOME.ry), ox = HOME.w / 2 + 2.2, sx = HOME.x + c * ox, sz = HOME.z - s * ox, gy = groundH(sx, sz);
     SHELTER = { x: sx, z: sz, gy }; for (const [u, v] of [[-1, -1.6], [-1, 1.6], [1, -1.6], [1, 1.6]]) put("hutpost", CYL_G, MAT.wood, sx + c * u + s * v, gy, sz - s * u + c * v, 0.14, u < 0 ? 2.2 : 1.2, 0.14);   // a lean-to of poles and old thatch
     put("hutroof", BOX_G, MAT.thatch, sx, gy + 1.6, sz, 2.6, 0.2, 3.6, HOME.ry, 0, 0.42); put("shfire", HFIRE_G, hearthFireM, sx + c * 2.4, gy, sz - s * 2.4, 1.2, 1.2, 1.2); SHELTER.fire = [sx + c * 2.4, sz - s * 2.4]; } }
 if (HOME) HOME.home = true;
@@ -2457,10 +2699,10 @@ const TASKS = {
     T_("eat", "Cook and eat with your family", "midday", "at home", () => atHome(), () => spend(60, "Pottage, the everyday food: grain, peas or beans and leeks, with a little bacon, simmered all morning in the pot on the fire. Bread, ale, cheese.")),
     T_("sleep", "Go to bed", "night", "at home", () => atHome() && hh() > 16, () => endDay())],
   south: [
-    T_("rebuild", "Work on rebuilding your house", "morning", "your burnt house", () => HOME && Math.hypot(HOME.x - P_.x, HOME.z - P_.z) < 10, () => spend(150, "You dig out the burnt post stumps and set new oak posts in the holes, your neighbour helping. Earth-fast posts, then wattle panels, daub, rafters, thatch: a house like this took a few weeks to build with family and neighbours.")),
+    T_("rebuild", ERA === 1066 ? "Work on rebuilding your house" : "Mend your nets and traps", "morning", ERA === 1066 ? "your burnt house" : "your house", () => HOME && Math.hypot(HOME.x - P_.x, HOME.z - P_.z) < 10, () => spend(150, ERA === 1066 ? "You dig out the burnt post stumps and set new oak posts in the holes, your neighbour helping. Earth-fast posts, then wattle panels, daub, rafters, thatch: a house like this took a few weeks to build with family and neighbours." : "You sit at your door mending your nets with hemp twine and weaving new eel traps of willow, waiting for the tide to turn.")),
     T_("eels", "Check your eel traps from the boat", "morning", "the Southwark landing", () => { const P = PIERS.find(p => p.name === "Southwark"); return P && Math.hypot(P.land[0] - P_.x, P.land[1] - P_.z) < 8; }, () => { const P = PIERS.find(p => p.name === "Southwark"); startEelRun(P); }),
     T_("selleels", "Sell eels at Billingsgate", "market day", "Billingsgate", () => MARKET && eels > 0 && STALLS.some(S => S.kind === "fish" && Math.hypot(S.x - P_.x, S.z - P_.z) < 8), () => { const p = eels * 2; spend(60, `You sell your eels to the fishmongers at Billingsgate: ${fmtD(p)}.`, () => { PURSE += p; eels = 0; }); }),
-    T_("eat", "Eat by the fire with your family", "midday", "the shelter", () => atHome(), () => spend(40, eels ? "Eels stewed in the pot, bread, small ale. The children are cold; the lean-to keeps off the rain but not the wind." : "Bread, a little cheese, small ale. The burning took your stores; neighbours across the river have helped.")),
+    T_("eat", "Eat by the fire with your family", "midday", ERA === 1066 ? "the shelter" : "your house", () => atHome(), () => spend(40, ERA !== 1066 ? (eels ? "Eels stewed in the pot with leeks, bread and ale, by the hearth with your family." : "Bread, a pottage of peas and beans, ale.") : eels ? "Eels stewed in the pot, bread, small ale. The children are cold; the lean-to keeps off the rain but not the wind." : "Bread, a little cheese, small ale. The burning took your stores; neighbours across the river have helped.")),
     T_("sleep", "Sleep in the shelter", "night", "the shelter", () => atHome() && hh() > 16, () => endDay())],
   thegn: [
     T_("dress", "Dress in your best", "dawn", "at home", () => atHome(), () => spend(20, "Your servants bring your best: a fine linen shirt, a tunic of madder-red wool with a tablet-woven border, a cloak of blue with a gilt brooch at the right shoulder, your sword-belt. A thegn showed his rank by his dress and his weapons.")),
@@ -2532,7 +2774,6 @@ mark(WHO === "thegn" || UNSEEN ? "Your horse" : "A neighbour's pony", MOUNT.x, M
 const MOUNT_MARK = MARKS[MARKS.length - 1];
 function mountToggle() { if (MOUNT.ridden) { MOUNT.ridden = false; MOUNT_MARK.x = MOUNT.x; MOUNT_MARK.z = MOUNT.z; MOUNT_MARK.hidden = false; say("You get down and tie the horse.", 4); return true; }
   if (Math.hypot(MOUNT.x - P_.x, MOUNT.z - P_.z) < 3 && !INSIDE_H && !zoneOf(P_.x, P_.z)) { MOUNT.ridden = true; MOUNT_MARK.hidden = true; SITTING_DOWN = false; P_.x = MOUNT.x; P_.z = MOUNT.z; say("You swing up into the saddle. Walk on: shift (or the trigger) to canter; E to get down. You'll need to get down to go indoors.", 7); return true; } return false; }
-let mountPrev = [0, 0];
 function mountStep(dt, t, moving) { const M_ = MOUNT; if (M_.ridden) { const dx = P_.x - mountPrev[0], dz = P_.z - mountPrev[1], v = Math.hypot(dx, dz) / Math.max(dt, 1e-3);
     if (v > 0.3) { const target = Math.atan2(dx, dz); let d = target - M_.h; d = Math.atan2(Math.sin(d), Math.cos(d)); M_.h += d * Math.min(1, dt * 5); }
     M_.gait = lerpN(M_.gait, v, Math.min(1, dt * 3)); M_.x = P_.x; M_.z = P_.z; }
