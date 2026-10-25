@@ -468,6 +468,7 @@ const G_TEX = {
     for (let x = 6; x < w; x += 24) { g.fillStyle = "#2a3a5a"; g.beginPath(); g.moveTo(x, 30); g.lineTo(x + 10, 44); g.lineTo(x, 58); g.lineTo(x - 10, 44); g.fill(); } g.fillStyle = "rgba(0,0,0,.15)"; for (let x = 0; x < w; x += 16) g.fillRect(x, 0, 2, h); }, 2),
   rush: GT(256, 256, (g, w, h) => { speckle("#5e5038", 3000, ["#7a6a44", "#4a3e2a", "#8a7a52", "#6a5a3a"], 6, 1.5)(g, w, h); }, 2) };
 const G_MAT = {}; for (const k in G_TEX) G_MAT[k] = new THREE.MeshStandardMaterial({ map: G_TEX[k], vertexColors: true, roughness: k === "oak" ? 0.85 : 0.95 });
+G_MAT.lod = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });   // distant houses: plain colours, no texture
 G_MAT.dark = new THREE.MeshStandardMaterial({ color: 0x0e0a06, vertexColors: true, roughness: 1 });
 G_MAT.plain = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
 const GCOL = new Map(), GCHUNK = 500;
@@ -520,7 +521,15 @@ function groof(F, mat, w, d, wh, rh, o = {}) { const t = o.t ?? (mat === "thatch
     }
     if (mat === "thatch") gbox(F, "thatch", 0, yr + tv - 0.05, 0, 0.5, 0.25, 2 * Rz + 0.4); } }
 // the timber house: low walls on earth-fast oak posts, wattle-and-daub or planks; door in a frame; shuttered window openings
-function gHouse(H) { if (ERA === 1285 && H.roof === "thatch" && (H.dense || CITY.inside(H.x, H.z)) && Math.abs((H.x * 31 + H.z * 17) | 0) % 10 < 7) { H.roof = "shingle"; H.tile = true; }
+// level of detail: each house is built in full into its 250 m square ("H"), and again as a plain block with a gable roof ("L"); the
+// squares near you show the full houses, those further off the blocks, and the farthest nothing (see lodStep)
+const LOD_CELL = 250, lodKey = (x, z) => Math.floor(x / LOD_CELL) + "," + Math.floor(z / LOD_CELL);
+function lodHouse(H) { const F = FR(H.x, H.z, H.ry, H.gy, "L" + lodKey(H.x, H.z)), w = H.w, d = H.d, wh = H.wh, rh = H.rh, wc = { daub: [0.52, 0.47, 0.38], plank: [0.31, 0.23, 0.16], stave: [0.31, 0.23, 0.16], rubble: [0.48, 0.45, 0.4] }[H.wall] || [0.45, 0.41, 0.34],
+    rc = H.tile ? [0.44, 0.21, 0.15] : H.roof === "thatch" ? [0.38, 0.31, 0.19] : [0.28, 0.28, 0.29], UV = [[0, 0], [1, 0], [1, 1], [0, 1]];
+  const k = 0.62; GTINT = wc.map(v => v * k); gbox(F, "lod", 0, wh / 2 - 0.15, 0, w, wh + 0.3, d, "b"); for (const sz of [-1, 1]) gpoly(F, "lod", [[-w / 2, wh, sz * d / 2], [w / 2, wh, sz * d / 2], [0, wh + rh, sz * d / 2]], [[0, 0], [1, 0], [0.5, 1]], [0, 0, sz]);
+  GTINT = rc.map(v => v * k); for (const sx of [-1, 1]) gpoly(F, "lod", [[sx * (w / 2 + 0.35), wh - 0.25, -d / 2 - 0.3], [0, wh + rh, -d / 2 - 0.3], [0, wh + rh, d / 2 + 0.3], [sx * (w / 2 + 0.35), wh - 0.25, d / 2 + 0.3]], UV, [sx, 1, 0]); GTINT = [1, 1, 1]; }
+function gHouse(H) { if (!H.chunkKey) H.chunkKey = "H" + lodKey(H.x, H.z);
+  if (ERA === 1285 && H.roof === "thatch" && (H.dense || CITY.inside(H.x, H.z)) && Math.abs((H.x * 31 + H.z * 17) | 0) % 10 < 7) { H.roof = "shingle"; H.tile = true; }
   const F = FR(H.x, H.z, H.ry, H.gy, H.chunkKey), w = H.w, d = H.d, wh = H.wh, rh = H.rh, R = seeded((H.x * 7 + H.z * 13) | 0);
   const bw = 0.85 + R() * 0.25, br = 0.8 + R() * 0.3, tintW = H.wall === "daub" ? (R() < 0.3 ? [1.3, 1.3, 1.27] : [bw, bw * 0.98, bw * 0.95]) : [bw, bw * 0.97, bw * 0.94];   // some daub limewashed
   const tintR = H.tile ? [1.05 * br + 0.1, 0.58 * br, 0.44 * br] : H.roof === "thatch" ? (R() < 0.25 ? [1.15, 1.1, 0.95] : [br, br * 0.98, br * 0.93]) : [br, br, br];   // a few roofs new-thatched, most weathered
@@ -613,7 +622,10 @@ const GABLE_G = gableGeo(), BOX_G = new THREE.BoxGeometry(1, 1, 1).translate(0, 
 const PLANE_G = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);
 // the kit: lists of [x, y, z, sx, sy, sz, rotY] per part and material, drawn as one instanced mesh each
 const KIT = {}; const kit = (key, geo, mat) => KIT[key] || (KIT[key] = { geo, mat, list: [] });
-const put = (key, geo, mat, x, y, z, sx, sy, sz, ry = 0, rx = 0, rz = 0) => { kit(key, geo, mat).list.push([x, y, z, sx, sy, sz, ry, rx, rz]); return KIT[key].list.length - 1; };
+// small things drawn only near you, batched by 250 m square: [name prefix, distance in m]
+const KIT_NEAR = [["tree", 900], ["crown", 900], ["fence", 600], ["st:", 360], ["stack", 700], ["rickbase", 700], ["vine", 600], ["pale", 700], ["block", 500], ["log", 500], ["stall", 300], ["candle", 200], ["effigy", 200], ["purbeck", 400], ["wtcol", 300], ["tcol", 300], ["hutpost", 400]];
+const kitNear = key => { for (const [p, r] of KIT_NEAR) if (key.startsWith(p)) return r; return 0; };
+const put = (key, geo, mat, x, y, z, sx, sy, sz, ry = 0, rx = 0, rz = 0) => { if (kitNear(key)) key = key + "@" + lodKey(x, z); kit(key, geo, mat).list.push([x, y, z, sx, sy, sz, ry, rx, rz]); return KIT[key].list.length - 1; };
 function buildKit(group) { for (const k in KIT) { const K = KIT[k]; if (!K.list.length || K.im) continue; const im = new THREE.InstancedMesh(K.geo, K.mat, K.list.length), c = new THREE.Color();
   K.list.forEach(([x, y, z, sx, sy, sz, ry, rx, rz], i) => { O3.position.set(x, y, z); O3.rotation.set(rx || 0, ry, rz || 0, "YXZ"); O3.scale.set(sx, sy, sz); O3.updateMatrix(); im.setMatrixAt(i, O3.matrix); c.setHSL(0.08, 0.1 + 0.15 * hash(i, 3), 0.78 + 0.22 * hash(i, 5)); im.setColorAt(i, c); });
   im.frustumCulled = false; K.im = im; group.add(im); } }
@@ -645,7 +657,7 @@ function addHouse(x, z, w, d, ry, o = {}) { const gy = o.gy ?? groundH(x, z), R 
       dr === "+x" ? [x + c * (w / 2 + 0.03), z - s * (w / 2 + 0.03), ry + Math.PI / 2] : [x - c * (w / 2 + 0.03), z + s * (w / 2 + 0.03), ry - Math.PI / 2]; }
   H.coll = solid(x, z, w + 0.1, d + 0.1, ry, H); if (H.lean) { const lx = H.lean * (w / 2 + 0.9); solid(x + Math.cos(ry) * lx, z - Math.sin(ry) * lx, 1.8, d * 0.45, ry); }
   HOUSES.push(H); return H; }
-function buildHouses(fireSet) { for (const H of HOUSES) { if (fireSet.has(H)) continue; if (H.burnt) gBurnt(H); else gHouse(H); }
+function buildHouses(fireSet) { for (const H of HOUSES) { if (fireSet.has(H)) continue; if (H.burnt) gBurnt(H); else { gHouse(H); lodHouse(H); } }
   let k = 0; for (const H of fireSet) { H.chunkKey = "fire" + k++; gHouse(H); }
   for (const m of gFlush()) { const key = m.userData.key; if (!key.startsWith("fire")) continue; const H = [...fireSet][+key.slice(4).split("|")[0]]; (H.fx || (H.fx = [])).push(m); m.userData.mat0 = m.material; } }
 // yard things: woodpiles, barrels, wells, wattle fences
@@ -1782,7 +1794,7 @@ const outsideDens = { "Fleet Street": (x, z) => 0.55 * (1 - sstepN(Math.hypot(x 
   "the road east from Aldgate": (x, z) => 0.4 * (1 - sstepN(Math.hypot(x - GATES[5].x, z - GATES[5].z), 80, 400)), "the road north from Cripplegate": (x, z) => 0.3 * (1 - sstepN(Math.hypot(x - GATES[3].x, z - GATES[3].z), 60, 300)),
   "Borough High Street": (x, z) => 0.75 * (1 - sstepN(Math.hypot(x - BRIDGE.P[1][0], z - BRIDGE.P[1][1]), 250, 650)), "the road to Lambeth": 0.03 };
 const [cheapX, cheapZ] = LL(51.5130, -0.0930);
-const cityDens = (x, z) => { if (!CITY.inside(x, z)) return 0; const d = Math.hypot(x - cheapX, (z - cheapZ) * 1.6); return ERA === 1285 ? (IS_HEADSET ? 0.82 : 0.98) - 0.18 * sstepN(d, 700, 1500) : 0.88 - 0.45 * sstepN(d, 500, 1300); };
+const cityDens = (x, z) => { if (!CITY.inside(x, z)) return 0; const d = Math.hypot(x - cheapX, (z - cheapZ) * 1.6); return ERA === 1285 ? 0.98 - 0.12 * sstepN(d, 700, 1500) : 0.88 - 0.45 * sstepN(d, 500, 1300); };
 // by 1285, about 80,000 people: the suburbs run far out along the roads from the gates, and the Strand is nearly built up to Westminster
 if (ERA === 1285) { const gd = (G, x, z) => Math.hypot(x - G.x, z - G.z); Object.assign(outsideDens, { "Fleet Street": (x, z) => 0.7 * (1 - sstepN(gd(GATES[0], x, z), 700, 1500)) + 0.25, "the Strand": 0.5, "King Street": (x, z) => z > -520 ? 0.85 : 0.35,
   "the road to Holborn": (x, z) => 0.88 * (1 - sstepN(gd(GATES[1], x, z), 400, 1100)), "Ermine Street": (x, z) => 0.85 * (1 - sstepN(gd(GATES[4], x, z), 300, 950)), "the road east from Aldgate": (x, z) => 0.8 * (1 - sstepN(gd(GATES[5], x, z), 300, 850)),
@@ -1791,7 +1803,7 @@ for (const S of STREETS) { const od = outsideDens[S.name], f = (x, z) => CITY.in
   if (S.name === "Thames Street") { lineStreet(S, f, { sides: [1] }); lineStreet(S, (x, z) => 0.3 * f(x, z), { sides: [-1], seed: 3, yards: false }); }
   else lineStreet(S, f, { burnt: S.name === "Borough High Street" && ERA === 1066, kind: S.name === "King Street" ? "vill" : "house" }); }
 { const R = seeded(23); let n = 0;   // houses back from the streets, on lanes and in yards
-  for (let tries = 0; tries < (ERA === 1285 ? 20000 : 6000) && n < (ERA === 1285 ? (IS_HEADSET ? 450 : 800) : 420); tries++) { const x = GATES[0].x + R() * (GATES[5].x - GATES[0].x + 60), z = -2200 + R() * 1300; if (!CITY.inside(x, z) || R() > cityDens(x, z) || baseH(x, z) < 1.2 || WALL.d(x, z) < 12) continue;
+  for (let tries = 0; tries < (ERA === 1285 ? 60000 : 6000) && n < (ERA === 1285 ? (IS_HEADSET ? 1300 : 2200) : 420); tries++) { const x = GATES[0].x + R() * (GATES[5].x - GATES[0].x + 60), z = -2200 + R() * 1300; if (!CITY.inside(x, z) || R() > cityDens(x, z) || baseH(x, z) < 1.2 || WALL.d(x, z) < 12) continue;
     const w = 4 + R() * 2, d = 6 + R() * 5, ry = (R() < 0.5 ? 0 : Math.PI / 2) + (R() - 0.5) * 0.3; if (!rRect(x, z, w + 2, d + 2, ry, 0, true)) continue;
     const H = addHouse(x, z, w, d, ry, { door: ["+z", "-z", "+x", "-x"][(R() * 4) | 0] }); rRect(x, z, w + 0.4, d + 0.4, ry, 2); rRect(x, z, w + 8, d + 8, ry, 3); n++; } }
 // small places outside: Charing, round St Clement Danes, Lambeth, and a few farmsteads
@@ -1799,7 +1811,7 @@ function cluster(lat, lon, n, rad, seed, o = {}) { const [cx, cz] = LL(lat, lon)
   for (let t = 0; t < n * 20 && k < n; t++) { const a = R() * 6.283, r = rad * Math.sqrt(R()), x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r, w = 4.5 + R() * 2, d = 7 + R() * 5, ry = R() * Math.PI;
     if (baseH(x, z) < 1.2 || !rRect(x, z, w + 3, d + 3, ry, 0, true)) continue; addHouse(x, z, w, d, ry, { door: "-z", ...o }); rRect(x, z, w + 0.4, d + 0.4, ry, 2); rRect(x, z, w + 14, d + 14, ry, 3); k++; } }
 cluster(51.5073, -0.1270, ERA === 1285 ? 22 : 6, ERA === 1285 ? 110 : 45, 41); cluster(51.5131, -0.1135, ERA === 1285 ? 40 : 10, ERA === 1285 ? 160 : 70, 42); cluster(51.4955, -0.1192, 7, 70, 43); cluster(51.5165, -0.1150, 3, 60, 44); cluster(51.5200, -0.1000, 3, 80, 45); cluster(51.4985, -0.1340, 4, 60, 46);
-cluster(51.5035, -0.0905, ERA === 1285 ? 60 : 10, ERA === 1285 ? 320 : 120, 47, { burnt: ERA === 1066 });   // Southwark: burned in 1066, rebuilt by 1100
+cluster(51.5035, -0.0905, ERA === 1285 ? 140 : 10, ERA === 1285 ? 380 : 120, 47, { burnt: ERA === 1066 });   // Southwark: burned in 1066, rebuilt by 1100
 markLL("Charing", 51.5073, -0.1277, "inferred", "A hamlet at the bend of the river road, where the Strand turns south to Westminster: its Old English name, cierring, means 'a turning'. The cross that gave Charing Cross its name was put up in 1294.", { range: 1200 });
 markLL("The Danish settlement", 51.5131, -0.1125, "known", "A small community of Danes, living outside the walls round St Clement's church: London had many Scandinavian residents after Cnut became king in 1016.", { range: 900 });
 markLL("Lambeth", 51.4958, -0.1188, "known", "A riverside manor on the Surrey shore opposite Westminster, held by Goda, King Edward's sister. The archbishops of Canterbury acquired it about 1200 and built Lambeth Palace.", { range: 1500 });
@@ -1953,7 +1965,7 @@ function addStall(x, z, a, side, kind) { const G = GOODS[kind], c = Math.cos(a),
   else if (kind === "cook") { for (let k = 0; k < 8; k++) P("pie", STALL_G.loaf, SMAT.pie, (k % 2 - 0.5) * 0.35, -0.9 + Math.floor(k / 2) * 0.5, top + 0.04, 1.1, 0.8, 0.9); P("pot", STALL_G.pot, SMAT.pot, -side * 0.3, 1.3, 0, 2, 2, 2); }
   solid(x, z, 0.9, 2.3, a); const [sx, sz] = at(side * 0.75, 0); const S = { x, z, a, side, kind, G, seller: [sx, sz, Math.atan2(-c * side, s * side)], front: at(-side * 0.8, 0) }; STALLS.push(S); return S; }
 // lines of stalls along a street between two longitudes, both sides, keeping the middle clear
-function stallsAlong(name, lon0, lon1, kinds, gap = 6.5) { if (IS_HEADSET && ERA === 1285) gap *= 2; const S = STREETS.find(q => q.name === name), R = seeded(name.length * 31 + lon0 * 1e4 | 0); if (!S) return;
+function stallsAlong(name, lon0, lon1, kinds, gap = 6.5) { if (IS_HEADSET && ERA === 1285) gap *= 1.4; const S = STREETS.find(q => q.name === name), R = seeded(name.length * 31 + lon0 * 1e4 | 0); if (!S) return;
   for (let s = 3; s < S.L.L; s += gap) { const [x, z, a] = S.L.at(s), lon = x / KX + LON0; if (lon < Math.min(lon0, lon1) || lon > Math.max(lon0, lon1)) continue;
     for (const side of [-1, 1]) { if (R() < 0.3) continue; const off = side * (S.w / 2 - 1.1), px = x + Math.cos(a) * off, pz = z - Math.sin(a) * off; if (rGet(px, pz) !== 1) continue; addStall(px, pz, a, side, kinds[(R() * kinds.length) | 0]); } } }
 if (MKT_ON && ERA === 1285) {
@@ -2403,7 +2415,7 @@ else if (MARKET) { NARR.length = 0; NARR.push([hms(9, 0), "A market day a few da
 let narrI = -1;
 
 // ---------- the people ----------
-const NC = ERA === 1285 ? (IS_HEADSET ? 740 : 1150) : IS_HEADSET ? 640 : 860, crowd = new Crowd(NC), AG2 = [];   // everyone, one instanced crowd
+const NC = ERA === 1285 ? (IS_HEADSET ? 1000 : 1700) : IS_HEADSET ? 640 : 860, crowd = new Crowd(NC), AG2 = [];   // everyone, one instanced crowd
 let nextI = 0;
 function agent(role, o = {}) { const i = nextI++; if (i >= NC) return null; const L = looks(i, role); crowd.look(i, L); const A = { i, L, role: L.role, x: 0, z: 0, y: 0, h: 0, kind: "stand", walk: 0, shown: false, ...o }; AG2.push(A); return A; }
 // a route: points [x, z]; position at distance s
@@ -2835,6 +2847,12 @@ const clock = new THREE.Clock(), fwd = V3(0, 0, 0), side = V3(0, 0, 0), UP = V3(
 let hudT = 0, mapT = 0, lblT = 0, loopErrs = 0;
 const dayUp = new THREE.Color(), dayHor = new THREE.Color();
 buildHouses(new Set(FIRE_H)); buildKit(scene);
+// the 250 m squares of houses: full detail near you, plain blocks further off, nothing far in the haze
+const LODS = new Map(); scene.traverse(o => { const k = o.userData && o.userData.key; if (!o.isMesh || typeof k !== "string" || !(k[0] === "H" || k[0] === "L") || !/^[HL]-?\d/.test(k)) return; const c = k.slice(1).split("|")[0]; if (!LODS.has(c)) { const [i, j] = c.split(",").map(Number); LODS.set(c, { x: (i + 0.5) * LOD_CELL, z: (j + 0.5) * LOD_CELL, H: [], L: [], near: null, far: null }); } LODS.get(c)[k[0]].push(o); });
+for (const k in KIT) { const at = k.indexOf("@"); if (at < 0 || !KIT[k].im) continue; const c = k.slice(at + 1); if (!LODS.has(c)) { const [i, j] = c.split(",").map(Number); LODS.set(c, { x: (i + 0.5) * LOD_CELL, z: (j + 0.5) * LOD_CELL, H: [], L: [], near: null, far: null }); } (LODS.get(c).K ||= []).push([KIT[k].im, kitNear(k) * (IS_HEADSET ? 0.75 : 1)]); }
+const LOD_LIST = [...LODS.values()], LOD_NEAR = IS_HEADSET ? 300 : 380, LOD_FAR = IS_HEADSET ? 3600 : 5200; let lodTick = 0;
+function lodStep(force) { if (!force && (lodTick++ % 8)) return; for (const C of LOD_LIST) { const d = Math.hypot(C.x - P_.x, C.z - P_.z), near = d < LOD_NEAR + (C.near ? 60 : 0), far = d > LOD_FAR; if (near === C.near && far === C.far) continue; C.near = near; C.far = far; for (const m of C.H) m.visible = near; for (const m of C.L) m.visible = !near && !far; }
+  for (const C of LOD_LIST) if (C.K) { const d = Math.hypot(C.x - P_.x, C.z - P_.z); for (const [im, r] of C.K) im.visible = d < r; } }
 if (ERA === 1285) scene.traverse(o => { const k = o.userData && o.userData.key; if (!o.isMesh || typeof k !== "string" || !k.startsWith("palace|")) return; const m = k.slice(7); if (m === "plank" || m === "stave" || m === "daub") o.material = G_MAT.rubble; else if (m === "thatch") o.material = G_MAT.shingle; });   // Henry III's palace: the old plan, rebuilt in stone
 const ALL_DOORS = [ND, WD, ...ZONES.flatMap(Z => Z.doors.map(([a, b]) => { const p = gw(Z.F, a, 0, b); return [p[0], p[2]]; }))];
 P_.y = groundAt(P_.x, P_.z); updateGround(P_.x, P_.z, 99);
@@ -2869,7 +2887,7 @@ function frame() {
   if (RIDE) { } else if (flying) P_.y = Math.max(g, P_.y + up * Math.max(4, sp) * dt); else P_.y = g > P_.y ? Math.min(g, P_.y + Math.max(3.2, sp * 1.2) * dt) : Math.max(g, P_.y - Math.max(7, sp) * dt);
   rig.position.set(P_.x, P_.y + (vr && SITTING ? 0.45 : 0) - (SITTING_DOWN || RIDE ? 0.65 : 0) + (MOUNT.ridden ? 1.05 + (MOUNT.gait > 0.3 ? Math.abs(Math.sin(t * (MOUNT.gait > 5 ? 9 : 7))) * 0.07 : 0) : 0), P_.z);
   updateGround(P_.x, P_.z);
-  lifeStep(dt, t); fireStep(dt, t); beastStep(t); reactStep(t); countryStep(t); lionStep(t); vehStep(t, dt); mountStep(dt, t); boatsStep(t, dt * Math.min(timeRate, 10));
+  lifeStep(dt, t); fireStep(dt, t); beastStep(t); reactStep(t); countryStep(t); lionStep(t); lodStep(); vehStep(t, dt); mountStep(dt, t); boatsStep(t, dt * Math.min(timeRate, 10));
   // the sun, low in the south all day; sky and light
   const hour = SIM / 3600, S = sunAt(hour), el = S.el, day = clampN(el * 7 + 0.35, 0, 1), dusk = clampN(1 - el * 9, 0, 1) * (el > -0.12 ? 1 : 0);
   sun.position.copy(rig.position).addScaledVector(S.dir, 800); sun.target.position.copy(rig.position);
