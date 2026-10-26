@@ -446,3 +446,26 @@ LN = LN[:i0] + """<div id="intro"><div class="card">
 out13 = HERE / "london1066.html"
 out13.write_text(LN.replace("__THREE__", three).replace("__SCENE__", (HERE / "london1066.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out13.name}, {out13.stat().st_size // 1024} KB")
+
+# ---- the fourteenth page: an antimatter starship at 1 g ------------------------------------------------------------------
+SS = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Starship: 1 g to the stars</title>").replace("background:#c8d4d8", "background:#05080c")
+i0, i1 = SS.index('<div id="intro">'), SS.index('<button id="vr">')
+SS = SS[:i0] + """<div id="intro"><div class="card">
+  <h1>Starship: 1 g to the stars</h1>
+  <p>A large antimatter starship waits in orbit near Earth. Its autopilot can take it to any star on its list: it accelerates at a steady
+  <b>1 g</b> (which you feel as ordinary gravity) to the halfway point, turns over, and decelerates at 1 g to arrive at rest, in orbit near
+  the most interesting planet. Known planets are real; elsewhere they are generated.</p>
+  <p>The trip computer on the bridge works it out exactly, from the metric of special relativity: the ship's own <b>proper time</b> and the
+  stars' <b>coordinate time</b> (both starting at today's date and time), the <b>proper velocity</b> w = &gamma;v (which can exceed c) and the
+  <b>map velocity</b> v (which never does). Out of the windows the sky is shown as you would see it: at high speed the stars crowd ahead and
+  turn blue, and fade and redden behind.</p>
+  <p>Proxima Centauri takes 3.5 years by the ship's clock (5.9 on Earth); the centre of the galaxy, 26,670 light years away, takes under 20.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; click the console buttons &nbsp;&middot;&nbsp; <kbd>[</kbd> <kbd>]</kbd> slower / faster time &nbsp;&middot;&nbsp;
+  <kbd>Q</kbd>/<kbd>Z</kbd> lift up / down &nbsp;&middot;&nbsp; <kbd>V</kbd> outside view<br>
+  In VR: left stick walk, right stick turn, trigger to press buttons, <b>A</b> lift, <b>B</b> outside view, <b>X</b>/<b>Y</b> slower / faster time</p>
+  <p class="dim">Star positions, distances and known planets are real; ship design follows published studies of antimatter rockets. Click to begin.</p>
+</div></div>
+""" + SS[i1:]
+SS = SS.replace("__SCENE__", 'const EARTH_JPG = "__EARTH__", MOON_JPG = "__MOON__";\n__SCENE__')
+out14 = HERE / "starship.html"
+out14.write_text(SS.replace("__THREE__", three).replace("__EARTH__", img("earth.jpg")).replace("__MOON__", img("moon.jpg")).replace("__SCENE__", (HERE / "starship.js").read_text(encoding="utf-8")), encoding="utf-8")
