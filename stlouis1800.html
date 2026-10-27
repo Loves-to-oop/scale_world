@@ -53321,18 +53321,29 @@ const lineUV = pts => line(pts.map(([u, v]) => toXZ(u, v)), true);
 // Terre, survived until 1869. The Mississippi was about 1.2 km wide here (the sand bar that became Bloody Island formed after
 // 1800); its banks have since moved, and its line here is approximate. Level 0 is the river in its spring rise.
 const WATER = 0;
-const riverU = v => 650 + 70 * Math.sin(v / 2600 + 0.4) - 0.000012 * v * v, RIVER_HW = 540;   // the river's centre line, in town coordinates, and its half-width
+// the river's centre line in town coordinates (u at each v), through points from today's course (the line used in the Cahokia program):
+// nearly straight past the town, then bending south-west below Mill Creek toward the Meramec; RIVER_HW its half-width
+const RIVER_CP = [[-14000, -1600], [-9000, -900], [-4996, -278], [-2097, 444], [-800, 600], [0, 660], [957, 690], [1700, 420], [2600, -120], [3662, -817], [5500, -1320], [8268, -1824], [14000, -2700]], RIVER_HW = 540;
+const riverU = v => { const P = RIVER_CP; if (v <= P[0][0]) return P[0][1]; if (v >= P[P.length - 1][0]) return P[P.length - 1][1]; let i = 0; while (P[i + 1][0] < v) i++;
+  const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)], t = (v - p1[0]) / (p2[0] - p1[0]), t2 = t * t, t3 = t2 * t;   // a Catmull-Rom curve through the points
+  const m1 = (p2[1] - p0[1]) / (p2[0] - p0[0]) * (p2[0] - p1[0]), m2 = (p3[1] - p1[1]) / (p3[0] - p1[0]) * (p2[0] - p1[0]);
+  return (2 * t3 - 3 * t2 + 1) * p1[1] + (t3 - 2 * t2 + t) * m1 + (-2 * t3 + 3 * t2) * p2[1] + (t3 - t2) * m2; };
 const BLUFF_TOP = v => 11.5 + 2.8 * sstepN(-v, -300, 1200) - 2.2 * sstepN(v, 500, 950);         // the terrace edge: higher to the north
 const LANDING = [-12, 112];                                                                         // the slope down to the landing, below the Place d'Armes (v range)
 const CREEK = v => 0, creekV = u => 965 + 35 * Math.sin(u / 280) + 0.03 * Math.max(0, -u - 800);  // Mill Creek's line: v at each u
 const DAM_U = -820, POND_Y = 9.2, POND = { u0: -2700, u1: DAM_U };                                  // Chouteau's mill dam and pond
 const [BMX, BMZ] = LL(38.64298, -90.18630), [BMU, BMV] = toUV(BMX, BMZ);                            // Big Mound (La Grange de Terre), at today's N. Broadway and Mound St.
+const AROUND_FLAT = [];
+// sandbars and young islands, growing willows; one opposite the town in these years became Bloody Island (u offset from the river's centre)
+const ISLANDS = [{ v: -1250, du: 140, len: 900, w: 150 }, { v: 2300, du: -120, len: 700, w: 120 }];
+const islandH = (u, v) => { let best = -99; for (const I of ISLANDS) { const ru = riverU(I.v) + I.du, q = Math.hypot((v - I.v) / (I.len / 2), (u - ru) / (I.w / 2)); if (q < 1.3) best = Math.max(best, lerpN(1.4, -2.5, sstepN(q, 0.6, 1.3))); } return best; };   // ground raised under the villages across the river (filled in below)
 const MOUNDS = [{ u: BMU, v: BMV, w: 97.2, d: 48.2, h: 10.4, ridge: true, name: "La Grange de Terre (Big Mound)" }];
 { const R = seeded(1764); for (let k = 0; k < 9; k++) MOUNDS.push({ u: BMU - 120 - R() * 320, v: BMV + 120 + R() * 520, w: 18 + R() * 22, d: 16 + R() * 18, h: 1.2 + R() * 3.2 }); }
 function baseH(x, z) { const [u, v] = toUV(x, z), ru = riverU(v), s = ru - RIVER_HW - u, n1 = fbm(x / 140, z / 140, 3), n2 = fbm(x / 900 + 7, z / 900, 3);
   let h;
-  if (u > ru) { const se = u - ru - RIVER_HW; h = se < 0 ? -1.5 - 6 * sstepN(-se, 0, 160) : 1.6 + 1.6 * n1 + 0.8 * n2 - 0.8 * sstepN(fbm(x / 300 + 4, z / 300, 3), 0.62, 0.7); return h; }   // the Illinois shore: low bottomland, sloughs
-  if (s < 0) return -1.2 - 6 * sstepN(-s, 0, 140);                                                   // the river bed
+  if (u > ru) { const se = u - ru - RIVER_HW; if (se < 0) return Math.max(-1.5 - 6 * sstepN(-se, 0, 160), islandH(u, v)); const sl = fbm(x / 420 + 4, z / 420, 3), sl2 = Math.abs(fbm(x / 1500 + 9, z / 1500 - 3, 3) - 0.5); h = 1.7 + 1.4 * n1 + 0.8 * n2 - 2.6 * sstepN(sl, 0.6, 0.68) * sstepN(se, 300, 700) - 2.4 * sstepN(0.03 - sl2, 0, 0.012) * sstepN(se, 500, 900);   // the American Bottom: ridges, sloughs and old channels holding water
+    for (const [cu, cv, r] of AROUND_FLAT) { const d = Math.hypot(u - cu, v - cv); if (d < r) h = lerpN(Math.max(h, 2.6), h, sstepN(d, r * 0.7, r)); } return h; }   // the villages stand on the higher ground
+  if (s < 0) return Math.max(-1.2 - 6 * sstepN(-s, 0, 140), islandH(u, v));                                                   // the river bed
   const top = BLUFF_TOP(v), lv = v > LANDING[0] && v < LANDING[1] ? Math.min(1, Math.min(v - LANDING[0], LANDING[1] - v) / 25) : 0;   // at the landing, a long slope instead of a bluff
   const beach = 0.4 + Math.min(s, 30) * 0.06, bluffAt = 32 + 3 * Math.sin(v / 90) + 4 * n1, cliff = sstepN(s, bluffAt, bluffAt + 9 + 6 * n1), ramp = sstepN(s, 18, 120);
   h = beach + (top - beach) * lerpN(cliff, ramp, lv);
@@ -53368,7 +53379,7 @@ const STREETS = [
   { name: "the path to the mill", w: 3.5, L: lineUV([[-180, 820], [-400, 880], [-700, 930], [DAM_U + 20, creekV(DAM_U) - 40]]) } ];
 // the land-use raster: 2 m cells, for ground colour, placing things without overlaps, and the map
 // 0 open, 1 street, 2 building, 3 yard, 4 square / churchyard, 5 field, 6 commons pasture, 7 wall / palisade, 8 garden beds, 9 orchard, 10 beach
-const RX0 = -3200, RZ0 = -3400, RC = 2, RW = 2900, RH = 3000, RAS = new Uint8Array(RW * RH);
+const RX0 = -3200, RZ0 = -3400, RC = 2, RW = 2900, RH = 5100, RAS = new Uint8Array(RW * RH);
 const rIdx = (x, z) => { const i = Math.floor((x - RX0) / RC), j = Math.floor((z - RZ0) / RC); return i < 0 || j < 0 || i >= RW || j >= RH ? -1 : j * RW + i; };
 const rGet = (x, z) => { const k = rIdx(x, z); return k < 0 ? 0 : RAS[k]; };
 function rRect(x, z, w, d, ry, v, test) { const c = Math.cos(ry), s = Math.sin(ry), R = Math.hypot(w, d) / 2 + RC;
@@ -53383,7 +53394,7 @@ function rLine(L, w, v) { for (const [ax, az, bx, bz] of L.S) { const len = Math
 // Champ north-west of the town, the Prairie des Noyers to the south-west). In May the wheat is up and green, the corn just planted.
 const ARPENT = 58.47, FIELDS = [{ u0: -2200, u1: -560, v0: -1700, v1: -380, name: "The Grand Champ" }, { u0: -2350, u1: -1000, v0: -250, v1: 760, name: "The Prairie des Noyers fields" }];
 for (const F of FIELDS) for (let v = F.v0; v < F.v1; v += ARPENT) rRectUV(F.u0, F.u1, v + 0.8, Math.min(F.v1, v + ARPENT) - 0.8, 5);
-rRectUV(-2600, -300, 1250, 2200, 6);   // the commons (la Commune) south of the creek: pasture for everyone's cattle
+rRectUV(-2600, -700, 1250, 2200, 6);   // the commons (la Commune) south of the creek: pasture for everyone's cattle
 for (const S of STREETS) rLine(S.L, S.w, 1);
 rRectUV(6, 66, 4, 96, 4);   // the Place d'Armes
 
@@ -53406,7 +53417,7 @@ function sunAt(hour) { const lat = 38.6 * Math.PI / 180, dec = 21.0 * Math.PI / 
 // the sky's reflection on the water: a simple light-to-dark gradient, so the river reads as water from the bank
 const SKY_ENV = tex(256, 128, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#8eb0d8"); gr.addColorStop(0.47, "#d4dce4"); gr.addColorStop(0.53, "#7a7666"); gr.addColorStop(1, "#4a463c"); g.fillStyle = gr; g.fillRect(0, 0, w, h); }); SKY_ENV.mapping = THREE.EquirectangularReflectionMapping; SKY_ENV.wrapS = SKY_ENV.wrapT = THREE.ClampToEdgeWrapping; SKY_ENV.repeat.set(1, 1);
 const water = new THREE.Mesh(new THREE.PlaneGeometry(40000, 40000).rotateX(-Math.PI / 2),
-  new THREE.MeshStandardMaterial({ color: 0x6e624a, roughness: 0.12, metalness: 0.0, envMap: SKY_ENV, envMapIntensity: 0.85, map: tex(256, 256, speckle("#ffffff", 1500, ["#d8d0c0", "#ffffff", "#c4b8a4"], 7, 1.2), [3000, 3000]) }));
+  new THREE.MeshStandardMaterial({ color: 0x5e5038, roughness: 0.14, metalness: 0.0, envMap: SKY_ENV, envMapIntensity: 0.42, map: tex(256, 256, speckle("#ffffff", 1500, ["#d8d0c0", "#ffffff", "#c4b8a4"], 7, 1.2), [3000, 3000]) }));
 water.position.y = WATER; scene.add(water);
 { const [cu, cv] = [(POND.u0 + POND.u1) / 2 - 200, creekV((POND.u0 + POND.u1) / 2)], [px, pz] = toXZ(cu, cv), pond = new THREE.Mesh(new THREE.PlaneGeometry(POND.u1 - POND.u0 + 400, 620).rotateX(-Math.PI / 2),
     new THREE.MeshStandardMaterial({ color: 0x3e4a3a, roughness: 0.12, metalness: 0.0, envMap: SKY_ENV, envMapIntensity: 0.8, map: tex(256, 256, speckle("#ffffff", 900, ["#c8d0c4", "#ffffff"], 6, 1.2), [40, 10]) }));
@@ -53453,7 +53464,11 @@ function stripOf(u, v) { for (const F of FIELDS) if (u > F.u0 && u < F.u1 && v >
 function groundColor(x, z, h, c) {
   const n1 = fbm(x / 40, z / 40, 3), n2 = fbm(x / 600 + 5, z / 600, 3), [u, v] = toUV(x, z), ru = riverU(v);
   c.setRGB(0.29 + 0.08 * n2, 0.45 + 0.08 * n1, 0.17 + 0.03 * n1);                                                        // May grass
-  if (u > ru) { c.setRGB(0.21 + 0.05 * n2, 0.36 + 0.06 * n1, 0.15); if (h < 1.6) c.lerp(_c1.setRGB(0.42, 0.38, 0.28), clampN((1.6 - h) * 0.8, 0, 0.8)); return c; }   // the Illinois bottomland
+  if (u < -260 && h > 12) { const pr = sstepN(-u, 260, 700); c.lerp(_c1.setRGB(0.42 + 0.07 * n2, 0.5 + 0.06 * n1, 0.22), pr * 0.85);   // the tall-grass prairie west of the town, with spring flowers
+    if (GC_CELL < 5) { const f = fbm(x / 6 + 30, z / 6, 2); if (f > 0.68) c.lerp(f > 0.74 ? _c1.setRGB(0.62, 0.42, 0.62) : _c1.setRGB(0.8, 0.72, 0.3), pr * 0.5); } }
+  if (u > ru) { const se = u - ru - RIVER_HW, wood = 1 - sstepN(se, 1200 + 600 * n2, 2000 + 600 * n2);   // the American Bottom: forest along the river, wet prairie and marsh beyond
+    c.setRGB(0.42 + 0.06 * n2, 0.5 + 0.06 * n1, 0.24).lerp(_c1.setRGB(0.19 + 0.04 * n2, 0.33 + 0.05 * n1, 0.14), wood);
+    if (h < 1.3) c.lerp(_c1.setRGB(0.4 + 0.05 * n1, 0.46, 0.26), clampN((1.3 - h) * 1.2, 0, 0.85)); if (h < 0.5) c.lerp(_c1.setRGB(0.36, 0.33, 0.25), 0.6); if (rGet(x, z) === 1) c.setRGB(0.5, 0.43, 0.32); else if (rGet(x, z) === 5) c.setRGB(0.48 + 0.05 * Math.sin(v * 2.4), 0.54, 0.22); return c; }
   const s = ru - RIVER_HW - u;
   if (s < 40 && h < 3.5) c.lerp(_c1.setRGB(0.56 + 0.06 * n1, 0.5 + 0.05 * n1, 0.4), clampN((3.5 - h) / 2, 0, 1));          // the beach: sand and drying mud
   if (h < WATER + 0.6) c.lerp(_c1.setRGB(0.38, 0.33, 0.25), clampN((WATER + 0.6 - h) * 1.5, 0, 0.9));                     // wet mud at the water's edge
@@ -53506,6 +53521,8 @@ const G_TEX = {
   // the stockade: logs a foot through, sharpened, set in a trench
   palisade: (() => { const t = tex(256, 256, (g, w, h) => { g.clearRect(0, 0, w, h); for (let x = 0; x < w; x += 32) { const gr = g.createLinearGradient(x, 0, x + 32, 0); gr.addColorStop(0, "#3a2e22"); gr.addColorStop(0.5, "#7a6650"); gr.addColorStop(1, "#3a2e22"); g.fillStyle = gr;
       const top = 10 + rnd() * 14; g.beginPath(); g.moveTo(x + 1, h); g.lineTo(x + 1, top + 14); g.lineTo(x + 16, top); g.lineTo(x + 31, top + 14); g.lineTo(x + 31, h); g.fill(); } }); t.repeat.set(1 / 1.0, 1 / 3.6); return t; })(),
+  // horizontal hewn logs with clay chinking: the American way of building (a contrast with the French upright logs)
+  logs: GT(256, 256, (g, w, h) => { g.fillStyle = "#b8a888"; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 64) { const gr = g.createLinearGradient(0, y, 0, y + 54); gr.addColorStop(0, "#4a3a2a"); gr.addColorStop(0.5, "#7a6448"); gr.addColorStop(1, "#3a2c20"); g.fillStyle = gr; g.fillRect(0, y + 4, w, 52); for (let k = 0; k < 20; k++) { g.fillStyle = "rgba(20,14,8,.25)"; g.fillRect(rnd() * w, y + 8 + rnd() * 44, 20 + rnd() * 60, 1.5); } } }, 2),
   dark: GT(16, 16, (g, w, h) => { g.fillStyle = "#1a140e"; g.fillRect(0, 0, w, h); }, 1) };
 const G_MAT = {}; for (const k in G_TEX) G_MAT[k] = new THREE.MeshStandardMaterial({ map: G_TEX[k], vertexColors: true, roughness: 0.92 });
 for (const k of ["pickets", "palisade"]) Object.assign(G_MAT[k], { alphaTest: 0.5, side: THREE.DoubleSide });
@@ -53577,7 +53594,7 @@ const PLANE_G = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);
 // the kit: lists of [x, y, z, sx, sy, sz, rotY] per part and material, drawn as one instanced mesh each
 const KIT = {}; const kit = (key, geo, mat) => KIT[key] || (KIT[key] = { geo, mat, list: [] });
 // small things drawn only near you, batched by 250 m square: [name prefix, distance in m]
-const KIT_NEAR = [["tree", 900], ["crown", 900], ["fruit", 500], ["fcap", 500], ["fcrown", 4800], ["ftrunk", 2400], ["fpost", 700], ["frail", 700], ["cross", 300], ["oven", 400], ["well", 350], ["tk:", 260], ["pirogue", 900], ["bateau", 900], ["bell", 400], ["cannon", 400], ["carriage", 400]];
+const KIT_NEAR = [["tree", 1400], ["crown", 1400], ["fruit", 500], ["fcap", 500], ["fcrown", 4800], ["ftrunk", 2400], ["fpost", 700], ["frail", 700], ["cross", 300], ["oven", 400], ["well", 350], ["tk:", 260], ["pirogue", 900], ["bateau", 900], ["bell", 400], ["cannon", 400], ["carriage", 400], ["cargo", 500], ["barrel", 500], ["leadpig", 400], ["cratepile", 500], ["lumber", 500], ["raftlog", 700]];
 const kitNear = key => { for (const [p, r] of KIT_NEAR) if (key.startsWith(p)) return r; return 0; };
 const put = (key, geo, mat, x, y, z, sx, sy, sz, ry = 0, rx = 0, rz = 0) => { if (kitNear(key)) key = key + "@" + lodKey(x, z); kit(key, geo, mat).list.push([x, y, z, sx, sy, sz, ry, rx, rz]); return KIT[key].list.length - 1; };
 function buildKit(group) { for (const k in KIT) { const K = KIT[k]; if (!K.list.length || K.im) continue; const im = new THREE.InstancedMesh(K.geo, K.mat, K.list.length), c = new THREE.Color();
@@ -53673,7 +53690,7 @@ const FRUIT = [], OVENS = [], WELLS = [], YARD_SPOTS = [];
 // ---------- the lots ----------
 // Each block (300 by 240 French feet) was usually cut into quarters, each a family's, the house at the street front; some families
 // held half a block or a whole one; some lots were still garden or empty in 1800. The town was densest near the Place d'Armes.
-const LOTS = [];
+const LOTS = [], STOREHOUSES = [];
 const fence = (u0, v0, u1, v1, hgt = 1.8, mat = "pickets") => { const [ax, az] = toXZ(u0, v0), [bx, bz] = toXZ(u1, v1), F = FR(0, 0, 0, 0, "H" + lodKey((ax + bx) / 2, (az + bz) / 2)), L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 6));
   for (let k = 0; k < n; k++) { const fx0 = ax + (bx - ax) * k / n, fz0 = az + (bz - az) * k / n, fx1 = ax + (bx - ax) * (k + 1) / n, fz1 = az + (bz - az) * (k + 1) / n, g0 = groundH(fx0, fz0) - 0.15, g1 = groundH(fx1, fz1) - 0.15, Lk = L / n, U0 = (L * k / n);
     GTINT = [1, 1, 1]; gpoly(F, mat, [[fx0, g0, fz0], [fx1, g1, fz1], [fx1, g1 + hgt, fz1], [fx0, g0 + hgt, fz0]], [[U0, 0], [U0 + Lk, 0], [U0 + Lk, hgt], [U0, hgt]]); }
@@ -53704,10 +53721,12 @@ const SPECIAL = new Set(["0,-1", "0,0", "1,1"]);   // blocks taken by the Choute
 { const R = seeded(1800);
   for (let bi = 0; bi < CROSS_V.length - 1; bi++) { const va = CROSS_V[bi] + 4.5, vb = CROSS_V[bi + 1] - 4.5, vm = (va + vb) / 2, key = Math.round(vm / 100 - 0.5);
     // east of La Grande Rue: lots from the street to the bluff (a single row, facing west)
-    if (key !== 0 && key !== 1 && key !== -2) { const ue = 50 + 3 * Math.sin(vm / 90); makeLot(6, ue, va, vm - 0.5, -1, townDens(vm), R); makeLot(6, ue, vm + 0.5, vb, -1, townDens(vm), R); }
+    if (key === -1) { for (const [vv, sz] of [[-80, 16], [-48, 14], [-20, 12]]) gShed(30, vv, 9, sz, "stone", "shingle", { wh: 3.4, door: -1 }); fence(6, va, 6, -54); fence(6, -46, 6, vb); fence(6, va, 52, va); fence(6, vb, 52, vb); rRectUV(6.5, 51.5, va + 0.5, vb - 0.5, 3); STOREHOUSES.push(toXZ(4, -80), toXZ(4, -48), toXZ(4, -20)); }
+    else if (key !== 0 && key !== 1 && key !== -2) { const ue = 50 + 3 * Math.sin(vm / 90); makeLot(6, ue, va, vm - 0.5, -1, townDens(vm), R); makeLot(6, ue, vm + 0.5, vb, -1, townDens(vm), R); }
     // between La Grande Rue and Rue de l'Église, and between it and Rue des Granges: four quarter-lots each
-    for (const [ua, ub] of [[-84.2, -5.8], [-174.2, -95.8]]) { if (ua === -84.2 && (key === -1 || key === 0)) continue; const um = (ua + ub) / 2;
-      makeLot(um + 0.5, ub, va, vm - 0.5, 1, townDens(vm), R); makeLot(um + 0.5, ub, vm + 0.5, vb, 1, townDens(vm), R); makeLot(ua, um - 0.5, va, vm - 0.5, -1, townDens(vm) * 0.9, R); makeLot(ua, um - 0.5, vm + 0.5, vb, -1, townDens(vm) * 0.9, R); }
+    for (const [ua, ub] of [[-84.2, -5.8], [-174.2, -95.8]]) { if (key === 0) continue; const um = (ua + ub) / 2;
+      if (R() < 0.22) makeLot(um + 0.5, ub, va, vb, 1, townDens(vm), R); else { makeLot(um + 0.5, ub, va, vm - 0.5, 1, townDens(vm), R); makeLot(um + 0.5, ub, vm + 0.5, vb, 1, townDens(vm), R); }   // some families held a half block
+      if (R() < 0.22) makeLot(ua, um - 0.5, va, vb, -1, townDens(vm) * 0.9, R); else { makeLot(ua, um - 0.5, va, vm - 0.5, -1, townDens(vm) * 0.9, R); makeLot(ua, um - 0.5, vm + 0.5, vb, -1, townDens(vm) * 0.9, R); } }
     // west of Rue des Granges: shallow lots facing it, up to the palisade
     makeLot(-230, -185.8, va, vm - 0.5, 1, townDens(vm) * 0.75, R); makeLot(-230, -185.8, vm + 0.5, vb, 1, townDens(vm) * 0.75, R); } }
 
@@ -53718,25 +53737,27 @@ const mark = (name, x, z, tag, text, o = {}) => { const m = { name, x, z, tag, t
 const markUV = (name, u, v, tag, text, o) => { const [x, z] = toXZ(u, v); return mark(name, x, z, tag, text, o); };
 
 // ---------- the Chouteau house ----------
-// Laclède's headquarters of 1764, the first stone house, on the block west of the Place d'Armes between the Rue de la Place and the
-// next street north; bought by Auguste Chouteau in 1789 and rebuilt: two storeys of stone with a garret, galleries, the whole block
+// Laclède's headquarters of 1764, the first stone house, on the block facing the Place d'Armes across La Grande Rue, between the Rue
+// de la Place and the Rue de la Tour; bought by Auguste Chouteau in 1789 and rebuilt: two storeys of stone with a garret, galleries, the whole block
 // enclosed by a stone wall about 10 feet high with loopholes for defence, and inside it kitchens, quarters for the enslaved, stables, a
 // warehouse for furs, a garden and orchard. The finest house in the town.
-const CHOU = { u: -34, v: -50 };
+const CHOU = { u: -34, v: 50 };
 { const H = addHouse(CHOU.u, CHOU.v, 12.5, 21, { wall: "stone", lime: true, roof: "shingle", gal: "all", gw: 2.6, storeys: 2, face: 1, wh: 3.1, fl: 0.7, chim: 1, kind: "chouteau" }); H.name = "Chouteau";
   const wall = (u0, v0, u1, v1) => { const [ax, az] = toXZ(u0, v0), [bx, bz] = toXZ(u1, v1), L = Math.hypot(bx - ax, bz - az), ry = Math.atan2(bx - ax, bz - az), mx = (ax + bx) / 2, mz = (az + bz) / 2, gy = Math.min(groundH(ax, az), groundH(bx, bz)) - 0.3, F = FR(mx, mz, ry, gy, "H" + lodKey(mx, mz));
     GTINT = [1.02, 1.0, 0.97]; gbox(F, "stone", 0, 1.65, 0, 0.6, 3.3 + 0.3, L); GTINT = [0.8, 0.78, 0.74]; gbox(F, "stone", 0, 3.5, 0, 0.75, 0.15, L + 0.1);
     for (let s = 2; s < L - 1; s += 3.2) gpoly(F, "dark", [[0.31, 2.1, s - L / 2 - 0.08], [0.31, 2.1, s - L / 2 + 0.08], [0.31, 2.35, s - L / 2 + 0.08], [0.31, 2.35, s - L / 2 - 0.08]], [[0, 0], [1, 0], [1, 1], [0, 1]], [1, 0, 0]);   // loopholes
     const lf = FR(mx, mz, ry, gy, "L" + lodKey(mx, mz)); GTINT = [0.6, 0.58, 0.55]; gbox(lf, "lod", 0, 1.8, 0, 0.6, 3.6, L); solid(mx, mz, 0.7, L, ry); rLine(line([[ax, az], [bx, bz]], true), 1.5, 7); };
-  wall(-84, -96, -84, -4); wall(-84, -4, -6, -4); wall(-84, -96, -6, -96); wall(-6, -96, -6, -55); wall(-6, -45, -6, -4);   // a gateway on La Grande Rue
-  gShed(-70, -86, 5, 7, "stone", "shingle", { chim: true, door: 1, hip: true }); gShed(-72, -66, 4.5, 11, "stone", "shingle", { door: 1 }); gShed(-72, -20, 6, 14, "stone", "shingle", { wh: 3.2, door: 1 });   // kitchen, quarters, the fur warehouse
-  gShed(-50, -88, 7, 9, "plank", "shingle", { wh: 3, door: -1 }); rRectUV(-80, -56, -40, -10, 8); for (let k = 0; k < 14; k++) FRUIT.push([...toXZ(-80 + (k % 4) * 7, -60 + Math.floor(k / 4) * 9), 0.6]);
+  wall(-84, 4, -84, 96); wall(-84, 96, -6, 96); wall(-84, 4, -6, 4); wall(-6, 4, -6, 45); wall(-6, 55, -6, 96);   // a gateway on La Grande Rue
+  gShed(-70, 14, 5, 7, "stone", "shingle", { chim: true, door: 1, hip: true }); gShed(-72, 34, 4.5, 11, "stone", "shingle", { door: 1 }); gShed(-72, 80, 6, 14, "stone", "shingle", { wh: 3.2, door: 1 });   // kitchen, quarters, the fur warehouse
+  gShed(-50, 12, 7, 9, "plank", "shingle", { wh: 3, door: -1 }); rRectUV(-80, -56, 60, 90, 8); for (let k = 0; k < 14; k++) FRUIT.push([...toXZ(-80 + (k % 4) * 7, 40 + Math.floor(k / 4) * 9), 0.6]);
   markUV("The Chouteau house", CHOU.u, CHOU.v, "known", "Pierre Laclède's stone headquarters of 1764, the first building of St. Louis, bought by Auguste Chouteau in 1789 and rebuilt as the grandest house in the town: two storeys of limestone with galleries all round, its whole block walled in stone with loopholes. Auguste Chouteau, now 50, came here at 14 with Laclède to clear the site in February 1764; with his half-brother Pierre he controls the Osage trade, holding the Spanish licence. Place known; the house's exact form is reconstructed from descriptions.", { y: 12, r: 25, range: 900, big: true }); }
 // ---------- the church ----------
 // The parish church of St. Louis, of upright logs (poteaux en terre), built in 1776 on the block given for it by Laclède, where the Old
-// Cathedral stands today; about 60 by 30 French feet, with a bell. Beside it the priest's house, and the graveyard round it.
-const CHURCH = { u: -52, v: 48 };
-{ const [x, z] = toXZ(CHURCH.u, CHURCH.v), gy = groundH(x, z) - 0.2, ry = Math.PI / 2 - GR, F = FR(x, z, ry, gy, "H" + lodKey(x, z)), nw = 9.5, nl = 19.5, wh = 4.6;   // the length runs east-west, the door at the east (toward the river)
+// Cathedral stands today: between the Rue de l'Église (named for it) and the Rue des Granges, the Rue de la Place and the Rue de la Tour,
+// one block west of Laclède's house. About 60 by 30 French feet, with a bell. Beside it the priest's house, and the graveyard round it.
+// Its exact place in the block, its door and its belfry are reconstructed.
+const CHURCH = { u: -135, v: 62 };
+{ const [x, z] = toXZ(CHURCH.u, CHURCH.v), gy = groundH(x, z) - 0.2, ry = Math.PI - GR, F = FR(x, z, ry, gy, "H" + lodKey(x, z)), nw = 9.5, nl = 19.5, wh = 4.6;   // the length runs along the block, the door at the north end, toward the Rue de la Place (as the Old Cathedral faces)
   flatUnder(F, nw + 2, nl + 2, gy + 0.2);
   GTINT = [0.5, 0.45, 0.4]; gbox(F, "stone", 0, 0.2, 0, nw + 0.2, 0.4, nl + 0.2); GTINT = [0.98, 0.96, 0.92]; gbox(F, "poteaux", 0, 0.4 + wh / 2, 0, nw, wh, nl);
   for (const sz of [-1, 1]) gpoly(F, "poteaux", [[-nw / 2, 0.4 + wh, sz * nl / 2], [nw / 2, 0.4 + wh, sz * nl / 2], [0, 0.4 + wh + nw * 0.75, sz * nl / 2]], [[0, 0], [nw, 0], [nw / 2, nw * 0.75]], [0, 0, sz]);
@@ -53748,12 +53769,12 @@ const CHURCH = { u: -52, v: 48 };
   gbox(F, "oak", 0, by + 2.9, nl / 2 - 1.6, 0.08, 1.0, 0.08); gbox(F, "oak", 0, by + 3.15, nl / 2 - 1.6, 0.5, 0.08, 0.08);
   const [bx, , bz] = gw(F, 0, 0, nl / 2 - 1.6); put("bell", new THREE.CylinderGeometry(0.18, 0.32, 0.5, 12, 1, true).translate(0, 0.25, 0), M(0x8a6a3a, { metalness: 0.6, roughness: 0.4, side: THREE.DoubleSide }), bx, gy + by + 0.7, bz, 1, 1, 1);
   const lf = FR(x, z, ry, gy, "L" + lodKey(x, z)); GTINT = [0.62, 0.6, 0.58]; gbox(lf, "lod", 0, (0.4 + wh) / 2, 0, nw, 0.4 + wh, nl); GTINT = [0.3, 0.3, 0.29]; for (const s of [-1, 1]) gpoly(lf, "lod", [[s * (nw / 2 + 0.4), 0.4 + wh, -nl / 2], [s * (nw / 2 + 0.4), 0.4 + wh, nl / 2], [0, by, nl / 2], [0, by, -nl / 2]], [[0, 0], [1, 0], [1, 1], [0, 1]], [s, 1, 0]); GTINT = [1, 1, 1];
-  solid(x, z, nw + 0.2, nl + 0.2, ry); rRect(x, z, nw + 2, nl + 2, ry, 2); rRectUV(-84, -6, 4, 96, 4);
-  addHouse(-20, 80, 6.5, 10, { face: 1, gal: "fb", kind: "presbytery", lime: true });   // the priest's house
-  const R = seeded(1776); for (let k = 0; k < 46; k++) { const cu = -80 + R() * 22, cv = 8 + R() * 82; if (Math.abs(cv - CHURCH.v) < 8 && cu > -62) continue; putUV("cross", BOX_G, MAT.wood, cu, cv, 0, 0.08, 1.0 + R() * 0.4, 0.08); putUV("crossbar", BOX_G, MAT.wood, cu, cv, 0.7, 0.07, 0.07, 0.45); }   // wooden crosses in the graveyard
-  fence(-84, 4, -84, 96); fence(-84, 4, -6, 4); fence(-84, 96, -6, 96); fence(-6, 4, -6, 44); fence(-6, 52, -6, 96);
-  markUV("The church of St. Louis", CHURCH.u, CHURCH.v, "known", "The parish church, of upright cedar logs on the block Laclède set aside for it, built in 1776 (the first was a tent, then a small log chapel) and blessed by Father Pierre Gibault. About 60 by 30 French feet, roofed with shingles, with a small belfry; the graveyard round it. The Old Cathedral (1834) stands on the same block. Place and building known; details reconstructed.", { y: 14, r: 22, range: 900, big: true });
-  markUV("The graveyard", -72, 30, "inferred", "The parish burial ground round the church, wooden crosses over the graves. In 1800 the town's dead (French, Spanish, enslaved and free Black Catholics) were buried here.", { y: 3, r: 10, range: 150 }); }
+  solid(x, z, nw + 0.2, nl + 0.2, ry); rRect(x, z, nw + 2, nl + 2, ry, 2); rRectUV(-174, -96, 4, 96, 4);
+  addHouse(-110, 84, 6.5, 10, { face: 1, gal: "fb", kind: "presbytery", lime: true });   // the priest's house
+  const R = seeded(1776); for (let k = 0; k < 46; k++) { const cu = -170 + R() * 22, cv = 8 + R() * 82; if (Math.abs(cu - CHURCH.u) < 8 && Math.abs(cv - CHURCH.v) < 13) continue; putUV("cross", BOX_G, MAT.wood, cu, cv, 0, 0.08, 1.0 + R() * 0.4, 0.08); putUV("crossbar", BOX_G, MAT.wood, cu, cv, 0.7, 0.07, 0.07, 0.45); }   // wooden crosses in the graveyard
+  fence(-174, 4, -174, 96); fence(-174, 4, -139, 4); fence(-131, 4, -96, 4); fence(-174, 96, -96, 96); fence(-96, 4, -96, 96);
+  markUV("The church of St. Louis", CHURCH.u, CHURCH.v, "known", "The parish church, of upright cedar logs on the block Laclède set aside for it, built in 1776 (the first was a tent, then a small log chapel) and blessed by Father Pierre Gibault. About 60 by 30 French feet, roofed with shingles, with a small belfry; the graveyard round it. The Old Cathedral (1834) stands on the same block. The church and its block are known; its form (belfry, windows) and the way it faced are reconstructed: here it faces north, as the Old Cathedral does.", { y: 14, r: 22, range: 900, big: true });
+  markUV("The graveyard", -160, 26, "inferred", "The parish burial ground round the church, wooden crosses over the graves. In 1800 the town's dead (French, Spanish, enslaved and free Black Catholics) were buried here.", { y: 3, r: 10, range: 150 }); }
 // ---------- the Government House and the Place d'Armes ----------
 // The lieutenant governor of Upper Louisiana, Charles Dehault Delassus (since 1799), lived and kept his offices in the Government House,
 // a stone house on La Grande Rue at the Rue de la Tour, rented by the Spanish crown. Its exact form is not known. The Place d'Armes, the public square, ran from La Grande Rue down to the landing: the market, the parade
@@ -53825,6 +53846,38 @@ for (const Mo of MOUNDS) if (Mo.name) markUV(Mo.name, Mo.u, Mo.v, "known", "The 
     markUV(F.name, (F.u0 + F.u1) / 2, (F.v0 + F.v1) / 2, "known", "The common fields: long strips, each an arpent wide (58.5 m) and up to 40 arpents long, granted to the families of the town and farmed side by side inside one fence. Wheat (sown in autumn) is up and green; the corn was planted this month; some strips grow oats, flax, tobacco or lie fallow. Many townspeople farmed; others had their fields worked by enslaved labourers. The layout follows the French long lots of the Illinois country; the strips here are representative.", { y: 4, r: 300, range: 3000, big: true }); } }
 
 
+// ---------- across the river: Cahokia and the ferry ----------
+// Cahokia, the old French village of the Illinois country (a mission from 1699), stood about 6 km south-east of St. Louis, a mile or
+// so inland from the river on Cahokia Creek. American since the Revolution, it was in the Northwest Territory (the Indiana Territory
+// from July 1800), with perhaps 700 people, French in language and ways like St. Louis. Its church of the Holy Family, built in 1799 of
+// upright walnut logs on a sill, still stands, as does the "Cahokia Courthouse", a French house of about 1740 used as the courthouse
+// from 1793. Village plan and houses here are typical; the church and courthouse are placed in it by eye.
+const CAHOKIA = (() => { const [x, z] = LL(38.5705, -90.1898), [u, v] = toUV(x, z); return { u, v }; })();
+AROUND_FLAT.push([CAHOKIA.u, CAHOKIA.v, 650]);
+{ const R = seeded(1699), C = CAHOKIA, streets = [[-120, -320, -120, 320], [-20, -320, -20, 320], [80, -300, 80, 300], [-200, -60, 200, -60], [-200, 120, 200, 120]];
+  for (const [a, b, c, d] of streets) { const L = lineUV([[C.u + a, C.v + b], [C.u + c, C.v + d]]); rLine(L, 8, 1); }
+  for (let k = 0; k < 120; k++) { const su = [-120, -20, 80][k % 3] + (R() < 0.5 ? -1 : 1) * 24, sv = -300 + R() * 600, u0 = C.u + su - 18, v0 = C.v + sv; if (LOTS.some(l => Math.abs(l.u0 - u0) < 36 && Math.abs(l.v0 - v0) < 44)) continue; if (R() < 0.25) continue;
+    makeLot(u0, u0 + 36, v0, v0 + 40, su > [-120, -20, 80][k % 3] ? -1 : 1, 0.85, R); if (LOTS.filter(l => Math.abs(l.u0 - C.u) < 400 && Math.abs(l.v0 - C.v) < 400).length > 55) break; }
+  for (let s = -600; s < 600; s += ARPENT) rRectUV(C.u + 260, C.u + 1600, C.v + s + 0.8, C.v + s + ARPENT - 0.8, 5);   // Cahokia's common field, long lots east of the village
+  // the church of the Holy Family (1799)
+  { const [x, z] = toXZ(C.u - 70, C.v + 10), gy = groundH(x, z) - 0.15, ry = Math.PI - GR, F = FR(x, z, ry, gy, "H" + lodKey(x, z)), nw = 10, nl = 22, wh = 4.4;
+    GTINT = [0.5, 0.45, 0.4]; gbox(F, "stone", 0, 0.25, 0, nw + 0.3, 0.5, nl + 0.3); GTINT = [0.72, 0.64, 0.54]; gbox(F, "poteaux", 0, 0.5 + wh / 2, 0, nw, wh, nl);
+    for (const sz of [-1, 1]) gpoly(F, "poteaux", [[-nw / 2, 0.5 + wh, sz * nl / 2], [nw / 2, 0.5 + wh, sz * nl / 2], [0, 0.5 + wh + nw * 0.7, sz * nl / 2]], [[0, 0], [nw, 0], [nw / 2, nw * 0.7]], [0, 0, sz]);
+    GTINT = [1, 1, 1]; gpoly(F, "door", [[-0.9, 0.52, nl / 2 + 0.03], [0.9, 0.52, nl / 2 + 0.03], [0.9, 3.0, nl / 2 + 0.03], [-0.9, 3.0, nl / 2 + 0.03]], [[0, 0], [1, 0], [1, 1], [0, 1]], [0, 0, 1]);
+    GTINT = [0.9, 0.88, 0.86]; groof(F, "shingle", nw, nl, 0.5 + wh, nw * 0.7, { e: 0.6, g: 0.4 }); const by = 0.5 + wh + nw * 0.7; gbox(F, "oak", 0, by + 0.8, nl / 2 - 1.4, 1.2, 1.6, 1.2, "b"); groof(FR(...gw(F, 0, 0, nl / 2 - 1.4).filter((_, i) => i !== 1), ry, gy + by + 1.6, F.key), "shingle", 1.6, 1.6, 0, 1.2, { hip: true, e: 0.1 });
+    solid(x, z, nw, nl, ry); rRect(x, z, nw + 2, nl + 2, ry, 2); const lf = FR(x, z, ry, gy, "L" + lodKey(x, z)); GTINT = [0.5, 0.46, 0.4]; gbox(lf, "lod", 0, (0.5 + wh) / 2, 0, nw, 0.5 + wh, nl); GTINT = [1, 1, 1];
+    for (let k = 0; k < 24; k++) { const cu = C.u - 92 + (k % 6) * 3.5, cv = C.v + 26 + Math.floor(k / 6) * 3.5; putUV("cross", BOX_G, MAT.wood, cu, cv, 0, 0.08, 1.1, 0.08); putUV("crossbar", BOX_G, MAT.wood, cu, cv, 0.75, 0.07, 0.07, 0.45); }
+    markUV("Cahokia: the Holy Family church", C.u - 70, C.v + 10, "known", "The parish church of Cahokia, built in 1799 of upright walnut logs set on a sill (poteaux sur solle), the oldest church west of the Alleghenies still in use. The Cahokia mission was founded in 1699 by priests from Quebec. The church stands; its exact place in this reconstructed village is approximate.", { y: 12, r: 25, range: 3000, big: true }); }
+  // the courthouse: a French house of about 1740, the seat of justice from 1793
+  addHouse(C.u + 40, C.v - 30, 8, 13, { wall: "poteaux", gal: "all", face: 1, roof: "shingle", lime: false, kind: "courthouse" });
+  markUV("Cahokia: the courthouse", C.u + 40, C.v - 30, "known", "A French house of upright logs with galleries all round, built about 1740 and used from 1793 as the courthouse of St. Clair County: where the American territory's law was kept for the Illinois villages. It survives (rebuilt in the 1930s from its own timbers). Its place in this village is approximate.", { y: 8, r: 15, range: 1500 });
+  markUV("Cahokia", C.u, C.v - 120, "known", "The French village of Cahokia, across the river and some 6 km downstream: founded as a mission in 1699, a generation older than St. Louis, now American (Northwest Territory; Indiana Territory from July 1800), with about 700 people. Many of its families had kin in St. Louis, and some moved there to stay under the French-speaking Spanish crown when the Americans came. Its houses and plan here are typical.", { y: 10, r: 120, range: 6000, big: true }); }
+// Piggott's ferry: on the Illinois shore opposite the town, the landing of the ferry James Piggott (an American, a veteran of the Revolution)
+// ran from about 1797; his cabin built the American way, of horizontal logs
+{ const v = 400, u = riverU(v) + RIVER_HW + 45; AROUND_FLAT.push([u, v, 60]); gShed(u, v, 5.5, 7.5, "logs", "shingle", { chim: true, door: -1, wh: 2.4 }); gShed(u + 14, v + 8, 4, 6, "logs", "shingle", { door: -1 });
+  markUV("Piggott's ferry landing", u, v, "inferred", "The Illinois landing of the ferry to St. Louis, run from about 1797 by James Piggott, an American from Pennsylvania who had fought in the Revolution. His cabin is of horizontal logs notched at the corners: the American way of building, quite different from the French upright logs across the river. The Illinois side is American: the Northwest Territory, the Indiana Territory from 4 July 1800.", { y: 6, r: 20, range: 1500 }); }
+
+
 // ---------- trees ----------
 // The Illinois shore across the river was bottomland forest (cottonwood, sycamore, willow, elm, pecan); on this side, timber along
 // the bluff and in the creek valley, groves of oak and walnut on the prairie's edge, and in the town's yards the orchards the French
@@ -53832,17 +53885,32 @@ for (const Mo of MOUNDS) if (Mo.name) markUV(Mo.name, Mo.u, Mo.v, "known", "The 
 const TRUNK_G = new THREE.CylinderGeometry(0.12, 0.26, 1, 6).translate(0, 0.5, 0), CROWN_G = new THREE.IcosahedronGeometry(1, 0), trunkM = M(0x4e4236, { roughness: 1 });
 const leafM = [0x3e5e2a, 0x4a6a30, 0x365526, 0x52703a].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, flatShading: true }));
 const tree = (x, z, s, kind = 0, far = false) => { const h = groundH(x, z), R = seeded((x * 13 + z * 7) | 0), k = far ? "f" : ""; put(k + "trunk", TRUNK_G, trunkM, x, h - 0.2, z, s, 5.5 * s, s, R() * 6.28);
-  const n = far ? 1 : 3; for (let q = 0; q < n; q++) put(k + "crown" + (kind % 4), CROWN_G, leafM[kind % 4], x + (R() - 0.5) * 2.2 * s * (far ? 0 : 1), h + (5.5 + R() * 2.2) * s, z + (R() - 0.5) * 2.2 * s * (far ? 0 : 1), (far ? 3.6 : 2.4) * s, (far ? 3.0 : 2.1) * s, (far ? 3.6 : 2.4) * s, R() * 6); };
-{ const R = seeded(71); let n = 0, cap = IS_HEADSET ? 2600 : 4200;
-  for (let gz = RZ0; gz < RZ0 + RH * RC && n < cap; gz += 20) for (let gx = RX0; gx < RX0 + RW * RC && n < cap; gx += 20) { const x = gx + R() * 18, z = gz + R() * 18, h = baseH(x, z); if (h < 0.6) continue;
+  const n = far ? 1 : 3; for (let q = 0; q < n; q++) put(k + "crown", CROWN_G, leafM[0], x + (R() - 0.5) * 2.2 * s * (far ? 0 : 1), h + (5.5 + R() * 2.2) * s, z + (R() - 0.5) * 2.2 * s * (far ? 0 : 1), (far ? 3.6 : 2.4) * s, (far ? 3.0 : 2.1) * s, (far ? 3.6 : 2.4) * s, R() * 6); };
+{ const R = seeded(71); let n = 0, cap = IS_HEADSET ? 3200 : 5200;
+  for (let k = 0; k < 400000 && n < cap; k++) { const x = RX0 + R() * RW * RC, z = RZ0 + R() * RH * RC, h = baseH(x, z); if (h < 0.6) continue;   // spread evenly over the map
     const v = rGet(x, z); if (v !== 0 && v !== 6) continue; const [u, vv] = toUV(x, z), s = riverU(vv) - RIVER_HW - u, cv = creekV(u), creek = Math.abs(vv - cv) < 200 && u < 100 && Math.abs(vv - cv) > 8;
-    if (inPond(x, z)) continue; const p = s < 40 ? 0.22 : creek ? 0.45 : h > 14 && u < -700 ? 0.04 + 0.4 * sstepN(fbm(x / 500 + 3, z / 500, 2), 0.55, 0.68) : 0.06;
+    if (inPond(x, z)) continue; const rav = Math.pow(1 - Math.abs(2 * fbm(x / 700 + 2, z / 700 + 5, 3) - 1), 6) * sstepN(-u, 500, 900);   // ravines cutting the prairie's edge, wooded
+    const p = (s < 60 ? 0.3 : creek ? 0.5 : rav > 0.35 ? 0.45 : u < -2600 ? 0.3 : u < -280 ? 0.015 + 0.45 * sstepN(fbm(x / 450 + 3, z / 450, 2), 0.6, 0.7) : 0.05) * 0.25;   // the bluff and the creek wooded; oak groves dotting the prairie
     if (R() > p) continue; tree(x, z, 0.9 + R() * 0.7, (R() * 4) | 0); n++; } }
 // the forest on the Illinois shore, seen across the river: big cottonwoods and sycamores
-{ const R = seeded(73); let n = 0, cap = IS_HEADSET ? 3500 : 6000; for (let v = -6000; v < 6000 && n < cap; v += 22) for (let d = 30; d < 1800 && n < cap; d += 22 + d * 0.02) { const u = riverU(v) + RIVER_HW + d + (R() - 0.5) * 16, vv = v + (R() - 0.5) * 16, [x, z] = toXZ(u, vv);
-    if (baseH(x, z) < 0.7 || R() < 0.15) continue; tree(x, z, 1.3 + R() * 0.9, (R() * 4) | 0, true); n++; } }
+// (a belt of forest 1-2 km deep along the river; beyond it, the wet prairie of the American Bottom with scattered groves)
+{ const R = seeded(73); let n = 0, cap = IS_HEADSET ? 4500 : 8000; for (let k = 0; k < 120000 && n < cap; k++) { const v = -5500 + R() * 14000, d = 30 + R() * 4200, belt = 1500 + 500 * fbm(v / 900, 3, 2);
+    if (d > belt && R() > 0.07) continue; if (d < belt && R() > 0.9) continue; const u = riverU(v) + RIVER_HW + d, [x, z] = toXZ(u, v); if (baseH(x, z) < 0.7 || AROUND_FLAT.some(([cu, cv, r]) => Math.hypot(u - cu, v - cv) < r * 0.9)) continue;
+    tree(x, z, (d < belt ? 2.0 : 1.3) + R() * 1.1, (R() * 4) | 0, true); n++; } }   // cottonwoods and sycamores 25-30 m tall
 // fruit trees in the yards
 for (const [x, z, s] of FRUIT) { const h = groundH(x, z), R = seeded((x * 5 + z * 3) | 0); put("fruit", TRUNK_G, trunkM, x, h - 0.1, z, s * 0.7, 2.6 * s, s * 0.7, R() * 6); put("fcap", CROWN_G, leafM[1], x, h + 3.2 * s, z, 2.2 * s, 1.7 * s, 2.2 * s, R() * 6); }
+
+// ---------- the prairie's tall grass, round you as you walk ----------
+// Big bluestem, Indian grass and switchgrass, knee- to waist-high in May, with spring flowers: drawn as clumps near you only.
+const GRASS_N = IS_HEADSET ? 2200 : 4200, GRASS = new THREE.InstancedMesh((() => { const parts = [0, Math.PI / 3, Math.PI * 2 / 3].map(a => new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0).rotateY(a).toNonIndexed()), out = new THREE.BufferGeometry();   // three crossed planes, keeping their texture coordinates
+  for (const k of ["position", "normal", "uv"]) out.setAttribute(k, new THREE.Float32BufferAttribute(parts.flatMap(g => [...g.attributes[k].array]), k === "uv" ? 2 : 3)); return out; })(),
+  new THREE.MeshStandardMaterial({ map: tex(128, 128, (g, w, h) => { g.clearRect(0, 0, w, h); for (let k = 0; k < 70; k++) { const x = rnd() * w, top = rnd() * h * 0.6; g.strokeStyle = ["#7a8a3a", "#8a9a48", "#6a7a30", "#9aa456", "#a8a060"][(rnd() * 5) | 0]; g.lineWidth = 1.5 + rnd() * 2; g.beginPath(); g.moveTo(x, h); g.quadraticCurveTo(x + (rnd() - 0.5) * 20, h * 0.6, x + (rnd() - 0.5) * 30, top); g.stroke(); }
+    for (let k = 0; k < 6; k++) { g.fillStyle = ["#a868b0", "#e0c040", "#f0f0e0"][(rnd() * 3) | 0]; g.beginPath(); g.arc(rnd() * w, rnd() * h * 0.5 + 8, 3 + rnd() * 3, 0, 6.283); g.fill(); } }), alphaTest: 0.4, side: THREE.DoubleSide, roughness: 1 }), GRASS_N);
+GRASS.frustumCulled = false; GRASS.count = 0; scene.add(GRASS); let grassAt = [1e9, 1e9];
+function grassStep() { if (Math.hypot(P_.x - grassAt[0], P_.z - grassAt[1]) < 12) return; grassAt = [P_.x, P_.z]; let n = 0; const R = seeded(((P_.x / 12) | 0) * 7 + ((P_.z / 12) | 0) * 13);
+  for (let k = 0; k < GRASS_N * 3 && n < GRASS_N; k++) { const a = R() * 6.283, r = Math.sqrt(R()) * 70, x = P_.x + Math.cos(a) * r, z = P_.z + Math.sin(a) * r, [u, v] = toUV(x, z), h = baseH(x, z); if (u > -270 || h < 12 || rGet(x, z) !== 0) continue;
+    const s = 0.7 + R() * 0.6; O3.position.set(x, h - 0.05, z); O3.rotation.set(0, R() * 3, 0); O3.scale.set(s * 1.1, s * (0.8 + R() * 0.5), s * 1.1); O3.updateMatrix(); GRASS.setMatrixAt(n++, O3.matrix); }
+  GRASS.count = n; GRASS.instanceMatrix.needsUpdate = true; }
 
 // ---------- boats at the landing ----------
 // The keelboat was the river's freighter: 15-25 m long, built on a keel, with a cargo box amidships, a mast for the towline (the
@@ -53865,7 +53933,14 @@ function keelGroup() { const g = new THREE.Group(), add = (geo, mat, x, y, z, sx
 const KEEL_AT = (v, off = 6) => { const u = riverU(v) - RIVER_HW + off; return toXZ(u, v); };
 { for (const [v, off, ry] of [[30, 7, 0.06], [78, 6.5, -0.04]]) { const [x, z] = KEEL_AT(v, off), g = keelGroup(); g.position.set(x, WATER, z); g.rotation.y = -GR + Math.PI + ry; scene.add(g); }
   const R = seeded(808); for (let k = 0; k < 9; k++) { const v = -20 + k * 7 + R() * 3, [x, z] = KEEL_AT(v, 1.5 + R() * 2.5); put("pirogue", BOAT_G, hullM, x, WATER - 0.12, z, 0.95, 0.55, 8 + R() * 3, -GR + Math.PI / 2 + (R() - 0.5) * 0.4); }   // dugouts drawn up on the beach
-  for (let k = 0; k < 2; k++) { const [x, z] = KEEL_AT(120 + k * 18, 7); put("bateau", BOAT_G, hullM, x, WATER - 0.3, z, 3.0, 0.9, 12, -GR + Math.PI); put("bateaubox", BOX_G, tarpM, x, WATER + 0.3, z, 2.2, 0.8, 5, -GR); }
+  for (const [v, off, ry] of [[-14, 8, 0.03], [112, 7.5, -0.02]]) { const [x, z] = KEEL_AT(v, off), g = keelGroup(); g.position.set(x, WATER, z); g.rotation.y = -GR + ry; scene.add(g); }
+  for (let k = 0; k < 4; k++) { const [x, z] = KEEL_AT(132 + k * 17, 7); put("bateau", BOAT_G, hullM, x, WATER - 0.3, z, 3.0, 0.9, 12, -GR + Math.PI); put("bateaubox", BOX_G, tarpM, x, WATER + 0.3, z, 2.2, 0.8, 5, -GR); }
+  for (let k = 0; k < 8; k++) { const v = 80 + k * 6, [x, z] = KEEL_AT(v, 1.5 + (k % 3)); put("pirogue", BOAT_G, hullM, x, WATER - 0.12, z, 0.9, 0.5, 7 + (k % 4), -GR + Math.PI / 2 + 0.2 * (k % 3 - 1)); }
+  { const [x, z] = KEEL_AT(205, 8); for (let k = 0; k < 14; k++) put("raftlog", CYL_G, MAT.wood, x + Math.cos(-GR) * (k - 7) * 0.45, WATER - 0.2, z - Math.sin(-GR) * (k - 7) * 0.45, 0.42, 14, 0.42, -GR, Math.PI / 2); }   // a raft of logs, floated down for building
+  // goods on the beach: packs of furs going down, lead in pigs from the mines, kegs of salt, barrels of flour and whiskey, trade goods coming up
+  { const R = seeded(1765); for (let k = 0; k < 70; k++) { const v = -10 + R() * 120, u = riverU(v) - RIVER_HW - 12 - R() * 16, [x, z] = toXZ(u, v), g = groundH(x, z), t = R();
+      if (t < 0.35) put("cargo", BOX_G, M(0x8a6a48), x, g, z, 0.9, 0.55 + (k % 3) * 0.5, 0.9, -GR + R()); else if (t < 0.6) put("barrel", CYL_G, MAT.wood, x, g, z, 0.6, 0.85, 0.6); else if (t < 0.75) put("leadpig", BOX_G, M(0x6a6e74, { metalness: 0.5, roughness: 0.5 }), x, g, z, 0.5, 0.3 + 0.15 * (k % 3), 0.25, -GR + R()); else if (t < 0.88) put("cratepile", BOX_G, M(0xb09a72), x, g, z, 1.1, 0.7, 0.8, -GR + R()); else put("lumber", BOX_G, M(0x9a7a52), x, g, z, 0.3, 0.25, 5, -GR + 0.1 * R()); } }
+  markUV("The riverfront trade", riverU(50) - RIVER_HW - 18, 40, "known", "The landing was St. Louis's business: furs and hides (deer, beaver, otter, bear, buffalo robes) went down to New Orleans; up came the convoys of keelboats with cloth, blankets, guns, powder, kettles, tools, sugar, coffee, wine and brandy, three or four months' hard work against the current. Bateaux brought lead from the mines and salt from the springs; hunters and Native traders came in by canoe. Porters (many of them enslaved) carried it all up to the merchants' storehouses. Much of the town's money was furs, lead and salt. The goods and boats here are typical; the trade is well recorded.", { y: 4, r: 30, range: 800, big: true });
   markUV("The landing", riverU(50) - RIVER_HW - 8, 50, "known", "Below the Place d'Armes the bank sloped down to a natural landing (the levee), where boats were drawn up and unloaded: keelboats from New Orleans (three or four months upstream) with sugar, coffee, cloth, guns, powder, kettles and wine; bateaux with lead from the mines and salt from the springs; pirogues of hunters and traders. Furs (deer, beaver, otter, bear) went down. The beach and boats here are typical; the landing's place is known.", { y: 4, r: 30, range: 800, big: true }); }
 
 
@@ -53892,7 +53967,7 @@ const frameUV = (u, v, rot = 0) => { const [x, z] = toXZ(u, v); return FR(x, z, 
 // the fur press, in the yard of the Chouteaus' warehouse: skins stacked in a frame and squeezed under a long lever into packs of about
 // 100 lb, tied with thongs and marked, for the keelboats to New Orleans or Montreal. Deerskins (shaved and dried) were also the town's
 // money: prices were reckoned in livres, but paid in peltries.
-{ const F = frameUV(-56, -24), gy = F.gy; GTINT = [1, 1, 1];
+{ const F = frameUV(-56, 76), gy = F.gy; GTINT = [1, 1, 1];
   for (const sx of [-0.6, 0.6]) for (const sz of [-0.6, 0.6]) put("tk:presspost", BOX_G, MAT.wood, ...gw(F, sx, 0, sz), 0.16, 1.6, 0.16);
   put("tk:pressbed", BOX_G, MAT.wood, ...gw(F, 0, 0, 0), 1.4, 0.2, 1.4); const pack = put("tk:pack", BOX_G, MAT.hide, ...gw(F, 0, 0.2, 0), 0.95, 0.6, 0.95);
   const lever = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 5.5).translate(0, 0, 2.2), MAT.wood), [lx, , lz] = gw(F, 0, 0, -0.5); lever.position.set(lx, gy + 1.5, lz); lever.rotation.order = "YXZ"; lever.rotation.y = -GR; scene.add(lever);
@@ -53903,7 +53978,7 @@ const frameUV = (u, v, rot = 0) => { const [x, z] = toXZ(u, v); return FR(x, z, 
   techJob("creole", F, [[0.4, 4.2, 0, 4.6, "lever", 14], [1.6, 0.9, 2.4, 0.4, "sell", 5], [0.8, 0.6, 0, 0, "kneel", 6]], 7);
   techLabel(F, 0, 0, 1.9, "The fur press", "Skins stacked in a frame of four posts and pressed flat under a long lever (here a man's weight on a 5 m pole) into a compact pack of about 100 pounds, to be tied with rawhide and marked with the trader's sign. A keelboat carried hundreds."); techLabel(F, -2.4, -1, 1.2, "Deerskins", "Shaved, dried deerskins: the commonest fur, and the town's money. A good skin was worth about 40 sous; prices in St. Louis were written in livres but paid in peltries, or in lead.");
   techLabel(F, 2.4, -0.6, 1.8, "Packs for the river", "Pressed packs of beaver, otter, bear and deer, ready for the landing. The Chouteaus' furs went down to New Orleans, or north by Michilimackinac to Montreal and London.");
-  markUV("The fur press", -56, -24, "typical", "The fur trade is why St. Louis exists: Laclède's company held the trade of the Missouri. In the yard of the Chouteaus' warehouse men press furs into packs for the river. The press is typical of the trade; the Chouteaus' furs passed through such a yard.", { y: 4, r: 8, range: 300 }); }
+  markUV("The fur press", -56, 76, "typical", "The fur trade is why St. Louis exists: Laclède's company held the trade of the Missouri. In the yard of the Chouteaus' warehouse men press furs into packs for the river. The press is typical of the trade; the Chouteaus' furs passed through such a yard.", { y: 4, r: 8, range: 300 }); }
 // a smithy on La Grande Rue
 { const L = LOTS.filter(l => l.house && l.face < 0 && l.v0 > 180 && l.v0 < 420)[0] || LOTS[10], u = (L.u0 + L.u1) / 2 + 6, v = L.v0 + 6, F = frameUV(u, v);
   gShed(u, v, 5, 6, "plank", "shingle", { door: -1, wh: 2.6 }); const gy = F.gy;
@@ -53993,6 +54068,7 @@ const NARR = [
   [T.proc, "After Mass the parish walks out in the Rogation procession: the cross and a banner, the priest in surplice and stole, children and the faithful behind, chanting the litany of the saints, out along the road to the common fields to bless the young wheat and corn."],
   [hms(8, 15), "The procession is back; the day's work begins. Fields to hoe, furs to press, a keelboat to load for the Missouri, bread to bake, a house going up. In the fields and the yards, much of the work is done by the town's enslaved people, about a quarter of its population."],
   [T.keel, "The keelboat pushes off from the landing for the Missouri, its crew of French Creole and métis voyageurs at the poles, then on the cordelle: weeks of hauling upstream to the trading posts. They sing as they go."],
+  [hms(15, 0), "A bateau comes up the river from Ste. Genevieve, rowed hard against the current, with lead from the mines and salt from the springs: the porters will carry it up to the storehouses."],
   [T.osage, "A party of Osage arrives by the north road to see the Chouteaus, their traders and old friends. Pierre Chouteau speaks their language. They will be given presents and food, and talk at length."],
   [T.noon, "The noon Angelus. Shops close and the town goes home to dinner, the main meal, and many to a rest in the heat of the day."],
   [hms(14, 30), "Work begins again: the fields, the boats, the yards."],
@@ -54013,7 +54089,7 @@ const face = (x, z, tx, tz) => Math.atan2(tx - x, tz - z);
 const UVP = pts => pts.map(([u, v]) => toXZ(u, v));
 const working = () => (SIM > hms(7, 0) && SIM < hms(12, 0)) || (SIM > hms(14, 30) && SIM < hms(18, 30));
 // the Rogation procession: cross, banner, the priest, children, the people, out to the Grand Champ and back
-const CH_DOOR = toXZ(CHURCH.u + 13, CHURCH.v), PROC_PATH = [CH_DOOR, ...UVP([[-10, 48], [0, 40], [0, -300], [-200, -300], [-240, -300], [-480, -322], [-560, -360], [-560, -700], [-560, -1000], [-480, -1000], [-300, -820], [-200, -310], [0, -300], [0, 40], [-10, 48]]), CH_DOOR];
+const CH_DOOR = toXZ(CHURCH.u, CHURCH.v - 13), PROC_PATH = [CH_DOOR, ...UVP([[-135, 0], [0, 0], [0, -300], [-200, -300], [-240, -300], [-480, -322], [-560, -360], [-560, -700], [-560, -1000], [-480, -1000], [-300, -820], [-200, -310], [0, -300], [0, 0], [-135, 0]]), CH_DOOR];
 const PROC = []; { const order = ["child", "child", "priest", "child", "child", ...Array.from({ length: 36 }, (_, k) => k % 3 === 0 ? "woman" : k % 7 === 0 ? "enslavedw" : k % 5 === 0 ? "child" : k % 4 === 0 ? "lady" : "creole")];
   order.forEach((r, k) => { const A = agent(r, { proc: true, delay: k * 1.7, lane: (k % 2 ? 0.7 : -0.7) * (k > 4 ? 1 : 0), prop: k === 0 ? "cross" : k === 1 ? "banner" : null }); if (A) PROC.push(A); }); }
 const PRIEST = PROC[2];
@@ -54023,16 +54099,24 @@ const BANK = v => toXZ(riverU(v) - RIVER_HW - 3.5, v), KEEL_V = s => KEEL.v0 + 2
 function keelState() { const t = SIM - T.keel; if (t < 0) return { s: 0, phase: "loading" }; const s = t < 300 ? 0.5 * t * t / 300 * 0.6 : 90 + (t - 300) * 0.6; return { s, phase: t < 400 ? "poling" : "cordelle" }; }
 // the Osage visitors: from the north road to the Chouteaus' gate and into the yard; at evening back to their camp north of the town
 const OSAGE = []; { for (let k = 0; k < 13; k++) { const A = agent(k < 9 ? "osage" : "osagew", { osage: k }); if (A) OSAGE.push(A); } }
-const OS_IN = UVP([[60, -2600], [40, -1800], [10, -1200], [0, -700], [0, -60], [-6, -50], [-14, -50], [-14, -70], [-50, -72], [-58, -60]]);
+const OS_IN = UVP([[60, -2600], [40, -1800], [10, -1200], [0, -700], [0, 50], [-6, 50], [-14, 50], [-14, 30], [-50, 28], [-58, 40]]);
 // soldiers: sentries at the fort's gate and the Government House, a patrol along La Grande Rue
 const SOLD = []; for (const [u, v, fu, fv] of [[FORT.u + 25, FORT.v - 1.5, FORT.u + 40, FORT.v], [FORT.u + 25, FORT.v + 1.5, FORT.u + 40, FORT.v], [21, 140, 0, 140], [24.5, 132, 0, 132]]) { const [x, z] = toXZ(u, v), [fx, fz] = toXZ(fu, fv); SOLD.push(agent("soldier", { fixed: [x, z, face(x, z, fx, fz)], kind: "guard" })); }
 const PATROL = [agent("soldier", { patrol: 0 }), agent("soldier", { patrol: 1 })], PATROL_PATH = UVP([[FORT.u + 26, FORT.v], [-180, 100], [0, 100], [0, -700], [0, 700], [0, 100], [-180, 100], [FORT.u + 26, FORT.v]]);
 // people with names (where they are today is not recorded: they stand for the town's leading men)
-const AUGUSTE = agent("merchant", { loop: UVP([[10, -40], [-4, -50], [-14, -50], [-14, -33], [-50, -31], [-56, -28]]), speed: 0.8, phase: 0 });
+const AUGUSTE = agent("merchant", { loop: UVP([[10, 60], [-4, 50], [-14, 50], [-14, 67], [-50, 69], [-56, 72]]), speed: 0.8, phase: 0 });
 const DELASSUS = agent("merchant", { loop: UVP([[20, 140], [12, 112], [20, 70], [12, 112]]), speed: 0.7, phase: 30 });
 if (AUGUSTE) AUGUSTE.L.coat = 0x1e2a44; if (DELASSUS) { DELASSUS.L.coat = 0xe8e4d8; DELASSUS.L.vest = 0x2a4a8a; DELASSUS.L.head = "tricorne"; crowd.look(DELASSUS.i, DELASSUS.L); }
 // sellers on the Place d'Armes in the morning: a farmer with greens, a fisherman, an Osage woman with moccasins, a baker's girl
 const SELL = []; for (const [u, v, r, p] of [[22, 30, "creole", "basket"], [26, 40, "creole", "sack"], [30, 22, "osagew", null], [20, 52, "enslavedw", "headbasket"], [36, 60, "woman", "basket"]]) { const [x, z] = toXZ(u, v); SELL.push(agent(r, { fixed: [x, z, face(x, z, ...toXZ(0, v))], kind: "sell", prop: p, seller: true })); }
+// the landing: porters carrying goods up to the storehouses and the Chouteaus' gate, merchants checking cargo, Native traders by their canoes
+const PORTERS = []; { const R = seeded(66); for (let k = 0; k < 18; k++) { const v = 10 + R() * 90, beach = toXZ(riverU(v) - RIVER_HW - 9 - R() * 6, v), mid = toXZ(riverU(50) - RIVER_HW - 45, 48 + (R() - 0.5) * 30), top = toXZ(44, 50 + (R() - 0.5) * 20), dest = k % 4 === 3 ? toXZ(-3, 50) : STOREHOUSES[k % 3];
+    const A = agent(k % 3 ? "enslaved" : "voyageur", { porter: [beach, mid, top, dest], phase: R() * 300, carry: ["bale", "keg", "sack", "bale"][k % 4] }); if (A) PORTERS.push(A); }
+  for (const [du, v, r, kind] of [[-14, 30, "merchant", "talk"], [-20, 70, "merchant", "sell"], [-10, 90, "osage", "sell"], [-8, 94, "osagew", "sitground"], [-9, 86, "osage", "sitground"], [-24, 50, "creole", "talk"]]) { const [x, z] = toXZ(riverU(v) - RIVER_HW + du, v); agent(r, { trader: true, fixed: [x, z, face(x, z, ...toXZ(riverU(v) - RIVER_HW - 30, v))], kind }); } }
+// a bateau rowed up from Ste. Genevieve in the afternoon, with lead and salt
+const ARRIVE = { g: (() => { const g = new THREE.Group(), h = new THREE.Mesh(BOAT_G, hullM); h.scale.set(3.0, 0.9, 12); g.add(h); const b = new THREE.Mesh(BOX_G, tarpM); b.scale.set(2.2, 0.8, 5); b.position.y = 0.6; g.add(b); scene.add(g); return g; })(), men: [] };
+for (let k = 0; k < 7; k++) ARRIVE.men.push(agent(k ? "voyageur" : "creole", { arrive: k }));
+const arriveState = () => { const t = SIM - hms(15, 0); if (t < -600) return null; const f = clampN(t / 2100, 0, 1), v = lerpN(1500, 150, f * (2 - f)), [x, z] = toXZ(riverU(v) - RIVER_HW + 12 + 10 * (1 - f), v); return { x, z, h: -GR + Math.PI, moving: f < 1 }; };
 // in the fields: hoeing the corn, cutting weeds out of the wheat
 const FIELDW = []; { const R = seeded(55); for (let k = 0; k < 44; k++) { const F = FIELDS[k % 2], u = F.u0 + 60 + R() * (F.u1 - F.u0 - 120), v = F.v0 + 10 + R() * (F.v1 - F.v0 - 20), [x, z] = toXZ(u, v); const A = agent(R() < 0.55 ? (R() < 0.5 ? "enslaved" : "enslavedw") : R() < 0.6 ? "creole" : "child", { field: true, fixed: [x, z, R() * 6.28], kind: "hoe", prop: "hoe" }); if (A) FIELDW.push(A); } }
 // the dance in the evening, on a gallery and in the street before it
@@ -54103,8 +54187,8 @@ function jobPose(A, S) { const J = A.job; if (!J.T) { J.T = 0; J.forEach((st, i)
 const PROC_L = routeLen(PROC_PATH);
 function agentState(A) { const S = SIM; if (A.job) return working() ? jobPose(A, S) : null;
   if (A.proc) { const start = T.proc + A.delay, s = (S - start) * 0.85; if (S < T.mass - 600 || S > T.procEnd + 900) return null;   // at Mass beforehand; home after
-    if (S < start) { const k = PROC.indexOf(A), [dx, dz] = CH_DOOR, x = dx + 4 + (k % 6) * 1.1, z = dz + (Math.floor(k / 6) - 3) * 1.1; return [x, z, face(x, z, dx - 10, dz), S < T.proc - 300 ? "pray" : "stand"]; }   // gathered at the church door
-    if (s > PROC_L) { const out = [CH_DOOR, [CH_DOOR[0] + 20 + (A.i % 7) * 9, CH_DOOR[1] + (A.i % 5 - 2) * 30]], [x, z, h, done] = routeAt(out, s - PROC_L); return done ? null : [x, z, h, "walk", true]; }
+    if (S < start) { const k = PROC.indexOf(A), [du, dv] = [CHURCH.u + ((k % 7) - 3) * 1.2, CHURCH.v - 16 - Math.floor(k / 7) * 1.2], [x, z] = toXZ(du, dv); return [x, z, face(x, z, ...CH_DOOR), S < T.proc - 300 ? "pray" : "stand"]; }   // gathered at the church door
+    if (s > PROC_L) { const out = [CH_DOOR, toXZ(CHURCH.u + (A.i % 7 - 3) * 12, -2), toXZ(-135 + (A.i % 9) * 18, (A.i % 5 - 2) * 60)], [x, z, h, done] = routeAt(out, s - PROC_L); return done ? null : [x, z, h, "walk", true]; }
     const [x, z, h] = routeAt(PROC_PATH, s); return [x + Math.cos(h) * A.lane, z - Math.sin(h) * A.lane, h, A.prop ? "carry" : "walk", true, 0.85]; }
   if (A.crew !== undefined) { const K = keelState(), k = A.crew, bx = KEEL.x, bz = KEEL.z;
     if (K.phase === "loading") { if (S < T.load - 1800) return null; if (A.patron) return [bx + 2, bz + 5, face(bx, bz, bx - 20, bz), "talk"];
@@ -54118,7 +54202,7 @@ function agentState(A) { const S = SIM; if (A.job) return working() ? jobPose(A,
   if (A.osage !== undefined) { const k = A.osage, arr = T.osage + k * 2.5, s = (S - arr) * 1.0; if (S < arr) return null;
     const L = routeLen(OS_IN); if (S > T.osageLeave + k * 3) { const s2 = (S - T.osageLeave - k * 3) * 1.0, back = [OS_IN[OS_IN.length - 1], ...OS_IN.slice().reverse()]; const [x, z, h, done] = routeAt(back, s2); return done ? null : [x, z, h, "walk", true]; }
     if (s < L) { const [x, z, h] = routeAt(OS_IN, s); return [x + Math.cos(h) * ((k % 3) - 1) * 0.9, z - Math.sin(h) * ((k % 3) - 1) * 0.9, h, "walk", true]; }
-    const [cx, cz] = toXZ(-58, -54), a = k / 13 * 6.283, r = 3.2 + (k % 2) * 1.2, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r; return [x, z, face(x, z, cx, cz), k < 9 ? (k % 3 === 0 ? "talk" : "sitground") : "sitground"]; }
+    const [cx, cz] = toXZ(-58, 46), a = k / 13 * 6.283, r = 3.2 + (k % 2) * 1.2, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r; return [x, z, face(x, z, cx, cz), k < 9 ? (k % 3 === 0 ? "talk" : "sitground") : "sitground"]; }
   if (A.patrol !== undefined) { if (SIM < T.retreat && SIM > hms(5, 0) && (SIM / 600 | 0) % 3 !== 0) return null; const L = routeLen(PATROL_PATH), s = (S * 1.1 + A.patrol * 3) % L, [x, z, h] = routeAt(PATROL_PATH, s); return [x + (A.patrol ? 0.8 : -0.8), z, h, "walk", true, 1.1]; }
   if (A.field) return working() ? [...A.fixed, "hoe"] : null;
   if (A.seller) return SIM > hms(7, 0) && SIM < hms(12, 0) ? [...A.fixed, "sell"] : null;
@@ -54127,6 +54211,11 @@ function agentState(A) { const S = SIM; if (A.job) return working() ? jobPose(A,
   if (A.dancer !== undefined) { if (SIM < T.dance || SIM > hms(22, 30)) return null; const k = A.dancer, a = S * 0.6 * (k % 2 ? 1 : -1) + k / 12 * 6.283, r = 3 + (k % 2) * 0.8, x = DANCE.c[0] + Math.cos(a) * r, z = DANCE.c[1] + Math.sin(a) * r; return [x, z, a + (k % 2 ? 0 : Math.PI), "dance", true, 1.2]; }
   if (A.ferry !== undefined) { const [x, z, h] = FERRY.pos, k = A.ferry, c = Math.cos(h), s = Math.sin(h), lx = k < 2 ? (k ? 1.2 : -1.2) : (k === 2 ? 0.6 : -0.6), lz = k < 2 ? 0 : 2.5; return [x + c * lx + s * lz, z - s * lx + c * lz, k < 2 ? h + (k ? -Math.PI / 2 : Math.PI / 2) : h, k < 2 ? "row" : "stand", false, 0, 0.55]; }
   if (A.pir !== undefined) { const [x, z, h] = PIROGUE.pos, lz = A.pir ? -2.5 : 2.5; return [x + Math.sin(h) * lz, z + Math.cos(h) * lz, h, "paddle", false, 0, 0.25]; }
+  if (A.porter) { if (!working()) { jobProp(A, null); return null; } const P = A.porter, L = A.pL || (A.pL = routeLen(P)), u = (S * 0.85 + A.phase * 5) % (2 * L + 24);
+    if (u < 12) { jobProp(A, A.carry); return [P[0][0], P[0][1], 0, "kneel"]; } if (u < L + 12) { jobProp(A, A.carry); const [x, z, h] = routeAt(P, u - 12); return [x, z, h, "shoulder", true, 0.85]; }
+    if (u < L + 24) { jobProp(A, null); return [P[P.length - 1][0], P[P.length - 1][1], 0, "kneel"]; } jobProp(A, null); const [x, z, h] = routeAt(P, 2 * L + 24 - u); return [x, z, h + Math.PI, "walk", true, 0.85]; }
+  if (A.trader) return SIM > hms(7, 30) && SIM < hms(18, 0) ? [...A.fixed, A.kind] : null;
+  if (A.arrive !== undefined) { const B = arriveState(); if (!B) return null; const k = A.arrive, c = Math.cos(B.h), s = Math.sin(B.h), lx = k ? (k % 2 ? 0.9 : -0.9) : 0, lz = k ? -3 + Math.floor((k - 1) / 2) * 2 : -5.2; return [B.x + c * lx + s * lz, B.z - s * lx + c * lz, k ? B.h + (k % 2 ? -Math.PI / 2 : Math.PI / 2) : B.h, B.moving && k ? "row" : "stand", false, 0, k && B.moving ? 0.5 : 0.7]; }
   if (A.cart !== undefined) return A.cartPos ? [A.cartPos[0], A.cartPos[1], A.cartPos[2], "walk", true, 0.9] : null;
   if (A.loop) { const P = A.loop, L = A.loopL || (A.loopL = routeLen(P)), u = (S * A.speed + A.phase * 7) % (2 * L + 16);
     if (u < L) { const [x, z, h] = routeAt(P, u); return [x, z, h, "walk", true]; } if (u < L + 8) { const [x, z, h] = routeAt(P, L); return [x, z, h, "talk"]; }
@@ -54152,7 +54241,7 @@ function lifeStep(dt, t) { frameN++; const px = P_.x, pz = P_.z, rate = Math.min
     crowd.set(A.i, x, y, z, h, kind, t, moving ? Math.min(2, (sp || 0.9) / 1.2) * Math.min(rate, 3) : 1); A.shown = true; if (A.prop) propSet(A, y); else propHide(A); }
   crowd.done(); }
 // the boats that move: the departing keelboat, the ferry, a pirogue
-function boatsStep(t) { const K = keelState(), bv = KEEL_V(K.s), [kx, kz] = KEEL_AT(bv, KEEL.off); KEEL.g.position.set(kx, WATER + 0.02 * Math.sin(t * 1.3), kz); KEEL.g.visible = bv > -2600;
+function boatsStep(t) { { const B = arriveState(); ARRIVE.g.visible = !!B; if (B) { ARRIVE.g.position.set(B.x, WATER - 0.25, B.z); ARRIVE.g.rotation.y = B.h; } } const K = keelState(), bv = KEEL_V(K.s), [kx, kz] = KEEL_AT(bv, KEEL.off); KEEL.g.position.set(kx, WATER + 0.02 * Math.sin(t * 1.3), kz); KEEL.g.visible = bv > -2600;
   const fc = 2400, f = ((SIM % fc) / fc), leg = f < 0.45 ? f / 0.45 : f < 0.5 ? 1 : f < 0.95 ? 1 - (f - 0.5) / 0.45 : 0, e = leg * leg * (3 - 2 * leg), [ax, az] = FERRY.a, [bx, bz] = FERRY.b, h = Math.atan2(bx - ax, bz - az);
   FERRY.pos = [ax + (bx - ax) * e, az + (bz - az) * e, h]; FERRY.g.position.set(FERRY.pos[0], WATER - 0.2, FERRY.pos[1]); FERRY.g.rotation.y = h;
   const pv = -400 + ((SIM * 1.2) % 1400), [px, pz] = KEEL_AT(pv, 40), [px2, pz2] = KEEL_AT(pv + 1, 40); PIROGUE.pos = [px, pz, Math.atan2(px2 - px, pz2 - pz)]; PIROGUE.g.position.set(px, WATER - 0.15, pz); PIROGUE.g.rotation.y = PIROGUE.pos[2]; }
@@ -54163,7 +54252,7 @@ function cordStep() { const K = keelState(); CORD.visible = K.phase === "cordell
 // ---------- animals and carts ----------
 // Cattle on the commons, pigs loose in the streets (a constant complaint), horses, and the two-wheeled charrette with a horse or an ox.
 const BEASTS = [], beastIM = {};
-{ const R = seeded(301); for (let k = 0; k < 40; k++) { const u = -2500 + R() * 2100, v = 1300 + R() * 850; BEASTS.push({ sp: "cow", home: toXZ(u, v), ph: R() * 100, r: 3 + R() * 6, sl: 0.01 }); }   // cattle on the commons
+{ const R = seeded(301); for (let k = 0; k < 60; k++) { const u = -2500 + R() * 1800, v = 1300 + R() * 850; if (baseH(...toXZ(u, v)) < 2) continue; BEASTS.push({ sp: "cow", home: toXZ(u, v), ph: R() * 100, r: 3 + R() * 6, sl: 0.01 }); }   // cattle on the commons
   for (let k = 0; k < 26; k++) { const S = STREETS[(R() * 3) | 0], [x, z] = S.L.at(R() * S.L.L); BEASTS.push({ sp: "pig", home: [x + (R() - 0.5) * 6, z + (R() - 0.5) * 6], ph: R() * 100, r: 3 + R() * 4, sl: 0.05 }); }   // pigs rooting in the streets
   for (let k = 0; k < 14; k++) { const L = LOTS[(R() * LOTS.length) | 0], [x, z] = toXZ((L.u0 + L.u1) / 2, (L.v0 + L.v1) / 2); BEASTS.push({ sp: "horse", home: [x, z], ph: R() * 100, r: 1.5, sl: 0.01 }); }   // horses in the yards
   for (const [sp, geo, col] of [["cow", COW_G, 0x6a4a34], ["pig", PIG_G, 0x5a4a40], ["horse", HORSE_G, 0x5a3e2a]]) { const n = BEASTS.filter(b => b.sp === sp).length, im = new THREE.InstancedMesh(geo, M(col, { vertexColors: true }), Math.max(1, n)); im.frustumCulled = false; im.count = n; scene.add(im); beastIM[sp] = im; } }
@@ -54218,7 +54307,7 @@ document.body.append(HUD, MSG, GUIDE, MAPC);
 let msgT = 0, msgText = "", vrDirty = true;
 function say(t, secs = 12) { msgText = t; msgT = secs; MSG.innerHTML = t; MSG.style.display = "block"; vrDirty = true; }
 function start() { if (started) return; started = true; intro?.classList.add("gone");
-  say("Tuesday 20 May 1800, early morning, on the Place d'Armes of St. Louis, capital of Spanish Upper Louisiana: a French village of about a thousand people on its terrace above the Mississippi. Behind you the landing and the keelboats; ahead the Rue de la Place, the church (its bell ringing for Mass) and the Chouteau house; on the hill beyond, the Spanish tower. Today is a Rogation day: after Mass the parish walks out to bless the fields. Walk anywhere. Markers name things and say how well we know them: press E near one to read it.", 26); }
+  say("Tuesday 20 May 1800, early morning, on the Place d'Armes of St. Louis, capital of Spanish Upper Louisiana: a French village of about a thousand people on its terrace above the Mississippi. Behind you the landing and the keelboats; ahead, across La Grande Rue, the Chouteaus' walled stone house; beyond it the church (its bell ringing for Mass); on the hill, the Spanish tower. Today is a Rogation day: after Mass the parish walks out to bless the fields. Walk anywhere. Markers name things and say how well we know them: press E near one to read it.", 26); }
 addEventListener("keydown", e => { keys[e.code] = true; start();
   if (e.code === "Equal") speedI = Math.min(SPEEDS.length - 1, speedI + 1); if (e.code === "Minus") speedI = Math.max(0, speedI - 1);
   if (e.code === "KeyF") flying = !flying; if (e.code === "KeyE") interact(); if (e.code === "KeyM") MAPC.style.display = MAPC.style.display === "none" ? "" : "none";
@@ -54237,9 +54326,9 @@ function teleport(x, z, lx, lz) { P_.x = x; P_.z = z; P_.y = groundAt(x, z); yaw
 const PLACES = [{ name: "The Place d'Armes (start)", at: START.at, look: START.look }];
 for (const m of MARKS) if (m.tag !== "person" && m.tag !== "typical" && !m.hidden && m.range > 200) PLACES.push({ name: m.name, m });
 function goPlace(p) { start(); if (p.at) { teleport(p.at[0], p.at[1], p.look[0], p.look[1]); say(`<b>${p.name}</b>`, 5); return; } const [x, z] = standSpot(p.m.x, p.m.z + Math.min(40, p.m.r + 8)); teleport(x, z, p.m.x, p.m.z); say(`<b>${p.m.name}</b> · <span style="color:${TAGC[p.m.tag]}">${TAGN[p.m.tag]}</span> · ${p.m.text}`, 24); }
-const TODO = [["Watch the Rogation procession (6:40)", [0, -200], [0, -300], T.proc + 120], ["See the fur press", [-46, -18], [-56, -24]], ["Watch the keelboat leave (9:30)", [ -0, 20], [120, 30], T.keel - 90], ["Meet the Osage visitors (11:00-16:30)", [-14, -32], [-36, -36], T.osage + 400],
+const TODO = [["Watch the Rogation procession (6:40)", [0, -200], [0, -300], T.proc + 120], ["See the fur press", [-46, 82], [-56, 76]], ["Watch the keelboat leave (9:30)", [ -0, 20], [120, 30], T.keel - 90], ["Meet the Osage visitors (11:00-16:30)", [-30, 30], [-58, 46], T.osage + 400],
   ["A house going up", null, null], ["The smithy", null, null], ["Chouteau's mill", [MILL.u + 30, MILL.v + 20], [MILL.u, MILL.v]], ["Up to Fort San Carlos", [FORT.u + 40, FORT.v], [FORT.u, FORT.v]], ["Out to the common fields", [-600, -700], [-900, -800], hms(9, 0)],
-  ["The Big Mound, north of the town", [BMU + 60, BMV + 90], [BMU, BMV]], ["The evening dance (19:30)", null, null, T.dance + 300]];
+  ["The Big Mound, north of the town", [BMU + 60, BMV + 90], [BMU, BMV]], ["The riverfront trade", [riverU(60) - RIVER_HW - 50, 20], [riverU(60) - RIVER_HW, 70], hms(9, 0)], ["Cahokia, across the river", [CAHOKIA.u - 40, CAHOKIA.v - 50], [CAHOKIA.u - 70, CAHOKIA.v + 10]], ["The bateau arrives (15:00)", [riverU(150) - RIVER_HW - 40, 170], [riverU(400) - RIVER_HW, 600], hms(15, 5)], ["The evening dance (19:30)", null, null, T.dance + 300]];
 function goTodo(k) { start(); const [name, at, look, tm] = TODO[k]; if (tm !== undefined) { SIM = tm; narrI = -1; }
   let A = at && toXZ(...at), L = look && toXZ(...look);
   if (!A) { const m = MARKS.find(q => q.name === (name === "A house going up" ? "A house going up" : name === "The smithy" ? "A smithy" : "")); if (m) { A = standSpot(m.x, m.z + 12); L = [m.x, m.z]; } else if (name.startsWith("The evening")) { A = toXZ(DANCE.H.u - DANCE.H.w / 2 - 18, DANCE.H.v + 6); L = DANCE.c; } }
@@ -54301,7 +54390,7 @@ function updateLabels() { const cx = P_.x, cz = P_.z, cy = P_.y + 1.6, myZone = 
   pinGeo.setDrawRange(0, n * 2); dotGeo.setDrawRange(0, n); pinGeo.attributes.position.needsUpdate = true; dotGeo.attributes.position.needsUpdate = true; dotGeo.attributes.color.needsUpdate = true; }
 
 // ---------- the map ----------
-const MX0 = RX0, MZ0 = RZ0, MW = RW * RC, MH = RH * RC, MPX = 6, MAPBASE = document.createElement("canvas"); MAPBASE.width = Math.ceil(MW / MPX); MAPBASE.height = Math.ceil(MH / MPX);
+const MX0 = RX0, MZ0 = RZ0, MW = RW * RC, MH = RH * RC, MPX = 8, MAPBASE = document.createElement("canvas"); MAPBASE.width = Math.ceil(MW / MPX); MAPBASE.height = Math.ceil(MH / MPX);
 { const g = MAPBASE.getContext("2d"), W = MAPBASE.width, Hh = MAPBASE.height, img = g.createImageData(W, Hh);
   for (let j = 0; j < Hh; j++) for (let i = 0; i < W; i++) { const x = MX0 + i * MPX, z = MZ0 + j * MPX, k = 4 * (j * W + i), v = rGet(x, z), h = baseH(x, z); let r = 140, gr = 156, b = 100;
     if (h < WATER || inPond(x, z)) { r = 96; gr = 104; b = 100; } else if (v === 1) { r = 196; gr = 178; b = 140; } else if (v === 2) { r = 120; gr = 84; b = 54; } else if (v === 7) { r = 90; gr = 76; b = 60; } else if (v === 3 || v === 8) { r = 150; gr = 150; b = 100; } else if (v === 4) { r = 170; gr = 168; b = 120; } else if (v === 5) { r = 156; gr = 164; b = 96; } else if (v === 6) { r = 128; gr = 150; b = 96; }
@@ -54379,7 +54468,7 @@ function frame() {
   if (flying) P_.y = Math.max(g, P_.y + up * Math.max(4, sp) * dt); else P_.y = g > P_.y ? Math.min(g, P_.y + Math.max(3.2, sp * 1.2) * dt) : Math.max(g, P_.y - Math.max(7, sp) * dt);
   rig.position.set(P_.x, P_.y + (vr && SITTING ? 0.45 : 0), P_.z);
   updateGround(P_.x, P_.z);
-  boatsStep(t); lifeStep(dt, t); beastStep(t); cordStep(); cartStep(t); smokeStep(dt); lodStep();
+  boatsStep(t); lifeStep(dt, t); beastStep(t); cordStep(); grassStep(); cartStep(t); smokeStep(dt); lodStep();
   for (const f of TECH_ANIM) f(t, dt);
   danceLight.intensity = SIM > T.dance && SIM < hms(22, 0) ? (1 - clampN(sunAt(SIM / 3600).el * 8, 0, 1)) * 40 * (0.9 + 0.1 * Math.sin(t * 9)) : 0;
   for (const f of FLAGS) { const p = f.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i); p.setZ(i, Math.sin(x * 2.2 - t * 4) * 0.12 * x / 2.4); } p.needsUpdate = true; }
