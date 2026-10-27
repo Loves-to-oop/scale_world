@@ -691,7 +691,7 @@ const CHURCH = { u: -135, v: 62 };
   gbox(F, "oak", 0, by + 2.9, nl / 2 - 1.6, 0.08, 1.0, 0.08); gbox(F, "oak", 0, by + 3.15, nl / 2 - 1.6, 0.5, 0.08, 0.08);
   const [bx, , bz] = gw(F, 0, 0, nl / 2 - 1.6); put("bell", new THREE.CylinderGeometry(0.18, 0.32, 0.5, 12, 1, true).translate(0, 0.25, 0), M(0x8a6a3a, { metalness: 0.6, roughness: 0.4, side: THREE.DoubleSide }), bx, gy + by + 0.7, bz, 1, 1, 1);
   const lf = FR(x, z, ry, gy, "L" + lodKey(x, z)); GTINT = [0.62, 0.6, 0.58]; gbox(lf, "lod", 0, (0.4 + wh) / 2, 0, nw, 0.4 + wh, nl); GTINT = [0.3, 0.3, 0.29]; for (const s of [-1, 1]) gpoly(lf, "lod", [[s * (nw / 2 + 0.4), 0.4 + wh, -nl / 2], [s * (nw / 2 + 0.4), 0.4 + wh, nl / 2], [0, by, nl / 2], [0, by, -nl / 2]], [[0, 0], [1, 0], [1, 1], [0, 1]], [s, 1, 0]); GTINT = [1, 1, 1];
-  solid(x, z, nw + 0.2, nl + 0.2, ry); rRect(x, z, nw + 2, nl + 2, ry, 2); rRectUV(-174, -96, 4, 96, 4);
+  Object.assign(CHURCH, { x, z, gy: gy + 0.4, ry, nw, nl, coll: solid(x, z, nw + 0.2, nl + 0.2, ry) }); rRect(x, z, nw + 2, nl + 2, ry, 2); rRectUV(-174, -96, 4, 96, 4);
   addHouse(-110, 84, 6.5, 10, { face: 1, gal: "fb", kind: "presbytery", lime: true });   // the priest's house
   const R = seeded(1776); for (let k = 0; k < 46; k++) { const cu = -170 + R() * 22, cv = 8 + R() * 82; if (Math.abs(cu - CHURCH.u) < 8 && Math.abs(cv - CHURCH.v) < 13) continue; putUV("cross", BOX_G, MAT.wood, cu, cv, 0, 0.08, 1.0 + R() * 0.4, 0.08); putUV("crossbar", BOX_G, MAT.wood, cu, cv, 0.7, 0.07, 0.07, 0.45); }   // wooden crosses in the graveyard
   fence(-174, 4, -174, 96); fence(-174, 4, -139, 4); fence(-131, 4, -96, 4); fence(-174, 96, -96, 96); fence(-96, 4, -96, 96);
@@ -976,6 +976,132 @@ function propHide(A) { const P = PROPS[A.prop]; if (!P) return; const s = P.slot
   if (s !== last) { P.im.getMatrixAt(last, _pm); P.im.setMatrixAt(s, _pm); P.slot[j] = s; P.who[s] = j; } P.slot[A.i] = -1; P.im.count = P.n; P.im.instanceMatrix.needsUpdate = true; }
 
 
+// ---------- inside the houses and the church ----------
+// Built when you go in, from what the inventories of St. Louis estates list (Billon prints many) and from the furnished houses at Ste.
+// Genevieve: the main room (la salle) with its hearth, a table and rush-seated chairs, the walnut armoire that every Creole household
+// prized, a dresser (vaisselier) of pewter and earthenware, a spinning wheel, a crucifix and a holy picture; the bedroom (la chambre)
+// with a tall bed hung with curtains, a chest; in the merchants' houses a writing desk, a mirror, more chairs; in the Government House
+// the lieutenant governor's office. Walls of bousillage smoothed and limewashed, a plank floor, the ceiling joists showing.
+let INSIDE = null;
+const _uvScale = (g, sx, sy) => { const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * sx, uv.getY(i) * sy); return g; };
+const IMAT = { plaster: new THREE.MeshStandardMaterial({ map: tex(256, 256, (g, w, h) => { speckle("#e8e2d4", 1400, ["#f0ece2", "#dcd4c2", "#e4dccc"], 4, 4)(g, w, h); for (let k = 0; k < 40; k++) { g.fillStyle = "rgba(160,146,120,.08)"; g.beginPath(); g.ellipse(rnd() * w, rnd() * h, 10 + rnd() * 30, 6 + rnd() * 20, 0, 0, 6.283); g.fill(); } }), roughness: 0.95 }),
+  floor: new THREE.MeshStandardMaterial({ map: G_TEX.plank, roughness: 0.85 }), wood: new THREE.MeshStandardMaterial({ map: G_TEX.oak, roughness: 0.75 }), walnut: M(0x4a3020, { roughness: 0.55 }), cherry: M(0x6a3a26, { roughness: 0.55 }), stone: new THREE.MeshStandardMaterial({ map: G_TEX.stone, roughness: 0.95 }),
+  linen: M(0xe8e2d2, { side: THREE.DoubleSide }), red: M(0x8a2a24, { side: THREE.DoubleSide }), blue: M(0x2a3a6a, { side: THREE.DoubleSide }), pewter: M(0x9a9ca0, { metalness: 0.6, roughness: 0.4 }), iron: M(0x2a2a2a, { metalness: 0.5, roughness: 0.6 }), rush: M(0xa88c52, { roughness: 1 }), brass: M(0xc8a040, { metalness: 0.7, roughness: 0.35 }),
+  glass: new THREE.MeshBasicMaterial({ color: 0xe8eef2, toneMapped: true }), dark: M(0x1a120c, { roughness: 1 }), fire: new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }) };
+const houseLight = new THREE.PointLight(0xffa860, 0, 14, 1.4); scene.add(houseLight);
+// a piece at local position (lx, ly, lz) in the building's frame, sized sx, sy, sz, turned ry about its own axis
+function iBox(G, mat, F, lx, ly, lz, sx, sy, sz, ry = 0, geo) { const g = geo || _uvScale(new THREE.BoxGeometry(1, 1, 1), 1, 1), m = new THREE.Mesh(g, mat); const [x, y, z] = gw(F, lx, ly, lz); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.y = Math.atan2(F.s, F.c) + ry; G.add(m); return m; }
+function iPlane(G, mat, F, lx, ly, lz, w, h, ry) { const m = new THREE.Mesh(_uvScale(new THREE.PlaneGeometry(1, 1), w / 2, h / 2), mat); const [x, y, z] = gw(F, lx, ly, lz); m.position.set(x, y, z); m.scale.set(w, h, 1); m.rotation.y = Math.atan2(F.s, F.c) + ry; G.add(m); return m; }
+const CYL1 = new THREE.CylinderGeometry(0.5, 0.5, 1, 10), SPH1 = new THREE.SphereGeometry(0.5, 10, 7);
+// furniture (all in local coordinates, the floor at y 0)
+const FURN = {
+  table(G, F, x, z, ry, w = 1.6, d = 0.85) { iBox(G, IMAT.walnut, F, x, 0.74, z, w, 0.05, d, ry); for (const [a, b] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { const c = Math.cos(ry), s = Math.sin(ry), lx = a * (w / 2 - 0.08), lz = b * (d / 2 - 0.08); iBox(G, IMAT.walnut, F, x + lx * c + lz * s, 0.36, z - lx * s + lz * c, 0.06, 0.72, 0.06, ry); } },
+  chair(G, F, x, z, ry) { const c = Math.cos(ry), s = Math.sin(ry), at = (lx, lz) => [x + lx * c + lz * s, z - lx * s + lz * c]; iBox(G, IMAT.rush, F, x, 0.44, z, 0.42, 0.04, 0.4, ry);
+    for (const [a, b] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { const [px, pz] = at(a * 0.19, b * 0.18); iBox(G, IMAT.wood, F, px, b < 0 ? 0.48 : 0.22, pz, 0.035, b < 0 ? 0.96 : 0.44, 0.035, ry); }
+    for (const y of [0.66, 0.82]) { const [px, pz] = at(0, -0.18); iBox(G, IMAT.wood, F, px, y, pz, 0.38, 0.05, 0.025, ry); } },
+  bed(G, F, x, z, ry, rich) { const c = Math.cos(ry), s = Math.sin(ry), at = (lx, lz) => [x + lx * c + lz * s, z - lx * s + lz * c], W = 1.45, L = 2.0, cur = rich ? IMAT.red : IMAT.blue;
+    iBox(G, IMAT.cherry, F, x, 0.35, z, W, 0.25, L, ry); iBox(G, IMAT.linen, F, x, 0.62, z, W - 0.06, 0.3, L - 0.06, ry); iBox(G, cur, F, ...at(0, 0.15), 0.79, W - 0.02, 0.04, L * 0.65, ry); const [bx, bz] = at(0, -L / 2 + 0.3); iBox(G, IMAT.linen, F, bx, 0.84, bz, W - 0.2, 0.18, 0.35, ry);   // the bed: feather mattresses, a coverlet, a bolster
+    for (const [a, b] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { const [px, pz] = at(a * W / 2, b * L / 2); iBox(G, IMAT.cherry, F, px, 1.1, pz, 0.08, 2.2, 0.08, ry); }
+    iBox(G, cur, F, x, 2.18, z, W + 0.1, 0.25, L + 0.1, ry);   // the tester (canopy) and its valance
+    for (const sx of [-1, 1]) { const [px, pz] = at(sx * (W / 2 + 0.02), -L / 4); iPlane(G, cur, F, px, 1.15, pz, L / 2, 2.0, ry + Math.PI / 2); } const [hx, hz] = at(0, -L / 2 - 0.02); iPlane(G, cur, F, hx, 1.2, hz, W, 1.9, ry); },
+  armoire(G, F, x, z, ry) { iBox(G, IMAT.walnut, F, x, 1.1, z, 1.5, 2.2, 0.6, ry); iBox(G, IMAT.walnut, F, x, 2.25, z, 1.62, 0.12, 0.68, ry); const c = Math.cos(ry), s = Math.sin(ry);   // the armoire: walnut, two tall doors with raised panels, a cornice
+    for (const a of [-0.36, 0.36]) for (const y of [0.6, 1.55]) iBox(G, IMAT.cherry, F, x + a * c + 0.31 * s, y, z - a * s + 0.31 * c, 0.56, y < 1 ? 0.75 : 0.95, 0.03, ry); },
+  chest(G, F, x, z, ry) { iBox(G, IMAT.walnut, F, x, 0.28, z, 1.1, 0.56, 0.55, ry); for (const a of [-0.4, 0.4]) { const c = Math.cos(ry), s = Math.sin(ry); iBox(G, IMAT.iron, F, x + a * c, 0.3, z - a * s, 0.04, 0.58, 0.57, ry); } },
+  dresser(G, F, x, z, ry) { const c = Math.cos(ry), s = Math.sin(ry); iBox(G, IMAT.walnut, F, x, 0.45, z, 1.5, 0.9, 0.5, ry); iBox(G, IMAT.walnut, F, x - 0.18 * s, 1.5, z - 0.18 * c, 1.5, 1.2, 0.12, ry);   // the vaisselier, with pewter plates and earthenware
+    for (const y of [1.2, 1.6]) { iBox(G, IMAT.walnut, F, x - 0.08 * s, y, z - 0.08 * c, 1.45, 0.03, 0.2, ry); for (let k = 0; k < 5; k++) { const a = -0.56 + k * 0.28; const p = iBox(G, k % 2 ? IMAT.pewter : M(0xd8ccb0), F, x + a * c - 0.1 * s, y + 0.15, z - a * s - 0.1 * c, 0.24, 0.24, 0.02, ry, CYL1); p.rotation.x = Math.PI / 2; } } },
+  hearth(G, F, x, z, ry) { const c = Math.cos(ry), s = Math.sin(ry), at = (lx, lz) => [x + lx * c + lz * s, z - lx * s + lz * c];   // the fireplace: stone, a deep hearth, a crane with a kettle
+    for (const a of [-0.85, 0.85]) iBox(G, IMAT.stone, F, ...at(a, 0), 0.7, 0.35, 1.4, 0.6, ry); iBox(G, IMAT.stone, F, ...at(0, 0), 1.55, 2.1, 0.5, 0.6, ry); iBox(G, IMAT.dark, F, ...at(0, -0.1), 0.62, 1.38, 1.24, 0.4, ry);
+    iBox(G, IMAT.walnut, F, ...at(0, 0.28), 1.42, 2.3, 0.08, 0.3, ry); iBox(G, IMAT.stone, F, ...at(0, 0.45), 0.03, 2.0, 0.06, 0.5, ry);
+    const fire = iBox(G, IMAT.fire, F, ...at(0, -0.05), 0.25, 0.5, 0.5, 0.5, ry, new THREE.ConeGeometry(0.5, 1, 7).translate(0, 0.5, 0)); fire.userData.fire = true;
+    for (const a of [-0.25, 0.25]) iBox(G, IMAT.wood, F, ...at(a * 0.4, -0.02), 0.08, 0.7, 0.08, 0.1, ry + Math.PI / 2 + a); iBox(G, IMAT.iron, F, ...at(0.2, -0.05), 0.65, 0.32, 0.32, 0.32, ry, SPH1); return at(0, 0.3); },
+  wheel(G, F, x, z, ry) { const w = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.025, 5, 20), IMAT.wood), [px, py, pz] = gw(F, x, 0.62, z); w.position.set(px, py, pz); w.rotation.y = Math.atan2(F.s, F.c) + ry; G.add(w);   // a spinning wheel
+    iBox(G, IMAT.wood, F, x, 0.3, z, 0.5, 0.06, 0.18, ry); for (const a of [-0.2, 0.2]) iBox(G, IMAT.wood, F, x + a * Math.cos(ry), 0.2, z - a * Math.sin(ry), 0.04, 0.4, 0.04, ry); iBox(G, IMAT.linen, F, x - 0.35 * Math.cos(ry), 0.85, z + 0.35 * Math.sin(ry), 0.08, 0.2, 0.08, ry, SPH1); },
+  candle(G, F, x, y, z) { iBox(G, IMAT.brass, F, x, y + 0.08, z, 0.08, 0.16, 0.08, 0, CYL1); iBox(G, M(0xf0ead8), F, x, y + 0.24, z, 0.03, 0.16, 0.03, 0, CYL1); const f = iBox(G, IMAT.fire, F, x, y + 0.33, z, 0.025, 0.06, 0.025, 0, new THREE.ConeGeometry(0.5, 1, 6)); f.userData.fire = true; },
+  crucifix(G, F, x, y, z, ry) { iBox(G, IMAT.walnut, F, x, y, z, 0.04, 0.5, 0.03, ry); iBox(G, IMAT.walnut, F, x, y + 0.08, z, 0.28, 0.04, 0.03, ry); },
+  picture(G, F, x, y, z, ry, kind) { const t = tex(128, 160, (g, w, h) => { g.fillStyle = "#2a2018"; g.fillRect(0, 0, w, h); g.fillStyle = kind === "king" ? "#3a3a5a" : "#4a3a5a"; g.fillRect(10, 10, w - 20, h - 20);
+      g.fillStyle = "#d8b088"; g.beginPath(); g.ellipse(64, 60, 18, 22, 0, 0, 6.283); g.fill(); g.fillStyle = kind === "king" ? "#c83a2a" : "#2a4a8a"; g.beginPath(); g.moveTo(30, 150); g.lineTo(98, 150); g.lineTo(84, 84); g.lineTo(44, 84); g.fill(); if (kind === "king") { g.fillStyle = "#e8e0d0"; g.fillRect(40, 30, 48, 14); } else { g.strokeStyle = "#e8c860"; g.lineWidth = 3; g.beginPath(); g.arc(64, 56, 28, 0, 6.283); g.stroke(); } });
+    iPlane(G, new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }), F, x, y, z, 0.5, 0.62, ry); },
+  desk(G, F, x, z, ry) { iBox(G, IMAT.walnut, F, x, 0.5, z, 1.1, 1.0, 0.55, ry); iBox(G, IMAT.walnut, F, x - 0.12 * Math.sin(ry), 1.25, z - 0.12 * Math.cos(ry), 1.1, 0.5, 0.3, ry); iBox(G, IMAT.linen, F, x + 0.1 * Math.sin(ry), 1.01, z + 0.1 * Math.cos(ry), 0.5, 0.01, 0.32, ry); },   // a writing desk (secrétaire) with papers
+  mirror(G, F, x, y, z, ry) { iPlane(G, M(0xa8b4bc, { metalness: 0.9, roughness: 0.08 }), F, x, y, z, 0.55, 0.85, ry); iBox(G, IMAT.brass, F, x, y + 0.48, z, 0.62, 0.08, 0.03, ry); },
+  musket(G, F, x, y, z, ry) { iBox(G, IMAT.walnut, F, x, y, z, 1.45, 0.05, 0.04, ry); iBox(G, IMAT.iron, F, x + 0.25 * Math.cos(ry), y + 0.03, z - 0.25 * Math.sin(ry), 1.0, 0.025, 0.025, ry); } };
+const ITEM_TXT = {
+  hearth: "The fireplace: a hearth of stone, the cooking fire kept going all day. Pots hang from an iron crane; meat is roasted on a spit; bread is baked outside in the oven. In many houses the cooking was done in the separate kitchen, by enslaved women.",
+  armoire: "The armoire: a tall wardrobe of black walnut with two panelled doors, the most valued piece in a Creole house, holding the household's linen and clothes. Estate inventories of St. Louis and Ste. Genevieve list many; several made in the Mississippi valley survive in museums.",
+  bed: "The bed: high, on a walnut or cherry frame, with feather mattresses, linen sheets and a coverlet, hung with curtains from a tester against draughts and mosquitoes.",
+  table: "The table, of walnut, with chairs seated with woven rush or hide. Meals: bread, soups and gumbos, game, fish from the river, pork, vegetables from the garden, fruit from the orchard; coffee and wine from New Orleans for those who could afford them.",
+  dresser: "The dresser (vaisselier), with the household's pewter plates and French earthenware (faience): ordinary people ate from wooden bowls and pewter.",
+  wheel: "A spinning wheel. Women spun wool, cotton and flax for the household's cloth and stockings; fine cloth came up the river from New Orleans.",
+  crucifix: "A crucifix and a holy picture: the household was Catholic, as the law required. Baptisms, marriages and burials were all by the church.",
+  desk: "A writing desk with papers: accounts kept in livres and sous, though paid in furs, lead or Spanish silver piastres. Contracts and sales went before the lieutenant governor or a notary, in French.",
+  mirror: "A looking glass in a gilt frame, brought up from New Orleans: a mark of a well-off house.",
+  musket: "A musket over the mantel: every man from 16 to 50 served in the militia and kept a gun, and hunting fed many families.",
+  king: "A portrait of King Charles IV of Spain, in whose name Louisiana is governed. (The furnishing of the Government House is not recorded; this is typical.)",
+  altar: "The altar, with its crucifix and candles, and a painting above it. The bishop of Louisiana, at New Orleans, sent the priests; vestments, vessels and paintings came from France and Spain.",
+  rail: "The communion rail, where the faithful knelt to receive the sacrament.",
+  pulpit: "The pulpit, from which the priest preached in French. Sermons, announcements and the governor's proclamations were all read in church.",
+  benches: "Benches for the congregation: many stood or knelt on the floor; some families had their own pews." };
+// enter a building: B = { F (frame at the floor, local z along the building), w, d, wh, kind, rich, door: [lx, lz], out: [x, z, h], church }
+function enterBuilding(B) { const G = new THREE.Group(), F = B.F, w = B.w, d = B.d, wh = B.wh, rich = B.rich; scene.add(G);
+  const marks = [], solids = [], folk = [], itm = (key, lx, lz, y = 1.6) => { const [x, , z] = gw(F, lx, 0, lz); marks.push(mark(key === "king" ? "Portrait of the King" : key[0].toUpperCase() + key.slice(1), x, z, "typical", ITEM_TXT[key], { y: y - (F.gy - groundH(x, z)) * 0 + (F.gy - groundH(x, z)), range: 14, r: 1.8 })); }, block = (lx, lz, sx, sz) => solids.push([lx, lz, sx / 2 + 0.2, sz / 2 + 0.2]);
+  // the room: floor, limewashed walls, joists and ceiling
+  iBox(G, IMAT.floor, F, 0, 0.03, 0, w, 0.04, d, 0, _uvScale(new THREE.BoxGeometry(1, 1, 1), w / 2, d / 2));
+  for (const sx of [-1, 1]) iBox(G, IMAT.plaster, F, sx * (w / 2 - 0.05), wh / 2, 0, 0.1, wh, d, 0, _uvScale(new THREE.BoxGeometry(1, 1, 1), d / 2, wh / 2));
+  for (const sz of [-1, 1]) iBox(G, IMAT.plaster, F, 0, wh / 2, sz * (d / 2 - 0.05), w, wh, 0.1, 0, _uvScale(new THREE.BoxGeometry(1, 1, 1), w / 2, wh / 2));
+  iBox(G, IMAT.wood, F, 0, wh + 0.02, 0, w, 0.04, d, 0, _uvScale(new THREE.BoxGeometry(1, 1, 1), w, d)); for (let k = 0; k < Math.floor(d / 0.9); k++) iBox(G, IMAT.walnut, F, 0, wh - 0.1, -d / 2 + 0.45 + k * 0.9, w, 0.18, 0.14);
+  // windows of daylight and the doors (glazed doors on the street side)
+  const dayK = clampN(sunAt(SIM / 3600).el * 5 + 0.2, 0.08, 1); IMAT.glass.color.setRGB(0.9 * dayK + 0.06, 0.93 * dayK + 0.06, 0.95 * dayK + 0.08);
+  if (B.church) { for (const sx of [-1, 1]) for (let k = 0; k < 4; k++) iPlane(G, IMAT.glass, F, sx * (w / 2 - 0.11), 2.6, -d / 2 + 3 + k * 4.5, 1.1, 1.9, sx > 0 ? -Math.PI / 2 : Math.PI / 2); iPlane(G, IMAT.floor, F, 0, 1.3, d / 2 - 0.11, 1.7, 2.5, Math.PI); }
+  else { const fx = B.face * (w / 2 - 0.11), nd = Math.max(1, Math.round(d / 4.5)); for (let k = 0; k < nd; k++) { const z = -d / 2 + d * (k + 0.5) / nd; if (k === Math.floor(nd / 2)) iPlane(G, IMAT.floor, F, fx, 1.05, z, 1.1, 2.1, B.face > 0 ? -Math.PI / 2 : Math.PI / 2); else iPlane(G, IMAT.glass, F, fx, 1.4, z, 0.85, 1.1, B.face > 0 ? -Math.PI / 2 : Math.PI / 2); }
+    for (let k = 0; k < Math.max(1, nd - 1); k++) iPlane(G, IMAT.glass, F, -fx, 1.4, -d / 2 + d * (k + 0.5) / Math.max(1, nd - 1), 0.8, 1.05, B.face > 0 ? Math.PI / 2 : -Math.PI / 2); }
+  let light = [0, wh * 0.7, 0];
+  if (B.church) {   // the church: the altar at the far (south) end, a rail, a pulpit, benches; the door at the north end
+    const az = -d / 2 + 1.4; iBox(G, IMAT.floor, F, 0, 0.1, az + 0.3, w - 0.3, 0.2, 3.2); iBox(G, IMAT.walnut, F, 0, 0.6, az, 2.4, 1.0, 0.9); iBox(G, IMAT.linen, F, 0, 1.11, az, 2.5, 0.02, 1.0); FURN.crucifix(G, F, 0, 1.6, az - 0.2, 0);
+    for (const a of [-0.9, -0.55, -0.2, 0.2, 0.55, 0.9]) FURN.candle(G, F, a, 1.12, az - 0.25); FURN.picture(G, F, 0, 2.9, -d / 2 + 0.12, 0, "saint"); iBox(G, IMAT.walnut, F, 0, 2.9, -d / 2 + 0.1, 1.5, 1.9, 0.04);
+    for (const sx of [-1, 1]) iBox(G, IMAT.walnut, F, sx * (w / 4 + 0.3), 0.45, az + 2.4, w / 2 - 1.2, 0.9, 0.12); iBox(G, IMAT.walnut, F, w / 2 - 1.0, 1.2, -d / 2 + 6, 1.0, 2.4, 1.0); block(w / 2 - 1.0, -d / 2 + 6, 1.0, 1.0);
+    for (let k = 0; k < 6; k++) for (const sx of [-1, 1]) { iBox(G, IMAT.wood, F, sx * (w / 4 + 0.25), 0.42, -d / 2 + 7 + k * 1.5, w / 2 - 1.4, 0.06, 0.38); block(sx * (w / 4 + 0.25), -d / 2 + 7 + k * 1.5, w / 2 - 1.4, 0.38); }
+    block(0, az, 2.4, 0.9); for (const sx of [-1, 1]) block(sx * (w / 4 + 0.3), az + 2.4, w / 2 - 1.2, 0.12);
+    itm("altar", 0, az + 0.8, 1.9); itm("rail", 0, az + 2.6, 1.3); itm("pulpit", w / 2 - 1.0, -d / 2 + 6.8, 2.8); itm("benches", -w / 4, -d / 2 + 10, 1.0); light = [0, 2.8, az + 1];
+    const pray = SIM > T.mass - 900 && SIM < T.proc; for (let k = 0; k < (pray ? 7 : 3); k++) folk.push([(k % 2 ? 1 : -1) * (1.2 + (k % 3) * 0.7), -d / 2 + 7.3 + Math.floor(k / 2) * 1.5, Math.PI, "pray", k % 3 ? "woman" : k % 2 ? "creole" : "enslavedw"]);
+    if (pray) folk.push([0, az + 0.9, 0, "sell", "priest"]); }
+  else {   // a house: the salle (with the hearth, at the chimney's end) and the chambre beyond a partition
+    const ch = B.chim, pz = -ch * d * 0.12, salle = [pz, ch * d / 2], chambre = [-ch * d / 2, pz];
+    for (const sx of [-1, 1]) { const wl = (w / 2 - 0.55); iBox(G, IMAT.plaster, F, sx * (0.55 + wl / 2), wh / 2, pz, wl, wh, 0.1, 0, _uvScale(new THREE.BoxGeometry(1, 1, 1), wl / 2, wh / 2)); block(sx * (0.55 + wl / 2), pz, wl, 0.1); }   // the partition, with a doorway
+    const hz = ch * (d / 2 - 0.35), hearthAt = FURN.hearth(G, F, 0, hz, ch > 0 ? Math.PI : 0); block(0, hz, 2.4, 0.8); itm("hearth", 0, hz - ch * 0.5, 1.7); light = [0, 1.0, hz - ch * 0.8];
+    FURN.musket(G, F, 0, 1.85, hz - ch * 0.32, 0); itm("musket", 0.6, hz - ch * 0.6, 2.1);
+    const sm = (salle[0] + salle[1]) / 2, tz = sm - ch * 0.3; FURN.table(G, F, 0, tz, 0); block(0, tz, 1.6, 0.85); itm("table", 0, tz, 1.2);
+    for (const [a, b, r] of [[-0.55, -0.62, 0], [0.55, -0.62, 0], [-0.55, 0.62, Math.PI], [0.55, 0.62, Math.PI]]) FURN.chair(G, F, a, tz + b, r);
+    FURN.candle(G, F, 0.3, 0.76, tz); const bw = -B.face; FURN.armoire(G, F, bw * (w / 2 - 0.42), sm + ch * 0.6, bw > 0 ? -Math.PI / 2 : Math.PI / 2); block(bw * (w / 2 - 0.42), sm + ch * 0.6, 0.6, 1.5); itm("armoire", bw * (w / 2 - 0.8), sm + ch * 0.6, 2.4);
+    if (rich) { FURN.desk(G, F, bw * (w / 2 - 0.38), sm - ch * 1.3, bw > 0 ? -Math.PI / 2 : Math.PI / 2); block(bw * (w / 2 - 0.38), sm - ch * 1.3, 0.55, 1.1); itm("desk", bw * (w / 2 - 0.8), sm - ch * 1.3, 1.6); FURN.mirror(G, F, -bw * (w / 2 - 0.12), 1.7, sm, bw > 0 ? Math.PI / 2 : -Math.PI / 2); itm("mirror", -bw * (w / 2 - 0.5), sm, 1.9); }
+    else { FURN.dresser(G, F, bw * (w / 2 - 0.32), sm - ch * 1.3, bw > 0 ? -Math.PI / 2 : Math.PI / 2); block(bw * (w / 2 - 0.32), sm - ch * 1.3, 0.5, 1.5); itm("dresser", bw * (w / 2 - 0.8), sm - ch * 1.3, 1.6); FURN.wheel(G, F, -bw * (w / 2 - 0.9), sm + ch * 0.4, 0); block(-bw * (w / 2 - 0.9), sm + ch * 0.4, 0.6, 0.6); itm("wheel", -bw * (w / 2 - 1.2), sm + ch * 0.4, 1.1); }
+    if (B.kind === "govt") { FURN.picture(G, F, bw * (w / 2 - 0.12), 2.0, sm, bw > 0 ? -Math.PI / 2 : Math.PI / 2, "king"); itm("king", bw * (w / 2 - 0.6), sm, 2.2); }
+    FURN.crucifix(G, F, 0, 2.0, pz + ch * 0.08, ch > 0 ? 0 : Math.PI); itm("crucifix", 0, pz + ch * 0.4, 2.1); FURN.picture(G, F, 0.7, 1.9, pz + ch * 0.08, ch > 0 ? 0 : Math.PI, "saint");
+    const cm = (chambre[0] + chambre[1]) / 2, bx = bw * (w / 2 - 0.85); FURN.bed(G, F, bx, cm, Math.PI / 2 * (bw > 0 ? 1 : -1), rich); block(bx, cm, 2.1, 1.6); itm("bed", bx - bw * 1.1, cm, 1.5);
+    FURN.chest(G, F, bx - bw * 1.4, cm, Math.PI / 2); block(bx - bw * 1.4, cm, 0.6, 1.1); if (d > 11) { FURN.armoire(G, F, -bw * (w / 2 - 0.42), cm, bw > 0 ? Math.PI / 2 : -Math.PI / 2); block(-bw * (w / 2 - 0.42), cm, 0.6, 1.5); }
+    // the household: by the hour, at table, at the hearth, spinning, a child at play
+    const h = SIM / 3600, meal = (h > 11.8 && h < 13.2) || (h > 18.5 && h < 19.5) || (h > 6 && h < 6.8), cook = rich ? "enslavedw" : hash(B.F.x | 0, 3) < 0.4 ? "enslavedw" : "woman";
+    folk.push([0.3, hz - ch * 1.0, ch > 0 ? 0 : Math.PI, "knead", cook]); if (meal) { folk.push([-0.55, tz - 0.62, 0, "sit", rich ? "merchant" : "creole"], [0.55, tz + 0.62, Math.PI, "sit", rich ? "lady" : "woman"], [-0.55, tz + 0.62, Math.PI, "sit", "child"]); }
+    else { folk.push([-bw * (w / 2 - 1.3), sm + ch * 0.4, bw > 0 ? -Math.PI / 2 : Math.PI / 2, rich ? "talk" : "spin", rich ? "lady" : "woman"], [0.8, sm + ch * 0.9, 1.5, "sitground", "child"]); if (rich) folk.push([bw * (w / 2 - 1.0), sm - ch * 1.3, bw > 0 ? Math.PI / 2 : -Math.PI / 2, "sell", "merchant"]); } }
+  // the building's own outside wall is not in the way inside; light from the hearth or candles
+  if (B.coll) B.coll.on = false;
+  INSIDE = { B, G, marks, solids, folk, light }; const [lx, ly, lz] = gw(F, ...light); houseLight.position.set(lx, ly, lz);
+  INDOOR.forEach((A, k) => { if (!A) return; const f = folk[k]; if (!f) return; A.L = looks(A.i, f[4]); crowd.look(A.i, A.L); });
+  const [dx, , dz] = gw(F, B.door[0], 0, B.door[1]); P_.x = dx; P_.z = dz; P_.y = F.gy; yaw = Math.atan2(F.s, F.c) + (B.church ? 0 : B.face * Math.PI / 2);   // facing into the room if (renderer.xr.isPresenting) vrTurn = yaw;
+  say(B.church ? "Inside the church of St. Louis. E near things to read; E at the door to go out." : `Inside ${B.kind === "chouteau" ? "the Chouteau house" : B.kind === "govt" ? "the Government House" : B.kind === "pchouteau" ? "Pierre Chouteau's house" : B.kind === "presbytery" ? "the priest's house" : B.kind === "courthouse" ? "the old courthouse" : "a Creole house"}: the salle with its hearth, and the bedroom beyond. E near things to read; E at the door to go out.`, 10); }
+function leaveBuilding() { if (!INSIDE) return; const { B, G, marks } = INSIDE; scene.remove(G); G.traverse(o => { if (o.isMesh) o.geometry.dispose(); }); for (const m of marks) { const i = MARKS.indexOf(m); if (i >= 0) MARKS.splice(i, 1); if (m.spr) LBL.remove(m.spr); }
+  if (B.coll) B.coll.on = true; houseLight.intensity = 0; INSIDE = null; P_.x = B.out[0]; P_.z = B.out[1]; P_.y = groundH(P_.x, P_.z); yaw = B.out[2]; if (renderer.xr.isPresenting) vrTurn = yaw; }
+// keep you inside the walls and out of the furniture
+function insideClamp(p) { const { B } = INSIDE, F = B.F, dx = p.x - F.x, dz = p.z - F.z; let lx = dx * F.c - dz * F.s, lz = dx * F.s + dz * F.c; const r = 0.28;
+  lx = clampN(lx, -B.w / 2 + 0.1 + r, B.w / 2 - 0.1 - r); lz = clampN(lz, -B.d / 2 + 0.1 + r, B.d / 2 - 0.1 - r);
+  for (const [sx, sz, hx, hz] of INSIDE.solids) { const ex = hx + r - Math.abs(lx - sx), ez = hz + r - Math.abs(lz - sz); if (ex > 0 && ez > 0) { if (ex < ez) lx = sx + Math.sign(lx - sx || 1) * (hx + r); else lz = sz + Math.sign(lz - sz || 1) * (hz + r); } }
+  p.x = F.x + lx * F.c + lz * F.s; p.z = F.z - lx * F.s + lz * F.c; }
+// the buildings you can go into, and their doors
+function buildingAtDoor(x, z) { const cd = Math.hypot(x - CH_DOOR[0], z - CH_DOOR[1]); if (cd < 3) { const C = CHURCH, F = FR(C.x, C.z, C.ry, C.gy, "int"); return { F, w: C.nw - 0.2, d: C.nl - 0.2, wh: 4.4, church: true, door: [0, C.nl / 2 - 1.2], out: [CH_DOOR[0], CH_DOOR[1], Math.atan2(F.s, F.c)], coll: C.coll }; }
+  let best = null, bd = 2.8; for (const H of HOUSES) { if (!H.dp) continue; const d = Math.hypot(H.dp[0] - x, H.dp[1] - z); if (d < bd) { bd = d; best = H; } }
+  if (!best) return null; const H = best, F = FR(H.x, H.z, H.ry, H.gy + H.fl, "int");
+  return { F, w: H.w - 0.2, d: H.d - 0.2, wh: Math.min(H.wh, 3.0), kind: H.kind, rich: H.wall === "stone" || H.kind === "chouteau" || H.kind === "govt" || H.kind === "pchouteau", face: H.face, chim: H.chim, door: [H.face * (H.w / 2 - 0.9), 0], out: [H.dp[0], H.dp[1], H.dp[2]], coll: H.coll }; }
+const insideFolk = A => { if (!INSIDE) return null; const f = INSIDE.folk[A.indoor]; if (!f) return null; const [x, , z] = gw(INSIDE.B.F, f[0], 0, f[1]); return [x, z, Math.atan2(INSIDE.B.F.s, INSIDE.B.F.c) + f[2], f[3], false, 0, INSIDE.B.F.gy - WATER]; };
+
+
 // ---------- the day's clock ----------
 // Tuesday 20 May 1800: Easter fell on 13 April, so this is a Rogation day, one of the three before Ascension when French Catholic
 // parishes walked in procession round their fields behind the cross, singing the litany and praying for the crops. The order of this
@@ -1055,6 +1181,7 @@ const PIROGUE = { pos: [0, 0, 0], g: (() => { const m = new THREE.Mesh(BOAT_G, h
 // craftsmen at their tasks (the tech sites)
 for (const J of TECH_JOBS) agent(J.role, { job: J.steps, jobPh: J.ph, x: J.steps[0].p[0], z: J.steps[0].p[1] });
 // everyone else: about the streets and yards near you
+const INDOOR = Array.from({ length: 8 }, (_, k) => agent("woman", { indoor: k }));   // the household of the building you are in
 const AMB = []; { const N = NC - nextI - 4; for (let k = 0; k < N; k++) { const A = agent(null, { amb: true }); if (A) AMB.push(A); } }
 mark("Auguste Chouteau", 0, 0, "person", "Auguste Chouteau, 50, co-founder of the town with Laclède and its richest merchant: fur trader, landowner, mill owner, militia officer and slaveholder. (Where he was on this day is not recorded: he stands here for the merchants of the town.)", { follow: AUGUSTE, r: 5, range: 80 });
 mark("Lieutenant Governor Delassus", 0, 0, "person", "Charles Dehault Delassus, born in Flanders, a colonel in Spanish service and lieutenant governor of Upper Louisiana since 1799; it will be he who hands the province over in 1804. (His movements today are not recorded.)", { follow: DELASSUS, r: 5, range: 80 });
@@ -1133,6 +1260,7 @@ function agentState(A) { const S = SIM; if (A.job) return working() ? jobPose(A,
   if (A.dancer !== undefined) { if (SIM < T.dance || SIM > hms(22, 30)) return null; const k = A.dancer, a = S * 0.6 * (k % 2 ? 1 : -1) + k / 12 * 6.283, r = 3 + (k % 2) * 0.8, x = DANCE.c[0] + Math.cos(a) * r, z = DANCE.c[1] + Math.sin(a) * r; return [x, z, a + (k % 2 ? 0 : Math.PI), "dance", true, 1.2]; }
   if (A.ferry !== undefined) { const [x, z, h] = FERRY.pos, k = A.ferry, c = Math.cos(h), s = Math.sin(h), lx = k < 2 ? (k ? 1.2 : -1.2) : (k === 2 ? 0.6 : -0.6), lz = k < 2 ? 0 : 2.5; return [x + c * lx + s * lz, z - s * lx + c * lz, k < 2 ? h + (k ? -Math.PI / 2 : Math.PI / 2) : h, k < 2 ? "row" : "stand", false, 0, 0.55]; }
   if (A.pir !== undefined) { const [x, z, h] = PIROGUE.pos, lz = A.pir ? -2.5 : 2.5; return [x + Math.sin(h) * lz, z + Math.cos(h) * lz, h, "paddle", false, 0, 0.25]; }
+  if (A.indoor !== undefined) return insideFolk(A);
   if (A.porter) { if (!working()) { jobProp(A, null); return null; } const P = A.porter, L = A.pL || (A.pL = routeLen(P)), u = (S * 0.85 + A.phase * 5) % (2 * L + 24);
     if (u < 12) { jobProp(A, A.carry); return [P[0][0], P[0][1], 0, "kneel"]; } if (u < L + 12) { jobProp(A, A.carry); const [x, z, h] = routeAt(P, u - 12); return [x, z, h, "shoulder", true, 0.85]; }
     if (u < L + 24) { jobProp(A, null); return [P[P.length - 1][0], P[P.length - 1][1], 0, "kneel"]; } jobProp(A, null); const [x, z, h] = routeAt(P, 2 * L + 24 - u); return [x, z, h + Math.PI, "walk", true, 0.85]; }
@@ -1240,10 +1368,10 @@ renderer.domElement.addEventListener("pointerdown", () => { dragging = true; sta
 addEventListener("pointermove", e => { if (!dragging) return; yaw -= e.movementX * 0.004; pitch = clampN(pitch - e.movementY * 0.004, -1.5, 1.5); });
 intro?.addEventListener("click", start);
 const RATES = [1, 10, 60]; function cycleRate() { timeRate = RATES[(RATES.indexOf(timeRate) + 1) % RATES.length]; say(`Time runs ${timeRate === 1 ? "at its real pace" : timeRate + " times faster"}.`, 4); drawGuide(); }
-function groundAt(x, z) { return Math.max(groundH(x, z), inPond(x, z) ? POND_Y - 1.4 : WATER - 1.4); }
+function groundAt(x, z) { if (INSIDE) return INSIDE.B.F.gy + 0.05; return Math.max(groundH(x, z), inPond(x, z) ? POND_Y - 1.4 : WATER - 1.4); }
 function standSpot(x, z) { for (let r = 0; r < 80; r += 4) for (let a = 0; a < 6.28; a += r ? 0.5 : 7) { const X = x + Math.cos(a) * (r + 8), Z = z + Math.sin(a) * (r + 8), v = rGet(X, Z);
   if (groundH(X, Z) < 0.4 || v === 2 || v === 7) continue; const p = { x: X, z: Z }; pushOut(p); if (Math.hypot(p.x - X, p.z - Z) < 0.01) return [X, Z]; } return [x + 12, z + 12]; }
-function teleport(x, z, lx, lz) { P_.x = x; P_.z = z; P_.y = groundAt(x, z); yaw = Math.atan2(-(lx - x), -(lz - z)); if (renderer.xr.isPresenting) vrTurn = yaw; flying = false; updateGround(x, z, 99); if (typeof lodStep === "function") lodStep(true); }
+function teleport(x, z, lx, lz) { if (INSIDE) leaveBuilding(); P_.x = x; P_.z = z; P_.y = groundAt(x, z); yaw = Math.atan2(-(lx - x), -(lz - z)); if (renderer.xr.isPresenting) vrTurn = yaw; flying = false; updateGround(x, z, 99); if (typeof lodStep === "function") lodStep(true); }
 // places and things to do
 const PLACES = [{ name: "The Place d'Armes (start)", at: START.at, look: START.look }];
 for (const m of MARKS) if (m.tag !== "person" && m.tag !== "typical" && !m.hidden && m.range > 200) PLACES.push({ name: m.name, m });
@@ -1267,6 +1395,8 @@ function drawGuide() { GUIDE.innerHTML = `<b>20 May 1800</b> <span style="color:
 GUIDE.addEventListener("click", e => { e.stopPropagation(); const d = e.target.closest("[data-i],[data-m],[data-r],[data-l],[data-t]"); if (!d) return; if (d.dataset.t) return goTodo(+d.dataset.t); if (d.dataset.i) goPlace(PLACES[+d.dataset.i]); else if (d.dataset.m) goMoment(+d.dataset.m); else if (d.dataset.r) cycleRate(); else { labelsOn = !labelsOn; drawGuide(); } });
 drawGuide();
 function interact() { if (!started) return start();
+  if (INSIDE) { const F = INSIDE.B.F, [dx, , dz] = gw(F, INSIDE.B.door[0], 0, INSIDE.B.door[1]); if (Math.hypot(P_.x - dx, P_.z - dz) < 1.6) return leaveBuilding(); }
+  else { const B = buildingAtDoor(P_.x, P_.z); if (B) return enterBuilding(B); }
   let best = null, bd = 1e9; for (const m of MARKS) { const [x, z] = m.follow ? [m.follow.x, m.follow.z] : [m.x, m.z], d = Math.hypot(x - P_.x, z - P_.z); if (d < m.r && d / m.r < bd && (!m.follow || m.follow.shown)) { bd = d / m.r; best = m; } }
   let pa = null, pd = 3; for (const A of AG2) { if (!A.shown) continue; const d = Math.hypot(A.x - P_.x, A.z - P_.z); if (d < pd) { pd = d; pa = A; } }
   const named = pa && MARKS.find(m => m.follow === pa); if (named) best = named;
@@ -1384,7 +1514,7 @@ function frame() {
   fwd.y = 0; fwd.normalize(); side.crossVectors(fwd, UP).normalize();
   const sp = SPEEDS[speedI][0] * run;
   if (mx || my) { const ox = P_.x, oz = P_.z; P_.x += (fwd.x * -my + side.x * mx) * sp * dt; P_.z += (fwd.z * -my + side.z * mx) * sp * dt;
-    const high = flying && P_.y > groundAt(P_.x, P_.z) + 6; if (!high) pushOut(P_);
+    const high = flying && P_.y > groundAt(P_.x, P_.z) + 6; if (INSIDE) { flying = false; insideClamp(P_); } else if (!high) pushOut(P_);
     if (!flying && groundAt(P_.x, P_.z) < -0.8) { P_.x = ox; P_.z = oz; } }   // the river is too deep to wade
   const g = groundAt(P_.x, P_.z);
   if (flying) P_.y = Math.max(g, P_.y + up * Math.max(4, sp) * dt); else P_.y = g > P_.y ? Math.min(g, P_.y + Math.max(3.2, sp * 1.2) * dt) : Math.max(g, P_.y - Math.max(7, sp) * dt);
@@ -1392,6 +1522,7 @@ function frame() {
   updateGround(P_.x, P_.z);
   boatsStep(t); lifeStep(dt, t); beastStep(t); cordStep(); grassStep(); cartStep(t); smokeStep(dt); lodStep();
   for (const f of TECH_ANIM) f(t, dt);
+  if (INSIDE) { sun.intensity *= 0.1; hemi.intensity *= 0.22; houseLight.intensity = 9 * (0.88 + 0.08 * Math.sin(t * 13) + 0.04 * Math.sin(t * 29)); INSIDE.G.traverse(o => { if (o.userData.fire) o.scale.y = o.userData.fire0 ?? (o.userData.fire0 = o.scale.y), o.scale.y = o.userData.fire0 * (0.8 + 0.3 * Math.sin(t * 11 + o.id)); }); }
   danceLight.intensity = SIM > T.dance && SIM < hms(22, 0) ? (1 - clampN(sunAt(SIM / 3600).el * 8, 0, 1)) * 40 * (0.9 + 0.1 * Math.sin(t * 9)) : 0;
   for (const f of FLAGS) { const p = f.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i); p.setZ(i, Math.sin(x * 2.2 - t * 4) * 0.12 * x / 2.4); } p.needsUpdate = true; }
   // the sun, sky and light
@@ -1408,7 +1539,7 @@ function frame() {
   hudT -= dt; if (hudT <= 0) { hudT = 0.3;
     let nearM = null, nd = 1e9; for (const m of MARKS) { if (m.follow || m.hidden) continue; const d = Math.hypot(m.x - P_.x, m.z - P_.z); if (d < m.r && d < nd) { nd = d; nearM = m; } }
     const [u, v] = toUV(P_.x, P_.z), street = Math.abs(u) < 7 ? "on La Grande Rue" : Math.abs(u + 90) < 6 ? "on the Rue de l'Église" : Math.abs(u + 180) < 6 ? "on the Rue des Granges" : u > riverU(v) ? "on the Illinois shore (American territory)" : "";
-    const where = nearM ? `at <b>${nearM.name}</b> · E to read` : street;
+    const DB = INSIDE ? null : buildingAtDoor(P_.x, P_.z), where = INSIDE ? "inside · E near things to read · E at the door to go out" : DB ? "at a door · <b>E: go inside</b>" : nearM ? `at <b>${nearM.name}</b> · E to read` : street;
     HUD.innerHTML = `<b>St. Louis, Tuesday 20 May 1800</b> · ${hm(SIM)}${timeRate > 1 ? ` (time ×${timeRate})` : ""} · ${flying ? "flying" : SPEEDS[speedI][1] + (run > 1 ? ", running" : "")}<br>${where}<br><span style="color:#c8b898;font-size:12.5px">WASD walk · drag to look · shift run · − / = pace · E read · N next moment · T time speed · L markers · F fly · M map</span>`;
     if (vr && (vrDirty || ((t * 3) | 0) % 3 === 0)) { drawVR(`${hm(SIM)} · ${where.replace(/<[^>]+>/g, "")}`, msgText || "Left stick walk · right stick turn · trigger run · A read · B next place · X next moment · Y time speed"); vrDirty = false; } }
   renderer.render(scene, camera);
