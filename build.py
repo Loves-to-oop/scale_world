@@ -461,8 +461,8 @@ SS = SS[:i0] + """<div id="intro"><div class="card">
   turn blue, and fade and redden behind.</p>
   <p>Proxima Centauri takes 3.5 years by the ship's clock (5.9 on Earth); the centre of the galaxy, 26,670 light years away, takes under 20.</p>
   <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; click the console buttons &nbsp;&middot;&nbsp; <kbd>[</kbd> <kbd>]</kbd> slower / faster time &nbsp;&middot;&nbsp;
-  <kbd>Q</kbd>/<kbd>Z</kbd> lift up / down &nbsp;&middot;&nbsp; <kbd>V</kbd> outside view<br>
-  In VR: left stick walk, right stick turn, trigger to press buttons, <b>A</b> lift, <b>B</b> outside view, <b>X</b>/<b>Y</b> slower / faster time</p>
+  the lift (in the middle of each deck) has buttons inside, or <kbd>Q</kbd>/<kbd>Z</kbd> up / down when you are in it; the cupola, for looking out, is at the top<br>
+  In VR: left stick walk, right stick turn, trigger to press buttons, <b>A</b> in the lift: next deck, <b>X</b>/<b>Y</b> slower / faster time</p>
   <p class="dim">Star positions, distances and known planets are real; ship design follows published studies of antimatter rockets. Click to begin.</p>
 </div></div>
 """ + SS[i1:]
