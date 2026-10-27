@@ -53316,7 +53316,7 @@ function buildSystem(S) { while (LOCAL.children.length) LOCAL.remove(LOCAL.child
 function planetPos(p, ms) { const days = (ms - J2000) / 864e5, th = p.L0 + 2 * Math.PI * days / p.period, a = p.aAU * AU; return SYS.e1.clone().multiplyScalar(a * Math.cos(th)).addScaledVector(SYS.e2, a * Math.sin(th)); }
 function moonPos(ms) { const days = (ms - J2000) / 864e5, th = 2 * Math.PI * days / 27.3217 + 2.1; return SYS.e1.clone().multiplyScalar(3.844e8 * Math.cos(th)).addScaledVector(SYS.e2, 3.844e8 * Math.sin(th)); }
 // draw each body from the ship: rel = body - ship (metres, equatorial)
-function placeBody(mesh, rel, radius, spin) { const d = rel.length(); if (d < radius * 1.01 || !isFinite(d)) { mesh.visible = false; return; } const v = rel.clone().applyMatrix3(R_EQ2SHIP).normalize(), rr = BODY_R * clampN(0.12 + 0.88 * (Math.log10(d) - 6) / 12, 0.08, 1); mesh.visible = true; mesh.position.copy(v).multiplyScalar(rr); mesh.scale.setScalar(rr * radius / d); if (spin !== undefined) { const ax = (mesh.userData.axis || SYS.n).clone().applyMatrix3(R_EQ2SHIP).normalize(); mesh.quaternion.setFromUnitVectors(V3(0, 1, 0), ax).multiply(new THREE.Quaternion().setFromAxisAngle(V3(0, 1, 0), spin)); } return v; }
+function placeBody(mesh, rel, radius, spin) { const d = rel.length(); mesh.userData.dist = d; if (d < radius * 1.01 || !isFinite(d)) { mesh.visible = false; return; } const v = rel.clone().applyMatrix3(R_EQ2SHIP).normalize(), rr = BODY_R * clampN(0.12 + 0.88 * (Math.log10(d) - 6) / 12, 0.08, 1); mesh.visible = true; mesh.position.copy(v).multiplyScalar(rr); mesh.scale.setScalar(rr * radius / d); if (spin !== undefined) { const ax = (mesh.userData.axis || SYS.n).clone().applyMatrix3(R_EQ2SHIP).normalize(); mesh.quaternion.setFromUnitVectors(V3(0, 1, 0), ax).multiply(new THREE.Quaternion().setFromAxisAngle(V3(0, 1, 0), spin)); } return v; }
 function updateSystem(shipPos, ms) { if (!SYS) return; const S = SYS.S, starRel = V3((S.p[0] - shipPos[0]) * LY, (S.p[1] - shipPos[1]) * LY, (S.p[2] - shipPos[2]) * LY), near = starRel.length() < 0.2 * LY;
   for (const o of LOCAL.children) o.visible = near; if (!near) return -1;
   const sv = placeBody(SYS.starMesh, starRel, S.radius); if (sv) { starLight.position.copy(sv).multiplyScalar(100); starLight.intensity = S.bh ? 0.4 : 2.6; const ang = S.radius / starRel.length(); SYS.glow.position.copy(SYS.starMesh.position); SYS.glow.scale.setScalar(SYS.starMesh.position.length() * Math.max(ang * 10, 0.012)); }
@@ -53460,7 +53460,7 @@ const pad = (n, k = 2) => String(n).padStart(k, "0");
 const fmtDate = ms => { const d = new Date(ms); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`; };
 const fmtDur = s => { s = Math.max(0, s); if (s < 120) return `${s.toFixed(0)} s`; if (s < 7200) return `${(s / 60).toFixed(1)} min`; if (s < 2 * 86400) return `${(s / 3600).toFixed(1)} hours`; if (s < YEAR) return `${(s / 86400).toFixed(1)} days`; const y = s / YEAR; return y < 1000 ? `${y.toFixed(2)} years` : `${Math.round(y).toLocaleString()} years`; };
 // distances step up through metres, kilometres, astronomical units and light years as they grow
-const fmtLy = ly => { const m = Math.abs(ly) * LY; if (m < 1000) return `${m.toFixed(m < 10 ? 2 : m < 100 ? 1 : 0)} m`; if (m < 1e8) return `${(m / 1000).toLocaleString(undefined, { maximumFractionDigits: m < 1e5 ? 2 : 0 })} km`; if (m < 0.05 * LY) { const au = m / AU; return `${au.toFixed(au < 10 ? 4 : au < 100 ? 2 : 1)} AU`; } return ly < 10 ? `${ly.toFixed(3)} ly` : `${ly.toLocaleString(undefined, { maximumFractionDigits: 1 })} ly`; };
+const fmtLy = ly => { const m = Math.abs(ly) * LY; if (m < 1000) return `${m.toFixed(m < 10 ? 2 : m < 100 ? 1 : 0)} m`; if (m < 1e9) return `${(m / 1000).toLocaleString(undefined, { maximumFractionDigits: m < 1e5 ? 2 : 0 })} km`; if (m < 0.05 * LY) { const au = m / AU; return `${au.toFixed(au < 10 ? 4 : au < 100 ? 2 : 1)} AU`; } return ly < 10 ? `${ly.toFixed(3)} ly` : `${ly.toLocaleString(undefined, { maximumFractionDigits: 1 })} ly`; };
 const fmtV = v => { const b = v / C; if (b < 0.9) return `${b.toFixed(6)} c`; const n = Math.min(14, Math.max(4, Math.ceil(-Math.log10(1 - b)) + 3)); return `${b.toFixed(n)} c`; };
 // speeds step up from metres a second to kilometres a second as they grow
 const fmtKms = v => { const a = Math.abs(v); if (a < 1000) return `${a.toFixed(a < 10 ? 3 : a < 100 ? 2 : 1)} m/s`; return `${(a / 1000).toLocaleString(undefined, { minimumFractionDigits: a < 1e7 ? 2 : 1, maximumFractionDigits: a < 1e7 ? 2 : 1 })} km/s`; };
@@ -53519,6 +53519,7 @@ function drawShip() { const S = SCREENS.ship, g = panel(S, "SHIP STATUS"), st = 
   deskBtn(...A, 0, 0.34, "ENGAGE AUTOPILOT", engage, 1.4, 0.17, "#6a2a22");
   deskBtn(...N, -0.5, 0.1, "TIME −", () => { warpI = Math.max(0, warpI - 1); }, 0.55); deskBtn(...N, 0.1, 0.1, "TIME +", () => { warpI = Math.min(WARPS.length - 1, warpI + 1); }, 0.55);
   deskBtn(...N, -0.42, 0.34, "TO TURNOVER", () => skip("turn"), 0.75); deskBtn(...N, 0.42, 0.34, "TO ARRIVAL", () => skip("arrive"), 0.75);
+  button("SKY LABELS", -3.0, 5.875, -3.0, Math.PI / 4, -1.3, () => toggleHud(), 0.7, 0.17);
   // inside the lift, on its wall facing the door: a button for each deck
   for (let d = 0; d < 3; d++) { const y = DECKS[d].y; if (d === 2) box(0.12, 1.4, 0.3, mPanel, LIFT_R - 0.02, y, 0); box(0.06, 0.8, 0.5, mPanel, LIFT_R - 0.06, y + 0.95, 0, 0); [["CUPOLA", 2], ["BRIDGE", 1], ["HABITAT", 0]].forEach(([lab, to], k) => button(lab, LIFT_R - 0.1, y + 1.6 - k * 0.24, 0, -Math.PI / 2, 0, () => goDeck(to), 0.42, 0.18, to === d ? "#4a5a2a" : "#2a3a48")); } }
 // ---------- you: walking and the lift ----------
@@ -53530,7 +53531,8 @@ document.body.append(HUD, MSG, FADE);
 function say(t, secs = 12) { msgText = t; msgT = secs; MSG.innerHTML = t; MSG.style.display = "block"; vrDirty = true; }
 function goDeck(d) { if (Math.hypot(P_.x, P_.z) > LIFT_R - 0.15) return say("Step into the lift first: the shaft in the middle of each deck, its door facing forward. The deck buttons are inside.", 6); if (d === P_.deck) return; FADE.style.opacity = 1; setTimeout(() => { P_.deck = d; P_.x = 0; P_.z = 0.2; yaw = 0; FADE.style.opacity = 0; say(`Lift: ${DECKS[d].name}. Walk out through the door ahead.`, 4); }, 450); }
 function start() { if (started) return; started = true; intro?.classList.add("gone"); say("You are on the bridge of an antimatter starship in orbit near Earth. At the AUTOPILOT station (front left) choose a destination and press ENGAGE AUTOPILOT; the TRIP COMPUTER ahead shows both clocks and both velocities. To look out, take the lift behind you up to the CUPOLA.", 16); }
-addEventListener("keydown", e => { keys[e.code] = true; start(); if (e.code === "KeyQ") goDeck(Math.min(2, P_.deck + 1)); if (e.code === "KeyZ") goDeck(Math.max(0, P_.deck - 1)); if (e.code === "BracketRight") warpI = Math.min(WARPS.length - 1, warpI + 1); if (e.code === "BracketLeft") warpI = Math.max(0, warpI - 1); });
+addEventListener("keydown", e => { keys[e.code] = true; start(); if (e.code === "KeyQ") goDeck(Math.min(2, P_.deck + 1)); if (e.code === "KeyZ") goDeck(Math.max(0, P_.deck - 1)); if (e.code === "BracketRight") warpI = Math.min(WARPS.length - 1, warpI + 1); if (e.code === "BracketLeft") warpI = Math.max(0, warpI - 1); if (e.code === "KeyH") toggleHud(); });
+function toggleHud() { SKYLAB.on = !SKYLAB.on; say(`Cupola sky labels ${SKYLAB.on ? "on" : "off"}.`, 3); }
 addEventListener("keyup", e => keys[e.code] = false);
 const ray = new THREE.Raycaster();
 function pick(origin, dir) { ray.set(origin, dir); const hit = ray.intersectObjects(BUTTONS, false)[0]; if (hit && hit.distance < 8) { hit.object.userData.onPick(); hit.object.scale.setScalar(0.92); setTimeout(() => hit.object.scale.setScalar(1), 150); return true; } return false; }
@@ -53554,6 +53556,37 @@ let SITTING = localStorage.getItem("vrPosture") === "sitting";
 if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block";
   VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); renderer.xr.setFoveation(1.0); await renderer.xr.setSession(s); start(); camera.position.set(0, 0, 0); vrPanel.visible = true; s.addEventListener("end", () => { camera.position.set(0, 1.6, 0); vrPanel.visible = false; }); }; });
 // ---------- the loop ----------
+// ---------- the cupola's head-up display ----------
+// In the cupola, labels are projected onto the sky round each object: a ring on it, its name and how far away it is. Their directions get
+// the same aberration as the stars, so at speed they crowd forward with them. Some galaxies, nebulae and clusters are drawn as soft glows
+// at their true angular size (name, RA and Dec in degrees, distance and size in ly, colour, brightness).
+const DSO = [["Andromeda Galaxy (M31)", 10.685, 41.269, 2.5e6, 140000, "#e0d6c4", 0.55], ["Triangulum Galaxy (M33)", 23.462, 30.660, 2.73e6, 61000, "#d8d4cc", 0.3],
+  ["Large Magellanic Cloud", 80.894, -69.756, 160000, 14000, "#dcd8d0", 0.6], ["Small Magellanic Cloud", 13.187, -72.829, 200000, 7000, "#dcd8d0", 0.45],
+  ["Orion Nebula (M42)", 83.822, -5.391, 1344, 24, "#ff9ab8", 0.5], ["Pleiades (M45)", 56.75, 24.117, 444, 13, "#a8c4ff", 0.4], ["Crab Nebula (M1)", 83.633, 22.015, 6500, 11, "#ffb090", 0.4],
+  ["Carina Nebula", 161.265, -59.867, 8500, 460, "#ff8aa0", 0.4], ["Omega Centauri", 201.697, -47.479, 17090, 150, "#f0e0b0", 0.4]].map(([name, ra, de, d, size, col, a]) => ({ name, size, a,
+  p: [d * Math.cos(de * DEG) * Math.cos(ra * DEG), d * Math.cos(de * DEG) * Math.sin(ra * DEG), d * Math.sin(de * DEG)],
+  glow: (() => { const g = new THREE.Sprite(new THREE.SpriteMaterial({ map: SPRITE_GLOW, color: col, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false })); g.renderOrder = -4; scene.add(g); return g; })() }));
+// a direction in the equatorial frame, as seen from the moving ship (the shader's formula); returns the Doppler factor
+const _d = V3(), _o = V3(), _pn = V3();
+function aberr(d, out) { const u = skyUniforms.uV.value, b = skyUniforms.uBeta.value, eps = skyUniforms.uEps.value, c = d.dot(u); _pn.copy(d).addScaledVector(u, -c); const pl = _pn.length(); if (pl > 1e-9) _pn.divideScalar(pl);
+  const omc2 = (1 - c) * eps / (1 + b * c), c2 = 1 - omc2; out.copy(u).multiplyScalar(c2).addScaledVector(_pn, Math.sqrt(Math.max(0, omc2 * (2 - omc2)))).applyMatrix3(R_EQ2SHIP).normalize(); return 1 / (skyUniforms.uGamma.value * (omc2 + eps * c2)); }
+const HUD_R = 3000, SKYLAB = { on: true };
+function hudLabel() { const c = document.createElement("canvas"); c.width = 512; c.height = 96; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false, toneMapped: false })); s.center.set(40 / 512, 0.5); s.scale.set(HUD_R * 0.05 * 512 / 96, HUD_R * 0.05, 1); s.renderOrder = 5; s.visible = false; scene.add(s); s.userData = { c, t, txt: "" }; return s; }
+function hudText(s, a, b, col) { const U = s.userData, k = a + "|" + b + "|" + col; if (U.txt === k) return; U.txt = k; const g = U.c.getContext("2d"); g.clearRect(0, 0, 512, 96);
+  g.strokeStyle = g.fillStyle = col; g.lineWidth = 3; g.beginPath(); g.arc(40, 48, 16, 0, 6.2832); g.stroke(); g.beginPath(); g.moveTo(58, 48); g.lineTo(72, 48); g.stroke();
+  g.shadowColor = "#000"; g.shadowBlur = 5; g.font = "600 30px Helvetica"; const w = g.measureText(a).width; if (w > 425) g.font = `600 ${Math.floor(30 * 425 / w)}px Helvetica`; g.fillText(a, 80, 42); g.font = "24px Helvetica"; g.globalAlpha = 0.8; g.fillText(b, 80, 76); g.globalAlpha = 1; U.t.needsUpdate = true; }
+const starL = STARS.map(hudLabel), dsoL = DSO.map(hudLabel), bodyL = Array.from({ length: 16 }, hudLabel);
+// show: in the cupola with the display on; txt: redraw the words (a few times a second, not every frame)
+function updateHud(pos, show, txt) { const near = !!SYS && SYS.starMesh.visible, dest = mode === "trip" ? trip.dest : destI;
+  DSO.forEach((O, k) => { const dx = O.p[0] - pos[0], dy = O.p[1] - pos[1], dz = O.p[2] - pos[2], d = Math.hypot(dx, dy, dz), D = aberr(_d.set(dx / d, dy / d, dz / d), _o), L = dsoL[k];
+    O.glow.position.copy(_o).multiplyScalar(SKY_R * 0.8); O.glow.scale.setScalar(SKY_R * 0.8 * Math.max(O.size / d / clampN(D, 0.05, 50), 0.004) * 2.2); O.glow.material.opacity = O.a * clampN(D * D, 0, 1);
+    L.visible = show; if (show) { L.position.copy(_o).multiplyScalar(HUD_R); if (txt) hudText(L, O.name, fmtLy(d), "#c8a8ff"); } });
+  STARS.forEach((S, i) => { const L = starL[i]; L.visible = false; if (!show || (near && SYS.S.i === i)) return; const dx = S.p[0] - pos[0], dy = S.p[1] - pos[1], dz = S.p[2] - pos[2], d = Math.hypot(dx, dy, dz); if (d < 1e-9) return;
+    aberr(_d.set(dx / d, dy / d, dz / d), _o); L.position.copy(_o).multiplyScalar(HUD_R); L.visible = true; if (txt) hudText(L, S.name + (i === dest ? "  ◆ DESTINATION" : ""), fmtLy(d), i === dest ? "#ffb347" : S.bh ? "#ff9a9a" : "#8fe8c0"); });
+  let bi = 0; const lab = (mesh, name, col) => { if (!mesh.visible || bi >= bodyL.length) return; const L = bodyL[bi++], r = Math.min(HUD_R, 0.9 * (mesh.position.length() - mesh.scale.x)); L.position.copy(mesh.position).normalize().multiplyScalar(r); L.scale.set(r * 0.05 * 512 / 96, r * 0.05, 1); L.visible = true; if (txt || !L.userData.txt.startsWith(name + "|")) hudText(L, name, fmtLy(mesh.userData.dist / LY), col); };
+  if (show && near) { lab(SYS.starMesh, SYS.S.name, "#ffe08a"); SYS.planets.forEach(p => lab(p.mesh, p.name, "#9ad0ff")); if (SYS.moon) lab(SYS.moon.mesh, "the Moon", "#9ad0ff"); }
+  for (; bi < bodyL.length; bi++) bodyL[bi].visible = false; }
 parkAt(0); setAttitude(bow);
 const clock = new THREE.Clock(), fwd = V3(0, 0, 0), side = V3(0, 0, 0), UP = V3(0, 1, 0); let scrT = 0, hudT = 0, loopErrs = 0;
 renderer.setAnimationLoop(() => { try { frame(); } catch (e) { if (loopErrs++ < 5) console.error(e); renderer.render(scene, camera); } });
@@ -53561,7 +53594,7 @@ function frame() { const dt = Math.min(clock.getDelta(), 0.1), vr = renderer.xr.
   if (started) stepFlight(dt);
   setAttitude(bow); const st = curState(), u = mode === "trip" ? trip.u : [1, 0, 0]; skyUniforms.uV.value.set(...u); skyUniforms.uBeta.value = st.v / C; skyUniforms.uGamma.value = st.gamma; skyUniforms.uEps.value = mode === "trip" ? Math.exp(-st.phi) / Math.cosh(st.phi) : 1;   // 1 - beta, computed without cancellation
   { const b = st.v / C; FWD.visible = b > 0.98; if (FWD.visible) { FWD.position.copy(eq2ship(u)).multiplyScalar(SKY_R * 0.9); FWD.scale.setScalar(SKY_R * 0.9 * clampN(0.01 + 0.008 * Math.log10(st.gamma), 0.01, 0.07)); } }
-  const hideI = updateSystem(shipPos, coordMs); updateNamedStars(shipPos, hideI);
+  const hideI = updateSystem(shipPos, coordMs); updateNamedStars(shipPos, hideI); updateHud(shipPos, P_.deck === 2 && SKYLAB.on, scrT <= dt);
   // walking
   let mx = 0, my = 0;
   if (vr) { const s = renderer.xr.getSession(); for (const src of s?.inputSources || []) { const gp = src.gamepad; if (!gp) continue; const [ax, ay] = stick(gp.axes);
@@ -53575,7 +53608,7 @@ function frame() { const dt = Math.min(clock.getDelta(), 0.1), vr = renderer.xr.
   // screens and messages
   scrT -= dt; if (scrT <= 0) { scrT = 0.25; drawTrip(); drawAuto(); drawNav(); drawEng(); drawShip(); }
   msgT -= dt; if (msgT <= 0 && MSG.style.display !== "none") { MSG.style.display = "none"; msgText = ""; }
-  hudT -= dt; if (hudT <= 0) { hudT = 0.25; HUD.innerHTML = `<b>${DECKS[P_.deck].name}</b> · ${mode === "trip" ? `to <b>${STARS[trip.dest].name}</b>, ${st.phase}` : mode === "align" ? "turning to the course" : `in orbit near ${parkName()}`} · time: ${WARPS[warpI][1]}<br>ship ${fmtDate(properMs)} · stars ${fmtDate(coordMs)}<br>map velocity v = ${fmtKms(st.v)} (${fmtC(st.v)}) · proper velocity w = ${fmtKms(st.w)} (${fmtC(st.w)}) · γ = ${fmtG(st.gamma)}<br><span style="color:#8ab0c4;font-size:12px">WASD walk · drag to look · click the console buttons · [ ] time · Q/Z lift up/down (in the lift)</span>`;
+  hudT -= dt; if (hudT <= 0) { hudT = 0.25; HUD.innerHTML = `<b>${DECKS[P_.deck].name}</b> · ${mode === "trip" ? `to <b>${STARS[trip.dest].name}</b>, ${st.phase}` : mode === "align" ? "turning to the course" : `in orbit near ${parkName()}`} · time: ${WARPS[warpI][1]}<br>ship ${fmtDate(properMs)} · stars ${fmtDate(coordMs)}<br>map velocity v = ${fmtKms(st.v)} (${fmtC(st.v)}) · proper velocity w = ${fmtKms(st.w)} (${fmtC(st.w)}) · γ = ${fmtG(st.gamma)}<br><span style="color:#8ab0c4;font-size:12px">WASD walk · drag to look · click the console buttons · [ ] time · Q/Z lift up/down (in the lift) · H sky labels (cupola)</span>`;
     if (vr) drawVR([`${mode === "trip" ? "to " + STARS[trip.dest].name + " · " + st.phase : "in orbit near " + parkName()} · ${WARPS[warpI][1]}`, `ship ${fmtDate(properMs)}`, `stars ${fmtDate(coordMs)}`, `v ${fmtKms(st.v)}  w ${fmtKms(st.w)}  gamma ${fmtG(st.gamma)}`, msgText.slice(0, 70), msgText.slice(70, 140), "trigger: press buttons · A in the lift: next deck · X/Y: time"]); }
   renderer.render(scene, camera); }
 
