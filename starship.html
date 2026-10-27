@@ -53268,7 +53268,10 @@ const FWD = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(128, 128, (g) =
 FWD.renderOrder = -4; scene.add(FWD);
 // the ship's attitude: the bow (+y) along a direction in the equatorial frame
 function setAttitude(bow) { const b = V3(...bow).normalize(), ref = Math.abs(b.z) > 0.95 ? V3(1, 0, 0) : V3(0, 0, 1), u = V3().crossVectors(b, ref).normalize(), w = V3().crossVectors(u, b);
-  R_EQ2SHIP.set(u.x, u.y, u.z, b.x, b.y, b.z, w.x, w.y, w.z); R_SHIP2EQ.copy(R_EQ2SHIP).transpose(); }
+  setFrame(u, b); }
+// the frame directly: x and y axes of the ship (or lander) in the equatorial frame
+const Q_E2S = new THREE.Quaternion(), _m4 = new THREE.Matrix4();
+function setFrame(x, y) { const z = V3().crossVectors(x, y); R_EQ2SHIP.set(x.x, x.y, x.z, y.x, y.y, y.z, z.x, z.y, z.z); R_SHIP2EQ.copy(R_EQ2SHIP).transpose(); _m4.setFromMatrix3(R_EQ2SHIP); Q_E2S.setFromRotationMatrix(_m4); }
 const eq2ship = v => V3(...v).applyMatrix3(R_EQ2SHIP);
 
 // ---------- the star system around the ship ----------
@@ -53309,21 +53312,41 @@ function buildSystem(S) { while (LOCAL.children.length) LOCAL.remove(LOCAL.child
   const planets = planetsOf(S).map((p, k) => { const tx = p.kind === "earth" ? EARTH_T : planetTex(p.kind, strSeed(p.name)), mat = new THREE.MeshStandardMaterial({ map: tx, roughness: 0.9, metalness: 0, emissive: p.kind === "lava" || p.kind === "hot" ? 0x401008 : 0x000000 });
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 32), mat); if (p.kind === "earth") mesh.userData.axis = V3(0, 0, 1); LOCAL.add(mesh); let ring = null;
     if (p.ring) { ring = new THREE.Mesh(new THREE.RingGeometry(1.25, 2.3, 96, 1), new THREE.MeshStandardMaterial({ map: ringTex, side: THREE.DoubleSide, transparent: true, depthWrite: false })); const uv = ring.geometry.attributes.uv, pos = ring.geometry.attributes.position; for (let i = 0; i < uv.count; i++) { const r = Math.hypot(pos.getX(i), pos.getY(i)); uv.setXY(i, (r - 1.25) / 1.05, 0.5); } LOCAL.add(ring); }
-    const L0 = sol ? (SOL_L0[p.name] || 0) * DEG : p.ph; return { ...p, mesh, ring, L0, spin: 0.3 + k * 0.1 }; });
+    const L0 = sol ? (SOL_L0[p.name] || 0) * DEG : p.ph; return { ...p, mesh, ring, L0, rot: SOL_ROT[p.name] ?? (p.aAU < 0.1 ? p.period : DENS[p.kind] || p.kind === "hot" ? 0.4 + seeded(strSeed(p.name) + 3)() * 0.6 : 0.6 + seeded(strSeed(p.name) + 3)() * 4) }; });
   let moon = null; if (sol) { moon = { name: "the Moon", radius: 1.7374e6, mesh: new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), new THREE.MeshStandardMaterial({ map: MOON_T, roughness: 1 })) }; LOCAL.add(moon.mesh); }
   SYS = { S, n: nv, e1, e2, starMesh, glow, disk, planets, moon }; }
 // where a planet is (metres from its star, equatorial frame) at a coordinate time
 function planetPos(p, ms) { const days = (ms - J2000) / 864e5, th = p.L0 + 2 * Math.PI * days / p.period, a = p.aAU * AU; return SYS.e1.clone().multiplyScalar(a * Math.cos(th)).addScaledVector(SYS.e2, a * Math.sin(th)); }
 function moonPos(ms) { const days = (ms - J2000) / 864e5, th = 2 * Math.PI * days / 27.3217 + 2.1; return SYS.e1.clone().multiplyScalar(3.844e8 * Math.cos(th)).addScaledVector(SYS.e2, 3.844e8 * Math.sin(th)); }
+// the bodies of a system you can fly to: sel -1 the star, 0, 1, 2 ... its planets, -2 our Moon. Masses (GM, m^3/s^2) are real for our
+// system; for generated planets they follow from the size and a density (rocky 5,500 kg/m^3). Rotation periods in days (negative:
+// backwards); a planet very close to its star is tidally locked. Atmospheres: surface density, scale height, sky colours, haze distance.
+const SOL_GM = { Mercury: 2.2032e13, Venus: 3.24859e14, Earth: 3.986004e14, Mars: 4.282837e13, Jupiter: 1.26687e17, Saturn: 3.7931e16, Uranus: 5.794e15, Neptune: 6.8365e15 }, MOON_GM = 4.9048695e12, G_N = 6.674e-11;
+const DENS = { gas: 1300, saturn: 700, ice: 1600, nep: 1640 }, SOL_ROT = { Mercury: 58.646, Venus: -243.02, Earth: 1, Mars: 1.0275, Jupiter: 0.41354, Saturn: 0.44401, Uranus: -0.71833, Neptune: 0.67125 };
+const EARTHLIKE = { rho: 1.225, H: 8500, zen: [0.16, 0.38, 0.78], hor: [0.66, 0.78, 0.92], sky: 1, vis: 60000 };
+const ATM = { earth: EARTHLIKE, temperate: EARTHLIKE, ocean: EARTHLIKE, mars: { rho: 0.020, H: 11100, zen: [0.55, 0.42, 0.3], hor: [0.85, 0.68, 0.5], sky: 0.8, vis: 40000 },
+  venus: { rho: 65, H: 15900, zen: [0.42, 0.3, 0.14], hor: [0.62, 0.46, 0.24], sky: 1, vis: 4000, cloud: 48000 } };
+const SOLID = { rock: 1, lava: 1, mars: 1, venus: 1, temperate: 1, ocean: 1, earth: 1, moon: 1 };
+function bodyInfo(sel) { const S = SYS.S; if (sel === -1) return { sel, name: S.name.split(" (")[0], R: S.radius, GM: 1.32712e20 * S.mass, axis: SYS.n, rot: 25, kind: S.bh ? "black hole" : "star", star: true };
+  if (sel === -2) return { sel, name: "the Moon", R: 1.7374e6, GM: MOON_GM, axis: SYS.n, rot: 27.3217, kind: "moon", spin0: Math.PI, solid: true, atm: null };
+  const p = SYS.planets[sel]; return { sel, name: p.name, R: p.radius, GM: SOL_GM[p.name] ?? G_N * (DENS[p.kind] || (p.kind === "hot" ? 900 : 5500)) * 4 / 3 * Math.PI * p.radius ** 3, axis: p.kind === "earth" ? V3(0, 0, 1) : SYS.n, rot: p.rot, kind: p.kind, atm: ATM[p.kind] || null, solid: !!SOLID[p.kind], p }; }
+const bodySpin = (B, ms) => 2 * Math.PI * (ms - J2000) / 864e5 / B.rot + (B.spin0 || 0);
+const bodyPosM = (sel, ms) => sel === -1 ? V3(0, 0, 0) : sel === -2 ? planetPos(SYS.planets.find(p => p.name === "Earth"), ms).add(moonPos(ms)) : planetPos(SYS.planets[sel], ms);
+// the body's equatorial plane: E1, E2 (a point at angle th there is at E1 cos th + E2 sin th; the body turns toward +th), and its orientation
+const qAxis = A => new THREE.Quaternion().setFromUnitVectors(V3(0, 1, 0), A.clone().normalize());
+const bodyBasis = B => { const q = qAxis(B.axis); return [V3(1, 0, 0).applyQuaternion(q), V3(0, 0, -1).applyQuaternion(q)]; };
+const bodyQ = (B, ms) => qAxis(B.axis).multiply(new THREE.Quaternion().setFromAxisAngle(V3(0, 1, 0), bodySpin(B, ms)));
+const sysList = () => SYS ? [-1, ...SYS.planets.map((p, k) => k), ...(SYS.moon ? [-2] : [])] : [-1];
+let shipRelM = null;   // the ship's position in metres from the current system's star, when in a system (kept apart from light years for precision)
 // draw each body from the ship: rel = body - ship (metres, equatorial)
-function placeBody(mesh, rel, radius, spin) { const d = rel.length(); mesh.userData.dist = d; if (d < radius * 1.01 || !isFinite(d)) { mesh.visible = false; return; } const v = rel.clone().applyMatrix3(R_EQ2SHIP).normalize(), rr = BODY_R * clampN(0.12 + 0.88 * (Math.log10(d) - 6) / 12, 0.08, 1); mesh.visible = true; mesh.position.copy(v).multiplyScalar(rr); mesh.scale.setScalar(rr * radius / d); if (spin !== undefined) { const ax = (mesh.userData.axis || SYS.n).clone().applyMatrix3(R_EQ2SHIP).normalize(); mesh.quaternion.setFromUnitVectors(V3(0, 1, 0), ax).multiply(new THREE.Quaternion().setFromAxisAngle(V3(0, 1, 0), spin)); } return v; }
-function updateSystem(shipPos, ms) { if (!SYS) return; const S = SYS.S, starRel = V3((S.p[0] - shipPos[0]) * LY, (S.p[1] - shipPos[1]) * LY, (S.p[2] - shipPos[2]) * LY), near = starRel.length() < 0.2 * LY;
+function placeBody(mesh, rel, radius, spin) { const d = rel.length(); mesh.userData.dist = d; if (d < radius * 1.01 || !isFinite(d)) { mesh.visible = false; return; } const v = rel.clone().applyMatrix3(R_EQ2SHIP).normalize(), rr = BODY_R * clampN(0.12 + 0.88 * (Math.log10(d) - 6) / 12, 0.08, 1); mesh.visible = true; mesh.position.copy(v).multiplyScalar(rr); mesh.scale.setScalar(rr * radius / d); if (spin !== undefined) mesh.quaternion.copy(Q_E2S).multiply(qAxis(mesh.userData.axis || SYS.n)).multiply(new THREE.Quaternion().setFromAxisAngle(V3(0, 1, 0), spin)); return v; }
+function updateSystem(shipPos, ms) { if (!SYS) return; const S = SYS.S, starRel = shipRelM ? shipRelM.clone().negate() : V3((S.p[0] - shipPos[0]) * LY, (S.p[1] - shipPos[1]) * LY, (S.p[2] - shipPos[2]) * LY), near = starRel.length() < 0.2 * LY;
   for (const o of LOCAL.children) o.visible = near; if (!near) return -1;
   const sv = placeBody(SYS.starMesh, starRel, S.radius); if (sv) { starLight.position.copy(sv).multiplyScalar(100); starLight.intensity = S.bh ? 0.4 : 2.6; const ang = S.radius / starRel.length(); SYS.glow.position.copy(SYS.starMesh.position); SYS.glow.scale.setScalar(SYS.starMesh.position.length() * Math.max(ang * 10, 0.012)); }
   if (SYS.disk) { SYS.disk.position.copy(SYS.starMesh.position); SYS.disk.scale.setScalar(SYS.starMesh.scale.x); SYS.disk.lookAt(SYS.disk.position.clone().add(SYS.n.clone().applyMatrix3(R_EQ2SHIP))); }
   const spin = (ms - J2000) / 864e5 * 2 * Math.PI;
-  for (const p of SYS.planets) { const rel = starRel.clone().add(planetPos(p, ms)), v = placeBody(p.mesh, rel, p.radius, p.kind === "earth" ? spin : spin * p.spin * 0.1); if (p.ring) { p.ring.visible = !!v; if (v) { p.ring.position.copy(p.mesh.position); p.ring.scale.setScalar(p.mesh.scale.x); p.ring.lookAt(p.ring.position.clone().add(SYS.n.clone().applyMatrix3(R_EQ2SHIP))); } } }
-  if (SYS.moon) { const E = SYS.planets.find(p => p.name === "Earth"); placeBody(SYS.moon.mesh, starRel.clone().add(planetPos(E, ms)).add(moonPos(ms)), SYS.moon.radius, spin / 27.32 + Math.PI); }
+  for (const p of SYS.planets) { const rel = starRel.clone().add(planetPos(p, ms)), v = placeBody(p.mesh, rel, p.radius, bodySpin(p, ms)); if (p.ring) { p.ring.visible = !!v; if (v) { p.ring.position.copy(p.mesh.position); p.ring.scale.setScalar(p.mesh.scale.x); p.ring.lookAt(p.ring.position.clone().add(SYS.n.clone().applyMatrix3(R_EQ2SHIP))); } } }
+  if (SYS.moon) { const E = SYS.planets.find(p => p.name === "Earth"); placeBody(SYS.moon.mesh, starRel.clone().add(planetPos(E, ms)).add(moonPos(ms)), SYS.moon.radius, bodySpin({ rot: 27.3217, spin0: Math.PI }, ms)); }
   return starRel.length() < 0.01 * LY ? S.i : -1; }
 
 // ---------- the ship ----------
@@ -53428,37 +53451,54 @@ scene.add(new THREE.HemisphereLight(0xdfe6ee, 0x404448, 0.6)); for (const D of D
 const NOW0 = Date.now(); let properMs = NOW0, coordMs = NOW0;
 const WARPS = [[1, "real time"], [60, "1 minute a second"], [3600, "1 hour a second"], [86400, "1 day a second"], [604800, "1 week a second"], [2629800, "1 month a second"], [31557600, "1 year a second"], [315576000, "10 years a second"]];
 let warpI = 0, mode = "parked", trip = null, destI = 1, listTop = 0, here = 0, park = null, shipPos = [0, 0, 0], bow = [1, 0, 0], align = null, tripLog = [];
-// where to park at a star: in orbit near its most interesting planet (one in the habitable zone if any, else the biggest), or near the star
+// where to park at a star: in orbit round its most interesting planet (one in the habitable zone if any, else the biggest), or the star.
+// A park is a real circular orbit in the body's equatorial plane, going round the way the body turns, at angular speed n = sqrt(GM/r^3).
+function mkPark(Si, sel, t0) { const B = bodyInfo(sel), [E1, E2] = bodyBasis(B), S = STARS[Si], k = sel === -1 ? (S.bh ? 40 : S.giant ? 4 : 30) : B.R > 3 * RE ? 4 : 3, r = B.R * k;
+  const ts = sel === -1 ? E1.clone() : bodyPosM(sel, t0).negate(), th0 = Math.atan2(ts.dot(E2), ts.dot(E1)) - 1.0;
+  return { Si, sel, r, th0, t0, n: Math.sqrt(B.GM / r ** 3), E1, E2 }; }
 function parkPlan(Si, ms) { const S = STARS[Si]; if (SYS?.S !== S) buildSystem(S); const P = SYS.planets;
   let p = P.findIndex(q => q.kind === "earth"); if (p < 0) p = P.findIndex(q => q.kind === "temperate" || q.kind === "ocean"); if (p < 0 && P.length) p = P.reduce((b, q, i) => q.radius > P[b].radius ? i : b, 0);
-  const body = p >= 0 ? planetPos(P[p], ms) : V3(0, 0, 0), rad = p >= 0 ? P[p].radius : S.radius, k = p >= 0 ? (P[p].radius > 3 * RE ? 4 : 3) : S.bh ? 40 : S.giant ? 4 : 30;
-  const toStar = body.length() > 0 ? body.clone().negate().normalize() : SYS.e1.clone(), off = toStar.clone().applyAxisAngle(SYS.n, 1.0).addScaledVector(SYS.n, 0.25).normalize().multiplyScalar(rad * k);
-  return { Si, p, off }; }
-const parkBody = (pk, ms) => (pk.p >= 0 ? planetPos(SYS.planets[pk.p], ms) : V3(0, 0, 0));
-const parkPos = (pk, ms) => { const S = STARS[pk.Si], b = parkBody(pk, ms).add(pk.off); return [S.p[0] + b.x / LY, S.p[1] + b.y / LY, S.p[2] + b.z / LY]; };
-function parkAt(Si) { here = Si; park = parkPlan(Si, coordMs); shipPos = parkPos(park, coordMs); const o = park.off.clone().negate().normalize(); bow = [o.x, o.y, o.z]; mode = "parked"; trip = null; }
-const parkName = () => park.p >= 0 ? SYS.planets[park.p].name : STARS[park.Si].name.split(" (")[0];
-function engage() { if (mode !== "parked") return say("The autopilot is already flying a course.", 6); if (destI === here) return say("We are already there.", 5);
-  const S = STARS[destI], d0 = Math.hypot(S.p[0] - shipPos[0], S.p[1] - shipPos[1], S.p[2] - shipPos[2]) * LY, est = tripPlan(d0), dpark = parkPlan(destI, coordMs + est.t * 1000); buildSystem(STARS[here]);
-  const P1 = (() => { const keep = SYS; buildSystem(S); const p = parkPos(dpark, coordMs + est.t * 1000); buildSystem(STARS[here]); return p; })();
+  return mkPark(Si, p, ms); }
+const parkOff = (pk, ms) => { const th = pk.th0 + pk.n * (ms - pk.t0) / 1000; return pk.E1.clone().multiplyScalar(pk.r * Math.cos(th)).addScaledVector(pk.E2, pk.r * Math.sin(th)); };
+const parkRelM = (pk, ms) => bodyPosM(pk.sel, ms).add(parkOff(pk, ms));
+const relToLy = (Si, m) => [STARS[Si].p[0] + m.x / LY, STARS[Si].p[1] + m.y / LY, STARS[Si].p[2] + m.z / LY];
+const parkPos = (pk, ms) => relToLy(pk.Si, parkRelM(pk, ms));
+// parked, the ship keeps its cupola pointed at the body it orbits
+function holdPark() { shipRelM = parkRelM(park, coordMs); shipPos = relToLy(park.Si, shipRelM); const o = parkOff(park, coordMs).negate().normalize(); bow = [o.x, o.y, o.z]; }
+function parkAt(Si) { here = Si; park = parkPlan(Si, coordMs); mode = "parked"; trip = null; holdPark(); }
+const parkName = () => bodyInfo(park.sel).name;
+let autoSys = false, sysI = 0;   // the autopilot's list: the stars, or the bodies of this system
+const destName = T => T.local ? T.dname : STARS[T.dest].name;
+function engage() { if (mode !== "parked") return say("The autopilot is already flying a course.", 6); if (typeof LAND !== "undefined" && LAND.away) return say("The lander is away; it has to come back first.", 6);
+  if (autoSys) return engageLocal();
+  if (destI === here) return say("We are already in this system. To fly to one of its planets, press STARS / SYSTEM and choose it.", 7);
+  const S = STARS[destI], d0 = Math.hypot(S.p[0] - shipPos[0], S.p[1] - shipPos[1], S.p[2] - shipPos[2]) * LY, est = tripPlan(d0), dpark = parkPlan(destI, coordMs + est.t * 1000);
+  const P1 = parkPos(dpark, coordMs + est.t * 1000); buildSystem(STARS[here]); 
   const u = [P1[0] - shipPos[0], P1[1] - shipPos[1], P1[2] - shipPos[2]], L = Math.hypot(...u); u[0] /= L; u[1] /= L; u[2] /= L;
   align = { from: bow.slice(), to: u, t: 0, dur: 20, P1, dest: destI, dpark };
   mode = "align"; say(`Autopilot engaged for <b>${S.name}</b>, ${fmtLy(L)} away. Turning the ship to point at it; then the engine lights and we accelerate at 1 g until the midpoint, turn over, and decelerate at 1 g for the second half.`, 14); }
-function startBurn() { const A = align, D = Math.hypot(A.P1[0] - shipPos[0], A.P1[1] - shipPos[1], A.P1[2] - shipPos[2]) * LY;
-  trip = { P0: shipPos.slice(), P1: A.P1, u: A.to, plan: tripPlan(D), tau: 0, prop0: properMs, coord0: coordMs, dest: A.dest, dpark: A.dpark, flipped: false, switched: false }; mode = "trip"; align = null;
+// within the system: aim at where the body will be when we arrive (found by repeating the estimate), and park in orbit round it
+function engageLocal() { const sel = sysList()[sysI]; if (sel === park.sel) return say(`We are already in orbit round ${parkName()}.`, 5);
+  let t = 0, dpark = null, R1 = null; for (let k = 0; k < 4; k++) { dpark = mkPark(here, sel, coordMs + t * 1000); R1 = parkRelM(dpark, coordMs + t * 1000); t = tripPlan(R1.distanceTo(shipRelM)).t; }
+  const D = R1.distanceTo(shipRelM), uv = R1.clone().sub(shipRelM).normalize(), B = bodyInfo(sel);
+  align = { from: bow.slice(), to: [uv.x, uv.y, uv.z], t: 0, dur: 20, P1: relToLy(here, R1), R1, dest: here, dpark, local: true, dname: B.name };
+  mode = "align"; say(`Autopilot engaged for <b>${B.name}</b>, ${fmtLy(D / LY)} away. Turning to the course; then 1 g to the midpoint, turnover, and 1 g of braking into orbit round it. The trip: ${fmtDur(tripPlan(D).tau)}.`, 12); }
+function startBurn() { const A = align, D = A.local ? A.R1.distanceTo(shipRelM) : Math.hypot(A.P1[0] - shipPos[0], A.P1[1] - shipPos[1], A.P1[2] - shipPos[2]) * LY;
+  trip = { P0: shipPos.slice(), P1: A.P1, u: A.to, plan: tripPlan(D), tau: 0, prop0: properMs, coord0: coordMs, dest: A.dest, dpark: A.dpark, flipped: false, switched: false, local: !!A.local, dname: A.dname, R0: A.local ? shipRelM.clone() : null, uv: V3(...A.to) }; mode = "trip"; align = null; if (!trip.local) shipRelM = null;
   say(`Engine lit. Proper acceleration 1.000 g: you feel it as ordinary gravity, toward the decks below. Expected trip: <b>${fmtDur(trip.plan.tau)}</b> by the ship's clock, <b>${fmtDur(trip.plan.t)}</b> by the stars' (and Earth's).`, 14); }
-function arrive() { const T = trip; tripLog.push({ from: STARS[here].name, to: STARS[T.dest].name, tau: T.plan.tau, t: T.plan.t }); buildSystem(STARS[T.dest]); here = T.dest; park = T.dpark; mode = "parked"; trip = null;
-  shipPos = parkPos(park, coordMs); const o = park.off.clone().negate().normalize(); bow = [o.x, o.y, o.z]; warpI = Math.min(warpI, 2);
+function arrive() { const T = trip; tripLog.push({ from: T.local ? parkName() : STARS[here].name, to: destName(T), tau: T.plan.tau, t: T.plan.t }); if (!T.local) buildSystem(STARS[T.dest]); here = T.dest; park = T.dpark; mode = "parked"; trip = null;
+  holdPark(); warpI = Math.min(warpI, 2);
+  if (T.local) return say(`In orbit round <b>${parkName()}</b>, ${fmtLy(park.r / LY)} from its centre. ${bodyInfo(park.sel).solid ? "The lander in the hangar (take the lift down) can take you to the surface." : bodyInfo(park.sel).star ? "" : "It has no solid surface to land on."}`, 12);
   say(`Arrived at <b>${STARS[here].name}</b>, in orbit near <b>${parkName()}</b>. ${STARS[here].note} ${SYS.planets.length ? `Planets: ${SYS.planets.map(p => p.name.replace(STARS[here].name.split(" (")[0] + " ", "")).join(", ")} (${SYS.planets[0].known ? "known" : "generated: none are known here"}).` : ""} Look out from the cupola.`, 18); }
 function skip(to) { if (mode !== "trip") return say("Engage the autopilot first.", 5); const P = trip.plan; trip.tau = Math.max(trip.tau, to === "turn" ? P.tauH - 120 : P.tau - 6 * 3600); say(to === "turn" ? "Skipping ahead to just before turnover." : "Skipping ahead to six hours (ship time) before arrival.", 6); }
 function stepFlight(dt) { const w = WARPS[warpI][0], step = dt * w;
-  if (mode === "parked") { properMs += step * 1000; coordMs += step * 1000; shipPos = parkPos(park, coordMs); }
-  else if (mode === "align") { properMs += dt * 1000; coordMs += dt * 1000; shipPos = parkPos(park, coordMs); align.t += dt; const f = Math.min(1, align.t / align.dur), s = f * f * (3 - 2 * f), a = V3(...align.from), b = V3(...align.to), q = new THREE.Quaternion().setFromUnitVectors(a, b), qi = new THREE.Quaternion().slerp(q, s), v = a.clone().applyQuaternion(qi); bow = [v.x, v.y, v.z]; if (f >= 1) startBurn(); }
+  if (mode === "parked") { properMs += step * 1000; coordMs += step * 1000; holdPark(); }
+  else if (mode === "align") { properMs += dt * 1000; coordMs += dt * 1000; shipRelM = parkRelM(park, coordMs); shipPos = relToLy(park.Si, shipRelM); align.t += dt; const f = Math.min(1, align.t / align.dur), s = f * f * (3 - 2 * f), a = V3(...align.from), b = V3(...align.to), q = new THREE.Quaternion().setFromUnitVectors(a, b), qi = new THREE.Quaternion().slerp(q, s), v = a.clone().applyQuaternion(qi); bow = [v.x, v.y, v.z]; if (f >= 1) startBurn(); }
   else if (mode === "trip") { const T = trip, P = T.plan; T.tau = Math.min(P.tau, T.tau + step); const st = tripState(P, T.tau); T.st = st;
-    shipPos = [T.P0[0] + T.u[0] * st.x / LY, T.P0[1] + T.u[1] * st.x / LY, T.P0[2] + T.u[2] * st.x / LY]; properMs = T.prop0 + T.tau * 1000; coordMs = T.coord0 + st.t * 1000;
+    if (T.local) { shipRelM = T.R0.clone().addScaledVector(T.uv, st.x); shipPos = relToLy(here, shipRelM); } else shipPos = [T.P0[0] + T.u[0] * st.x / LY, T.P0[1] + T.u[1] * st.x / LY, T.P0[2] + T.u[2] * st.x / LY]; properMs = T.prop0 + T.tau * 1000; coordMs = T.coord0 + st.t * 1000;
     bow = st.accel ? T.u : [-T.u[0], -T.u[1], -T.u[2]];
     if (!st.accel && !T.flipped) { T.flipped = true; say("<b>Turnover.</b> At the midpoint the engine shuts down, the ship turns end over end, and the engine lights again pointing ahead: now 1 g of deceleration. The floor is still 'down', but the cupola now faces back the way we came.", 14); }
-    if (!T.switched && st.x > P.D / 2) { T.switched = true; buildSystem(STARS[T.dest]); }
+    if (!T.local && !T.switched && st.x > P.D / 2) { T.switched = true; buildSystem(STARS[T.dest]); }
     if (T.tau >= P.tau) arrive(); } }
 // ---------- formatting ----------
 const pad = (n, k = 2) => String(n).padStart(k, "0");
@@ -53479,7 +53519,7 @@ function panel(S, title) { const g = S.g; g.fillStyle = "#06121a"; g.fillRect(0,
 function row(g, y, label, value, x = 28, vx = 560, size = 34, col = "#e8f4fa") { g.fillStyle = "#8ab0c4"; g.font = `500 ${size * 0.72}px Helvetica, sans-serif`; g.fillText(label, x, y); g.fillStyle = col; g.font = `600 ${size}px Menlo, monospace`; g.fillText(value, vx, y); }
 const curState = () => mode === "trip" && trip.st ? trip.st : { tau: 0, x: 0, t: 0, v: 0, w: 0, gamma: 1, phi: 0, accel: false, phase: mode === "align" ? "turning to the course" : "in orbit" };
 function drawTrip() { const S = SCREENS.trip, g = panel(S, "TRIP COMPUTER"), st = curState(), T = trip;
-  g.fillStyle = "#f0d890"; g.font = "600 34px Helvetica, sans-serif"; g.fillText(mode === "trip" ? `${STARS[here].name.split(" (")[0]}  →  ${STARS[T.dest].name.split(" (")[0]}   ·   ${st.phase}` : `${mode === "align" ? "turning to the course for " + STARS[align.dest].name.split(" (")[0] : "in orbit near " + parkName() + ", " + STARS[here].name.split(" (")[0]}`, 28, 110);
+  g.fillStyle = "#f0d890"; g.font = "600 34px Helvetica, sans-serif"; g.fillText(mode === "trip" ? `${T.local ? STARS[here].name.split(" (")[0] + ": " : STARS[here].name.split(" (")[0] + "  →  "}${destName(T).split(" (")[0]}   ·   ${st.phase}` : `${mode === "align" ? "turning to the course for " + (align.local ? align.dname : STARS[align.dest].name.split(" (")[0]) : "in orbit near " + parkName() + ", " + STARS[here].name.split(" (")[0]}`, 28, 110);
   let y = 175; const R = (l, v, c) => { row(g, y, l, v, 28, 640, 38, c); y += 58; };
   R("PROPER TIME (ship clock)", fmtDate(properMs), "#9af0b0"); R("COORDINATE TIME (star frame)", fmtDate(coordMs), "#f0c890");
   R("  elapsed this trip: ship / stars", mode === "trip" ? `${fmtDur(st.tau)}  /  ${fmtDur(st.t)}` : "-");
@@ -53489,7 +53529,18 @@ function drawTrip() { const S = SCREENS.trip, g = panel(S, "TRIP COMPUTER"), st 
   if (mode === "trip") { R("DISTANCE: covered / to go (map)", `${fmtLy(st.x / LY)}  /  ${fmtLy((T.plan.D - st.x) / LY)}`); R("  to go as the ship measures it", fmtLy((T.plan.D - st.x) / LY / st.gamma)); R("ARRIVAL: ship clock / star clock", `${fmtDur(T.plan.tau - st.tau)}  /  ${fmtDur(T.plan.t - st.t)}  from now`); }
   g.fillStyle = "#5a8aa0"; g.font = "500 24px Menlo, monospace"; g.fillText("c²dτ² = c²dt² − dx²    t = (c/a) sinh(aτ/c)    x = (c²/a)(cosh(aτ/c) − 1)    v = c tanh(aτ/c)    w = c sinh(aτ/c)", 28, S.h - 30);
   g.fillStyle = "#c8a860"; g.font = "600 28px Helvetica, sans-serif"; g.fillText(`TIME: ${WARPS[warpI][1]}`, S.w - 470, 56); S.t.needsUpdate = true; }
-function drawAuto() { const S = SCREENS.auto, g = panel(S, "AUTOPILOT: DESTINATIONS"), n = 11; listTop = clampN(destI - 5, 0, STARS.length - n);
+const KIND_NAME = { rock: "rocky", lava: "rocky, molten", mars: "rocky, thin air", venus: "rocky, thick air", temperate: "rocky, temperate", ocean: "ocean world", earth: "rocky, oceans", hot: "hot gas giant", gas: "gas giant", saturn: "gas giant, rings", ice: "ice giant", nep: "ice giant", moon: "rocky moon", star: "star", "black hole": "black hole" };
+function drawSys() { const S = SCREENS.auto, g = panel(S, `AUTOPILOT: ${STARS[here].name.split(" (")[0].toUpperCase()} SYSTEM`), L = sysList(), n = 11; sysI = clampN(sysI, 0, L.length - 1); const top = clampN(sysI - 5, 0, Math.max(0, L.length - n));
+  for (let k = 0; k < n; k++) { const i = top + k; if (i >= L.length) break; const B = bodyInfo(L[i]), d = Math.max(0, bodyPosM(L[i], coordMs).distanceTo(shipRelM || V3()) - B.R), y = 108 + k * 44, sel = i === sysI, cur = L[i] === park?.sel;
+    if (sel) { g.fillStyle = "#1a4a62"; g.fillRect(16, y - 32, S.w - 32, 42); } g.fillStyle = cur ? "#9af0b0" : sel ? "#ffffff" : "#c8dce8"; g.font = `${sel ? 700 : 500} 28px Helvetica, sans-serif`; g.fillText(B.name, 28, y);
+    g.font = "500 24px Menlo, monospace"; g.fillStyle = "#8ab0c4"; g.fillText(cur && mode === "parked" ? "in orbit" : fmtLy(d / LY), 520, y); g.fillText(KIND_NAME[B.kind] || B.kind, 800, y); }
+  const B = bodyInfo(L[sysI]), D = shipRelM ? parkRelM(mkPark(here, L[sysI], coordMs), coordMs).distanceTo(shipRelM) : 0, P = tripPlan(Math.max(D, 1)), gs = B.GM / B.R ** 2;
+  g.fillStyle = "#0e2230"; g.fillRect(16, 600, S.w - 32, 184); g.fillStyle = "#f0d890"; g.font = "700 30px Helvetica, sans-serif"; g.fillText(`${B.name}  ·  ${KIND_NAME[B.kind] || B.kind}`, 30, 640);
+  g.fillStyle = "#c8dce8"; g.font = "500 23px Helvetica, sans-serif"; g.fillText(`radius ${fmtLy(B.R / LY)}  ·  surface gravity ${(gs / G0).toFixed(gs / G0 < 10 ? 2 : 0)} g  ·  day ${fmtDur(Math.abs(B.rot) * 86400)}${B.rot < 0 ? " (turns backwards)" : ""}`, 30, 676);
+  g.fillText(B.star ? "No landing: a star." : B.solid ? `Landing: yes, by the lander.${B.atm ? ` Air at the surface ${(B.atm.rho / 1.225).toFixed(B.atm.rho < 0.1 ? 3 : 1)} × Earth's density.` : " No air."}` : "No landing: no solid surface.", 30, 704);
+  g.fillStyle = "#9ad8ff"; g.font = "600 24px Menlo, monospace"; g.fillText(L[sysI] === park?.sel ? "We are in orbit here." : `1 g trip: ${fmtDur(P.tau)}; top speed ${fmtKms(P.vMax)}`, 30, 750);
+  g.fillStyle = "#c8a860"; g.font = "600 22px Helvetica, sans-serif"; g.fillText("STARS / SYSTEM: switch lists", S.w - 380, 56); S.t.needsUpdate = true; }
+function drawAuto() { if (autoSys) return drawSys(); const S = SCREENS.auto, g = panel(S, "AUTOPILOT: DESTINATIONS"), n = 11; listTop = clampN(destI - 5, 0, STARS.length - n);
   for (let k = 0; k < n; k++) { const i = listTop + k; if (i >= STARS.length) break; const St = STARS[i], d = Math.hypot(St.p[0] - shipPos[0], St.p[1] - shipPos[1], St.p[2] - shipPos[2]), y = 108 + k * 44, sel = i === destI;
     if (sel) { g.fillStyle = "#1a4a62"; g.fillRect(16, y - 32, S.w - 32, 42); } g.fillStyle = i === here ? "#9af0b0" : sel ? "#ffffff" : "#c8dce8"; g.font = `${sel ? 700 : 500} 28px Helvetica, sans-serif`; g.fillText(St.name, 28, y);
     g.font = "500 24px Menlo, monospace"; g.fillStyle = "#8ab0c4"; g.fillText(i === here ? "here" : fmtLy(d), 640, y); g.fillText(KNOWN[St.name] ? `${KNOWN[St.name].length} known` : St.bh ? "black hole" : "generated", 900, y); }
@@ -53519,9 +53570,9 @@ function drawShip() { const S = SCREENS.ship, g = panel(S, "SHIP STATUS"), st = 
 // buttons
 { const deskBtn = (dx, dz, ry, u, v, label, fn, w = 0.42, h = 0.16, col) => button(label, dx + Math.cos(ry) * u + Math.sin(ry) * v, 0.875, dz - Math.sin(ry) * u + Math.cos(ry) * v, ry, -1.3, fn, w, h, col);
   const A = [-2.6, -6.4, 0.22], N = [2.6, -6.4, -0.22];
-  deskBtn(...A, -0.72, 0.1, "▲", () => { destI = Math.max(0, destI - 1); }); deskBtn(...A, -0.24, 0.1, "▼", () => { destI = Math.min(STARS.length - 1, destI + 1); });
-  deskBtn(...A, 0.24, 0.1, "▲ 10", () => { destI = Math.max(0, destI - 10); }); deskBtn(...A, 0.72, 0.1, "▼ 10", () => { destI = Math.min(STARS.length - 1, destI + 10); });
-  deskBtn(...A, 0, 0.34, "ENGAGE AUTOPILOT", engage, 1.4, 0.17, "#6a2a22");
+  const mv = k => { if (autoSys) sysI = clampN(sysI + k, 0, sysList().length - 1); else destI = clampN(destI + k, 0, STARS.length - 1); };
+  deskBtn(...A, -0.72, 0.1, "▲", () => mv(-1)); deskBtn(...A, -0.24, 0.1, "▼", () => mv(1)); deskBtn(...A, 0.24, 0.1, "▲ 10", () => mv(-10)); deskBtn(...A, 0.72, 0.1, "▼ 10", () => mv(10));
+  deskBtn(...A, -0.55, 0.34, "STARS / SYSTEM", () => { autoSys = !autoSys; if (autoSys) sysI = Math.max(0, sysList().indexOf(park?.sel)); }, 0.62, 0.17, "#2a4a3a"); deskBtn(...A, 0.3, 0.34, "ENGAGE AUTOPILOT", engage, 0.98, 0.17, "#6a2a22");
   deskBtn(...N, -0.5, 0.1, "TIME −", () => { warpI = Math.max(0, warpI - 1); }, 0.55); deskBtn(...N, 0.1, 0.1, "TIME +", () => { warpI = Math.min(WARPS.length - 1, warpI + 1); }, 0.55);
   deskBtn(...N, -0.42, 0.34, "TO TURNOVER", () => skip("turn"), 0.75); deskBtn(...N, 0.42, 0.34, "TO ARRIVAL", () => skip("arrive"), 0.75);
   button("SKY LABELS", -3.0, DECKS[2].y + 0.875, -3.0, Math.PI / 4, -1.3, () => toggleHud(), 0.7, 0.17);
@@ -53569,7 +53620,7 @@ const ALBEDO = { rock: 0.14, lava: 0.1, mars: 0.17, venus: 0.69, temperate: 0.3,
 const PL_TEMP = { rock: 5000, lava: 3200, mars: 3600, venus: 5600, temperate: 6500, ocean: 7500, earth: 6500, hot: 3800, gas: 4800, saturn: 4600, ice: 9000, nep: 12000 };
 const NPL = 32, plDir = new Float32Array(NPL * 3), plMag = new Float32Array(NPL).fill(99), plTemp = new Float32Array(NPL).fill(5500), PLANET_PTS = mkStars(plDir, plMag, plTemp);
 const _pp = V3();
-function updatePlanetPoints(shipPos, ms) { plMag.fill(99); if (SYS && SYS.starMesh.visible) { const S = SYS.S, dm = isFinite(S.absMag) ? S.absMag - 4.83 : 0, starRel = V3((S.p[0] - shipPos[0]) * LY, (S.p[1] - shipPos[1]) * LY, (S.p[2] - shipPos[2]) * LY);
+function updatePlanetPoints(shipPos, ms) { plMag.fill(99); if (SYS && SYS.starMesh.visible) { const S = SYS.S, dm = isFinite(S.absMag) ? S.absMag - 4.83 : 0, starRel = shipRelM ? shipRelM.clone().negate() : V3((S.p[0] - shipPos[0]) * LY, (S.p[1] - shipPos[1]) * LY, (S.p[2] - shipPos[2]) * LY);
     const put = (k, fromStar, H, T) => { if (k >= NPL) return; _pp.copy(starRel).add(fromStar); const d = _pp.length(), r = fromStar.length(), ca = clampN(fromStar.dot(_pp) / (r * d), -1, 1), al = Math.acos(ca), q = (Math.sin(al) + (Math.PI - al) * ca) / Math.PI;
       plDir.set([_pp.x / d, _pp.y / d, _pp.z / d], k * 3); plMag[k] = H + 5 * Math.log10(r * d / (AU * AU)) - 2.5 * Math.log10(Math.max(q, 1e-5)) + dm; plTemp[k] = T; };
     SYS.planets.forEach((p, k) => put(k, planetPos(p, ms), SOL_H[p.name] ?? 5 * Math.log10(1329 / (2 * p.radius / 1000 * Math.sqrt(ALBEDO[p.kind] || 0.3))), PL_TEMP[p.kind] || 5500));
@@ -53597,14 +53648,14 @@ function hudText(s, a, b, col) { const U = s.userData, k = a + "|" + b + "|" + c
   g.shadowColor = "#000"; g.shadowBlur = 5; g.font = "600 30px Helvetica"; const w = g.measureText(a).width; if (w > 425) g.font = `600 ${Math.floor(30 * 425 / w)}px Helvetica`; g.fillText(a, 80, 42); g.font = "24px Helvetica"; g.globalAlpha = 0.8; g.fillText(b, 80, 76); g.globalAlpha = 1; U.t.needsUpdate = true; }
 const starL = STARS.map(hudLabel), dsoL = DSO.map(hudLabel), bodyL = Array.from({ length: 16 }, hudLabel);
 // show: in the cupola with the display on; txt: redraw the words (a few times a second, not every frame)
-function updateHud(pos, show, txt) { const near = !!SYS && SYS.starMesh.visible, dest = mode === "trip" ? trip.dest : destI;
+function updateHud(pos, show, txt) { const near = !!SYS && SYS.starMesh.visible, dest = mode === "trip" ? (trip.local ? -1 : trip.dest) : autoSys ? -1 : destI, dsel = mode === "trip" && trip.local ? trip.dpark.sel : autoSys && mode !== "trip" ? sysList()[sysI] : -9;
   DSO.forEach((O, k) => { const dx = O.p[0] - pos[0], dy = O.p[1] - pos[1], dz = O.p[2] - pos[2], d = Math.hypot(dx, dy, dz), D = aberr(_d.set(dx / d, dy / d, dz / d), _o), L = dsoL[k];
     O.glow.position.copy(_o).multiplyScalar(SKY_R * 0.8); O.glow.scale.setScalar(SKY_R * 0.8 * Math.max(O.size / d / clampN(D, 0.05, 50), 0.004) * 2.2); O.glow.material.opacity = O.a * clampN(D * D, 0, 1);
     L.visible = show; if (show) { L.position.copy(_o).multiplyScalar(HUD_R); if (txt) hudText(L, O.name, fmtLy(d), "#c8a8ff"); } });
   STARS.forEach((S, i) => { const L = starL[i]; L.visible = false; if (!show || (near && SYS.S.i === i)) return; const dx = S.p[0] - pos[0], dy = S.p[1] - pos[1], dz = S.p[2] - pos[2], d = Math.hypot(dx, dy, dz); if (d < 1e-9) return;
     aberr(_d.set(dx / d, dy / d, dz / d), _o); L.position.copy(_o).multiplyScalar(HUD_R); L.visible = true; if (txt) hudText(L, S.name + (i === dest ? "  ◆ DESTINATION" : ""), fmtLy(d), i === dest ? "#ffb347" : S.bh ? "#ff9a9a" : "#8fe8c0"); });
-  let bi = 0; const lab = (mesh, name, col) => { if (!mesh.visible || bi >= bodyL.length) return; const L = bodyL[bi++], r = Math.min(HUD_R, 0.9 * (mesh.position.length() - mesh.scale.x)); L.position.copy(mesh.position).normalize().multiplyScalar(r); L.scale.set(r * 0.05 * 512 / 96, r * 0.05, 1); L.visible = true; if (txt || !L.userData.txt.startsWith(name + "|")) hudText(L, name, fmtLy(mesh.userData.dist / LY), col); };
-  if (show && near) { lab(SYS.starMesh, SYS.S.name, "#ffe08a"); SYS.planets.forEach(p => lab(p.mesh, p.name, "#9ad0ff")); if (SYS.moon) lab(SYS.moon.mesh, "the Moon", "#9ad0ff"); }
+  let bi = 0; const lab = (mesh, name, col, sel) => { if (sel === dsel) { name += "  ◆ DESTINATION"; col = "#ffb347"; } if (!mesh.visible || bi >= bodyL.length) return; const L = bodyL[bi++], r = Math.min(HUD_R, 0.9 * (mesh.position.length() - mesh.scale.x)); L.position.copy(mesh.position).normalize().multiplyScalar(r); L.scale.set(r * 0.05 * 512 / 96, r * 0.05, 1); L.visible = true; if (txt || !L.userData.txt.startsWith(name + "|")) hudText(L, name, fmtLy(mesh.userData.dist / LY), col); };
+  if (show && near) { lab(SYS.starMesh, SYS.S.name, "#ffe08a", -1); SYS.planets.forEach((p, k) => lab(p.mesh, p.name, "#9ad0ff", k)); if (SYS.moon) lab(SYS.moon.mesh, "the Moon", "#9ad0ff", -2); }
   for (; bi < bodyL.length; bi++) bodyL[bi].visible = false; }
 parkAt(0); setAttitude(bow);
 const clock = new THREE.Clock(), fwd = V3(0, 0, 0), side = V3(0, 0, 0), UP = V3(0, 1, 0); let scrT = 0, hudT = 0, loopErrs = 0;
@@ -53627,8 +53678,8 @@ function frame() { const dt = Math.min(clock.getDelta(), 0.1), vr = renderer.xr.
   // screens and messages
   scrT -= dt; if (scrT <= 0) { scrT = 0.25; drawTrip(); drawAuto(); drawNav(); drawEng(); drawShip(); }
   msgT -= dt; if (msgT <= 0 && MSG.style.display !== "none") { MSG.style.display = "none"; msgText = ""; }
-  hudT -= dt; if (hudT <= 0) { hudT = 0.25; HUD.innerHTML = `<b>${DECKS[P_.deck].name}</b> · ${mode === "trip" ? `to <b>${STARS[trip.dest].name}</b>, ${st.phase}` : mode === "align" ? "turning to the course" : `in orbit near ${parkName()}`} · time: ${WARPS[warpI][1]}<br>ship ${fmtDate(properMs)} · stars ${fmtDate(coordMs)}<br>map velocity v = ${fmtKms(st.v)} (${fmtC(st.v)}) · proper velocity w = ${fmtKms(st.w)} (${fmtC(st.w)}) · γ = ${fmtG(st.gamma)}<br><span style="color:#8ab0c4;font-size:12px">WASD walk · drag to look · click the console buttons · [ ] time · Q/Z lift up/down (in the lift) · H sky labels (cupola)</span>`;
-    if (vr) drawVR([`${mode === "trip" ? "to " + STARS[trip.dest].name + " · " + st.phase : "in orbit near " + parkName()} · ${WARPS[warpI][1]}`, `ship ${fmtDate(properMs)}`, `stars ${fmtDate(coordMs)}`, `v ${fmtKms(st.v)}  w ${fmtKms(st.w)}  gamma ${fmtG(st.gamma)}`, msgText.slice(0, 70), msgText.slice(70, 140), "trigger: press buttons · A in the lift: next deck · X/Y: time"]); }
+  hudT -= dt; if (hudT <= 0) { hudT = 0.25; HUD.innerHTML = `<b>${DECKS[P_.deck].name}</b> · ${mode === "trip" ? `to <b>${destName(trip)}</b>, ${st.phase}` : mode === "align" ? "turning to the course" : `in orbit near ${parkName()}`} · time: ${WARPS[warpI][1]}<br>ship ${fmtDate(properMs)} · stars ${fmtDate(coordMs)}<br>map velocity v = ${fmtKms(st.v)} (${fmtC(st.v)}) · proper velocity w = ${fmtKms(st.w)} (${fmtC(st.w)}) · γ = ${fmtG(st.gamma)}<br><span style="color:#8ab0c4;font-size:12px">WASD walk · drag to look · click the console buttons · [ ] time · Q/Z lift up/down (in the lift) · H sky labels (cupola)</span>`;
+    if (vr) drawVR([`${mode === "trip" ? "to " + destName(trip) + " · " + st.phase : "in orbit near " + parkName()} · ${WARPS[warpI][1]}`, `ship ${fmtDate(properMs)}`, `stars ${fmtDate(coordMs)}`, `v ${fmtKms(st.v)}  w ${fmtKms(st.w)}  gamma ${fmtG(st.gamma)}`, msgText.slice(0, 70), msgText.slice(70, 140), "trigger: press buttons · A in the lift: next deck · X/Y: time"]); }
   renderer.render(scene, camera); }
 
 </script></body></html>
