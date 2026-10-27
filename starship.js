@@ -320,22 +320,23 @@ function button(label, x, y, z, ry, tilt, onPick, w = 0.5, h = 0.18, col = "#2a3
   plaque(["EXERCISE"], 9.0, y + 2.6, -1.4, -Math.PI / 2, 0.6, 0.14); box(0.8, 0.2, 2.0, mPanel, 7.6, y, 0.6); box(0.8, 1.1, 0.08, mPanel, 7.6, y, -0.4); obst(0, 7.6, 0.6, 0.9, 2.1); box(0.5, 0.9, 1.0, mPanel, 6.0, y, 2.2); obst(0, 6.0, 2.2, 0.6, 1.1);
   // the sick bay
   plaque(["MEDICAL"], 4.0, y + 2.6, 3.14, Math.PI, 0.55, 0.14); box(2.0, 0.8, 0.8, mWhite, 7.0, y, 5.0, Math.PI / 6); obst(0, 7.0, 5.0, 2.1, 1.1); box(0.6, 1.8, 0.4, mWhite, 8.8, y, 3.5, -Math.PI / 3); }
-// the cupola: an observation room on the roof, eight sloping framed windows round a large round window overhead (looking forward, at the bow)
-{ const y = 5, n = 8, wallTop = y + 2.0, rTop = 2.2, yTop = y + 4.2, R1 = CUP_R / Math.cos(Math.PI / n);
-  for (let k = 0; k < n; k++) { const a0 = (k - 0.5) / n * Math.PI * 2, a1 = (k + 0.5) / n * Math.PI * 2, am = k / n * Math.PI * 2;
-    const wl = 2 * CUP_R * Math.tan(Math.PI / n); box(wl, 2.0, 0.12, mWall, Math.cos(am) * CUP_R, y, Math.sin(am) * CUP_R, -am + Math.PI / 2);
-    const P = [[R1 * Math.cos(a0), wallTop, R1 * Math.sin(a0)], [R1 * Math.cos(a1), wallTop, R1 * Math.sin(a1)], [rTop / Math.cos(Math.PI / n) * Math.cos(a1), yTop, rTop / Math.cos(Math.PI / n) * Math.sin(a1)], [rTop / Math.cos(Math.PI / n) * Math.cos(a0), yTop, rTop / Math.cos(Math.PI / n) * Math.sin(a0)]];
-    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute([...P[0], ...P[1], ...P[2], ...P[0], ...P[2], ...P[3]], 3)); g.computeVertexNormals(); add(g, mGlass, 0, 0, 0);
-    // the window frame: a heavy metal edge round each pane, with a shutter folded back
-    for (let e = 0; e < 4; e++) { const A = V3(...P[e]), B = V3(...P[(e + 1) % 4]), L = A.distanceTo(B), mid = A.clone().add(B).multiplyScalar(0.5), bar = add(new THREE.BoxGeometry(0.16, 0.16, L), mFrame, mid.x, mid.y, mid.z); bar.lookAt(B); }
-    box(0.5, 0.3, 0.12, mFrame, Math.cos(am) * (CUP_R - 0.15), wallTop - 0.3, Math.sin(am) * (CUP_R - 0.15), -am + Math.PI / 2); }
+// the cupola: an observation room on the roof, glazed all the way round: eight tall windows from a low sill up to eight sloping
+// windows, and a large round window overhead (looking forward, at the bow). Only the floor and the slim frames block the view.
+{ const y = 5, n = 8, sill = y + 0.25, wallTop = y + 2.2, rTop = 2.2, yTop = y + 4.2, R1 = CUP_R / Math.cos(Math.PI / n), R2 = rTop / Math.cos(Math.PI / n);
+  const pane = P => { const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute([...P[0], ...P[1], ...P[2], ...P[0], ...P[2], ...P[3]], 3)); g.computeVertexNormals(); add(g, mGlass, 0, 0, 0);
+    // the window frame: a metal edge round each pane
+    for (let e = 0; e < 4; e++) { const A = V3(...P[e]), B = V3(...P[(e + 1) % 4]), L = A.distanceTo(B), mid = A.clone().add(B).multiplyScalar(0.5), bar = add(new THREE.BoxGeometry(0.12, 0.12, L), mFrame, mid.x, mid.y, mid.z); bar.lookAt(B); } };
+  for (let k = 0; k < n; k++) { const a0 = (k - 0.5) / n * Math.PI * 2, a1 = (k + 0.5) / n * Math.PI * 2, am = k / n * Math.PI * 2, at = (R, h, a) => [R * Math.cos(a), h, R * Math.sin(a)];
+    box(2 * CUP_R * Math.tan(Math.PI / n), 0.25, 0.2, mFrame, Math.cos(am) * CUP_R, y, Math.sin(am) * CUP_R, -am + Math.PI / 2);
+    pane([at(R1, sill, a0), at(R1, sill, a1), at(R1, wallTop, a1), at(R1, wallTop, a0)]);
+    pane([at(R1, wallTop, a0), at(R1, wallTop, a1), at(R2, yTop, a1), at(R2, yTop, a0)]); }
   { const top = new THREE.Mesh(new THREE.CircleGeometry(rTop * 0.92, 48), mGlass); top.position.set(0, yTop + 0.01, 0); top.rotation.x = -Math.PI / 2; SHIP.add(top); const fr = add(new THREE.TorusGeometry(rTop * 0.95, 0.12, 8, 64), mFrame, 0, yTop, 0); fr.rotation.x = Math.PI / 2;
     const ring2 = add(new THREE.RingGeometry(rTop * 0.95, rTop / Math.cos(Math.PI / n), 8, 1, Math.PI / n), mFrame, 0, yTop + 0.005, 0); ring2.rotation.x = -Math.PI / 2; }
   add(new THREE.CircleGeometry(CUP_R / Math.cos(Math.PI / n), n, Math.PI / n), mFloor, 0, y + 0.005, 0).rotation.x = -Math.PI / 2;
   // two reclining couches for looking up through the big window, a handrail round the room, a small workstation
   for (const s of [-1, 1]) { const cx = s * 1.9, cz = 1.6; box(0.7, 0.4, 1.9, mSeat, cx, y, cz); const back = box(0.7, 0.1, 1.2, mSeat, cx, y + 0.55, cz - 1.2); back.rotation.x = -0.7; obst(2, cx, cz - 0.3, 0.8, 2.4); }
   const hr = add(new THREE.TorusGeometry(CUP_R - 0.22, 0.025, 6, 64), mRail, 0, y + 1.1, 0); hr.rotation.x = Math.PI / 2;
-  box(1.2, 0.85, 0.5, mDesk, -3.0, y, -3.0, Math.PI / 4); obst(2, -3.0, -3.0, 1.0, 1.0); plaque(["CUPOLA"], 0, y + 1.75, -CUP_R + 0.08, 0, 0.6, 0.14); }
+  box(1.2, 0.85, 0.5, mDesk, -3.0, y, -3.0, Math.PI / 4); obst(2, -3.0, -3.0, 1.0, 1.0); plaque(["CUPOLA"], -3.0 + 0.18, y + 1.0, -3.0 + 0.18, Math.PI / 4, 0.5, 0.12); }
 // light inside: soft white panels; the cupola kept dim so the sky can be seen
 scene.add(new THREE.HemisphereLight(0xdfe6ee, 0x404448, 0.6)); for (const D of DECKS.slice(0, 2)) for (const [x, z] of [[0, -5], [0, 5], [-5, 0], [5, 0]]) { const l = new THREE.PointLight(0xf2f4ff, 14, 16, 1.6); l.position.set(x, D.y + 3.2, z); scene.add(l); }
 { const l = new THREE.PointLight(0xc8d4e8, 1.5, 8, 2); l.position.set(0, 6.6, 0); scene.add(l); }
