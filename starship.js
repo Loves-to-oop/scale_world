@@ -255,7 +255,7 @@ function updateSystem(shipPos, ms) { if (!SYS) return; const S = SYS.S, starRel 
 // framed windows like the ISS's, on its roof. Below it (not visible from inside) a long spine carries the hydrogen tanks, the magnetic
 // antimatter traps, the radiators and, 600 m aft, the engine; the forward hull carries the radiation shield.
 const SHIP = new THREE.Group(); scene.add(SHIP);
-const HULL_R = 11, CUP_R = 5.0, DECKS = [{ name: "the habitat deck", y: -5 }, { name: "the bridge", y: 0 }, { name: "the cupola", y: 5 }];
+const HULL_R = 11, CUP_R = 5.0, DECKS = [{ name: "the habitat deck", y: -5 }, { name: "the bridge", y: 0 }, { name: "the cupola", y: 25 }];
 // surfaces: light grey wall panels with seams and fasteners, non-slip floor plates, ceiling light panels
 const panelT = tex(512, 512, (g, w, h) => { g.fillStyle = "#c4c8cc"; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 128) for (let x = 0; x < w; x += 256) { g.fillStyle = (x + y) % 384 ? "#cdd1d4" : "#bfc3c7"; g.fillRect(x + 3, y + 3, 250, 122); g.strokeStyle = "#8a9096"; g.lineWidth = 3; g.strokeRect(x + 2, y + 2, 252, 124);
     g.fillStyle = "#7a8086"; for (const [fx, fy] of [[10, 10], [244, 10], [10, 118], [244, 118]]) { g.beginPath(); g.arc(x + fx, y + fy, 3, 0, 6.28); g.fill(); } } g.fillStyle = "#5a6066"; g.font = "600 13px Helvetica"; g.fillText("P-117", 20, 40); g.fillText("O2 / N2", 280, 168); });
@@ -274,11 +274,11 @@ const plaque = (lines, x, y, z, ry, w = 0.7, h = 0.16) => add(new THREE.PlaneGeo
 const OBST = [[], [], []]; const obst = (deck, x, z, w, d) => OBST[deck].push([x, z, w / 2 + 0.25, d / 2 + 0.25]);
 // the lift: an enclosed shaft through the decks, its door facing forward (-z) on every deck
 const LIFT_R = 1.4, DOOR = 0.42;
-const walkable = (deck, x, z) => { const r = Math.hypot(x, z), lim = deck === 2 ? CUP_R - 0.5 : HULL_R - 0.6; if (r > lim) return false;
+const walkable = (deck, x, z) => { const r = Math.hypot(x, z), lim = deck === 2 ? CUP_R - 0.55 : HULL_R - 0.6; if (r > lim) return false;
   if (deck < 2 && r > LIFT_R - 0.25 && r < LIFT_R + 0.25 && Math.abs(Math.atan2(x, z)) < Math.PI - DOOR * 0.8) return false; return !OBST[deck].some(([ox, oz, hw, hd]) => Math.abs(x - ox) < hw && Math.abs(z - oz) < hd); };
 { for (const D of DECKS) add(new THREE.CircleGeometry(LIFT_R - 0.05, 32), mFloor, 0, D.y + 0.012, 0).rotation.x = -Math.PI / 2;
   add(new THREE.CylinderGeometry(LIFT_R, LIFT_R, 10, 40, 1, true, Math.PI + DOOR, Math.PI * 2 - 2 * DOOR), mWall, 0, 0, 0);
-  { const r = add(new THREE.TorusGeometry(LIFT_R + 0.05, 0.03, 6, 48, Math.PI * 2 - 2 * DOOR), mRail, 0, 6.0, 0); r.rotation.x = -Math.PI / 2; r.rotation.z = -Math.PI / 2 + DOOR; for (let k = 0; k < 8; k++) { const a = DOOR + (k + 0.5) / 8 * (Math.PI * 2 - 2 * DOOR) + Math.PI; box(0.04, 1.0, 0.04, mRail, Math.sin(a) * (LIFT_R + 0.05), 5, Math.cos(a) * (LIFT_R + 0.05)); } }
+  { const r = add(new THREE.TorusGeometry(LIFT_R + 0.05, 0.03, 6, 48, Math.PI * 2 - 2 * DOOR), mRail, 0, DECKS[2].y + 1.0, 0); r.rotation.x = -Math.PI / 2; r.rotation.z = -Math.PI / 2 + DOOR; for (let k = 0; k < 8; k++) { const a = DOOR + (k + 0.5) / 8 * (Math.PI * 2 - 2 * DOOR) + Math.PI; box(0.04, 1.0, 0.04, mRail, Math.sin(a) * (LIFT_R + 0.05), DECKS[2].y, Math.cos(a) * (LIFT_R + 0.05)); } }
   for (const D of DECKS.slice(0, 2)) { add(new THREE.CircleGeometry(LIFT_R - 0.05, 32), mFloor, 0, D.y + 0.01, 0).rotation.x = -Math.PI / 2; for (const s of [-1, 1]) box(0.12, 2.2, 0.15, mFrame, s * Math.sin(DOOR) * LIFT_R, D.y, -Math.cos(DOOR) * LIFT_R); box(Math.sin(DOOR) * LIFT_R * 2 + 0.2, 0.25, 0.15, mFrame, 0, D.y + 2.2, -Math.cos(DOOR) * LIFT_R);
     plaque(["LIFT"], 0, D.y + 2.6, -LIFT_R - 0.02, Math.PI, 0.5, 0.14); } }
 // the hull: the outer wall panelled inside, floors, ceilings with light panels, handrails, lockers, cable trays
@@ -286,7 +286,11 @@ const walkable = (deck, x, z) => { const r = Math.hypot(x, z), lim = deck === 2 
   const ring = (y0, r0, r1, mat, up) => { const f = add(new THREE.RingGeometry(r0, r1, 72, 1), mat, 0, y0, 0); f.rotation.x = up ? -Math.PI / 2 : Math.PI / 2; return f; };
   ring(-5, LIFT_R, HULL_R, mFloor, true); ring(-1.4, LIFT_R, HULL_R, mCeil, false); ring(0, LIFT_R, HULL_R, mFloor, true); ring(3.6, LIFT_R, HULL_R, mCeil, false);
   add(new THREE.CircleGeometry(HULL_R, 72), M(0x2a2e34), 0, -9, 0).rotation.x = -Math.PI / 2;
-  ring(5, CUP_R, HULL_R, M(0x8a9096, { metalness: 0.4 }), true);
+  ring(5, LIFT_R + 0.3, HULL_R + 0.2, M(0x8a9096, { metalness: 0.4 }), true);
+  // the outside of the crew section, seen from the cupola: the hull's outer skin, a rim, and hatches and radiator panels on the roof
+  const mOut = M(0x9aa0a6, { metalness: 0.5, roughness: 0.5 }); add(new THREE.CylinderGeometry(HULL_R + 0.2, HULL_R + 0.2, 14.2, 72, 1, true), mOut, 0, -2, 0);
+  const rim = add(new THREE.TorusGeometry(HULL_R + 0.2, 0.18, 8, 96), mOut, 0, 5.05, 0); rim.rotation.x = Math.PI / 2;
+  for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + 0.3; box(1.4, 0.12, 3.2, M(0x5a6068, { metalness: 0.6 }), Math.sin(a) * 7.5, 5, Math.cos(a) * 7.5, a); box(0.9, 0.2, 0.9, mOut, Math.sin(a + 0.52) * 4.5, 5, Math.cos(a + 0.52) * 4.5, a); }
   const ledM = new THREE.MeshBasicMaterial({ color: 0xf4f6ff }); for (const y of [-1.42, 3.58]) for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2, l = add(new THREE.PlaneGeometry(1.6, 0.4), ledM, Math.cos(a) * 6, y, Math.sin(a) * 6, -a); l.rotation.x = Math.PI / 2; l.rotation.order = "YXZ"; l.rotation.y = -a; }
   for (const D of DECKS.slice(0, 2)) { const hr = add(new THREE.TorusGeometry(HULL_R - 0.18, 0.025, 6, 96), mRail, 0, D.y + 1.05, 0); hr.rotation.x = Math.PI / 2; const tray = add(new THREE.TorusGeometry(HULL_R - 0.3, 0.12, 4, 96), mPanel, 0, D.y + (D.y < 0 ? 3.3 : 3.35), 0); tray.rotation.x = Math.PI / 2; } }
 const deckOf = y => DECKS.reduce((b, D, i) => Math.abs(D.y - y) < Math.abs(DECKS[b].y - y) ? i : b, 0);
@@ -320,26 +324,27 @@ function button(label, x, y, z, ry, tilt, onPick, w = 0.5, h = 0.18, col = "#2a3
   plaque(["EXERCISE"], 9.0, y + 2.6, -1.4, -Math.PI / 2, 0.6, 0.14); box(0.8, 0.2, 2.0, mPanel, 7.6, y, 0.6); box(0.8, 1.1, 0.08, mPanel, 7.6, y, -0.4); obst(0, 7.6, 0.6, 0.9, 2.1); box(0.5, 0.9, 1.0, mPanel, 6.0, y, 2.2); obst(0, 6.0, 2.2, 0.6, 1.1);
   // the sick bay
   plaque(["MEDICAL"], 4.0, y + 2.6, 3.14, Math.PI, 0.55, 0.14); box(2.0, 0.8, 0.8, mWhite, 7.0, y, 5.0, Math.PI / 6); obst(0, 7.0, 5.0, 2.1, 1.1); box(0.6, 1.8, 0.4, mWhite, 8.8, y, 3.5, -Math.PI / 3); }
-// the cupola: an observation room on the roof, glazed all the way round: eight tall windows from a low sill up to eight sloping
-// windows, and a large round window overhead (looking forward, at the bow). Only the floor and the slim frames block the view.
-{ const y = 5, n = 8, sill = y + 0.25, wallTop = y + 2.2, rTop = 2.2, yTop = y + 4.2, R1 = CUP_R / Math.cos(Math.PI / n), R2 = rTop / Math.cos(Math.PI / n);
-  const pane = P => { const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute([...P[0], ...P[1], ...P[2], ...P[0], ...P[2], ...P[3]], 3)); g.computeVertexNormals(); add(g, mGlass, 0, 0, 0);
-    // the window frame: a metal edge round each pane
-    for (let e = 0; e < 4; e++) { const A = V3(...P[e]), B = V3(...P[(e + 1) % 4]), L = A.distanceTo(B), mid = A.clone().add(B).multiplyScalar(0.5), bar = add(new THREE.BoxGeometry(0.12, 0.12, L), mFrame, mid.x, mid.y, mid.z); bar.lookAt(B); } };
-  for (let k = 0; k < n; k++) { const a0 = (k - 0.5) / n * Math.PI * 2, a1 = (k + 0.5) / n * Math.PI * 2, am = k / n * Math.PI * 2, at = (R, h, a) => [R * Math.cos(a), h, R * Math.sin(a)];
-    box(2 * CUP_R * Math.tan(Math.PI / n), 0.25, 0.2, mFrame, Math.cos(am) * CUP_R, y, Math.sin(am) * CUP_R, -am + Math.PI / 2);
-    pane([at(R1, sill, a0), at(R1, sill, a1), at(R1, wallTop, a1), at(R1, wallTop, a0)]);
-    pane([at(R1, wallTop, a0), at(R1, wallTop, a1), at(R2, yTop, a1), at(R2, yTop, a0)]); }
-  { const top = new THREE.Mesh(new THREE.CircleGeometry(rTop * 0.92, 48), mGlass); top.position.set(0, yTop + 0.01, 0); top.rotation.x = -Math.PI / 2; SHIP.add(top); const fr = add(new THREE.TorusGeometry(rTop * 0.95, 0.12, 8, 64), mFrame, 0, yTop, 0); fr.rotation.x = Math.PI / 2;
-    const ring2 = add(new THREE.RingGeometry(rTop * 0.95, rTop / Math.cos(Math.PI / n), 8, 1, Math.PI / n), mFrame, 0, yTop + 0.005, 0); ring2.rotation.x = -Math.PI / 2; }
-  add(new THREE.CircleGeometry(CUP_R / Math.cos(Math.PI / n), n, Math.PI / n), mFloor, 0, y + 0.005, 0).rotation.x = -Math.PI / 2;
-  // two reclining couches for looking up through the big window, a handrail round the room, a small workstation
+// the cupola: a glass bubble 10.4 m across, held 20 m above the roof on a neck that carries the lift, so that only the ship below blocks
+// the view (a cone some 30 degrees round straight down). Its floor is glass too, on a frame of spokes and rings.
+{ const y = DECKS[2].y, RB = 5.2, yc = y + 1.4, NECK_R = LIFT_R + 0.3, mOut = M(0x9aa0a6, { metalness: 0.5, roughness: 0.5 });
+  add(new THREE.CylinderGeometry(NECK_R, NECK_R * 1.8, y - 5, 32, 1, true), mOut, 0, (y + 5) / 2, 0);
+  add(new THREE.SphereGeometry(RB, 64, 40), mGlass, 0, yc, 0);
+  // the frame: eight ribs from bottom to top and rings of latitude, the heaviest at the floor
+  for (let k = 0; k < 4; k++) add(new THREE.TorusGeometry(RB + 0.02, 0.06, 6, 96), mFrame, 0, yc, 0).rotation.y = k * Math.PI / 4;
+  for (const [h, t] of [[-3.6, 0.1], [-2.6, 0.06], [-1.4, 0.14], [0.6, 0.06], [2.6, 0.06], [4.3, 0.08]]) { const r = Math.sqrt(RB * RB - h * h), g = add(new THREE.TorusGeometry(r + 0.02, t, 6, 96), mFrame, 0, yc + h, 0); g.rotation.x = Math.PI / 2; }
+  // the glass floor, on spokes and rings
+  const mFG = new THREE.MeshPhysicalMaterial({ color: 0x9ab8cc, transparent: true, opacity: 0.16, roughness: 0.1, metalness: 0, side: THREE.DoubleSide, depthWrite: false });
+  const fl = add(new THREE.CircleGeometry(Math.sqrt(RB * RB - 1.96), 64), mFG, 0, y - 0.01, 0); fl.rotation.x = -Math.PI / 2;
+  for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2, r0 = NECK_R, r1 = Math.sqrt(RB * RB - 1.96), rm = (r0 + r1) / 2; box(0.08, 0.08, r1 - r0, mFrame, Math.sin(a) * rm, y - 0.1, Math.cos(a) * rm, a); }
+  for (const r of [NECK_R, 2.6, 3.8]) { const g = add(new THREE.TorusGeometry(r, 0.05, 6, 64), mFrame, 0, y - 0.05, 0); g.rotation.x = Math.PI / 2; }
+  // two reclining couches for looking up, a handrail round the room, a small workstation
   for (const s of [-1, 1]) { const cx = s * 1.9, cz = 1.6; box(0.7, 0.4, 1.9, mSeat, cx, y, cz); const back = box(0.7, 0.1, 1.2, mSeat, cx, y + 0.55, cz - 1.2); back.rotation.x = -0.7; obst(2, cx, cz - 0.3, 0.8, 2.4); }
-  const hr = add(new THREE.TorusGeometry(CUP_R - 0.22, 0.025, 6, 64), mRail, 0, y + 1.1, 0); hr.rotation.x = Math.PI / 2;
+  const hr = add(new THREE.TorusGeometry(CUP_R - 0.35, 0.025, 6, 64), mRail, 0, y + 1.0, 0); hr.rotation.x = Math.PI / 2;
+  for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; box(0.04, 1.0, 0.04, mRail, Math.sin(a) * (CUP_R - 0.35), y, Math.cos(a) * (CUP_R - 0.35)); }
   box(1.2, 0.85, 0.5, mDesk, -3.0, y, -3.0, Math.PI / 4); obst(2, -3.0, -3.0, 1.0, 1.0); plaque(["CUPOLA"], -3.0 + 0.18, y + 1.0, -3.0 + 0.18, Math.PI / 4, 0.5, 0.12); }
 // light inside: soft white panels; the cupola kept dim so the sky can be seen
 scene.add(new THREE.HemisphereLight(0xdfe6ee, 0x404448, 0.6)); for (const D of DECKS.slice(0, 2)) for (const [x, z] of [[0, -5], [0, 5], [-5, 0], [5, 0]]) { const l = new THREE.PointLight(0xf2f4ff, 14, 16, 1.6); l.position.set(x, D.y + 3.2, z); scene.add(l); }
-{ const l = new THREE.PointLight(0xc8d4e8, 1.5, 8, 2); l.position.set(0, 6.6, 0); scene.add(l); }
+{ const l = new THREE.PointLight(0xc8d4e8, 1.5, 8, 2); l.position.set(0, DECKS[2].y + 1.6, 0); scene.add(l); }
 // ---------- the flight ----------
 // Two clocks, both set to the real date and time when the page opens: the ship's own (proper) time, and coordinate time in the rest
 // frame of the stars (the galaxy's frame, near enough Earth's). Parked, they run together; under way, coordinate time runs gamma times faster.
@@ -442,7 +447,7 @@ function drawShip() { const S = SCREENS.ship, g = panel(S, "SHIP STATUS"), st = 
   deskBtn(...A, 0, 0.34, "ENGAGE AUTOPILOT", engage, 1.4, 0.17, "#6a2a22");
   deskBtn(...N, -0.5, 0.1, "TIME −", () => { warpI = Math.max(0, warpI - 1); }, 0.55); deskBtn(...N, 0.1, 0.1, "TIME +", () => { warpI = Math.min(WARPS.length - 1, warpI + 1); }, 0.55);
   deskBtn(...N, -0.42, 0.34, "TO TURNOVER", () => skip("turn"), 0.75); deskBtn(...N, 0.42, 0.34, "TO ARRIVAL", () => skip("arrive"), 0.75);
-  button("SKY LABELS", -3.0, 5.875, -3.0, Math.PI / 4, -1.3, () => toggleHud(), 0.7, 0.17);
+  button("SKY LABELS", -3.0, DECKS[2].y + 0.875, -3.0, Math.PI / 4, -1.3, () => toggleHud(), 0.7, 0.17);
   // inside the lift, on its wall facing the door: a button for each deck
   for (let d = 0; d < 3; d++) { const y = DECKS[d].y; if (d === 2) box(0.12, 1.4, 0.3, mPanel, LIFT_R - 0.02, y, 0); box(0.06, 0.8, 0.5, mPanel, LIFT_R - 0.06, y + 0.95, 0, 0); [["CUPOLA", 2], ["BRIDGE", 1], ["HABITAT", 0]].forEach(([lab, to], k) => button(lab, LIFT_R - 0.1, y + 1.6 - k * 0.24, 0, -Math.PI / 2, 0, () => goDeck(to), 0.42, 0.18, to === d ? "#4a5a2a" : "#2a3a48")); } }
 // ---------- you: walking and the lift ----------
@@ -479,6 +484,20 @@ let SITTING = localStorage.getItem("vrPosture") === "sitting";
 if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block";
   VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); renderer.xr.setFoveation(1.0); await renderer.xr.setSession(s); start(); camera.position.set(0, 0, 0); vrPanel.visible = true; s.addEventListener("end", () => { camera.position.set(0, 1.6, 0); vrPanel.visible = false; }); }; });
 // ---------- the loop ----------
+// planets as the eye sees them: too small to show a disc from far off, but bright points, some brighter than any star. Apparent
+// magnitude m = H + 5 log10(r d / AU^2) - 2.5 log10(phase) + (the star's brightness relative to the Sun), H the magnitude at 1 AU
+// from the Sun and from us, fully lit; the phase is the fraction of the sunlit side facing us (a Lambert sphere).
+const SOL_H = { Mercury: -0.6, Venus: -4.4, Earth: -3.99, Mars: -1.5, Jupiter: -9.4, Saturn: -8.9, Uranus: -7.1, Neptune: -7.0 }, MOON_H = 0.25;
+const ALBEDO = { rock: 0.14, lava: 0.1, mars: 0.17, venus: 0.69, temperate: 0.3, ocean: 0.3, earth: 0.3, hot: 0.3, gas: 0.5, saturn: 0.5, ice: 0.5, nep: 0.44 };
+const PL_TEMP = { rock: 5000, lava: 3200, mars: 3600, venus: 5600, temperate: 6500, ocean: 7500, earth: 6500, hot: 3800, gas: 4800, saturn: 4600, ice: 9000, nep: 12000 };
+const NPL = 32, plDir = new Float32Array(NPL * 3), plMag = new Float32Array(NPL).fill(99), plTemp = new Float32Array(NPL).fill(5500), PLANET_PTS = mkStars(plDir, plMag, plTemp);
+const _pp = V3();
+function updatePlanetPoints(shipPos, ms) { plMag.fill(99); if (SYS && SYS.starMesh.visible) { const S = SYS.S, dm = isFinite(S.absMag) ? S.absMag - 4.83 : 0, starRel = V3((S.p[0] - shipPos[0]) * LY, (S.p[1] - shipPos[1]) * LY, (S.p[2] - shipPos[2]) * LY);
+    const put = (k, fromStar, H, T) => { if (k >= NPL) return; _pp.copy(starRel).add(fromStar); const d = _pp.length(), r = fromStar.length(), ca = clampN(fromStar.dot(_pp) / (r * d), -1, 1), al = Math.acos(ca), q = (Math.sin(al) + (Math.PI - al) * ca) / Math.PI;
+      plDir.set([_pp.x / d, _pp.y / d, _pp.z / d], k * 3); plMag[k] = H + 5 * Math.log10(r * d / (AU * AU)) - 2.5 * Math.log10(Math.max(q, 1e-5)) + dm; plTemp[k] = T; };
+    SYS.planets.forEach((p, k) => put(k, planetPos(p, ms), SOL_H[p.name] ?? 5 * Math.log10(1329 / (2 * p.radius / 1000 * Math.sqrt(ALBEDO[p.kind] || 0.3))), PL_TEMP[p.kind] || 5500));
+    if (SYS.moon) put(SYS.planets.length, planetPos(SYS.planets.find(p => p.name === "Earth"), ms).add(moonPos(ms)), MOON_H, 5400); }
+  PLANET_PTS.geometry.attributes.aDir.needsUpdate = PLANET_PTS.geometry.attributes.aMag.needsUpdate = PLANET_PTS.geometry.attributes.aTemp.needsUpdate = true; }
 // ---------- the cupola's head-up display ----------
 // In the cupola, labels are projected onto the sky round each object: a ring on it, its name and how far away it is. Their directions get
 // the same aberration as the stars, so at speed they crowd forward with them. Some galaxies, nebulae and clusters are drawn as soft glows
@@ -517,7 +536,7 @@ function frame() { const dt = Math.min(clock.getDelta(), 0.1), vr = renderer.xr.
   if (started) stepFlight(dt);
   setAttitude(bow); const st = curState(), u = mode === "trip" ? trip.u : [1, 0, 0]; skyUniforms.uV.value.set(...u); skyUniforms.uBeta.value = st.v / C; skyUniforms.uGamma.value = st.gamma; skyUniforms.uEps.value = mode === "trip" ? Math.exp(-st.phi) / Math.cosh(st.phi) : 1;   // 1 - beta, computed without cancellation
   { const b = st.v / C; FWD.visible = b > 0.98; if (FWD.visible) { FWD.position.copy(eq2ship(u)).multiplyScalar(SKY_R * 0.9); FWD.scale.setScalar(SKY_R * 0.9 * clampN(0.01 + 0.008 * Math.log10(st.gamma), 0.01, 0.07)); } }
-  const hideI = updateSystem(shipPos, coordMs); updateNamedStars(shipPos, hideI); updateHud(shipPos, P_.deck === 2 && SKYLAB.on, scrT <= dt);
+  const hideI = updateSystem(shipPos, coordMs); updateNamedStars(shipPos, hideI); updatePlanetPoints(shipPos, coordMs); updateHud(shipPos, P_.deck === 2 && SKYLAB.on, scrT <= dt);
   // walking
   let mx = 0, my = 0;
   if (vr) { const s = renderer.xr.getSession(); for (const src of s?.inputSources || []) { const gp = src.gamepad; if (!gp) continue; const [ax, ay] = stick(gp.axes);
