@@ -447,6 +447,31 @@ out13 = HERE / "london1066.html"
 out13.write_text(LN.replace("__THREE__", three).replace("__SCENE__", (HERE / "london1066.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out13.name}, {out13.stat().st_size // 1024} KB")
 
+# St. Louis, 1800
+SL = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>St. Louis, May 1800: the French village on the Mississippi</title>").replace("background:#c8d4d8", "background:#c4c8c0").replace("#intro.gone{", "#intro{overflow-y:auto;align-items:flex-start;padding:16px 0;box-sizing:border-box} #intro .card{margin:auto} #intro.gone{", 1)
+i0, i1 = SL.index('<div id="intro">'), SL.index('<button id="vr">')
+SL = SL[:i0] + """<div id="intro"><div class="card">
+  <h1>St. Louis, 20 May 1800</h1>
+  <p>Thirty-six years after Pierre Laclède and the 14-year-old Auguste Chouteau cleared the site, St. Louis is the capital of Spanish
+  Upper Louisiana and the fur-trading town of the Missouri: about a thousand people, French in speech and ways, a quarter of them enslaved,
+  on a limestone terrace above the Mississippi. Walk its three long streets (La Grande Rue, the Rue de l'Église, the Rue des Granges)
+  between houses of upright logs with galleries all round, each behind its picket fence; the log church of 1776, the Chouteaus' walled
+  stone house, the Government House flying the flag of Spain, the stone tower of 1780 on the hill; down to the landing and the keelboats;
+  out to Chouteau's mill and pond, the long strips of the common fields, and the great mound north of the town.</p>
+  <p>It is a Rogation day: after early Mass the parish walks in procession to bless the fields. Later a keelboat leaves for the Missouri
+  and its crew hauls it upstream on the towline; a party of Osage comes to see the Chouteaus; in the evening there is a dance. At the
+  fur press, the smithy, the mill, a bake oven and a house going up you can watch the work and read about each part.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; shift run &nbsp;&middot;&nbsp; <kbd>−</kbd> <kbd>=</kbd> pace &nbsp;&middot;&nbsp; <kbd>E</kbd> read a marker or ask about a person &nbsp;&middot;&nbsp;
+  <kbd>N</kbd> next moment &nbsp;&middot;&nbsp; <kbd>T</kbd> time speed &nbsp;&middot;&nbsp; <kbd>L</kbd> markers &nbsp;&middot;&nbsp; <kbd>F</kbd> fly &nbsp;&middot;&nbsp; <kbd>M</kbd> map<br>
+  In VR: left stick walk, right stick turn, trigger run, <b>A</b> read, <b>B</b> next place, <b>X</b> next moment, <b>Y</b> time speed</p>
+  <p class="dim">The town plan, the church, the Chouteau house, the tower, the mill and the mounds are placed from the records; most houses
+  and the day's events are typical of the time, and every marker says how well a thing is known. Click to begin.</p>
+</div></div>
+""" + SL[i1:]
+out15 = HERE / "stlouis1800.html"
+out15.write_text(SL.replace("__THREE__", three).replace("__SCENE__", (HERE / "stlouis1800.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out15.name}, {out15.stat().st_size // 1024} KB")
+
 # ---- the fourteenth page: an antimatter starship at 1 g ------------------------------------------------------------------
 SS = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Starship: 1 g to the stars</title>").replace("background:#c8d4d8", "background:#05080c")
 i0, i1 = SS.index('<div id="intro">'), SS.index('<button id="vr">')
