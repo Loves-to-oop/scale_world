@@ -53458,9 +53458,11 @@ function stepFlight(dt) { const w = WARPS[warpI][0], step = dt * w;
 const pad = (n, k = 2) => String(n).padStart(k, "0");
 const fmtDate = ms => { const d = new Date(ms); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`; };
 const fmtDur = s => { s = Math.max(0, s); if (s < 120) return `${s.toFixed(0)} s`; if (s < 7200) return `${(s / 60).toFixed(1)} min`; if (s < 2 * 86400) return `${(s / 3600).toFixed(1)} hours`; if (s < YEAR) return `${(s / 86400).toFixed(1)} days`; const y = s / YEAR; return y < 1000 ? `${y.toFixed(2)} years` : `${Math.round(y).toLocaleString()} years`; };
-const fmtLy = ly => ly < 0.001 ? `${(ly * LY / AU).toFixed(ly * LY / AU < 10 ? 3 : 1)} AU` : ly < 10 ? `${ly.toFixed(3)} ly` : `${ly.toLocaleString(undefined, { maximumFractionDigits: 1 })} ly`;
+// distances step up through metres, kilometres, astronomical units and light years as they grow
+const fmtLy = ly => { const m = Math.abs(ly) * LY; if (m < 1000) return `${m.toFixed(m < 10 ? 2 : m < 100 ? 1 : 0)} m`; if (m < 1e8) return `${(m / 1000).toLocaleString(undefined, { maximumFractionDigits: m < 1e5 ? 2 : 0 })} km`; if (m < 0.05 * LY) { const au = m / AU; return `${au.toFixed(au < 10 ? 4 : au < 100 ? 2 : 1)} AU`; } return ly < 10 ? `${ly.toFixed(3)} ly` : `${ly.toLocaleString(undefined, { maximumFractionDigits: 1 })} ly`; };
 const fmtV = v => { const b = v / C; if (b < 0.9) return `${b.toFixed(6)} c`; const n = Math.min(14, Math.max(4, Math.ceil(-Math.log10(1 - b)) + 3)); return `${b.toFixed(n)} c`; };
-const fmtKms = v => `${(v / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km/s`;
+// speeds step up from metres a second to kilometres a second as they grow
+const fmtKms = v => { const a = Math.abs(v); if (a < 1000) return `${a.toFixed(a < 10 ? 3 : a < 100 ? 2 : 1)} m/s`; return `${(a / 1000).toLocaleString(undefined, { minimumFractionDigits: a < 1e7 ? 2 : 1, maximumFractionDigits: a < 1e7 ? 2 : 1 })} km/s`; };
 // a speed in units of c, with enough digits to see it (both velocities use this, so at low speed they read the same)
 const fmtC = v => { const b = v / C; if (b === 0) return "0 c"; if (b < 1e-3) return `${b.toExponential(4)} c`; if (b < 0.99) return `${b.toFixed(6)} c`; if (b < 1) return fmtV(v); return `${b.toFixed(b < 10 ? 6 : 3)} c`; };
 const fmtG = g => g < 10 ? g.toFixed(g < 1.01 ? 8 : 5) : fmtBig(g);
@@ -53573,7 +53575,7 @@ function frame() { const dt = Math.min(clock.getDelta(), 0.1), vr = renderer.xr.
   scrT -= dt; if (scrT <= 0) { scrT = 0.25; drawTrip(); drawAuto(); drawNav(); drawEng(); drawShip(); }
   msgT -= dt; if (msgT <= 0 && MSG.style.display !== "none") { MSG.style.display = "none"; msgText = ""; }
   hudT -= dt; if (hudT <= 0) { hudT = 0.25; HUD.innerHTML = `<b>${DECKS[P_.deck].name}</b> · ${mode === "trip" ? `to <b>${STARS[trip.dest].name}</b>, ${st.phase}` : mode === "align" ? "turning to the course" : `in orbit near ${parkName()}`} · time: ${WARPS[warpI][1]}<br>ship ${fmtDate(properMs)} · stars ${fmtDate(coordMs)}<br>map velocity v = ${fmtKms(st.v)} (${fmtC(st.v)}) · proper velocity w = ${fmtKms(st.w)} (${fmtC(st.w)}) · γ = ${fmtG(st.gamma)}<br><span style="color:#8ab0c4;font-size:12px">WASD walk · drag to look · click the console buttons · [ ] time · Q/Z lift up/down (in the lift)</span>`;
-    if (vr) drawVR([`${mode === "trip" ? "to " + STARS[trip.dest].name + " · " + st.phase : "in orbit near " + parkName()} · ${WARPS[warpI][1]}`, `ship ${fmtDate(properMs)}`, `stars ${fmtDate(coordMs)}`, `v ${fmtC(st.v)}  w ${fmtC(st.w)}  gamma ${fmtG(st.gamma)}`, msgText.slice(0, 70), msgText.slice(70, 140), "trigger: press buttons · A in the lift: next deck · X/Y: time"]); }
+    if (vr) drawVR([`${mode === "trip" ? "to " + STARS[trip.dest].name + " · " + st.phase : "in orbit near " + parkName()} · ${WARPS[warpI][1]}`, `ship ${fmtDate(properMs)}`, `stars ${fmtDate(coordMs)}`, `v ${fmtKms(st.v)}  w ${fmtKms(st.w)}  gamma ${fmtG(st.gamma)}`, msgText.slice(0, 70), msgText.slice(70, 140), "trigger: press buttons · A in the lift: next deck · X/Y: time"]); }
   renderer.render(scene, camera); }
 
 </script></body></html>
