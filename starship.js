@@ -247,8 +247,8 @@ function moonPos(ms) { const days = (ms - J2000) / 864e5, th = 2 * Math.PI * day
 const SOL_GM = { Mercury: 2.2032e13, Venus: 3.24859e14, Earth: 3.986004e14, Mars: 4.282837e13, Jupiter: 1.26687e17, Saturn: 3.7931e16, Uranus: 5.794e15, Neptune: 6.8365e15 }, MOON_GM = 4.9048695e12, G_N = 6.674e-11;
 const DENS = { gas: 1300, saturn: 700, ice: 1600, nep: 1640 }, SOL_ROT = { Mercury: 58.646, Venus: -243.02, Earth: 1, Mars: 1.0275, Jupiter: 0.41354, Saturn: 0.44401, Uranus: -0.71833, Neptune: 0.67125 };
 const EARTHLIKE = { rho: 1.225, H: 8500, zen: [0.16, 0.38, 0.78], hor: [0.66, 0.78, 0.92], sky: 1, vis: 60000 };
-const ATM = { earth: EARTHLIKE, temperate: EARTHLIKE, ocean: EARTHLIKE, mars: { rho: 0.020, H: 11100, zen: [0.55, 0.42, 0.3], hor: [0.85, 0.68, 0.5], sky: 0.8, vis: 40000 },
-  venus: { rho: 65, H: 15900, zen: [0.42, 0.3, 0.14], hor: [0.62, 0.46, 0.24], sky: 1, vis: 4000, cloud: 48000 } };
+const ATM = { earth: EARTHLIKE, temperate: EARTHLIKE, ocean: EARTHLIKE, mars: { rho: 0.020, H: 11100, zen: [0.55, 0.42, 0.3], hor: [0.85, 0.68, 0.5], sky: 0.97, vis: 40000 },
+  venus: { rho: 65, H: 15900, h1: 60000, H2: 5000, zen: [0.42, 0.3, 0.14], hor: [0.62, 0.46, 0.24], sky: 1, vis: 4000, cloud: 48000 } };
 const SOLID = { rock: 1, lava: 1, mars: 1, venus: 1, temperate: 1, ocean: 1, earth: 1, moon: 1 };
 function bodyInfo(sel) { const S = SYS.S; if (sel === -1) return { sel, name: S.name.split(" (")[0], R: S.radius, GM: 1.32712e20 * S.mass, axis: SYS.n, rot: 25, kind: S.bh ? "black hole" : "star", star: true };
   if (sel === -2) return { sel, name: "the Moon", R: 1.7374e6, GM: MOON_GM, axis: SYS.n, rot: 27.3217, kind: "moon", spin0: Math.PI, solid: true, atm: null };
@@ -278,7 +278,7 @@ function updateSystem(shipPos, ms) { if (!SYS) return; const S = SYS.S, starRel 
 // framed windows like the ISS's, on its roof. Below it (not visible from inside) a long spine carries the hydrogen tanks, the magnetic
 // antimatter traps, the radiators and, 600 m aft, the engine; the forward hull carries the radiation shield.
 const SHIP = new THREE.Group(); scene.add(SHIP);
-const HULL_R = 11, CUP_R = 5.0, DECKS = [{ name: "the habitat deck", y: -5 }, { name: "the bridge", y: 0 }, { name: "the cupola", y: 25 }];
+const HULL_R = 11, CUP_R = 5.0, DECKS = [{ name: "the habitat deck", y: -5 }, { name: "the bridge", y: 0 }, { name: "the cupola", y: 25 }, { name: "the hangar", y: -12 }], DECK_ORDER = [3, 0, 1, 2];
 // surfaces: light grey wall panels with seams and fasteners, non-slip floor plates, ceiling light panels
 const panelT = tex(512, 512, (g, w, h) => { g.fillStyle = "#c4c8cc"; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 128) for (let x = 0; x < w; x += 256) { g.fillStyle = (x + y) % 384 ? "#cdd1d4" : "#bfc3c7"; g.fillRect(x + 3, y + 3, 250, 122); g.strokeStyle = "#8a9096"; g.lineWidth = 3; g.strokeRect(x + 2, y + 2, 252, 124);
     g.fillStyle = "#7a8086"; for (const [fx, fy] of [[10, 10], [244, 10], [10, 118], [244, 118]]) { g.beginPath(); g.arc(x + fx, y + fy, 3, 0, 6.28); g.fill(); } } g.fillStyle = "#5a6066"; g.font = "600 13px Helvetica"; g.fillText("P-117", 20, 40); g.fillText("O2 / N2", 280, 168); });
@@ -289,33 +289,34 @@ const ceilT = tex(256, 256, (g, w, h) => { g.fillStyle = "#d4d8dc"; g.fillRect(0
 const mWall = new THREE.MeshStandardMaterial({ map: panelT, roughness: 0.75, metalness: 0.1, side: THREE.DoubleSide }), mFloor = new THREE.MeshStandardMaterial({ map: floorT, roughness: 0.9 }), mCeil = new THREE.MeshStandardMaterial({ map: ceilT, roughness: 0.8, side: THREE.DoubleSide });
 const mPanel = M(0x2a2e34, { roughness: 0.6 }), mDesk = M(0x8a9096, { metalness: 0.3, roughness: 0.55 }), mRail = M(0xc8b46a, { metalness: 0.6, roughness: 0.35 }), mSeat = M(0x3a4048, { roughness: 0.9 }), mWhite = M(0xe2e4e6, { roughness: 0.7 }), mFrame = M(0x4a4e54, { metalness: 0.6, roughness: 0.4 });
 const mGlass = new THREE.MeshPhysicalMaterial({ color: 0xa8c0d0, transparent: true, opacity: 0.08, roughness: 0.02, metalness: 0, side: THREE.DoubleSide, depthWrite: false });
-const add = (geo, mat, x, y, z, ry = 0, parent = SHIP) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = ry; parent.add(m); return m; };
+let PARENT = SHIP; const add = (geo, mat, x, y, z, ry = 0, parent = PARENT) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = ry; parent.add(m); return m; };
 const box = (w, h, d, mat, x, y, z, ry = 0) => add(new THREE.BoxGeometry(w, h, d), mat, x, y + h / 2, z, ry);
 function signTex(lines, w = 512, h = 128, bg = "#1a1e22", fg = "#d8dde2", font = 44) { return tex(w, h, (g) => { g.fillStyle = bg; g.fillRect(0, 0, w, h); g.fillStyle = fg; g.font = `600 ${font}px Helvetica, Arial, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; const L = [].concat(lines); L.forEach((t, i) => g.fillText(t, w / 2, h / 2 + (i - (L.length - 1) / 2) * font * 1.15)); }); }
 // small stencilled labels, as on a real spacecraft
 const plaque = (lines, x, y, z, ry, w = 0.7, h = 0.16) => add(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: signTex(lines, 512, Math.round(512 * h / w), "#e4e6e8", "#22262a", Math.round(512 * h / w * 0.55)), toneMapped: false }), x, y, z, ry);
-const OBST = [[], [], []]; const obst = (deck, x, z, w, d) => OBST[deck].push([x, z, w / 2 + 0.25, d / 2 + 0.25]);
+const OBST = [[], [], [], []]; const obst = (deck, x, z, w, d) => OBST[deck].push([x, z, w / 2 + 0.25, d / 2 + 0.25]);
 // the lift: an enclosed shaft through the decks, its door facing forward (-z) on every deck
 const LIFT_R = 1.4, DOOR = 0.42;
 const walkable = (deck, x, z) => { const r = Math.hypot(x, z), lim = deck === 2 ? CUP_R - 0.55 : HULL_R - 0.6; if (r > lim) return false;
-  if (deck < 2 && r > LIFT_R - 0.25 && r < LIFT_R + 0.25 && Math.abs(Math.atan2(x, z)) < Math.PI - DOOR * 0.8) return false; return !OBST[deck].some(([ox, oz, hw, hd]) => Math.abs(x - ox) < hw && Math.abs(z - oz) < hd); };
+  if (deck !== 2 && r > LIFT_R - 0.25 && r < LIFT_R + 0.25 && Math.abs(Math.atan2(x, z)) < Math.PI - DOOR * 0.8) return false; return !OBST[deck].some(([ox, oz, hw, hd]) => Math.abs(x - ox) < hw && Math.abs(z - oz) < hd); };
 { for (const D of DECKS) add(new THREE.CircleGeometry(LIFT_R - 0.05, 32), mFloor, 0, D.y + 0.012, 0).rotation.x = -Math.PI / 2;
-  add(new THREE.CylinderGeometry(LIFT_R, LIFT_R, 10, 40, 1, true, Math.PI + DOOR, Math.PI * 2 - 2 * DOOR), mWall, 0, 0, 0);
+  add(new THREE.CylinderGeometry(LIFT_R, LIFT_R, 17, 40, 1, true, Math.PI + DOOR, Math.PI * 2 - 2 * DOOR), mWall, 0, -3.5, 0);
   { const r = add(new THREE.TorusGeometry(LIFT_R + 0.05, 0.03, 6, 48, Math.PI * 2 - 2 * DOOR), mRail, 0, DECKS[2].y + 1.0, 0); r.rotation.x = -Math.PI / 2; r.rotation.z = -Math.PI / 2 + DOOR; for (let k = 0; k < 8; k++) { const a = DOOR + (k + 0.5) / 8 * (Math.PI * 2 - 2 * DOOR) + Math.PI; box(0.04, 1.0, 0.04, mRail, Math.sin(a) * (LIFT_R + 0.05), DECKS[2].y, Math.cos(a) * (LIFT_R + 0.05)); } }
-  for (const D of DECKS.slice(0, 2)) { add(new THREE.CircleGeometry(LIFT_R - 0.05, 32), mFloor, 0, D.y + 0.01, 0).rotation.x = -Math.PI / 2; for (const s of [-1, 1]) box(0.12, 2.2, 0.15, mFrame, s * Math.sin(DOOR) * LIFT_R, D.y, -Math.cos(DOOR) * LIFT_R); box(Math.sin(DOOR) * LIFT_R * 2 + 0.2, 0.25, 0.15, mFrame, 0, D.y + 2.2, -Math.cos(DOOR) * LIFT_R);
+  for (const D of DECKS.filter((D, i) => i !== 2)) { add(new THREE.CircleGeometry(LIFT_R - 0.05, 32), mFloor, 0, D.y + 0.01, 0).rotation.x = -Math.PI / 2; for (const s of [-1, 1]) box(0.12, 2.2, 0.15, mFrame, s * Math.sin(DOOR) * LIFT_R, D.y, -Math.cos(DOOR) * LIFT_R); box(Math.sin(DOOR) * LIFT_R * 2 + 0.2, 0.25, 0.15, mFrame, 0, D.y + 2.2, -Math.cos(DOOR) * LIFT_R);
     plaque(["LIFT"], 0, D.y + 2.6, -LIFT_R - 0.02, Math.PI, 0.5, 0.14); } }
 // the hull: the outer wall panelled inside, floors, ceilings with light panels, handrails, lockers, cable trays
-{ add(new THREE.CylinderGeometry(HULL_R, HULL_R, 14, 72, 1, true), mWall, 0, -2, 0).material.map.repeat.set(26, 7);
+{ add(new THREE.CylinderGeometry(HULL_R, HULL_R, 17.05, 72, 1, true), mWall, 0, -3.525, 0).material.map.repeat.set(26, 8.5);
   const ring = (y0, r0, r1, mat, up) => { const f = add(new THREE.RingGeometry(r0, r1, 72, 1), mat, 0, y0, 0); f.rotation.x = up ? -Math.PI / 2 : Math.PI / 2; return f; };
   ring(-5, LIFT_R, HULL_R, mFloor, true); ring(-1.4, LIFT_R, HULL_R, mCeil, false); ring(0, LIFT_R, HULL_R, mFloor, true); ring(3.6, LIFT_R, HULL_R, mCeil, false);
-  add(new THREE.CircleGeometry(HULL_R, 72), M(0x2a2e34), 0, -9, 0).rotation.x = -Math.PI / 2;
+  ring(-12, LIFT_R, HULL_R, mFloor, true); ring(-5.05, LIFT_R, HULL_R, mCeil, false); add(new THREE.CircleGeometry(HULL_R + 0.2, 72), M(0x5a6068, { metalness: 0.5 }), 0, -12.1, 0).rotation.x = Math.PI / 2;
   ring(5, LIFT_R + 0.3, HULL_R + 0.2, M(0x8a9096, { metalness: 0.4 }), true);
   // the outside of the crew section, seen from the cupola: the hull's outer skin, a rim, and hatches and radiator panels on the roof
-  const mOut = M(0x9aa0a6, { metalness: 0.5, roughness: 0.5 }); add(new THREE.CylinderGeometry(HULL_R + 0.2, HULL_R + 0.2, 14.2, 72, 1, true), mOut, 0, -2, 0);
+  const mOut = M(0x9aa0a6, { metalness: 0.5, roughness: 0.5 }); add(new THREE.CylinderGeometry(HULL_R + 0.2, HULL_R + 0.2, 17.25, 72, 1, true), mOut, 0, -3.525, 0);
   const rim = add(new THREE.TorusGeometry(HULL_R + 0.2, 0.18, 8, 96), mOut, 0, 5.05, 0); rim.rotation.x = Math.PI / 2;
   for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + 0.3; box(1.4, 0.12, 3.2, M(0x5a6068, { metalness: 0.6 }), Math.sin(a) * 7.5, 5, Math.cos(a) * 7.5, a); box(0.9, 0.2, 0.9, mOut, Math.sin(a + 0.52) * 4.5, 5, Math.cos(a + 0.52) * 4.5, a); }
-  const ledM = new THREE.MeshBasicMaterial({ color: 0xf4f6ff }); for (const y of [-1.42, 3.58]) for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2, l = add(new THREE.PlaneGeometry(1.6, 0.4), ledM, Math.cos(a) * 6, y, Math.sin(a) * 6, -a); l.rotation.x = Math.PI / 2; l.rotation.order = "YXZ"; l.rotation.y = -a; }
-  for (const D of DECKS.slice(0, 2)) { const hr = add(new THREE.TorusGeometry(HULL_R - 0.18, 0.025, 6, 96), mRail, 0, D.y + 1.05, 0); hr.rotation.x = Math.PI / 2; const tray = add(new THREE.TorusGeometry(HULL_R - 0.3, 0.12, 4, 96), mPanel, 0, D.y + (D.y < 0 ? 3.3 : 3.35), 0); tray.rotation.x = Math.PI / 2; } }
+  const ledM = new THREE.MeshBasicMaterial({ color: 0xf4f6ff }); for (const y of [-1.42, 3.58, -5.07]) for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2, l = add(new THREE.PlaneGeometry(1.6, 0.4), ledM, Math.cos(a) * 6, y, Math.sin(a) * 6, -a); l.rotation.x = Math.PI / 2; l.rotation.order = "YXZ"; l.rotation.y = -a; }
+  for (const D of DECKS.filter((D, i) => i !== 2)) { const hr = add(new THREE.TorusGeometry(HULL_R - 0.18, 0.025, 6, 96), mRail, 0, D.y + 1.05, 0); hr.rotation.x = Math.PI / 2; const tray = add(new THREE.TorusGeometry(HULL_R - 0.3, 0.12, 4, 96), mPanel, 0, D.y + (D.y < 0 ? 3.3 : 3.35), 0); tray.rotation.x = Math.PI / 2; } }
+const canWalk = (x, z) => PLACE === "ship" ? walkable(P_.deck, x, z) : PLACE === "lander" ? Math.hypot(x, z) < 1.85 && !LOBST.some(([ox, oz, hw, hd]) => Math.abs(x - ox) < hw && Math.abs(z - oz) < hd) : Math.hypot(x, z) > 3.9 && Math.hypot(x, z) < 400;
 const deckOf = y => DECKS.reduce((b, D, i) => Math.abs(D.y - y) < Math.abs(DECKS[b].y - y) ? i : b, 0);
 // screens: canvases on framed displays
 const SCREENS = {}; const screen = (key, w, h, cw, ch, x, y, z, ry, tilt = 0) => { const c = document.createElement("canvas"); c.width = cw; c.height = ch; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
@@ -366,14 +367,58 @@ function button(label, x, y, z, ry, tilt, onPick, w = 0.5, h = 0.18, col = "#2a3
   const hr = add(new THREE.TorusGeometry(CUP_R - 0.35, 0.025, 6, 64), mRail, 0, y + 1.0, 0); hr.rotation.x = Math.PI / 2;
   for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; box(0.04, 1.0, 0.04, mRail, Math.sin(a) * (CUP_R - 0.35), y, Math.cos(a) * (CUP_R - 0.35)); }
   box(1.2, 0.85, 0.5, mDesk, -3.0, y, -3.0, Math.PI / 4); obst(2, -3.0, -3.0, 1.0, 1.0); plaque(["CUPOLA"], -3.0 + 0.18, y + 1.0, -3.0 + 0.18, Math.PI / 4, 0.5, 0.12); }
+// the hangar, under the habitat deck: the lander on its pad, the bay doors in the hull beyond it, suit lockers and tool racks
+{ const y = DECKS[3].y, mStripe = new THREE.MeshBasicMaterial({ map: tex(256, 32, (g, w, h) => { for (let x = -h; x < w; x += 32) { g.fillStyle = "#e8b820"; g.fillRect(0, 0, w, h); } for (let x = -h; x < w + h; x += 32) { g.fillStyle = "#1a1a1a"; g.beginPath(); g.moveTo(x, h); g.lineTo(x + 16, h); g.lineTo(x + 16 + h, 0); g.lineTo(x + h, 0); g.fill(); } }), toneMapped: false });
+  const pad = add(new THREE.RingGeometry(4.0, 4.25, 64), new THREE.MeshBasicMaterial({ color: 0xe8b820, toneMapped: false }), 0, y + 0.01, 7.0); pad.rotation.x = -Math.PI / 2;
+  // the bay doors: two leaves in the hull ahead of the lander, with hazard stripes round them
+  for (const s of [-1, 1]) box(3.0, 5.6, 0.2, M(0x6a7078, { metalness: 0.5, roughness: 0.5 }), s * 1.52, y + 0.2, 10.75);
+  for (const [w, h, x, yy] of [[6.4, 0.25, 0, y + 5.8], [6.4, 0.25, 0, y], [0.25, 6.0, -3.2, y], [0.25, 6.0, 3.2, y]]) { const b = box(w, h, 0.05, mStripe, x, yy, 10.62); }
+  plaque(["BAY DOORS · LANDER 1"], 0, y + 6.3, 10.6, Math.PI, 1.4, 0.16);
+  // suit lockers and racks round the walls
+  for (let k = 0; k < 4; k++) { const a = Math.PI * 1.15 + k * 0.16; box(0.9, 2.1, 0.6, mWhite, Math.cos(a) * 10.4, y, Math.sin(a) * 10.4, -a + Math.PI / 2); } plaque(["EVA SUITS"], Math.cos(Math.PI * 1.39) * 10.05, y + 2.4, Math.sin(Math.PI * 1.39) * 10.05, -Math.PI * 1.39 - Math.PI / 2, 0.6, 0.14);
+  for (let k = 0; k < 3; k++) { const a = -Math.PI * 0.15 - k * 0.2; box(1.4, 1.6, 0.5, mPanel, Math.cos(a) * 10.5, y, Math.sin(a) * 10.5, -a + Math.PI / 2); }
+  obst(3, 0, 7.0, 7.4, 7.4); plaque(["HANGAR"], 0, y + 2.6, -LIFT_R - 0.02, Math.PI, 0.6, 0.14); }
+// the lander: a squat vertical lander, a cabin with windows all round over its propellant tanks, heat shield and antimatter engine, on
+// four legs. Its origin is the cabin floor, 3.4 m above its footpads.
+const CAB_H = 3.4, CAB_R = 2.3, LANDER = new THREE.Group(); LANDER.position.set(0, DECKS[3].y + CAB_H, 7.0); SHIP.add(LANDER); PARENT = LANDER;
+const lbox = (w, h, d, mat, x, y, z, parent) => add(new THREE.BoxGeometry(w, h, d), mat, x, y + h / 2, z, 0, parent);
+const strut = (A, Bp, r, mat) => { const L = A.distanceTo(Bp), m = add(new THREE.CylinderGeometry(r, r, L, 8), mat, (A.x + Bp.x) / 2, (A.y + Bp.y) / 2, (A.z + Bp.z) / 2); m.quaternion.setFromUnitVectors(V3(0, 1, 0), Bp.clone().sub(A).normalize()); return m; };
+const LOBST = [[0.6, -0.3, 0.5, 0.5], [-0.6, -0.3, 0.5, 0.5], [0, 1.45, 1.1, 0.4]];
+let HATCH = null, PLUME = null;
+{ const mHull = M(0xd8dadc, { metalness: 0.3, roughness: 0.5 }), mShield = M(0x2a2420, { roughness: 0.95 }), mLeg = M(0x9a9ea4, { metalness: 0.7, roughness: 0.35 }), mFoil = M(0xc8a040, { metalness: 0.8, roughness: 0.3 }), n = 8, wl = 2 * CAB_R * Math.tan(Math.PI / n);
+  // the cabin's eight sides: a window in each (0.9 to 1.8 m up), but the hatch side (facing -z)
+  for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2, g = new THREE.Group(); g.position.set(Math.sin(a) * CAB_R, 0, Math.cos(a) * CAB_R); g.rotation.y = a; LANDER.add(g);
+    for (const s of [-1, 1]) lbox(0.1, 2.4, 0.16, mFrame, s * wl / 2, 0, 0, g);
+    if (k === 4) { lbox(wl, 0.4, 0.12, mWall, 0, 2.0, 0, g); HATCH = lbox(wl - 0.1, 2.0, 0.08, mHull, 0, 0, 0.02, g); add(new THREE.PlaneGeometry(0.3, 0.3), mGlass, 0, 1.5, 0.07, 0, g); }
+    else { lbox(wl, 0.9, 0.12, mWall, 0, 0, 0, g); lbox(wl, 0.6, 0.12, mWall, 0, 1.8, 0, g); add(new THREE.PlaneGeometry(wl, 0.9), mGlass, 0, 1.35, 0, 0, g); for (const yy of [0.9, 1.8]) lbox(wl, 0.06, 0.16, mFrame, 0, yy - 0.03, 0, g); } }
+  const oct = (r, y, mat, up) => { const m = add(new THREE.CircleGeometry(r / Math.cos(Math.PI / n), n, Math.PI / n), mat, 0, y, 0); m.rotation.x = up ? -Math.PI / 2 : Math.PI / 2; return m; };
+  oct(CAB_R, 0.01, mFloor, true); oct(CAB_R, 2.4, mCeil, false); oct(CAB_R + 0.1, -0.02, mHull, false);
+  add(new THREE.PlaneGeometry(0.8, 0.3), new THREE.MeshBasicMaterial({ color: 0xf4f6ff }), 0, 2.38, 0).rotation.x = Math.PI / 2;
+  const roof = add(new THREE.ConeGeometry(CAB_R / Math.cos(Math.PI / n) + 0.06, 0.9, n), mHull, 0, 2.85, 0); roof.rotation.y = Math.PI / n; add(new THREE.CylinderGeometry(0.55, 0.6, 0.35, 24), mLeg, 0, 3.35, 0);
+  // below: propellant tanks in gold foil, the heat shield, the engine bell, and the exhaust plume when it fires
+  add(new THREE.CylinderGeometry(2.45, 2.6, 2.0, 32), mFoil, 0, -1.0, 0); add(new THREE.CylinderGeometry(2.75, 2.75, 0.25, 48), mShield, 0, -2.12, 0);
+  add(new THREE.CylinderGeometry(0.35, 0.95, 0.9, 24, 1, true), M(0x3a3e44, { metalness: 0.8, roughness: 0.4, side: THREE.DoubleSide }), 0, -2.7, 0);
+  PLUME = add(new THREE.ConeGeometry(0.85, 1, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0x9ab8ff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }), 0, -3.65, 0); PLUME.rotation.x = Math.PI; PLUME.visible = false;
+  // four legs, each with a footpad, and a ladder down from the hatch
+  for (let k = 0; k < 4; k++) { const a = Math.PI / 4 + k * Math.PI / 2, c = Math.cos(a), sn = Math.sin(a), foot = V3(3.5 * sn, -3.32, 3.5 * c); strut(V3(2.5 * sn, -0.6, 2.5 * c), foot, 0.09, mLeg); strut(V3(2.65 * sn, -2.0, 2.65 * c), foot, 0.07, mLeg); add(new THREE.CylinderGeometry(0.4, 0.45, 0.1, 16), mLeg, foot.x, -3.35, foot.z); }
+  for (const s of [-1, 1]) strut(V3(s * 0.35, 0, -2.45), V3(s * 0.35, -3.4, -3.35), 0.03, mLeg); for (let k = 1; k < 11; k++) { const f = k / 11; lbox(0.7, 0.03, 0.03, mLeg, 0, -3.4 * f, -2.45 - 0.9 * f); }
+  box(0.08, 1.2, 0.08, mLeg, 0.95, -3.4, -3.7); button("BOARD LANDER", 0.95, -2.1, -3.72, Math.PI, 0, () => board(), 0.55, 0.16, "#2a4a3a");
+  // inside: two seats facing the console (+z), its screen, and its buttons
+  for (const s of [-1, 1]) { box(0.55, 0.45, 0.55, mSeat, s * 0.6, 0, -0.3); box(0.55, 0.9, 0.12, mSeat, s * 0.6, 0.45, -0.6); }
+  box(1.9, 0.85, 0.5, mDesk, 0, 0, 1.45); screen("lander", 1.05, 0.62, 1300, 768, 0, 1.2, 1.62, Math.PI, -0.3); plaque(["LANDER 1"], 0, 2.05, 2.2, Math.PI, 0.5, 0.12);
+  const cb = (u, v, label, fn, w = 0.42, col) => button(label, -u, 0.875, 1.45 - v, Math.PI, -1.3, fn, w, 0.15, col);
+  cb(-0.76, 0.18, "TIME −", () => { warpI = Math.max(0, warpI - 1); LAND.userWarp = true; }, 0.34); cb(-0.38, 0.18, "LAND", () => startLanding(), 0.34, "#6a2a22"); cb(0, 0.18, "LAUNCH", () => launchLander(), 0.34, "#2a4a6a");
+  cb(0.38, 0.18, "GO OUT", () => exitLander(), 0.34, "#2a4a3a"); cb(0.76, 0.18, "TIME +", () => { warpI = Math.min(WARPS.length - 1, warpI + 1); LAND.userWarp = true; }, 0.34);
+  const l = new THREE.PointLight(0xf0f4ff, 3, 7, 1.6); l.position.set(0, 2.2, 0); LANDER.add(l); }
+PARENT = SHIP;
 // light inside: soft white panels; the cupola kept dim so the sky can be seen
-scene.add(new THREE.HemisphereLight(0xdfe6ee, 0x404448, 0.6)); for (const D of DECKS.slice(0, 2)) for (const [x, z] of [[0, -5], [0, 5], [-5, 0], [5, 0]]) { const l = new THREE.PointLight(0xf2f4ff, 14, 16, 1.6); l.position.set(x, D.y + 3.2, z); scene.add(l); }
-{ const l = new THREE.PointLight(0xc8d4e8, 1.5, 8, 2); l.position.set(0, DECKS[2].y + 1.6, 0); scene.add(l); }
+const HEMI = new THREE.HemisphereLight(0xdfe6ee, 0x404448, 0.6); scene.add(HEMI); for (const D of DECKS.filter((D, i) => i !== 2)) for (const [x, z] of [[0, -5], [0, 5], [-5, 0], [5, 0]]) { const l = new THREE.PointLight(0xf2f4ff, D.y < -10 ? 22 : 14, 16, 1.6); l.position.set(x, D.y + (D.y < -10 ? 6.6 : 3.2), z); SHIP.add(l); }
+{ const l = new THREE.PointLight(0xc8d4e8, 1.5, 8, 2); l.position.set(0, DECKS[2].y + 1.6, 0); SHIP.add(l); }
 // ---------- the flight ----------
 // Two clocks, both set to the real date and time when the page opens: the ship's own (proper) time, and coordinate time in the rest
 // frame of the stars (the galaxy's frame, near enough Earth's). Parked, they run together; under way, coordinate time runs gamma times faster.
 const NOW0 = Date.now(); let properMs = NOW0, coordMs = NOW0;
-const WARPS = [[1, "real time"], [60, "1 minute a second"], [3600, "1 hour a second"], [86400, "1 day a second"], [604800, "1 week a second"], [2629800, "1 month a second"], [31557600, "1 year a second"], [315576000, "10 years a second"]];
+const WARPS = [[1, "real time"], [10, "10 seconds a second"], [60, "1 minute a second"], [3600, "1 hour a second"], [86400, "1 day a second"], [604800, "1 week a second"], [2629800, "1 month a second"], [31557600, "1 year a second"], [315576000, "10 years a second"]];
 let warpI = 0, mode = "parked", trip = null, destI = 1, listTop = 0, here = 0, park = null, shipPos = [0, 0, 0], bow = [1, 0, 0], align = null, tripLog = [];
 // where to park at a star: in orbit round its most interesting planet (one in the habitable zone if any, else the biggest), or the star.
 // A park is a real circular orbit in the body's equatorial plane, going round the way the body turns, at angular speed n = sqrt(GM/r^3).
@@ -411,12 +456,12 @@ function startBurn() { const A = align, D = A.local ? A.R1.distanceTo(shipRelM) 
   trip = { P0: shipPos.slice(), P1: A.P1, u: A.to, plan: tripPlan(D), tau: 0, prop0: properMs, coord0: coordMs, dest: A.dest, dpark: A.dpark, flipped: false, switched: false, local: !!A.local, dname: A.dname, R0: A.local ? shipRelM.clone() : null, uv: V3(...A.to) }; mode = "trip"; align = null; if (!trip.local) shipRelM = null;
   say(`Engine lit. Proper acceleration 1.000 g: you feel it as ordinary gravity, toward the decks below. Expected trip: <b>${fmtDur(trip.plan.tau)}</b> by the ship's clock, <b>${fmtDur(trip.plan.t)}</b> by the stars' (and Earth's).`, 14); }
 function arrive() { const T = trip; tripLog.push({ from: T.local ? parkName() : STARS[here].name, to: destName(T), tau: T.plan.tau, t: T.plan.t }); if (!T.local) buildSystem(STARS[T.dest]); here = T.dest; park = T.dpark; mode = "parked"; trip = null;
-  holdPark(); warpI = Math.min(warpI, 2);
+  holdPark(); warpI = Math.min(warpI, 3);
   if (T.local) return say(`In orbit round <b>${parkName()}</b>, ${fmtLy(park.r / LY)} from its centre. ${bodyInfo(park.sel).solid ? "The lander in the hangar (take the lift down) can take you to the surface." : bodyInfo(park.sel).star ? "" : "It has no solid surface to land on."}`, 12);
   say(`Arrived at <b>${STARS[here].name}</b>, in orbit near <b>${parkName()}</b>. ${STARS[here].note} ${SYS.planets.length ? `Planets: ${SYS.planets.map(p => p.name.replace(STARS[here].name.split(" (")[0] + " ", "")).join(", ")} (${SYS.planets[0].known ? "known" : "generated: none are known here"}).` : ""} Look out from the cupola.`, 18); }
 function skip(to) { if (mode !== "trip") return say("Engage the autopilot first.", 5); const P = trip.plan; trip.tau = Math.max(trip.tau, to === "turn" ? P.tauH - 120 : P.tau - 6 * 3600); say(to === "turn" ? "Skipping ahead to just before turnover." : "Skipping ahead to six hours (ship time) before arrival.", 6); }
-function stepFlight(dt) { const w = WARPS[warpI][0], step = dt * w;
-  if (mode === "parked") { properMs += step * 1000; coordMs += step * 1000; holdPark(); }
+function stepFlight(dt) { if (LAND.away && LAND.s) return stepLander(dt); const w = WARPS[warpI][0], step = dt * w;
+  if (mode === "parked") { properMs += step * 1000; coordMs += step * 1000; holdPark(); if (LAND.away && coordMs >= LAND.departAt) undock(); }
   else if (mode === "align") { properMs += dt * 1000; coordMs += dt * 1000; shipRelM = parkRelM(park, coordMs); shipPos = relToLy(park.Si, shipRelM); align.t += dt; const f = Math.min(1, align.t / align.dur), s = f * f * (3 - 2 * f), a = V3(...align.from), b = V3(...align.to), q = new THREE.Quaternion().setFromUnitVectors(a, b), qi = new THREE.Quaternion().slerp(q, s), v = a.clone().applyQuaternion(qi); bow = [v.x, v.y, v.z]; if (f >= 1) startBurn(); }
   else if (mode === "trip") { const T = trip, P = T.plan; T.tau = Math.min(P.tau, T.tau + step); const st = tripState(P, T.tau); T.st = st;
     if (T.local) { shipRelM = T.R0.clone().addScaledVector(T.uv, st.x); shipPos = relToLy(here, shipRelM); } else shipPos = [T.P0[0] + T.u[0] * st.x / LY, T.P0[1] + T.u[1] * st.x / LY, T.P0[2] + T.u[2] * st.x / LY]; properMs = T.prop0 + T.tau * 1000; coordMs = T.coord0 + st.t * 1000;
@@ -424,6 +469,203 @@ function stepFlight(dt) { const w = WARPS[warpI][0], step = dt * w;
     if (!st.accel && !T.flipped) { T.flipped = true; say("<b>Turnover.</b> At the midpoint the engine shuts down, the ship turns end over end, and the engine lights again pointing ahead: now 1 g of deceleration. The floor is still 'down', but the cupola now faces back the way we came.", 14); }
     if (!T.local && !T.switched && st.x > P.D / 2) { T.switched = true; buildSystem(STARS[T.dest]); }
     if (T.tau >= P.tau) arrive(); } }
+// ---------- the lander's flight: Newton's laws, integrated step by step ----------
+// Everything happens in the body's equatorial plane (x, y in metres from its centre, the body turning toward +angle at w rad/s): gravity
+// GM/r^2, drag from the air (which turns with the body), and the engine, which the autopilot points and throttles, up to 3 g.
+// Going down: a Hohmann transfer from the ship's orbit to a low one; where there is air, a small burn to dip into it, entry on the heat
+// shield, and the engine lit near the ground; where there is none, powered descent from orbit. Going up: a climb into a low orbit, a wait
+// for the ship to come round to the right place, a Hohmann transfer up to it, and a final approach to dock.
+const LND = { amax: 29.4, beta: 1800, ld: 0.3 };   // engine: 3 g at most; ballistic coefficient m / (Cd A), kg/m^2, heat shield first; lift / drag in entry
+// the air: density falling off exponentially with height (scale height H), above h1 faster (scale height H2), as on Venus
+const airRho = (B, h) => { const A = B.atm; if (!A) return 0; h = Math.max(h, 0); return A.h1 && h > A.h1 ? A.rho * Math.exp(-A.h1 / A.H - (h - A.h1) / A.H2) : A.rho * Math.exp(-h / A.H); };
+const lowOrbit = B => B.R + (B.atm ? Math.max(150e3, 14 * B.atm.H) : Math.max(15e3, 0.008 * B.R)), entryAlt = B => 5.3 * B.atm.H;
+const wrapPi = a => a - 2 * Math.PI * Math.floor((a + Math.PI) / (2 * Math.PI));
+// acceleration from gravity and drag; out[2] is the size of the drag
+function lnNat(B, x, y, vx, vy, out) { const r = Math.hypot(x, y), g = -B.GM / (r * r * r), rho = airRho(B, r - B.R), ux = vx + B.w * y, uy = vy - B.w * x, u = Math.hypot(ux, uy), k = -0.5 * rho * u / LND.beta;
+  out[0] = g * x + k * ux; out[1] = g * y + k * uy; out[2] = -k * u;
+  if (B.lift && u > 1) { let px = -uy / u, py = ux / u; if (px * x + py * y < 0) { px = -px; py = -py; } out[0] += B.lift * out[2] * px; out[1] += B.lift * out[2] * py; }   // lift, rolled to point away from the ground
+  return out; }
+const _la = [0, 0, 0], _lb = [0, 0, 0], _lc = [0, 0, 0], _ld = [0, 0, 0];
+// one step of dt seconds with the engine's acceleration (tx, ty) held fixed: fourth-order Runge-Kutta
+function lnStep(B, s, tx, ty, dt) { const { x, y, vx, vy } = s;
+  lnNat(B, x, y, vx, vy, _la); const k1vx = _la[0] + tx, k1vy = _la[1] + ty, d1 = _la[2];
+  lnNat(B, x + vx * dt / 2, y + vy * dt / 2, vx + k1vx * dt / 2, vy + k1vy * dt / 2, _lb); const k2x = vx + k1vx * dt / 2, k2y = vy + k1vy * dt / 2, k2vx = _lb[0] + tx, k2vy = _lb[1] + ty;
+  lnNat(B, x + k2x * dt / 2, y + k2y * dt / 2, vx + k2vx * dt / 2, vy + k2vy * dt / 2, _lc); const k3x = vx + k2vx * dt / 2, k3y = vy + k2vy * dt / 2, k3vx = _lc[0] + tx, k3vy = _lc[1] + ty;
+  lnNat(B, x + k3x * dt, y + k3y * dt, vx + k3vx * dt, vy + k3vy * dt, _ld); const k4x = vx + k3vx * dt, k4y = vy + k3vy * dt, k4vx = _ld[0] + tx, k4vy = _ld[1] + ty;
+  s.x += dt / 6 * (vx + 2 * k2x + 2 * k3x + k4x); s.y += dt / 6 * (vy + 2 * k2y + 2 * k3y + k4y); s.vx += dt / 6 * (k1vx + 2 * k2vx + 2 * k3vx + k4vx); s.vy += dt / 6 * (k1vy + 2 * k2vy + 2 * k3vy + k4vy);
+  s.t += dt; s.dv += Math.hypot(tx, ty) * dt; s.drag = d1; }
+// the orbit's closest and farthest points from the centre (periapsis, apoapsis), from its energy and angular momentum
+function apsides(B, s) { const r = Math.hypot(s.x, s.y), E = (s.vx * s.vx + s.vy * s.vy) / 2 - B.GM / r, h = s.x * s.vy - s.y * s.vx; if (E >= 0) return [0, Infinity]; const a = -B.GM / (2 * E), e = Math.sqrt(Math.max(0, 1 + 2 * E * h * h / (B.GM * B.GM))); return [a * (1 - e), a * (1 + e)]; }
+// the ship, in its circular orbit (T: radius r, angle th0 at time t0, angular speed n)
+const shipAt = (T, t) => { const th = T.th0 + T.n * (t - T.t0), c = Math.cos(th), sn = Math.sin(th); return [T.r * c, T.r * sn, -T.r * T.n * sn, T.r * T.n * c, th]; };
+// the autopilot: returns the engine's acceleration for this moment, and moves through the phases
+function lnGuide(B, s, T) { const r = Math.hypot(s.x, s.y), rx = s.x / r, ry = s.y / r, tx = -ry, ty = rx, h = r - B.R, amax = LND.amax, retro = k => { const v = Math.hypot(s.vx, s.vy); return [-s.vx / v * k, -s.vy / v * k]; };
+  const ux = s.vx + B.w * s.y, uy = s.vy - B.w * s.x, u = Math.hypot(ux, uy), vr = ux * rx + uy * ry, vt = ux * tx + uy * ty, vtIn = s.vx * tx + s.vy * ty, gl = B.GM / (r * r);
+  lnNat(B, s.x, s.y, s.vx, s.vy, _la); const dr = (_la[0] + gl * rx) * rx + (_la[1] + gl * ry) * ry, dt_ = _la[0] * tx + _la[1] * ty;   // drag along r and t
+  const [rp, ra] = apsides(B, s);
+  switch (s.phase) {
+    case "deorbit": if (rp <= lowOrbit(B)) { s.phase = "transfer"; s.wasDown = false; return [0, 0]; } return retro(0.5 * amax);
+    case "transfer": if (vr < 0) s.wasDown = true; if (B.atm) { if (s.wasDown && vr >= 0) s.phase = "circularize"; return [0, 0]; } break;
+    case "circularize": if (Math.hypot(s.vx, s.vy) <= Math.sqrt(B.GM / r)) { s.phase = "entry burn"; return [0, 0]; } return retro(0.5 * amax);
+    case "entry burn": if (rp <= B.R + entryAlt(B)) { s.phase = "entry"; return [0, 0]; } return retro(0.5 * amax);
+    case "entry": if (h > 3000 && !((h < 25000 || u < 600) && u * u / (2 * Math.max(h - 300, 1)) > 0.4 * amax)) return [0, 0]; s.phase = "powered descent"; break; }
+  if (s.phase === "transfer") { if (u * u / (2 * Math.max(h - 300, 1)) < 0.4 * amax) return [0, 0]; s.phase = "powered descent"; }
+  if (s.phase === "powered descent") {
+    // the descent rate wanted: limited by what the engine can stop, and slow enough to finish braking sideways first; then a gentle 0.8 m/s
+    const th = Math.abs(vt) / (0.6 * amax), c = th + 4, k = 0.35 * amax, vs = Math.sqrt(2 * k * Math.max(h, 0)), vl = h / c; let vrDes, ff = 0;
+    if (h < 2) vrDes = -0.8; else if (vs < Math.max(vl, 1)) { vrDes = -vs; ff = -k * vr / Math.max(vs, 1); } else if (vl > 1) { vrDes = -vl; ff = -vr / c; } else vrDes = -1;
+    const tgo = h / Math.max(-vrDes, 0.5), atDes = clampN(-vt / Math.max(1.5, Math.min(tgo, 30)), -0.7 * amax, 0.7 * amax);
+    let Tr = (vrDes - vr) / 1.0 + ff + gl - vtIn * vtIn / r - dr, Tt = atDes + B.w * vr + vr * vtIn / r - dt_;
+    const along = Tr * vr + Tt * vt; if (along > 0 && u > 30) { const u2 = vr * vr + vt * vt; Tr -= along * vr / u2; Tt -= along * vt / u2; }   // never push forward against the air
+    Tr = clampN(Tr, -amax, amax); const tmax = Math.sqrt(Math.max(0, amax * amax - Tr * Tr)); Tt = clampN(Tt, -tmax, tmax);
+    return [Tr * rx + Tt * tx, Tr * ry + Tt * ty]; }
+  if (s.phase === "liftoff") { if (h > 150) s.phase = "climb"; return [(gl + 6) * rx, (gl + 6) * ry]; }
+  if (s.phase === "climb") { const rl = lowOrbit(B), hl = rl - B.R, vc = Math.sqrt(B.GM / rl);
+    if (Math.abs(h - hl) < 3000 && Math.abs(vr) < 15 && vtIn > vc - 10 && rp > B.R + 0.8 * hl) { s.phase = "low orbit"; return [0, 0]; }
+    const vrDes = h < hl ? Math.min(B.atm ? 900 : 300, Math.sqrt(2 * 0.25 * amax * (hl - h))) : -(h - hl) / 30, dense = airRho(B, h) > 2e-3 && u > 350;
+    let Tr = (vrDes - vr) / 2 + gl - vtIn * vtIn / r - dr, Tt = dense ? -dt_ : clampN((vc - vtIn) / 4, -amax, amax) + vr * vtIn / r - dt_;
+    Tr = clampN(Tr, -amax, amax); const tmax = Math.sqrt(Math.max(0, amax * amax - Tr * Tr)); Tt = clampN(Tt, -tmax, tmax); return [Tr * rx + Tt * tx, Tr * ry + Tt * ty]; }
+  if (s.phase === "low orbit" && rp < B.R + 0.6 * (lowOrbit(B) - B.R)) s.phase = "climb";   // sagging: trim it again
+  if (s.phase === "low orbit") { // wait until the ship leads by the angle a Hohmann transfer needs
+    const r2 = T.r, tH = Math.PI * Math.sqrt(((r + r2) / 2) ** 3 / B.GM), lead = Math.PI - T.n * tH, d = wrapPi(shipAt(T, s.t)[4] - Math.atan2(s.y, s.x) - lead);
+    if (s.prevD !== undefined && s.prevD > 0 && d <= 0 && d > -0.5) s.phase = "transfer up"; s.prevD = d; return [0, 0]; }
+  if (s.phase === "transfer up") { if (ra >= T.r) { s.phase = "coast up"; return [0, 0]; } const v = Math.hypot(s.vx, s.vy); return [s.vx / v * 0.5 * amax, s.vy / v * 0.5 * amax]; }
+  const [px, py, pvx, pvy] = shipAt(T, s.t), dx = px - s.x, dy = py - s.y, dist = Math.hypot(dx, dy);
+  if (s.phase === "coast up") { if (vr > 20) s.wasUp = true; if (dist < 0.1 * T.r || (s.wasUp && vr <= 0)) s.phase = "approach"; else return [0, 0]; }
+  if (s.phase === "approach") { if (dist < 25 && Math.hypot(s.vx - pvx, s.vy - pvy) < 1.5) { s.phase = "docked"; return [0, 0]; }
+    const sDes = Math.min(Math.sqrt(2 * 0.3 * amax * dist), dist / 2 + 0.5), gp = -B.GM / T.r ** 3, vdx = pvx + dx / dist * sDes, vdy = pvy + dy / dist * sDes;
+    let Ax = (vdx - s.vx) / 2 + gp * px - _la[0], Ay = (vdy - s.vy) / 2 + gp * py - _la[1]; const A = Math.hypot(Ax, Ay); if (A > amax) { Ax *= amax / A; Ay *= amax / A; } return [Ax, Ay]; }
+  return [0, 0]; }
+const LN_COAST = { transfer: 1, entry: 1, "low orbit": 1, "coast up": 1 };
+// advance the flight by dt seconds, in steps short enough for the moment (long in free flight, short near the ground or in the air)
+function lnAdvance(B, s, T, dt) { let left = dt; while (left > 1e-9 && s.phase !== "landed" && s.phase !== "docked") { const r = Math.hypot(s.x, s.y), h = r - B.R, v = Math.hypot(s.vx, s.vy);
+    const coast = LN_COAST[s.phase], step = Math.min(left, coast ? clampN(0.003 * r / Math.max(v, 1), 0.05, 20) : h < 3000 ? 0.05 : 0.25, airRho(B, h) > 1e-6 ? Math.max(0.05, Math.min(0.5, 30 * LND.beta / (airRho(B, h) * v + 1e-9) / 1000)) : 1e9);
+    const [tx, ty] = lnGuide(B, s, T); B.lift = s.phase === "entry" ? LND.ld : 0; lnStep(B, s, tx, ty, step); left -= step; s.thrust = Math.hypot(tx, ty); s.load = (s.thrust + s.drag) / 9.80665; s.maxG = Math.max(s.maxG, s.load);
+    const r2 = Math.hypot(s.x, s.y); if (r2 <= B.R) { const ux = s.vx + B.w * s.y, uy = s.vy - B.w * s.x; s.touch = Math.hypot(ux, uy); s.phase = "landed"; const k = B.R / r2; s.x *= k; s.y *= k; s.vx = -B.w * s.y; s.vy = B.w * s.x; s.landAng = Math.atan2(s.y, s.x); } } }
+// ---------- the lander's missions ----------
+// PLACE: where you are: "ship" (walking the decks), "lander" (in its cabin, docked or away), "outside" (on the surface, in a suit)
+let PLACE = "ship";
+const LAND = { away: false, s: null, B: null, T: null, departAt: 0, alpha: 0, site: null, userWarp: false, fx: V3(1, 0, 0), fy: V3(0, 1, 0), rocks: null };
+const warpTo = sec => { if (!LAND.userWarp) warpI = Math.max(0, WARPS.findIndex(w => w[0] >= sec)); };
+function landerBody() { const B = bodyInfo(park.sel); B.w = 2 * Math.PI / (B.rot * 86400); return B; }
+// the ship's place and speed in its orbit, in the body's equatorial plane, at a coordinate time
+function ship2D(ms) { const th = park.th0 + park.n * (ms - park.t0) / 1000, r = park.r; return { x: r * Math.cos(th), y: r * Math.sin(th), vx: -r * park.n * Math.sin(th), vy: r * park.n * Math.cos(th) }; }
+const sunAngle = (B, ms) => { const d = bodyPosM(B.sel, ms).negate(); return Math.atan2(d.dot(park.E2), d.dot(park.E1)); };
+// where on Earth's equator there is land, read from the map
+let EARTH_LAND = null;
+function earthLand() { if (EARTH_LAND) return EARTH_LAND; const im = EARTH_T.image; if (!im || !im.width) return null; const c = document.createElement("canvas"); c.width = 720; c.height = 360; const g = c.getContext("2d"); g.drawImage(im, 0, 0, 720, 360);
+  const d = g.getImageData(0, 178, 720, 4).data; EARTH_LAND = []; for (let i = 0; i < 720; i++) { let r = 0, gg = 0, b = 0; for (let k = 0; k < 4; k++) { const o = (k * 720 + i) * 4; r += d[o]; gg += d[o + 1]; b += d[o + 2]; } EARTH_LAND.push(!(b > r + 12 && b >= gg - 4)); } return EARTH_LAND; }
+const isLand = lonRad => { const L = earthLand(); if (!L) return true; return L[Math.floor(((lonRad / (2 * Math.PI) + 0.5) % 1 + 1) % 1 * 720)]; };
+const PLACES = { Earth: [[-81, -75, "Ecuador"], [-75, -50, "the Amazon rainforest"], [-50, -44, "the mouth of the Amazon"], [9, 14, "Gabon"], [14, 30, "the Congo rainforest"], [30, 35, "Uganda"], [35, 42, "Kenya"], [42, 48, "Somalia"], [95, 106, "Sumatra"], [108, 119, "Borneo"], [119, 125, "Sulawesi"], [130, 141, "New Guinea"]],
+  "the Moon": [[-75, -40, "Oceanus Procellarum"], [-40, -8, "the Sinus Medii region"], [-8, 10, "Sinus Medii"], [10, 33, "Mare Tranquillitatis"], [33, 65, "Mare Fecunditatis"]] };
+const placeName = (B, lon) => { const d = wrapPi(lon) / DEG, hit = (PLACES[B.name] || []).find(([a, b]) => d >= a && d < b); return `${hit ? hit[2] + ", " : ""}${Math.abs(d).toFixed(1)}° ${d >= 0 ? "E" : "W"} on the equator`; };
+// planning: fly the whole descent once in advance (from this point of the orbit), then wait for the moment that brings the lander down
+// in the local morning, and on Earth on land
+function planLanding(B) { const s0 = ship2D(coordMs), sim = { ...s0, t: 0, dv: 0, phase: "deorbit", maxG: 0, drag: 0 }, th0 = Math.atan2(s0.y, s0.x);
+  for (let k = 0; k < 40000 && sim.phase !== "landed" && sim.t < 3e5; k++) lnAdvance(B, sim, null, 30);
+  if (sim.phase !== "landed") return null; const dTh = sim.landAng - th0, Td = sim.t, n = park.n, syn = Math.min(2 * Math.PI / Math.abs(n - B.w), 4 * 86400), sg = Math.sign(B.w) || 1;
+  const span = B.name === "Earth" ? Math.max(syn, 3 * 86400) : syn, N = Math.ceil(span / 40);
+  let best = null; for (let k = 0; k <= N; k++) { const wait = 60 + span * k / N, tL = coordMs + (wait + Td) * 1000, thL = th0 + n * wait + dTh, lon = wrapPi(thL - bodySpin(B, tL)), ha = wrapPi(thL - sunAngle(B, tL)) * sg;
+    const score = Math.abs(wrapPi(ha + 0.85)) + (B.name === "Earth" && !isLand(lon) ? 3 : 0) + wait / 86400 * 0.15; if (!best || score < best.score) best = { score, wait, lon, Td, tL, dv: sim.dv, maxG: sim.maxG }; }
+  return best; }
+function startLanding() { if (PLACE !== "lander") return; if (LAND.away) return say(LAND.s ? "We are already flying." : "The landing is planned: waiting to undock.", 5); if (mode !== "parked") return say("The ship has to be in orbit round a body first.", 6);
+  const B = landerBody(); if (B.star) return say("There is no landing on a star.", 5); if (!B.solid) return say(`${B.name} has no solid surface to land on: below the clouds the gas just gets hotter and denser.`, 8);
+  const P = planLanding(B); if (!P) return say("The autopilot could not find a way down.", 6);
+  Object.assign(LAND, { away: true, s: null, B, T: { r: park.r, th0: park.th0, n: park.n, t0: (park.t0 - NOW0) / 1000 }, departAt: coordMs + P.wait * 1000, plan: P, userWarp: false, rocks: null });
+  warpTo(P.wait > 3 * 3600 ? 3600 : P.wait > 600 ? 60 : 10);
+  say(`Landing planned on <b>${B.name}</b>: ${placeName(B, P.lon)}, in the local morning. Undocking in ${fmtDur(P.wait)} (the landing site has to come round); then ${fmtDur(P.Td)} down: a Hohmann transfer to a low orbit, ${B.atm ? "entry on the heat shield, and the engine near the ground" : "and powered descent from orbit"}.`, 16); }
+function undock() { const s0 = ship2D(coordMs); LAND.s = { ...s0, t: (coordMs - NOW0) / 1000, dv: 0, phase: "deorbit", maxG: 0, drag: 0, load: 0, thrust: 0, tx: 0, ty: 0 }; LAND.alpha = Math.atan2(s0.y, s0.x) + Math.PI;
+  scene.add(LANDER); LANDER.position.set(0, 0, 0); SHIP.visible = false; HATCH.visible = true; warpTo(10);
+  say(`Undocked; the bay doors close behind us. <b>Deorbit burn</b>: the engine fires against our orbital motion to drop us toward ${LAND.B.name}.`, 10); }
+function launchLander() { if (PLACE !== "lander") return; if (!LAND.s || LAND.s.phase !== "landed") return say(LAND.away ? "We can only launch from the ground." : "We are docked: press LAND to go down.", 5);
+  const s = LAND.s; s.phase = "liftoff"; s.dv = 0; s.maxG = 0; s.prevD = undefined; s.wasUp = false; LAND.userWarp = false; warpTo(1); LAND.T = { r: park.r, th0: park.th0, n: park.n, t0: (park.t0 - NOW0) / 1000 };
+  say(`<b>Liftoff.</b> Up into a low orbit, then a wait for the ship to come round, and a Hohmann transfer up to it.`, 8); }
+function dockLander() { LAND.away = false; LAND.s = null; SHIP.add(LANDER); LANDER.position.set(0, DECKS[3].y + CAB_H, 7.0); SHIP.visible = true; HATCH.visible = false; LAND.userWarp = false; warpI = 0; PLUME.visible = false;
+  say("<b>Docked.</b> The lander is back in the hangar. Go out through the hatch, and take the lift up.", 10); }
+function board() { FADE.style.opacity = 1; setTimeout(() => { PLACE = "lander"; P_.x = 0; P_.z = -1.2; yaw = Math.PI; FADE.style.opacity = 0; say(LAND.away ? "Back in the cabin; the hatch is closed and the cabin repressurised." : "In the lander's cabin. LAND takes it down to the body the ship is orbiting.", 6); }, 450); }
+function exitLander() { if (LAND.away && (!LAND.s || LAND.s.phase !== "landed")) return say(LAND.s ? "Not in flight!" : "We are about to undock: stay aboard, or wait in the ship.", 5);
+  FADE.style.opacity = 1; setTimeout(() => { if (LAND.away) { PLACE = "outside"; P_.x = 0.6; P_.z = -4.6; yaw = 0; say(`You climb down the ladder in your suit onto <b>${LAND.B.name}</b>. Gravity here: ${(LAND.B.GM / LAND.B.R ** 2 / G0).toFixed(2)} g. ${LAND.B.atm ? "" : "No air: the sky is black even by day."} BOARD LANDER at the foot of the ladder takes you back in.`, 12); }
+    else { PLACE = "ship"; P_.deck = 3; P_.x = 0; P_.z = 2.6; yaw = 0; say("In the hangar. The lift is ahead.", 4); } FADE.style.opacity = 0; }, 450); }
+const PHASE_SAY = { transfer: "Burn complete. Now coasting down a Hohmann transfer orbit to a low orbit; it takes some time, so time runs faster.", circularize: "At the bottom of the transfer: braking into a low circular orbit.", "entry burn": "A short burn to dip the orbit into the top of the atmosphere.",
+  entry: "<b>Entry.</b> The heat shield faces forward into the air; the air slows us, a little lift spreads the braking out. You feel it as weight, toward the floor.", "powered descent": "<b>Powered descent.</b> The engine takes over: braking, then down slowly onto the surface.",
+  climb: "Climbing: the engine pushes us up, then sideways to orbital speed.", "low orbit": "In a low orbit. Waiting for the ship to come round to where the transfer up will meet it.", "transfer up": "Burn to rise on a Hohmann transfer to the ship's orbit.", "coast up": "Coasting up the transfer.", approach: "Final approach: matching the ship's speed and closing in to dock." };
+function stepLander(dt) { const s = LAND.s, B = LAND.B, ph = s.phase, cap = ph === "landed" ? Infinity : LN_COAST[ph] ? 3600 : 10; if (WARPS[warpI][0] > cap) warpI = WARPS.findIndex(w => w[0] >= cap);
+  const step = dt * WARPS[warpI][0];
+  if (ph === "landed") { s.t += step; const th = LAND.site + bodySpin(B, NOW0 + s.t * 1000), r = B.R; s.x = r * Math.cos(th); s.y = r * Math.sin(th); s.vx = -B.w * s.y; s.vy = B.w * s.x; s.thrust = 0; s.load = B.GM / r ** 2 / G0; }
+  else lnAdvance(B, s, LAND.T, step);
+  coordMs = NOW0 + s.t * 1000; properMs += step * 1000;
+  if (s.phase !== ph) { LAND.userWarp = false; if (PHASE_SAY[s.phase]) say(PHASE_SAY[s.phase], 9);
+    if (s.phase === "landed") { LAND.site = s.landAng - bodySpin(B, coordMs); warpI = 0; say(`<b>Touchdown</b> at ${s.touch.toFixed(1)} m/s on ${B.name}: ${placeName(B, LAND.site)}. Flight ${fmtDur(s.t - (LAND.departAt - NOW0) / 1000)}, most g felt ${s.maxG.toFixed(1)}. GO OUT to step outside; LAUNCH to go back up.`, 16); }
+    if (s.phase === "docked") return dockLander(); }
+  // automatic time steps for each part of the flight
+  const r = Math.hypot(s.x, s.y), h = r - B.R; if (!LAND.userWarp && s.phase !== "landed") { const P = s.phase, d = Math.hypot(...shipAt(LAND.T, s.t).slice(0, 2).map((v, i) => v - [s.x, s.y][i]));
+    warpTo(P === "transfer" || P === "low orbit" || P === "coast up" ? 60 : P === "entry" ? (s.drag < 0.3 ? 60 : 10) : P === "powered descent" ? (h > 3000 ? 10 : 1) : P === "liftoff" ? 1 : P === "approach" ? (d > 20000 ? 10 : 1) : 10); }
+  // the lander's attitude in its plane: the engine points along the thrust; in entry the heat shield faces the oncoming air; landed, upright
+  let want = null; if (s.phase === "landed") LAND.alpha = Math.atan2(s.y, s.x); else if (s.thrust > 0.3) want = Math.atan2(s.ty, s.tx); else if (s.phase === "entry") want = Math.atan2(-(s.vy - B.w * s.x), -(s.vx + B.w * s.y));
+  if (want !== null) LAND.alpha += clampN(wrapPi(want - LAND.alpha), -Math.max(0.6 * step, 0.01), Math.max(0.6 * step, 0.01));
+  const E1 = park.E1, E2 = park.E2, up = E1.clone().multiplyScalar(Math.cos(LAND.alpha)).addScaledVector(E2, Math.sin(LAND.alpha)); LAND.fy.copy(up); LAND.fx.crossVectors(B.axis.clone().normalize(), up).normalize();
+  shipRelM = bodyPosM(B.sel, coordMs).addScaledVector(E1, s.x).addScaledVector(E2, s.y); shipPos = relToLy(here, shipRelM);
+  PLUME.visible = s.thrust > 0.3; if (PLUME.visible) { PLUME.scale.set(1, 0.8 + 6 * s.thrust / LND.amax, 1); PLUME.position.y = -3.15 - PLUME.scale.y / 2; } }
+
+// ---------- the surface: ground, air and stones ----------
+// Near the surface the body is drawn as a cap of a true sphere round the point below the lander, out to the horizon (at true size close
+// to the ground, shrunk in proportion higher up so that it fits the view), coloured from the body's map with fine detail for close up.
+const CAP_N = 56, CAP_M = 96, capPos = new Float32Array((CAP_N + 1) * CAP_M * 3), capNor = new Float32Array(capPos.length), capUV = new Float32Array((CAP_N + 1) * CAP_M * 2), capT = new Float32Array(capPos.length);
+const capGeo = new THREE.BufferGeometry(); capGeo.setAttribute("position", new THREE.BufferAttribute(capPos, 3)); capGeo.setAttribute("normal", new THREE.BufferAttribute(capNor, 3)); capGeo.setAttribute("aUV", new THREE.BufferAttribute(capUV, 2)); capGeo.setAttribute("aT", new THREE.BufferAttribute(capT, 3));
+{ const idx = []; for (let i = 0; i < CAP_N; i++) for (let j = 0; j < CAP_M; j++) { const a = i * CAP_M + j, b = i * CAP_M + (j + 1) % CAP_M, c = a + CAP_M, d = b + CAP_M; idx.push(a, c, b, b, c, d); } capGeo.setIndex(idx); capGeo.boundingSphere = new THREE.Sphere(V3(), 1e9); }
+const groundU = { map: { value: null }, uSun: { value: V3(0, 1, 0) }, uSunI: { value: 1 }, uAmb: { value: 0.03 }, uSky: { value: new THREE.Color(0, 0, 0) }, uHaze: { value: 0 }, uVis: { value: 60000 }, uDet: { value: 1 } };
+const GROUND = new THREE.Mesh(capGeo, new THREE.ShaderMaterial({ uniforms: groundU,
+  vertexShader: `attribute vec2 aUV; attribute vec3 aT; varying vec2 vUV; varying vec3 vT; varying vec3 vN; void main(){ vUV = aUV; vT = aT; vN = normal; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform sampler2D map; uniform vec3 uSun, uSky; uniform float uSunI, uAmb, uHaze, uVis, uDet; varying vec2 vUV; varying vec3 vT; varying vec3 vN;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y); }
+    void main(){ vec3 base = texture2D(map, vUV).rgb; float d = vT.z, det = 0.0, amp = 0.5;
+      for (int k = 0; k < 7; k++) { float sc = 0.4 * pow(4.0, float(k)); det += amp * clamp(sc * 30.0 / (d + 1.0), 0.0, 1.0) * (noise(vT.xy / sc + float(k) * 17.0) - 0.5); amp *= 0.85; }
+      vec3 col = base * 1.35 * (1.0 + uDet * det * 1.5); col *= max(dot(normalize(vN), uSun), 0.0) * uSunI + uAmb;
+      gl_FragColor = vec4(mix(col, uSky, uHaze * (1.0 - exp(-d / uVis))), 1.0); }` }));
+GROUND.frustumCulled = false; GROUND.visible = false; GROUND.renderOrder = -2; scene.add(GROUND);
+// the daytime sky of a world with air: blue on Earth, butterscotch on Mars, a dim orange overcast on Venus
+const skyU = { uUp: { value: V3(0, 1, 0) }, uSun: { value: V3(0, 1, 0) }, uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uDay: { value: 0 }, uGlow: { value: 1 } };
+const SKYDOME = new THREE.Mesh(new THREE.SphereGeometry(50000, 48, 24), new THREE.ShaderMaterial({ uniforms: skyU, side: THREE.BackSide, transparent: true, depthWrite: false,
+  vertexShader: `varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform vec3 uUp, uSun, uZen, uHor; uniform float uDay, uGlow; varying vec3 vD; void main(){ float el = dot(vD, uUp), sd = max(dot(vD, uSun), 0.0);
+    vec3 c = mix(uHor, uZen, pow(clamp(el, 0.0, 1.0), 0.45)) + uGlow * (vec3(1.0, 0.95, 0.85) * pow(sd, 300.0) * 1.5 + uHor * pow(sd, 10.0) * 0.4); gl_FragColor = vec4(c, uDay); }` }));
+SKYDOME.renderOrder = -3; SKYDOME.frustumCulled = false; SKYDOME.visible = false; scene.add(SKYDOME);
+// stones round the landing site, for scale
+const ROCK_N = 140, ROCKS = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0x8a8580, roughness: 1, flatShading: true }), ROCK_N); ROCKS.visible = false; ROCKS.frustumCulled = false; scene.add(ROCKS);
+const ROCK_COL = { moon: 0x8a8682, mars: 0x7a4a30, venus: 0x4a3e30, earth: 0x6a5e50, temperate: 0x6a5e50, rock: 0x6a645c, lava: 0x2a2422, ocean: 0x6a6a6a };
+function makeRocks(B, Lsite) { const R = seeded(Math.floor(Lsite.x * 1e6) + 7), east = V3(0, 1, 0).cross(Lsite).normalize(), out = [];
+  for (let k = 0; k < ROCK_N; k++) { const d = 6 + 250 * Math.pow(R(), 1.6), a = R() * 6.2832, size = 0.08 + 1.1 * Math.pow(R(), 3.5); out.push({ L: Lsite.clone().addScaledVector(east, d * Math.cos(a) / B.R).addScaledVector(V3(0, 1, 0), d * Math.sin(a) / B.R).normalize(), size, rot: R() * 6.28, sink: 0.3 + 0.3 * R() }); }
+  ROCKS.material.color.setHex(ROCK_COL[B.kind] ?? 0x6a645c); return out; }
+const _q = new THREE.Quaternion(), _qi = new THREE.Quaternion(), _v = V3(), _w = V3(), _mt = new THREE.Matrix4();
+function updateSurface() { const on = LAND.away && LAND.s; GROUND.visible = SKYDOME.visible = ROCKS.visible = false; HEMI.intensity = PLACE === "ship" ? 0.6 : PLACE === "lander" && !on ? 0.6 : 0.3; if (!on) return;
+  const B = LAND.B, s = LAND.s, r = Math.hypot(s.x, s.y), h = Math.max(r - B.R, 0), E1 = park.E1, E2 = park.E2, rh = E1.clone().multiplyScalar(s.x / r).addScaledVector(E2, s.y / r), upS = rh.clone().applyMatrix3(R_EQ2SHIP);
+  const sunEq = bodyPosM(B.sel, coordMs).negate().normalize(), el = sunEq.dot(rh), sunS = sunEq.clone().applyMatrix3(R_EQ2SHIP), A = B.atm, rho = airRho(B, h), dens = A ? 1 - Math.exp(-4 * rho / A.rho) : 0;
+  const eye = h + CAB_H + 2, dip = Math.acos(B.R / (B.R + eye)), clouded = A && A.cloud && h < A.cloud, day = clampN((el + 0.1) / 0.2, 0, 1);
+  HEMI.intensity = PLACE === "outside" ? (A ? 0.08 + 0.35 * dens * day : 0.03) : 0.3;
+  if (A) { SKYDOME.visible = dens > 0.002; skyU.uUp.value.copy(upS); skyU.uSun.value.copy(sunS); skyU.uZen.value.setRGB(...(clouded ? A.hor : A.zen)).multiplyScalar(clouded ? 0.5 : 1); const tw = clampN(el / 0.3, 0, 1);
+    skyU.uHor.value.setRGB(...A.hor).lerp(new THREE.Color(1.0, 0.5, 0.25), clouded ? 0 : 1 - tw).multiplyScalar(clouded ? 0.5 : 1); skyU.uDay.value = A.sky * dens * (clouded ? clampN((el + 0.15) / 0.2, 0, 1) : day); skyU.uGlow.value = clouded ? 0 : 1; }
+  // the sun and planets set below the horizon; under Venus's clouds the sun is never seen
+  if (h < 0.08 * B.R || clouded) for (const o of LOCAL.children) { if (!o.visible) continue; const dl = o.position.length(); if (dl < 1) continue; const e = o.position.dot(upS) / dl, ang = (o.scale.x || 0) / dl; if (e < -Math.sin(dip) - ang) o.visible = false; }
+  if (clouded) { SYS.starMesh.visible = SYS.glow.visible = false; } starLight.intensity = (clouded ? 0.35 : SYS.starMesh.visible ? 2.6 : 0);
+  if (h >= 0.05 * B.R) return;
+  // the cap of ground; the body's own globe is hidden while it is shown
+  const mesh = B.sel === -2 ? SYS.moon.mesh : SYS.planets[B.sel].mesh; mesh.visible = false; if (B.p?.ring) SYS.planets[B.sel].ring.visible = false;
+  const map = mesh.material.map; map.wrapS = THREE.RepeatWrapping; map.needsUpdate = map.userData.wrapped ? false : (map.userData.wrapped = true); groundU.map.value = map;
+  const hd = Math.sqrt(2 * B.R * eye + eye * eye), sc = Math.min(1, 0.6 * 90000 / hd), thMax = Math.min(Math.PI / 2, dip * 1.08 + 2 / B.R), east = B.axis.clone().normalize().cross(rh).normalize(), north = rh.clone().cross(east);
+  _q.copy(bodyQ(B, coordMs)); _qi.copy(_q).invert(); const lon0 = (() => { _v.copy(rh).applyQuaternion(_qi); return Math.atan2(_v.z, -_v.x); })();
+  for (let i = 0; i <= CAP_N; i++) { const th = thMax * (i / CAP_N) ** 2.2, st = Math.sin(th), ct = Math.cos(th);
+    for (let j = 0; j < CAP_M; j++) { const ph = j / CAP_M * 2 * Math.PI, k = i * CAP_M + j; _w.copy(rh).multiplyScalar(ct).addScaledVector(east, st * Math.cos(ph)).addScaledVector(north, st * Math.sin(ph));
+      _v.copy(_w).multiplyScalar(B.R).addScaledVector(rh, -(B.R + h)).applyMatrix3(R_EQ2SHIP).multiplyScalar(sc); capPos[k * 3] = _v.x; capPos[k * 3 + 1] = _v.y - CAB_H; capPos[k * 3 + 2] = _v.z;
+      _v.copy(_w).applyMatrix3(R_EQ2SHIP); capNor[k * 3] = _v.x; capNor[k * 3 + 1] = _v.y; capNor[k * 3 + 2] = _v.z;
+      _v.copy(_w).applyQuaternion(_qi); const lon = lon0 + wrapPi(Math.atan2(_v.z, -_v.x) - lon0), lat = Math.asin(clampN(_v.y, -1, 1)); capUV[k * 2] = lon / (2 * Math.PI); capUV[k * 2 + 1] = 0.5 + lat / Math.PI;
+      capT[k * 3] = B.R * th * Math.cos(ph); capT[k * 3 + 1] = B.R * th * Math.sin(ph); capT[k * 3 + 2] = Math.hypot(B.R * th, h + 2); } }
+  for (const n of ["position", "normal", "aUV", "aT"]) capGeo.attributes[n].needsUpdate = true; GROUND.visible = true;
+  groundU.uSun.value.copy(sunS); groundU.uSunI.value = (clouded ? 0.18 : 1.1) * clampN((el + 0.02) / 0.06, 0, 1); groundU.uAmb.value = A ? 0.04 + 0.3 * dens * day : 0.02;
+  groundU.uSky.value.copy(A ? skyU.uHor.value : new THREE.Color(0, 0, 0)).multiplyScalar(A ? day : 0); groundU.uHaze.value = A ? dens : 0; groundU.uVis.value = A ? A.vis : 1e9; groundU.uDet.value = B.kind === "ocean" ? 0.15 : 1;
+  // stones, once low enough
+  if (h < 1500) { if (!LAND.rocks) LAND.rocks = makeRocks(B, rh.clone().applyQuaternion(_qi)); ROCKS.visible = true;
+    LAND.rocks.forEach((k, i) => { _w.copy(k.L).applyQuaternion(_q); _v.copy(_w).multiplyScalar(B.R).addScaledVector(rh, -(B.R + h)).applyMatrix3(R_EQ2SHIP); _v.y -= CAB_H + k.size * k.sink; _mt.makeRotationY(k.rot).scale(_w.set(k.size, k.size * 0.6, k.size)).setPosition(_v); ROCKS.setMatrixAt(i, _mt); }); ROCKS.instanceMatrix.needsUpdate = true; } }
 // ---------- formatting ----------
 const pad = (n, k = 2) => String(n).padStart(k, "0");
 const fmtDate = ms => { const d = new Date(ms); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`; };
@@ -501,7 +743,20 @@ function drawShip() { const S = SCREENS.ship, g = panel(S, "SHIP STATUS"), st = 
   deskBtn(...N, -0.42, 0.34, "TO TURNOVER", () => skip("turn"), 0.75); deskBtn(...N, 0.42, 0.34, "TO ARRIVAL", () => skip("arrive"), 0.75);
   button("SKY LABELS", -3.0, DECKS[2].y + 0.875, -3.0, Math.PI / 4, -1.3, () => toggleHud(), 0.7, 0.17);
   // inside the lift, on its wall facing the door: a button for each deck
-  for (let d = 0; d < 3; d++) { const y = DECKS[d].y; if (d === 2) box(0.12, 1.4, 0.3, mPanel, LIFT_R - 0.02, y, 0); box(0.06, 0.8, 0.5, mPanel, LIFT_R - 0.06, y + 0.95, 0, 0); [["CUPOLA", 2], ["BRIDGE", 1], ["HABITAT", 0]].forEach(([lab, to], k) => button(lab, LIFT_R - 0.1, y + 1.6 - k * 0.24, 0, -Math.PI / 2, 0, () => goDeck(to), 0.42, 0.18, to === d ? "#4a5a2a" : "#2a3a48")); } }
+  for (let d = 0; d < 4; d++) { const y = DECKS[d].y; if (d === 2) box(0.12, 1.4, 0.3, mPanel, LIFT_R - 0.02, y, 0); box(0.06, 1.0, 0.5, mPanel, LIFT_R - 0.06, y + 0.8, 0, 0); [["CUPOLA", 2], ["BRIDGE", 1], ["HABITAT", 0], ["HANGAR", 3]].forEach(([lab, to], k) => button(lab, LIFT_R - 0.1, y + 1.64 - k * 0.22, 0, -Math.PI / 2, 0, () => goDeck(to), 0.42, 0.18, to === d ? "#4a5a2a" : "#2a3a48")); } }
+function drawLander() { const S = SCREENS.lander; if (!S || !park) return; const g = panel(S, "LANDER 1"), s = LAND.s, B = LAND.away ? LAND.B : landerBody(); let y = 160;
+  const R = (l, v, c) => { row(g, y, l, v, 26, 600, 32, c); y += 50; }, gs = B.GM / B.R ** 2;
+  g.fillStyle = "#f0d890"; g.font = "600 32px Helvetica, sans-serif";
+  if (!LAND.away) { g.fillText(`Docked in the hangar · the ship orbits ${B.name}`, 26, 108);
+    R("SURFACE GRAVITY", `${(gs / G0).toFixed(2)} g`); R("AIR AT THE SURFACE", B.atm ? `${(B.atm.rho / 1.225).toFixed(B.atm.rho < 0.1 ? 3 : 1)} × Earth's density` : "none"); R("DAY (one turn)", fmtDur(Math.abs(B.rot) * 86400)); R("ESCAPE SPEED", fmtKms(Math.sqrt(2 * B.GM / B.R)));
+    R("LANDING", B.star ? "no: a star" : B.solid ? "yes: press LAND" : "no: no solid surface", B.solid ? "#9af0b0" : "#f0a090"); }
+  else if (!s) { g.fillText(`Landing on ${B.name} planned`, 26, 108); R("UNDOCKING IN", fmtDur(Math.max(0, (LAND.departAt - coordMs) / 1000)), "#ffd890"); R("LANDING SITE", placeName(B, LAND.plan.lon)); R("FLIGHT DOWN", fmtDur(LAND.plan.Td)); R("MOST G EXPECTED", LAND.plan.maxG.toFixed(1) + " g"); }
+  else { const r = Math.hypot(s.x, s.y), h = r - B.R, rx = s.x / r, ry = s.y / r, ux = s.vx + B.w * s.y, uy = s.vy - B.w * s.x, vr = ux * rx + uy * ry, vt = -ux * ry + uy * rx, sh = shipAt(LAND.T, s.t), dShip = Math.hypot(sh[0] - s.x, sh[1] - s.y);
+    g.fillText(`${B.name} · ${s.phase.toUpperCase()}`, 26, 108);
+    R("ALTITUDE", s.phase === "landed" ? "on the ground" : fmtLy(Math.max(h, 0) / LY), "#9ad8ff"); R("VERTICAL SPEED", `${vr < 0 ? "down" : "up"} ${fmtKms(Math.abs(vr))}`); R("SPEED OVER THE GROUND", fmtKms(Math.abs(vt))); R("ORBITAL SPEED (from the centre)", fmtKms(Math.hypot(s.vx, s.vy)));
+    R("WEIGHT FELT: now / most", `${(s.phase === "landed" ? gs / G0 : s.load).toFixed(2)} g  /  ${s.maxG.toFixed(2)} g`); R("ENGINE", s.thrust > 0.3 ? `${(s.thrust / G0).toFixed(2)} g of thrust` : "off"); R("AIR", B.atm ? `${airRho(B, h).toPrecision(3)} kg/m³` : "none");
+    R("THE SHIP", fmtLy(dShip / LY)); R("SPEED CHANGE USED (Δv)", fmtKms(s.dv)); if (s.phase === "landed") { const ha = wrapPi(Math.atan2(s.y, s.x) - sunAngle(B, coordMs)) * (Math.sign(B.w) || 1); R("LOCAL SOLAR TIME", `${pad(Math.floor(((12 + ha / Math.PI * 12) % 24 + 24) % 24))}:${pad(Math.floor((((12 + ha / Math.PI * 12) % 1) + 1) % 1 * 60))}`); } }
+  g.fillStyle = "#c8a860"; g.font = "600 26px Helvetica, sans-serif"; g.fillText(`TIME: ${WARPS[warpI][1]}`, S.w - 420, 56); S.t.needsUpdate = true; }
 // ---------- you: walking and the lift ----------
 const P_ = { x: 0, z: -3.0, deck: 1 }; let yaw = 0, pitch = 0.05, dragging = false, down = null, started = false, vrDirty = true, msgT = 0, msgText = "";
 const keys = {}; const intro = document.getElementById("intro"), FADE = document.createElement("div"); FADE.style.cssText = "position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .5s;z-index:5";
@@ -511,11 +766,12 @@ document.body.append(HUD, MSG, FADE);
 function say(t, secs = 12) { msgText = t; msgT = secs; MSG.innerHTML = t; MSG.style.display = "block"; vrDirty = true; }
 function goDeck(d) { if (Math.hypot(P_.x, P_.z) > LIFT_R - 0.15) return say("Step into the lift first: the shaft in the middle of each deck, its door facing forward. The deck buttons are inside.", 6); if (d === P_.deck) return; FADE.style.opacity = 1; setTimeout(() => { P_.deck = d; P_.x = 0; P_.z = 0.2; yaw = 0; FADE.style.opacity = 0; say(`Lift: ${DECKS[d].name}. Walk out through the door ahead.`, 4); }, 450); }
 function start() { if (started) return; started = true; intro?.classList.add("gone"); say("You are on the bridge of an antimatter starship in orbit near Earth. At the AUTOPILOT station (front left) choose a destination and press ENGAGE AUTOPILOT; the TRIP COMPUTER ahead shows both clocks and both velocities. To look out, take the lift behind you up to the CUPOLA.", 16); }
-addEventListener("keydown", e => { keys[e.code] = true; start(); if (e.code === "KeyQ") goDeck(Math.min(2, P_.deck + 1)); if (e.code === "KeyZ") goDeck(Math.max(0, P_.deck - 1)); if (e.code === "BracketRight") warpI = Math.min(WARPS.length - 1, warpI + 1); if (e.code === "BracketLeft") warpI = Math.max(0, warpI - 1); if (e.code === "KeyH") toggleHud(); });
+addEventListener("keydown", e => { keys[e.code] = true; start(); if (e.code === "KeyQ") goDeck(DECK_ORDER[Math.min(3, DECK_ORDER.indexOf(P_.deck) + 1)]); if (e.code === "KeyZ") goDeck(DECK_ORDER[Math.max(0, DECK_ORDER.indexOf(P_.deck) - 1)]); if (e.code === "BracketRight") warpI = Math.min(WARPS.length - 1, warpI + 1); if (e.code === "BracketLeft") warpI = Math.max(0, warpI - 1); if (e.code === "KeyH") toggleHud(); });
 function toggleHud() { SKYLAB.on = !SKYLAB.on; say(`Cupola sky labels ${SKYLAB.on ? "on" : "off"}.`, 3); }
 addEventListener("keyup", e => keys[e.code] = false);
 const ray = new THREE.Raycaster();
-function pick(origin, dir) { ray.set(origin, dir); const hit = ray.intersectObjects(BUTTONS, false)[0]; if (hit && hit.distance < 8) { hit.object.userData.onPick(); hit.object.scale.setScalar(0.92); setTimeout(() => hit.object.scale.setScalar(1), 150); return true; } return false; }
+const shown = o => { for (; o; o = o.parent) if (!o.visible) return false; return true; };
+function pick(origin, dir) { ray.set(origin, dir); const hit = ray.intersectObjects(BUTTONS, false).find(h => shown(h.object)); if (hit && hit.distance < 8) { hit.object.userData.onPick(); hit.object.scale.setScalar(0.92); setTimeout(() => hit.object.scale.setScalar(1), 150); return true; } return false; }
 renderer.domElement.addEventListener("pointerdown", e => { dragging = true; down = [e.clientX, e.clientY]; start(); });
 addEventListener("pointerup", e => { dragging = false; if (down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) < 5 && !renderer.xr.isPresenting) { const m = new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1); ray.setFromCamera(m, camera); pick(ray.ray.origin.clone(), ray.ray.direction.clone()); } down = null; });
 addEventListener("pointermove", e => { if (!dragging) return; yaw -= e.movementX * 0.004; pitch = clampN(pitch - e.movementY * 0.004, -1.5, 1.5); });
@@ -586,22 +842,22 @@ const clock = new THREE.Clock(), fwd = V3(0, 0, 0), side = V3(0, 0, 0), UP = V3(
 renderer.setAnimationLoop(() => { try { frame(); } catch (e) { if (loopErrs++ < 5) console.error(e); renderer.render(scene, camera); } });
 function frame() { const dt = Math.min(clock.getDelta(), 0.1), vr = renderer.xr.isPresenting;
   if (started) stepFlight(dt);
-  setAttitude(bow); const st = curState(), u = mode === "trip" ? trip.u : [1, 0, 0]; skyUniforms.uV.value.set(...u); skyUniforms.uBeta.value = st.v / C; skyUniforms.uGamma.value = st.gamma; skyUniforms.uEps.value = mode === "trip" ? Math.exp(-st.phi) / Math.cosh(st.phi) : 1;   // 1 - beta, computed without cancellation
+  if (LAND.away && LAND.s) setFrame(LAND.fx, LAND.fy); else setAttitude(bow); const st = curState(), u = mode === "trip" ? trip.u : [1, 0, 0]; skyUniforms.uV.value.set(...u); skyUniforms.uBeta.value = st.v / C; skyUniforms.uGamma.value = st.gamma; skyUniforms.uEps.value = mode === "trip" ? Math.exp(-st.phi) / Math.cosh(st.phi) : 1;   // 1 - beta, computed without cancellation
   { const b = st.v / C; FWD.visible = b > 0.98; if (FWD.visible) { FWD.position.copy(eq2ship(u)).multiplyScalar(SKY_R * 0.9); FWD.scale.setScalar(SKY_R * 0.9 * clampN(0.01 + 0.008 * Math.log10(st.gamma), 0.01, 0.07)); } }
-  const hideI = updateSystem(shipPos, coordMs); updateNamedStars(shipPos, hideI); updatePlanetPoints(shipPos, coordMs); updateHud(shipPos, P_.deck === 2 && SKYLAB.on, scrT <= dt);
+  const hideI = updateSystem(shipPos, coordMs); updateNamedStars(shipPos, hideI); updatePlanetPoints(shipPos, coordMs); updateHud(shipPos, PLACE === "ship" && P_.deck === 2 && SKYLAB.on, scrT <= dt); updateSurface();
   // walking
   let mx = 0, my = 0;
   if (vr) { const s = renderer.xr.getSession(); for (const src of s?.inputSources || []) { const gp = src.gamepad; if (!gp) continue; const [ax, ay] = stick(gp.axes);
       if (src.handedness === "left") { mx += ax; my += ay; if (tap("L", gp, 4)) warpI = Math.max(0, warpI - 1); if (tap("L", gp, 5)) warpI = Math.min(WARPS.length - 1, warpI + 1); }
-      else { if (tap("R", gp, 4)) goDeck((P_.deck + 1) % 3); if (Math.abs(ax) > 0.7 && snap) { vrTurn -= Math.sign(ax) * Math.PI / 6; snap = false; } else if (Math.abs(ax) < 0.3) snap = true; } }
+      else { if (tap("R", gp, 4) && PLACE === "ship") goDeck(DECK_ORDER[(DECK_ORDER.indexOf(P_.deck) + 1) % 4]); if (Math.abs(ax) > 0.7 && snap) { vrTurn -= Math.sign(ax) * Math.PI / 6; snap = false; } else if (Math.abs(ax) < 0.3) snap = true; } }
     rig.rotation.y = vrTurn; fwd.set(0, 0, -1).applyQuaternion(camera.quaternion).applyAxisAngle(UP, vrTurn); }
   else { camera.rotation.set(pitch, yaw, 0, "YXZ"); fwd.set(-Math.sin(yaw), 0, -Math.cos(yaw)); if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD) mx += 1; if (keys.KeyA) mx -= 1; if (keys.ArrowLeft) yaw += 1.6 * dt; if (keys.ArrowRight) yaw -= 1.6 * dt; }
   fwd.y = 0; fwd.normalize(); side.set(-fwd.z, 0, fwd.x);
-  if (mx || my) { const sp = 1.4 * dt, nx = P_.x + (fwd.x * -my + side.x * mx) * sp, nz = P_.z + (fwd.z * -my + side.z * mx) * sp; if (walkable(P_.deck, nx, nz)) { P_.x = nx; P_.z = nz; } else if (walkable(P_.deck, nx, P_.z)) P_.x = nx; else if (walkable(P_.deck, P_.x, nz)) P_.z = nz; }
-  rig.position.set(P_.x, DECKS[P_.deck].y + (vr && SITTING ? 0.45 : 0), P_.z);
+  if (mx || my) { const sp = 1.4 * dt, nx = P_.x + (fwd.x * -my + side.x * mx) * sp, nz = P_.z + (fwd.z * -my + side.z * mx) * sp; if (canWalk(nx, nz)) { P_.x = nx; P_.z = nz; } else if (canWalk(nx, P_.z)) P_.x = nx; else if (canWalk(P_.x, nz)) P_.z = nz; }
+  const sit = vr && SITTING ? 0.45 : 0; if (PLACE === "ship") rig.position.set(P_.x, DECKS[P_.deck].y + sit, P_.z); else if (PLACE === "outside") rig.position.set(P_.x, -CAB_H + sit, P_.z); else rig.position.set(LANDER.position.x + P_.x, LANDER.position.y + sit, LANDER.position.z + P_.z);
   // screens and messages
-  scrT -= dt; if (scrT <= 0) { scrT = 0.25; drawTrip(); drawAuto(); drawNav(); drawEng(); drawShip(); }
+  scrT -= dt; if (scrT <= 0) { scrT = 0.25; drawLander(); if (PLACE === "ship") { drawTrip(); drawAuto(); drawNav(); drawEng(); drawShip(); } }
   msgT -= dt; if (msgT <= 0 && MSG.style.display !== "none") { MSG.style.display = "none"; msgText = ""; }
-  hudT -= dt; if (hudT <= 0) { hudT = 0.25; HUD.innerHTML = `<b>${DECKS[P_.deck].name}</b> · ${mode === "trip" ? `to <b>${destName(trip)}</b>, ${st.phase}` : mode === "align" ? "turning to the course" : `in orbit near ${parkName()}`} · time: ${WARPS[warpI][1]}<br>ship ${fmtDate(properMs)} · stars ${fmtDate(coordMs)}<br>map velocity v = ${fmtKms(st.v)} (${fmtC(st.v)}) · proper velocity w = ${fmtKms(st.w)} (${fmtC(st.w)}) · γ = ${fmtG(st.gamma)}<br><span style="color:#8ab0c4;font-size:12px">WASD walk · drag to look · click the console buttons · [ ] time · Q/Z lift up/down (in the lift) · H sky labels (cupola)</span>`;
+  hudT -= dt; if (hudT <= 0) { hudT = 0.25; HUD.innerHTML = `<b>${PLACE === "ship" ? DECKS[P_.deck].name : PLACE === "outside" ? "outside, on " + LAND.B.name : "the lander" + (LAND.s ? ": " + LAND.s.phase : LAND.away ? ": waiting to undock" : ", docked")}</b> · ${mode === "trip" ? `to <b>${destName(trip)}</b>, ${st.phase}` : mode === "align" ? "turning to the course" : `in orbit near ${parkName()}`} · time: ${WARPS[warpI][1]}<br>ship ${fmtDate(properMs)} · stars ${fmtDate(coordMs)}<br>map velocity v = ${fmtKms(st.v)} (${fmtC(st.v)}) · proper velocity w = ${fmtKms(st.w)} (${fmtC(st.w)}) · γ = ${fmtG(st.gamma)}<br><span style="color:#8ab0c4;font-size:12px">WASD walk · drag to look · click the console buttons · [ ] time · Q/Z lift up/down (in the lift) · H sky labels (cupola) · the lander is in the hangar</span>`;
     if (vr) drawVR([`${mode === "trip" ? "to " + destName(trip) + " · " + st.phase : "in orbit near " + parkName()} · ${WARPS[warpI][1]}`, `ship ${fmtDate(properMs)}`, `stars ${fmtDate(coordMs)}`, `v ${fmtKms(st.v)}  w ${fmtKms(st.w)}  gamma ${fmtG(st.gamma)}`, msgText.slice(0, 70), msgText.slice(70, 140), "trigger: press buttons · A in the lift: next deck · X/Y: time"]); }
   renderer.render(scene, camera); }

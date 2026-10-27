@@ -459,9 +459,13 @@ SS = SS[:i0] + """<div id="intro"><div class="card">
   stars' <b>coordinate time</b> (both starting at today's date and time), the <b>proper velocity</b> w = &gamma;v (which can exceed c) and the
   <b>map velocity</b> v (which never does). Out of the windows the sky is shown as you would see it: at high speed the stars crowd ahead and
   turn blue, and fade and redden behind.</p>
-  <p>Proxima Centauri takes 3.5 years by the ship's clock (5.9 on Earth); the centre of the galaxy, 26,670 light years away, takes under 20.</p>
+  <p>Proxima Centauri takes 3.5 years by the ship's clock (5.9 on Earth); the centre of the galaxy, 26,670 light years away, takes under 20.
+  Within a system the autopilot flies to any planet, the star, or the Moon (press STARS / SYSTEM): Earth to Mars takes about 3 days.</p>
+  <p>In the <b>hangar</b>, at the bottom of the lift, a <b>lander</b> can take you down to the surface of the body the ship is orbiting, and back.
+  Its autopilot flies by Newton's laws, step by step: a Hohmann transfer to a low orbit, entry on the heat shield where there is air, the engine
+  near the ground; it picks a site in the local morning. Then you can step outside.</p>
   <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; click the console buttons &nbsp;&middot;&nbsp; <kbd>[</kbd> <kbd>]</kbd> slower / faster time &nbsp;&middot;&nbsp;
-  the lift (in the middle of each deck) has buttons inside, or <kbd>Q</kbd>/<kbd>Z</kbd> up / down when you are in it; the cupola, for looking out, is at the top<br>
+  the lift (in the middle of each deck) has buttons inside, or <kbd>Q</kbd>/<kbd>Z</kbd> up / down when you are in it; the cupola, for looking out, is at the top; the hangar at the bottom<br>
   In VR: left stick walk, right stick turn, trigger to press buttons, <b>A</b> in the lift: next deck, <b>X</b>/<b>Y</b> slower / faster time</p>
   <p class="dim">Star positions, distances and known planets are real; ship design follows published studies of antimatter rockets. Click to begin.</p>
 </div></div>
