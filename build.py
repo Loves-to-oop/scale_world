@@ -472,6 +472,32 @@ out15 = HERE / "stlouis1800.html"
 out15.write_text(SL.replace("__THREE__", three).replace("__SCENE__", (HERE / "stlouis1800.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out15.name}, {out15.stat().st_size // 1024} KB")
 
+# Eridu, about 4500 BC
+ER = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Eridu, about 4500 BC: the temple town of the Ubaid</title>").replace("background:#c8d4d8", "background:#d8ccb4").replace("#intro.gone{", "#intro{overflow-y:auto;align-items:flex-start;padding:16px 0;box-sizing:border-box} #intro .card{margin:auto} #intro.gone{", 1)
+i0, i1 = ER.index('<div id="intro">'), ER.index('<button id="vr">')
+ER = ER[:i0] + """<div id="intro"><div class="card">
+  <h1>Eridu, about 4500 BC</h1>
+  <p>At the southern edge of Mesopotamia, where the river met the great reed marshes at the head of the Gulf, Eridu was one of the first
+  towns: the place the Sumerians later believed kingship first came down from heaven, the city of Enki, lord of the sweet waters. This is
+  the late Ubaid period, more than a thousand years before writing. Walk up to the temple on its platform (the seventh of eighteen temples
+  built one over another) and into its hall, where fish were offered; through the town of mud-brick houses and reed huts; out along the
+  river and canals, through the barley harvest and the date groves, into the marsh and to the desert's edge.</p>
+  <p>See how people lived and worked: potters with the slow wheel and the kiln, brick-makers, reapers with sickles of fired clay, cattle
+  threshing, boat-builders binding reeds and coating them with bitumen, fishermen, women spinning, weaving and grinding grain. Go into the
+  houses (E at a door). The country round the town is generated; the temple and its offerings, the cemetery and the crafts are from the
+  excavations.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; shift run &nbsp;&middot;&nbsp; <kbd>−</kbd> <kbd>=</kbd> pace &nbsp;&middot;&nbsp; <kbd>E</kbd> read, ask, go in &nbsp;&middot;&nbsp;
+  <kbd>N</kbd> next moment &nbsp;&middot;&nbsp; <kbd>T</kbd> time speed &nbsp;&middot;&nbsp; <kbd>L</kbd> markers &nbsp;&middot;&nbsp; <kbd>F</kbd> fly &nbsp;&middot;&nbsp; <kbd>M</kbd> map<br>
+  In VR: left stick walk, right stick turn, trigger run, <b>A</b> read / go in, <b>B</b> next place, <b>X</b> next moment, <b>Y</b> time speed</p>
+  <p class="dim">After Safar, Mustafa and Lloyd's excavations at Eridu (1946-49) and work on Ubaid villages, crafts, boats and environment. Much
+  is unknown (above all, how people dressed and how the town was laid out): every marker says whether a thing is known, inferred, or
+  typical. Click to begin.</p>
+</div></div>
+""" + ER[i1:]
+out16 = HERE / "eridu.html"
+out16.write_text(ER.replace("__THREE__", three).replace("__SCENE__", (HERE / "eridu.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out16.name}, {out16.stat().st_size // 1024} KB")
+
 # ---- the fourteenth page: an antimatter starship at 1 g ------------------------------------------------------------------
 SS = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Starship: 1 g to the stars</title>").replace("background:#c8d4d8", "background:#05080c")
 i0, i1 = SS.index('<div id="intro">'), SS.index('<button id="vr">')
