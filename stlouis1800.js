@@ -829,10 +829,15 @@ const GRASS_N = IS_HEADSET ? 2200 : 4200, GRASS = new THREE.InstancedMesh((() =>
   new THREE.MeshStandardMaterial({ map: tex(128, 128, (g, w, h) => { g.clearRect(0, 0, w, h); for (let k = 0; k < 70; k++) { const x = rnd() * w, top = rnd() * h * 0.6; g.strokeStyle = ["#7a8a3a", "#8a9a48", "#6a7a30", "#9aa456", "#a8a060"][(rnd() * 5) | 0]; g.lineWidth = 1.5 + rnd() * 2; g.beginPath(); g.moveTo(x, h); g.quadraticCurveTo(x + (rnd() - 0.5) * 20, h * 0.6, x + (rnd() - 0.5) * 30, top); g.stroke(); }
     for (let k = 0; k < 6; k++) { g.fillStyle = ["#a868b0", "#e0c040", "#f0f0e0"][(rnd() * 3) | 0]; g.beginPath(); g.arc(rnd() * w, rnd() * h * 0.5 + 8, 3 + rnd() * 3, 0, 6.283); g.fill(); } }), alphaTest: 0.4, side: THREE.DoubleSide, roughness: 1 }), GRASS_N);
 GRASS.frustumCulled = false; GRASS.count = 0; scene.add(GRASS); let grassAt = [1e9, 1e9];
-function grassStep() { if (Math.hypot(P_.x - grassAt[0], P_.z - grassAt[1]) < 12) return; grassAt = [P_.x, P_.z]; let n = 0; const R = seeded(((P_.x / 12) | 0) * 7 + ((P_.z / 12) | 0) * 13);
-  for (let k = 0; k < GRASS_N * 3 && n < GRASS_N; k++) { const a = R() * 6.283, r = Math.sqrt(R()) * 70, x = P_.x + Math.cos(a) * r, z = P_.z + Math.sin(a) * r, [u, v] = toUV(x, z), h = baseH(x, z); if (u > -270 || h < 12 || rGet(x, z) !== 0) continue;
-    const s = 0.7 + R() * 0.6; O3.position.set(x, h - 0.05, z); O3.rotation.set(0, R() * 3, 0); O3.scale.set(s * 1.1, s * (0.8 + R() * 0.5), s * 1.1); O3.updateMatrix(); GRASS.setMatrixAt(n++, O3.matrix); }
-  GRASS.count = n; GRASS.instanceMatrix.needsUpdate = true; }
+// scatter plants on a fixed jittered grid in the world, nearest first: the same spot always holds the same plant, so nothing jumps as you walk
+function stableScatter(IM, cap, sp, radius, accept, place) { const offs = IM.userData.offs || (IM.userData.offs = (() => { const o = [], n = Math.ceil(radius / sp); for (let j = -n; j <= n; j++) for (let i = -n; i <= n; i++) if (Math.hypot(i, j) * sp <= radius) o.push([i, j]); return o.sort((a, b) => Math.hypot(...a) - Math.hypot(...b)); })());
+  const ci = Math.round(P_.x / sp), cj = Math.round(P_.z / sp); let n = 0;
+  for (const [di, dj] of offs) { if (n >= cap) break; const i = ci + di, j = cj + dj, x = (i + hash(i, j * 7 + 1) - 0.5) * sp, z = (j + hash(i * 3 + 5, j) - 0.5) * sp; if (!accept(x, z, i, j)) continue;
+    place(x, z, hash(i * 11, j * 13), hash(i * 17 + 3, j * 19 + 7)); IM.setMatrixAt(n++, O3.matrix); }
+  IM.count = n; IM.instanceMatrix.needsUpdate = true; }
+function grassStep() { if (Math.hypot(P_.x - grassAt[0], P_.z - grassAt[1]) < 6) return; grassAt = [P_.x, P_.z];
+  stableScatter(GRASS, GRASS_N, 1.7, 72, (x, z) => { const [u] = toUV(x, z); return u < -270 && rGet(x, z) === 0 && baseH(x, z) >= 12; },
+    (x, z, r1, r2) => { const s = 0.7 + r1 * 0.6; O3.position.set(x, baseH(x, z) - 0.05, z); O3.rotation.set(0, r2 * 3, 0); O3.scale.set(s * 1.1, s * (0.8 + r2 * 0.5), s * 1.1); O3.updateMatrix(); }); }
 
 // ---------- boats at the landing ----------
 // The keelboat was the river's freighter: 15-25 m long, built on a keel, with a cargo box amidships, a mast for the towline (the
