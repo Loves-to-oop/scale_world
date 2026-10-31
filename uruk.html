@@ -53157,6 +53157,11 @@ function shawlBand() { const P = [[0.14, -0.02], [0.13, 0.12], [0.15, 0.25], [0.
   const N = 28, K = 4, pos = [], idx = []; for (let i = 0; i <= N; i++) { const a = i / N * Math.PI * 2, yc = 0.3 + 0.11 * Math.cos(a); for (let j = 0; j <= K; j++) { const y = yc - 0.085 + 0.17 * j / K, r = rAt(y) + 0.016; pos.push(r * Math.cos(a), y, -r * Math.sin(a) * 0.7); } }
   for (let i = 0; i < N; i++) for (let j = 0; j < K; j++) { const a = i * (K + 1) + j, b = a + K + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
   const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g; }
+// the leader's long skirt with its net pattern (as on the Uruk Vase and seals): a lattice of darker lines baked into the cloth's shading
+function netSkirt() { const g = new THREE.CylinderGeometry(0.155, 0.28, 0.86, 40, 18, true).scale(1, 1, 0.82).translate(0, -0.37, 0).toNonIndexed(), p = g.attributes.position, n = p.count, col = new Float32Array(n * 3);
+  for (let t = 0; t < n; t += 3) { let cx = 0, cy = 0, cz = 0; for (let k = 0; k < 3; k++) { cx += p.getX(t + k) / 3; cy += p.getY(t + k) / 3; cz += p.getZ(t + k) / 3; } const u = (Math.atan2(cz / 0.82, cx) / (Math.PI * 2) + 0.5) * 20, v = (cy + 0.8) / 0.86 * 11, fu = u + v - Math.floor(u + v), fv = u - v - Math.floor(u - v);
+    const sh = cy < -0.74 ? 0.6 : (fu < 0.16 || fv < 0.16) ? 0.58 : 1; for (let k = 0; k < 3; k++) col.set([sh, sh, sh], (t + k) * 3); }
+  g.setAttribute("color", new THREE.BufferAttribute(col, 3)); return g; }
 const PG = {
   thigh: G1(new THREE.CylinderGeometry(0.078, 0.058, THIGH, 9).translate(0, -THIGH / 2, 0)),
   shin: mergeG([[new THREE.SphereGeometry(0.058, 7, 5), MT(0, 0, 0)], [new THREE.LatheGeometry([[0.044, -SHIN], [0.048, -SHIN * 0.75], [0.058, -SHIN * 0.35], [0.055, -0.04], [0.05, 0]].map(([r, y]) => new THREE.Vector2(r, y)), 9), MT(0, 0, 0)]]),
@@ -53175,7 +53180,8 @@ const PG = {
   bun: mergeG([[faceCap(0.11, Math.PI * 0.55, Math.PI * 0.3, Math.PI * 0.42), MT(0, 0.672, -0.006, 0.9, 1.12, 1.04)], [new THREE.SphereGeometry(0.065, 8, 6), MT(0, 0.75, -0.1, 1, 0.9, 1)]]),   // the hair gathered up behind
   fillet: G1(new THREE.TorusGeometry(0.104, 0.012, 4, 20).rotateX(Math.PI / 2).scale(0.93, 1, 1.06).translate(0, 0.73, -0.005)),   // a band round the head
   kilt: G1(foldTube(0.15, 0.24, 0.5, 20, 8, 0.07, 0, 0, 3).scale(1, 1, 0.82).translate(0, -0.18, 0)),   // a wrapped kilt, waist to knee
-  wrap: G1(foldTube(0.15, 0.3, 0.88, 22, 9, 0.07, 0, 0, 2).scale(1, 1, 0.82).translate(0, -0.38, 0)),   // a wrap to the ankle
+  wrap: G1(foldTube(0.15, 0.3, 0.88, 22, 9, 0.07, 0, 0, 2).scale(1, 1, 0.82).translate(0, -0.38, 0)),
+  netskirt: G1(netSkirt()),   // a wrap to the ankle
   wraptop: G1(new THREE.LatheGeometry([[0.146, -0.04], [0.136, 0.12], [0.158, 0.25], [0.172, 0.34], [0.175, 0.4]].map(([r, y]) => new THREE.Vector2(r, y)), 14).scale(1, 1, 0.7)),   // the wrap's upper part, over the breast
   shawl: mergeG([[shawlBand(), MT(0, 0, 0)], [new THREE.SphereGeometry(0.083, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), MT(0.155, 0.425, 0, 1, 0.75, 1)]]),   // a shawl over the left shoulder, wound round the body under the right arm
   loincloth: mergeG([[new THREE.BoxGeometry(0.22, 0.32, 0.012), MT(0, -0.1, 0.15)], [new THREE.BoxGeometry(0.22, 0.3, 0.012), MT(0, -0.1, -0.14)], [new THREE.CylinderGeometry(0.143, 0.143, 0.05, 14, 1, true), MT(0, 0.05, 0, 1, 1, 0.72)]]),
@@ -53184,7 +53190,7 @@ const PG = {
   beads: G1(new THREE.TorusGeometry(0.09, 0.016, 5, 16).rotateX(Math.PI / 2 - 0.3).translate(0, 0.47, 0.035)),
   belt: mergeG([[new THREE.CylinderGeometry(0.146, 0.146, 0.03, 14, 1, true), MT(0, 0.06, 0, 1, 1, 0.72)]]),
   beard: G1(new THREE.SphereGeometry(0.07, 10, 6, 0, Math.PI * 2, Math.PI * 0.38, Math.PI * 0.62).scale(0.9, 1.2, 0.8).translate(0, 0.625, 0.04)) };
-const PARTS = ["legL", "legR", "shinL", "shinR", "shoeL", "shoeR", "armL", "armR", "foreL", "foreR", "handL", "handR", "torso", "head", "eyeW", "eyes", "brows", "hairShort", "hairLong", "bun", "fillet", "kilt", "wrap", "wraptop", "shawl", "loincloth", "beads", "marks", "seal", "belt", "beard"];
+const PARTS = ["legL", "legR", "shinL", "shinR", "shoeL", "shoeR", "armL", "armR", "foreL", "foreR", "handL", "handR", "torso", "head", "eyeW", "eyes", "brows", "hairShort", "hairLong", "bun", "fillet", "kilt", "wrap", "netskirt", "wraptop", "shawl", "loincloth", "beads", "marks", "seal", "belt", "beard"];
 const PGEO = { legL: PG.thigh, legR: PG.thigh, shinL: PG.shin, shinR: PG.shin, shoeL: PG.shoe, shoeR: PG.shoe, armL: PG.uarm, armR: PG.uarm, foreL: PG.farm, foreR: PG.farm, handL: PG.hand, handR: PG.hand };
 for (const k in PG) if (!PG[k].attributes.color) PG[k] = G1(PG[k]);
 const METAL = new Set([]);
@@ -53196,6 +53202,10 @@ function looks(i, role) { const h = k => hash(i * 13 + k, 77), pick = (A, k) => 
     shawl: r === "elder" ? h(9) < 0.8 : r === "woman" ? h(9) < 0.5 : r === "man" ? h(9) < 0.15 : false, beard: (r === "man" || r === "elder" || r === "fisher") && h(10) < 0.6, beads: h(11) < 0.45, fillet: h(12) < 0.25, sandals: h(13) < 0.2, girl: h(14) < 0.5, naked: r === "child" && h(15) < 0.5, shaven: r === "temple" };
   if (!LATE) Object.assign(L, { cloth: h(7) < 0.7 ? pick(UNDYED, 7) : pick(LINEN, 7), cloth2: h(8) < 0.8 ? pick(UNDYED, 8) : pick(DYED, 8), shawl: r === "woman" ? h(9) < 0.45 : false, beads: h(11) < 0.35, marks: false, fillet: r === "man" || r === "elder" ? h(12) < 0.25 : r === "woman" ? h(12) < 0.4 : false });   // Uruk: wool, mostly undyed; headbands as on the Uruk Vase and seals
   else Object.assign(L, { cloth: h(7) < 0.85 ? pick(UNDYED, 7) : pick(DYED, 7), cloth2: h(8) < 0.7 ? pick(UNDYED, 8) : pick(DYED, 8), fillet: r === "woman" ? L.fillet : false, beard: (r === "man" || r === "elder" || r === "worker") && h(10) < 0.5, shaven: (r === "man" || r === "worker") && h(22) < 0.2, beads: r === "woman" ? h(11) < 0.5 : h(11) < 0.12 });
+  if (r === "leader") Object.assign(L, { cloth: pick([0xddd2b8, 0xcfc2a2, 0xe6dcc6], 7), beard: true, bun: true, fillet: true, shawl: false, beads: false, shaven: false, s: 1.0 + h(5) * 0.05 });   // bearded, hair in a bun under a headband, the net skirt
+  if (r === "bearer") Object.assign(L, { naked: true, shaven: true, beard: false, fillet: false, beads: false, shawl: false });   // naked, as on the Uruk Vase
+  if (r === "priestess") Object.assign(L, { role: "woman", priestess: true, cloth: 0xe8e2d2, cloth2: 0xd8ccb0, shawl: true, fillet: true, beads: true });
+  if (L.role === "woman") L.long = h(23) < 0.5;   // long hair down the back, or a bun
   if (r === "child") L.s = 0.58 + h(5) * 0.18; if (r === "temple") Object.assign(L, { cloth: 0xeee8da, beard: false, shawl: false, s: 0.95 + h(5) * 0.08 });
   if (LATE && !role && r === "man" && h(16) < 0.18) L.role = h(17) < 0.5 ? "official" : "scribe";
   if (L.role === "official") Object.assign(L, { cloth: pick([0xe8e0cc, 0xd8ccb0, 0xc8b898], 18), cloth2: pick([0xe8e0cc, 0x9a6a3a, 0x6a5a8a, 0x8a3a2a], 19), shawl: true, seal: true, shaven: h(20) < 0.65, beard: h(20) >= 0.65 && h(10) < 0.6, beads: false });   // a long robe and a fringed shawl over the left shoulder
@@ -53207,14 +53217,14 @@ const isWoman = L => L.role === "woman" || (L.role === "child" && L.girl);
 const robed = L => L.role === "official" || L.role === "temple";
 function shows(L, p) { const r = L.role, w = isWoman(L), man = !w && r !== "child";
   switch (p) {
-    case "hairShort": return !w && !L.shaven; case "hairLong": return r === "child" && L.girl; case "bun": return r === "woman"; case "fillet": return L.fillet && !L.shaven && r !== "child";
-    case "kilt": return (man && r !== "fisher" && !robed(L)) || (r === "child" && !L.girl && !L.naked); case "wrap": return r === "woman" || (r === "child" && L.girl && !L.naked) || robed(L); case "seal": return !!L.seal; case "wraptop": return r === "woman" || r === "official";
-    case "shawl": return L.shawl; case "loincloth": return r === "fisher"; case "beads": return L.beads; case "marks": return !!L.marks; case "belt": return (man && r !== "fisher") || r === "woman"; case "beard": return L.beard;
+    case "hairShort": return !w && !L.shaven && !L.bun; case "hairLong": return (r === "child" && L.girl) || !!L.long; case "bun": return (r === "woman" && !L.long) || !!L.bun; case "fillet": return L.fillet && !L.shaven && r !== "child";
+    case "kilt": return (man && r !== "fisher" && r !== "leader" && r !== "bearer" && !robed(L)) || (r === "child" && !L.girl && !L.naked); case "wrap": return r === "woman" || (r === "child" && L.girl && !L.naked) || robed(L); case "seal": return !!L.seal; case "netskirt": return r === "leader"; case "wraptop": return r === "woman" || r === "official";
+    case "shawl": return L.shawl; case "loincloth": return r === "fisher"; case "beads": return L.beads; case "marks": return !!L.marks; case "belt": return (man && r !== "fisher" && r !== "bearer") || r === "woman"; case "beard": return L.beard;
     default: return true; } }
 function colorOf(L, p) {
   if (p.startsWith("leg") || p.startsWith("shin") || p.startsWith("hand") || p === "head" || p === "torso" || p.startsWith("arm") || p.startsWith("fore")) return L.skin; if (p.startsWith("shoe")) return L.sandals ? 0x6a4a2a : L.skin;
   switch (p) { case "eyes": return 0x1e140c; case "eyeW": return 0xe8e4dc; case "brows": case "hairShort": case "hairLong": case "bun": case "beard": return L.hair; case "fillet": return 0x8a3a2a;
-    case "kilt": case "wrap": case "wraptop": return L.cloth; case "shawl": return L.cloth2; case "loincloth": return L.cloth; case "beads": return 0xd8c8a0; case "marks": return 0x2e2018; case "seal": return 0x3a4a5a; case "belt": return 0x6a4a2a; } return 0xffffff; }
+    case "kilt": case "wrap": case "netskirt": case "wraptop": return L.cloth; case "shawl": return L.cloth2; case "loincloth": return L.cloth; case "beads": return 0xd8c8a0; case "marks": return 0x2e2018; case "seal": return 0x3a4a5a; case "belt": return 0x6a4a2a; } return 0xffffff; }
 // poses: hip flex (l), knee bend (k), shoulder swing (a), elbow bend (e, negative = forearm forward), skirt tilt (sk)
 function poseOf(kind, t, ph, walkAmt = 1) { const c = t * 7 + ph, w = Math.sin(c), sway = 0.04 * Math.sin(t * 0.8 + ph);
   const P = { drop: 0, lean: 0, lL: 0, lR: 0, kL: 0.05, kR: 0.05, aL: sway, aR: -sway, eL: -0.15, eR: -0.15, sk: 0 };
@@ -53547,10 +53557,13 @@ const OVEN_G = new THREE.CylinderGeometry(0.42, 0.55, 0.9, 12, 1, true).translat
 // (the "hut sounding"), plastered with mud, like the reed houses still built in the marshes: arches of bundled reeds covered with mats.
 const HOUSES = [];
 function addHouse(x, z, w, d, ry, o = {}) { const gy = Math.min(...[[0, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => groundH(x + Math.cos(ry) * a * w / 2 + Math.sin(ry) * b * d / 2, z - Math.sin(ry) * a * w / 2 + Math.cos(ry) * b * d / 2))) - 0.05, R = seeded((x * 31 + z * 17) | 0);
-  const H = { x, z, w, d, ry, gy, kind: o.kind || "house", reed: !!o.reed, plain: !!o.plain, court: o.court ?? (LATE && !o.reed), wh: o.wh ?? (o.reed ? 0 : 2.9 + R() * 0.5), face: o.face ?? (R() < 0.5 ? 1 : -1), name: o.name, tint: 0.88 + R() * 0.2 };
+  const H = { x, z, w, d, ry, gy, kind: o.kind || "house", reed: !!o.reed, plain: !!o.plain, fore: o.fore || 0, court: o.court ?? (LATE && !o.reed), wh: o.wh ?? (o.reed ? 0 : 2.9 + R() * 0.5), face: o.face ?? (R() < 0.5 ? 1 : -1), name: o.name, tint: 0.88 + R() * 0.2 };
   const c = Math.cos(ry), s = Math.sin(ry), fx = H.reed ? 0 : H.face * (w / 2 + 0.7), fz = H.reed ? H.face * (d / 2 + 0.7) : 0;
   H.dp = [x + fx * c + fz * s, z - fx * s + fz * c, Math.atan2(fx * c + fz * s, -fx * s + fz * c)];
   H.coll = solid(x, z, w + 0.1, d + 0.1, ry, H); rRect(x, z, w + 1, d + 1, ry, 2); HOUSES.push(H); return H; }
+// the walled forecourt in front of a house, with a gateway onto the street (as at Habuba Kabira)
+function foreWalls(F, H) { const fd = H.fore, w = H.w, d = H.d, f = H.face, t = H.tint, wl = (cx, cz, sx, sz) => { gbox(F, "mud", cx, 1.0, cz, sx, 2.0, sz, "b"); const [x, , z] = gw(F, cx, 0, cz); solid(x, z, sx, sz, H.ry); };
+  GTINT = [t * 0.97, t * 0.94, t * 0.9]; for (const sz of [-1, 1]) wl(f * (w / 2 + fd / 2), sz * (d / 2 - 0.2), fd, 0.4); const fx = f * (w / 2 + fd - 0.2), L = d / 2 - 0.75; for (const sz of [-1, 1]) wl(fx, sz * (0.75 + L / 2), 0.4, L); GTINT = [1, 1, 1]; }
 function gMudHouse(H) { const F = FR(H.x, H.z, H.ry, H.gy, "H" + lodKey(H.x, H.z)), w = H.w, d = H.d, wh = H.wh, R = seeded((H.x * 7 + H.z * 13) | 0), t = H.tint;
   GTINT = [t, t * 0.97, t * 0.93]; gbox(F, "mud", 0, wh / 2, 0, w, wh, d); gbox(F, "mud", 0, wh + 0.25, 0, w + 0.1, 0.5, d + 0.1, "b");   // walls and the parapet
   GTINT = [t * 0.95, t * 0.92, t * 0.88]; gbox(F, "mud", 0, wh + 0.06, 0, w - 0.4, 0.1, d - 0.4, "b");   // the roof's mud surface inside the parapet
@@ -53561,7 +53574,7 @@ function gMudHouse(H) { const F = FR(H.x, H.z, H.ry, H.gy, "H" + lodKey(H.x, H.z
   if (R() < 0.45) { GTINT = [0.95, 0.88, 0.72]; const sx = -H.face * w * 0.2; for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) gbox(F, "palm", sx + a * 1.2, wh + 0.9, b * 1.4, 0.1, 1.8, 0.1, "b"); gbox(F, "reedmat", sx, wh + 1.85, 0, 2.8, 0.08, 3.2, "");   // a reed shade on the roof, for sleeping in the heat
     GTINT = [1, 1, 1]; }
   GTINT = [t * 0.9, t * 0.86, t * 0.8]; const sz = R() < 0.5 ? 1 : -1; for (let k = 0; k < 6; k++) gbox(F, "mud", H.face * (w / 2 + 0.45), (k + 1) * wh / 12, sz * (d / 2 - 0.8 - k * 0.42), 0.8, (k + 1) * wh / 6, 0.42, "b");   // an outside stair to the roof
-  GTINT = [1, 1, 1];
+  GTINT = [1, 1, 1]; if (H.fore) foreWalls(F, H);
   const L = FR(H.x, H.z, H.ry, H.gy, "L" + lodKey(H.x, H.z)); GTINT = [0.46 * t, 0.38 * t, 0.28 * t]; gbox(L, "lod", 0, (wh + 0.5) / 2, 0, w, wh + 0.5, d); GTINT = [1, 1, 1]; }
 // the courtyard house of Sumerian towns (excavated at Ur, Nippur, Tell Asmar): rooms round an open court, the outer walls blank but for the
 // door, flat roofs over the rooms, the court open to the sky; a vestibule inside the door, a reception room, a kitchen, stores, stairs
@@ -53576,7 +53589,7 @@ function gCourtHouse(H) { const F = FR(H.x, H.z, H.ry, H.gy, "H" + lodKey(H.x, H
   GTINT = [1, 1, 1]; const L = FR(H.x, H.z, H.ry, H.gy, "L" + lodKey(H.x, H.z)); GTINT = [0.46 * t, 0.38 * t, 0.28 * t]; gbox(L, "lod", 0, (wh + 0.5) / 2, 0, w, wh + 0.5, d); GTINT = [1, 1, 1]; }
 // a house built simply, for the outer city: the same size and shape, its walls, parapet and door (the plan inside is the full one)
 function gPlainHouse(H) { const F = FR(H.x, H.z, H.ry, H.gy, "H" + lodKey(H.x, H.z)), w = H.w, d = H.d, wh = H.wh, t = H.tint; GTINT = [t, t * 0.97, t * 0.93]; gbox(F, "mud", 0, (wh + 0.45) / 2, 0, w, wh + 0.45, d, "b");
-  GTINT = [1, 1, 1]; const fx = H.face * (w / 2 + 0.03); gpoly(F, "dark", [[fx, 0, -0.5], [fx, 0, 0.5], [fx, 1.9, 0.5], [fx, 1.9, -0.5]], [[0, 0], [1, 0], [1, 1], [0, 1]], [H.face, 0, 0]);
+  GTINT = [1, 1, 1]; const fx = H.face * (w / 2 + 0.03); gpoly(F, "dark", [[fx, 0, -0.5], [fx, 0, 0.5], [fx, 1.9, 0.5], [fx, 1.9, -0.5]], [[0, 0], [1, 0], [1, 1], [0, 1]], [H.face, 0, 0]); if (H.fore) foreWalls(F, H);
   const L = FR(H.x, H.z, H.ry, H.gy, "L" + lodKey(H.x, H.z)); GTINT = [0.46 * t, 0.38 * t, 0.28 * t]; gbox(L, "lod", 0, (wh + 0.45) / 2, 0, w, wh + 0.45, d); GTINT = [1, 1, 1]; }
 // a reed hut: arches of bundled reeds, covered with mats, the ends closed with a lattice of reeds and a door
 const reedBundle = (F, x, z, y0, y1, r0, r1) => { for (let k = 0; k < 8; k++) { const a0 = k / 8 * Math.PI * 2, a1 = (k + 1) / 8 * Math.PI * 2, am = (a0 + a1) / 2; gpoly(F, "reed", [[x + Math.cos(a0) * r0, y0, z + Math.sin(a0) * r0], [x + Math.cos(a1) * r0, y0, z + Math.sin(a1) * r0], [x + Math.cos(a1) * r1, y1, z + Math.sin(a1) * r1], [x + Math.cos(a0) * r1, y1, z + Math.sin(a0) * r1]], [[0, 0], [0.3, 0], [0.3, y1 - y0], [0, y1 - y0]], [Math.cos(am), 0, Math.sin(am)]); } };   // a tapering column of bundled reeds
@@ -53609,9 +53622,9 @@ G_MAT.white = new THREE.MeshStandardMaterial({ map: G_TEX.white, vertexColors: t
 const drawCones = (g, w, h) => { g.fillStyle = "#8a7a62"; g.fillRect(0, 0, w, h); const C = ["#f0e8d8", "#242018", "#b84a2c"];   // cone mosaic: the painted heads of clay cones in zigzags and lozenges
   for (let y = 0; y < h; y += 8) for (let x = (y / 8) % 2 ? 4 : 0; x < w; x += 8) { const zz = Math.abs(((x / 8 + Math.floor(y / 32) * 2) % 8) - 4), band = Math.floor(y / 32) % 3, lz = (Math.abs((x % 64) - 32) + Math.abs((y % 64) - 32)) < 20;
     g.fillStyle = C[lz ? (band + 1) % 3 : (zz + Math.floor(y / 8)) % 4 < 2 ? band : (band + 2) % 3]; g.beginPath(); g.arc(x + 4, y + 4, 3.9, 0, 6.283); g.fill(); } };
-G_TEX.cones = GT(256, 256, drawCones, 1.0);
+G_TEX.cones = GT(256, 256, drawCones, 0.64);   // cone heads about 2 cm across
 G_MAT.cones = new THREE.MeshStandardMaterial({ map: G_TEX.cones, vertexColors: true, roughness: 0.8 });
-const PILLAR_M = new THREE.MeshStandardMaterial({ map: (() => { const t = tex(256, 256, drawCones); t.repeat.set(8, 6); return t; })(), roughness: 0.8 });   // for the round columns (their own UVs)
+const PILLAR_M = new THREE.MeshStandardMaterial({ map: (() => { const t = tex(256, 256, drawCones); t.repeat.set(12.8, 10.6); return t; })(), roughness: 0.8 });   // for the round columns (their own UVs)
 const HALLS = [];   // interiors that dim the daylight: { inside(x, y, z), lp: light position, name }
 // a tripartite building: the long central hall (T-shaped when tdepth is set), rows of rooms either side, outer walls set with niches
 function tripartite(cx, cz, ry, gy, o) {
@@ -53674,6 +53687,18 @@ const EANNA = { x: 520, z: 80, ry: Math.PI / 4 };
   { const [x, z] = IN(-88, 66), F = FR(x, z, E.ry, gy, "eanna"), PH = 1.6; flatUnder(F, 34, 22, gy + PH, true); GTINT = [0.95, 0.9, 0.82]; gbox(F, "brick", 0, PH / 2, 0, 34, PH, 22, "b"); for (let k = 0; k < 8; k++) gbox(F, "brick", 0, (k + 1) * PH / 16, -11 - 2.6 + k * 0.34, 8, (k + 1) * PH / 8, 0.36, "b");
     GTINT = [1, 1, 1]; gbox(F, "cones", 0, PH + 3.4, 9.5, 34, 6.8, 1.6); for (let k = -6; k <= 6; k++) if (k % 2 === 0) { const [cx, , cz] = gw(F, k * 2.6, 0, 8.6); put("pillar", CYL_G, PILLAR_M, cx, gy + PH, cz, 1.6, 6.8, 1.6); }   // the back wall with half-columns
     for (const r of [-4, 2]) for (const k of [-1.5, -0.5, 0.5, 1.5]) { const [cx, , cz] = gw(F, k * 7, 0, r); put("pillar", CYL_G, PILLAR_M, cx, gy + PH, cz, 2.6, 6.8, 2.6); solid(cx, cz, 2.4, 2.4, E.ry); } }
+  // Inanna's ring-posts at the door of Temple D: bundles of reeds bent into a loop at the top, with streamers
+  { const reed = M(0xc8b070), band = M(0x6a4a2a); for (const lx of [7.4, 12.6]) { const [px, pz] = IN(lx, -26.4), G = new THREE.Group(); G.position.set(px, gy, pz); G.rotation.y = E.ry;
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.24, 4.6, 10).translate(0, 2.3, 0), reed), loop = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.1, 6, 14), reed); loop.position.set(0, 5.0, 0); G.add(post, loop);
+      for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.2 - k * 0.012, 0.2 - k * 0.012, 0.08, 10), band); b.position.y = 0.8 + k * 1.0; G.add(b); }
+      for (let k = 0; k < 3; k++) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.4, 0.01).translate(0, -0.7, 0), reed); st.position.set(0.28 + k * 0.06, 4.75, 0); st.rotation.z = 0.15 + k * 0.08; G.add(st); } scene.add(G); }
+    mark("Inanna's ring-posts", ...IN(10, -27), "known", "Bundles of reeds bent into a loop at the top, with streamers: the symbol of Inanna. They stand beside her shrine on the Uruk Vase and on seals, and the same shape is the sign for her name in the earliest writing. Placed here at Temple D by inference.", { y: 5.6, r: 4, range: 120 }); }
+  // the Cone-Mosaic Court behind the Pillar Hall: walls and half-columns all covered with mosaic (level IVb)
+  { const F = FR(...IN(-88, 91), E.ry, gy, "eanna"), W = 34, D = 26, H = 4.6, th = 1.0, wl = (cx, cz, sx, sz) => { gbox(F, "cones", cx, H / 2, cz, sx, H, sz); const [x, , z] = gw(F, cx, 0, cz); solid(x, z, sx, sz, E.ry); };
+    GTINT = [1, 1, 1]; wl(-W / 2, 0, th, D); wl(W / 2, -D / 4 - 1.5, th, D / 2 - 3); wl(W / 2, D / 4 + 1.5, th, D / 2 - 3); wl(0, D / 2, W, th);   // a gateway in the east wall; the Pillar Hall's back wall closes the south
+    for (let k = -5; k <= 5; k++) { for (const sz of [1]) { const [cx, , cz] = gw(F, k * 2.9, 0, sz * (D / 2 - 0.5)); put("pillar", CYL_G, PILLAR_M, cx, gy, cz, 1.3, H, 1.3); } }
+    for (let k = -3; k <= 3; k++) { const [cx, , cz] = gw(F, -W / 2 + 0.5, 0, k * 3.2); put("pillar", CYL_G, PILLAR_M, cx, gy, cz, 1.3, H, 1.3); }
+    mark("The Cone-Mosaic Court", ...IN(-88, 91), "known", "A court whose walls and half-columns were covered all over with cone mosaic: tens of thousands of clay cones, their heads dipped in black, red or white, pressed into the wet plaster to make zigzags, lozenges and triangles, like woven matting. Level IVb, a little before 3200 BC; the size and placement here are approximate.", { y: 6, r: 14, range: 400 }); }
   mark("Eanna", ...IN(-40, -100), "known", "The precinct of Inanna, goddess of love and war (Eanna, 'house of heaven'). In the Late Uruk period, level IVa of the excavations, about 3200 BC, it held a cluster of huge buildings unlike anything built before: halls up to 80 m long, courts, colonnades. What they were for is debated: temples, assembly halls, the seat of a ruler, storehouses. The plans are from the excavations; how the buildings stood relative to one another is approximate here.", { y: 14, r: 120, range: 4000, big: true });
   mark("Temple D", ...IN(10, 15), "known", "The largest building of Eanna IVa, about 80 by 50 m: a cross-shaped central hall with rows of rooms either side, its outer walls set all round with niches. Plan from the excavations; height and roof inferred.", { y: 13, r: 30, range: 900 });
   mark("Temple C", ...IN(-88, -10), "known", "About 54 by 22 m: a T-shaped central hall with rooms either side, entered from both long sides and the end. Plan from the excavations; height and roof inferred.", { y: 11, r: 20, range: 700 });
@@ -53687,7 +53712,7 @@ TEMPLE.hallAt = (x, y, z) => HALLS.find(H => H.inside(x, y, z)) || null;
 // ---------- the city ----------
 // Uruk at its height covered about 250 hectares, perhaps 25,000-50,000 people. Its plan outside the sacred districts is barely known;
 // houses of the period are known best from the Uruk colonies on the Euphrates in Syria (Habuba Kabira, Jebel Aruda): mud-brick houses
-// with a long central hall and rooms either side, or rooms round a court, on plots of a few hundred square metres, along streets.
+// with a long central hall and rooms either side, opening onto a walled forecourt, on plots of a few hundred square metres, along streets.
 // Here: avenues out from the centre, the canals through the city with their quays, blocks of houses, denser near the sacred districts and
 // with gardens and open ground toward the edge. Near the centre the houses are built in full; further out more simply (the same size and
 // shape). All typical.
@@ -53702,7 +53727,8 @@ const LANES = [], LATE_SQ = [];
     for (let r = 0; r < rows; r++) { const dep = bd / rows, cv = v + dep * (r + 0.5), face = rows === 2 ? (r === 0 ? -1 : 1) : (R() < 0.5 ? -1 : 1); let lu = u;
       while (lu < u + bw - 8) { let lw = 10 + R() * 6; if (u + bw - (lu + lw) < 9) lw = u + bw - lu; const [x, z] = IN(lu + lw / 2, cv); lu += lw; const rc = Math.hypot(x - CITY.x, z - CITY.z), core = rc < CORE;
         if (!ok(x, z, dep, lw) || !rRect(x, z, dep - 1.6, lw - 1.6, HR, 0, true)) continue; if (R() < (core ? 0.04 : 0.1)) { rRect(x, z, dep, lw, HR, 3); YARD_SPOTS.push([x, z]); continue; }   // now and then a yard or garden
-        addHouse(x, z, dep - 0.2, lw - 0.2, HR, { court: core ? R() < 0.5 : false, face, plain: !core, wh: 3.0 + R() * 0.6 }); } } };
+        const hb = Math.max(8, dep * 0.62), fd = dep - hb - 0.2, cH = Math.cos(HR), sH = Math.sin(HR), hx = x - face * (fd / 2) * cH, hz = z + face * (fd / 2) * sH;   // the house at the back of its plot, its forecourt in front
+        rRect(x + face * (hb / 2) * cH, z - face * (hb / 2) * sH, fd, lw, HR, 3); addHouse(hx, hz, hb - 0.2, lw - 0.2, HR, { court: false, face, plain: !core, fore: fd > 2.5 ? fd : 0, wh: 3.0 + R() * 0.6 }); } } };
   const gap = () => R() < 0.2 ? 6 : 3 + R() * 1.5;
   for (let u = -CITY.r; u < CITY.r; ) { const bw = 30 + R() * 16; for (let v = -CITY.r; v < CITY.r; ) { const bd = 24 + R() * 16, [x, z] = IN(u + bw / 2, v + bd / 2), rc = Math.hypot(x - CITY.x, z - CITY.z);
       if (rc < edge(x, z) && R() < fill(rc)) block(u, v, bw, bd); const g = gap(); lane(u, v + bd + g / 2, u + bw, v + bd + g / 2); v += bd + g; }
@@ -53710,7 +53736,7 @@ const LANES = [], LATE_SQ = [];
   // reed huts and byres along the river outside the city, as on the Uruk trough
   for (let k = 0, n = 0; k < 4000 && n < (IS_HEADSET ? 40 : 80); k++) { const [x0, z0, a] = RIVER.at(R() * RIVER.L), sd = R() < 0.5 ? -1 : 1, off = RIVER_HW + 25 + R() * 120, x = x0 + Math.cos(a) * sd * off, z = z0 - Math.sin(a) * sd * off;
     const rc = Math.hypot(x - CITY.x, z - CITY.z); if (rc < CITY.r + 60 || rc > 4200 || groundH(x, z) < 0.5) continue; const ry = R() * 6.28, w = 3.8 + R() * 1.6, d = 7 + R() * 6; if (!rRect(x, z, w + 2.5, d + 2.5, ry, 0, true)) continue; addHouse(x, z, w, d, ry, { reed: true }); n++; } }
-mark("The city", ...[CITY.x + 180, CITY.z + 260], "inferred", "Uruk at its height covered about 250 hectares, with perhaps 25,000-50,000 people: the largest city in the world. Its plan outside the sacred districts is barely known. The houses follow those of the Uruk colonies on the Euphrates in Syria: mud-brick houses with a long central hall and rooms either side, or rooms round a court. Here they are packed in blocks along streets near the centre, with more gardens and open ground toward the edge.", { y: 12, r: 200, range: 4000, big: true });
+mark("The city", ...[CITY.x + 180, CITY.z + 260], "inferred", "Uruk at its height covered about 250 hectares, with perhaps 25,000-50,000 people: the largest city in the world. Its plan outside the sacred districts is barely known. The houses follow those of the Uruk colonies on the Euphrates in Syria: mud-brick houses with a long central hall and rooms either side, opening onto a walled forecourt with a gateway to the street. Here they are packed in blocks along streets near the centre, with more gardens and open ground toward the edge.", { y: 12, r: 200, range: 4000, big: true });
 mark("Canals through the city", ...CANALS[0].at(CANALS[0].L * 0.32).slice(0, 2), "known", "Magnetic survey of Uruk has traced canals and waterways running through the city, with what look like quays and harbours: boats brought grain, reeds, fish, timber and stone right into the city. Their exact courses here are generated.", { y: 4, r: 12, range: 800 });
 // the brick yard by the canal, where mud is mixed with chaff, moulded and laid out in rows to dry
 const BRICKYARD = { x: -620, z: -1150 }; { rRect(BRICKYARD.x, BRICKYARD.z, 60, 30, Math.PI / 4, 11); const R = seeded(77);
@@ -53802,7 +53828,7 @@ const PROP_COL = { jar: 0xd8c4a0, basket: 0xa88c5a, sheaf: 0xd8b860, sickle: 0xb
 const PROPS = {}; for (const k in PROP_G) { const im = new THREE.InstancedMesh(PROP_G[k], M(PROP_COL[k], { vertexColors: true }), NC); im.frustumCulled = false; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.count = 0; scene.add(im); PROPS[k] = { im, slot: new Int32Array(NC).fill(-1), who: new Int32Array(NC), n: 0 }; }
 const _pm = new THREE.Matrix4();
 function propSet(A, y) { const P = PROPS[A.prop]; if (!P) return; if (P.slot[A.i] < 0) { P.slot[A.i] = P.n; P.who[P.n] = A.i; P.n++; P.im.count = P.n; }
-  O3.position.set(A.x, y, A.z); O3.rotation.set(0, A.h, 0); const s = A.L.s; O3.scale.set(s, s, s); O3.updateMatrix(); P.im.setMatrixAt(P.slot[A.i], O3.matrix); P.im.instanceMatrix.needsUpdate = true; }
+  const s = A.L.s; O3.position.set(A.x, y - (A.L.shaven && !A.L.bun ? 0.09 * s : 0), A.z); O3.rotation.set(0, A.h, 0); O3.scale.set(s, s, s); O3.updateMatrix(); P.im.setMatrixAt(P.slot[A.i], O3.matrix); P.im.instanceMatrix.needsUpdate = true; }
 function propHide(A) { const P = PROPS[A.prop]; if (!P) return; const s = P.slot[A.i]; if (s < 0) return; const last = --P.n, j = P.who[last];
   if (s !== last) { P.im.getMatrixAt(last, _pm); P.im.setMatrixAt(s, _pm); P.slot[j] = s; P.who[s] = j; } P.slot[A.i] = -1; P.im.count = P.n; P.im.instanceMatrix.needsUpdate = true; }
 // animals
@@ -54014,9 +54040,12 @@ const face = (x, z, tx, tz) => Math.atan2(tx - x, tz - z);
 const working = () => (SIM > T.work && SIM < T.rest) || (SIM > T.work2 && SIM < T.eve - 600);
 const TL = (lx, lz) => { const c = Math.cos(TEMPLE.ry), s = Math.sin(TEMPLE.ry); return [lx * c + lz * s, -lx * s + lz * c]; };   // the temple's local frame to the map
 // bearers of offerings: from the town up the stair, in by the side door, to the offering table, and back
-const OFFER_PATH = [TL(TEMPLE.pw / 2 + 52, 0), TL(TEMPLE.pw / 2 + 2, 0), TL(TEMPLE.w / 2 + 3, TEMPLE.doorZ), TL(TEMPLE.w / 2 - 1.5, TEMPLE.doorZ), TL(1.2, TEMPLE.doorZ), TL(0.9, TEMPLE.tableZ + 0.9)];   // up the terrace stair, in at the side door, to the offering table
+const OFFER_PATH = [EANNA.IN(-150, -60), EANNA.IN(-60, -70), EANNA.IN(10, -60), EANNA.IN(10, -27), EANNA.IN(10, -20), EANNA.IN(10.9, -4.3)];   // the procession: from the city into Eanna, in at the door of Temple D, to the offering table
 if (LATE) { const IN = TEMPLE.IN, Z = TEMPLE.ZIG, PW = TEMPLE.PW; OFFER_PATH.length = 0; OFFER_PATH.push(IN(-20, 58), IN(40, 48), IN(72, 10), IN(72, -12), IN(32, -44), IN(32, -52), IN(32, -63), IN(32, -68.4)); }   // from the temple kitchen to the god's table
-const OFFER = []; for (let k = 0; k < 12; k++) { const A = agent(k % 3 ? "woman" : k % 2 ? "man" : "elder", { offer: k, prop: k % 2 ? "fish" : "basket" }); if (A) OFFER.push(A); }
+const OFFER = []; for (let k = 0; k < 12; k++) { const A = agent("bearer", { offer: k, prop: k % 3 === 0 ? "jar" : "basket" }); if (A) OFFER.push(A); }   // naked offering-bearers with baskets and jars, as on the Uruk Vase
+const EANNA_AG = [agent("leader", { fixed: [...EANNA.IN(10, -31), face(...EANNA.IN(10, -31), ...EANNA.IN(10, -60))], kind: "talk" }), agent("priestess", { fixed: [...EANNA.IN(10.2, -1.9), face(...EANNA.IN(10.2, -1.9), ...EANNA.IN(10, -20))], kind: "pray" })];
+mark("The leader", ...EANNA.IN(10, -31), "inferred", "The leading figure of Uruk, as cylinder seals, the Uruk Vase and statuettes show him: bearded, his hair in a bun under a headband, bare-chested in a long skirt with a net pattern. He feeds the sacred flocks, leads offerings to Inanna, hunts lions, stands over prisoners. Whether he was a priest, a king, or both, archaeologists do not know; they call him the priest-king. Here he waits at the door of Temple D for the morning\'s offerings.", { y: 2.6, r: 3, range: 60 });
+mark("The offering procession", ...EANNA.IN(-60, -70), "inferred", "At dawn a procession of naked men carries baskets of fruit and grain and jars of beer and oil to the house of Inanna, as on the Uruk Vase, found in Eanna: rows of offering-bearers, naked (nakedness probably meant purity before the gods), walking toward the goddess, or a priestess acting for her, who stands at the door of her shrine by her reed ring-posts. When and how often such processions happened is not known.", { y: 3, r: 10, range: 300 });
 const ATTEND = LATE ? [agent("temple", { fixed: [...TEMPLE.IN(30.4, -68.6), face(...TEMPLE.IN(30.4, -68.6), ...TEMPLE.IN(32, -72))], kind: "pray", attend: true }), agent("temple", { fixed: [...TEMPLE.IN(33.6, -68.6), face(...TEMPLE.IN(33.6, -68.6), ...TEMPLE.IN(32, -72))], kind: "sell", attend: true })] : [agent("temple", { fixed: [...TL(0.9, -TEMPLE.d / 2 + 4.0), face(...TL(0.9, -TEMPLE.d / 2 + 4.0), ...TL(0, -TEMPLE.d / 2 + 4.5))], kind: "sell", attend: true }), agent("temple", { fixed: [...TL(0, TEMPLE.d / 2 - 3.0), face(...TL(0, TEMPLE.d / 2 - 3.0), ...TL(0, TEMPLE.d / 2 - 1.6))], kind: "pray", attend: true })];
 // fishing boats poled about the marsh and the river; the sailing boat from the Gulf
 const rboatMesh = (bit = true, sail = false) => { const g = new THREE.Group(), h = new THREE.Mesh(RBOAT_G, bit ? boatBitM : boatReedM); h.scale.set(1.2, 0.75, sail ? 11 : 7); g.add(h); if (sail) { const m = new THREE.Mesh(CYL_G, MAT.wood); m.scale.set(0.12, 6, 0.12); m.position.set(0, 0.3, 1.5); g.add(m); const s = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 3.2), MAT.cloth); s.position.set(0, 3.8, 1.3); s.rotation.y = Math.PI / 2; g.add(s); } scene.add(g); return g; };
@@ -54037,6 +54066,9 @@ const CARTS = []; if (LATE) { const IN = TEMPLE.IN, PW = TEMPLE.PW; for (let k =
 const INDOOR = Array.from({ length: 6 }, (_, k) => agent("woman", { indoor: k }));
 const AMB = []; { const N = NC - nextI - 4; for (let k = 0; k < N; k++) { const A = agent(null, { amb: true }); if (A) AMB.push(A); } }
 const DRESS = {
+  leader: "The leader of Uruk, as the seals and the Uruk Vase show him: bearded, his hair in a bun under a headband, bare-chested, in a long skirt with a net pattern. Priest, king, or both: no one knows.",
+  bearer: "An offering-bearer, naked as on the Uruk Vase, which shows a procession of naked men bringing baskets and jars of produce to Inanna: nakedness probably marked purity before the gods.",
+  priestess: "A woman in a long robe and headband receiving the offerings at the table, as on the Uruk Vase: there the figure is the goddess Inanna herself, or a priestess acting for her.",
   man: LATE ? "A man of Eridu in the time of the kings of Ur: a wrapped kilt or a long fringed garment of wool, mostly undyed (coloured cloth cost more); men of rank are often shown with the head and face shaved, others with long hair and beard; as statues and seals show." : "A man of Uruk: bare-chested in a kilt of wool or linen, as on the Uruk Vase and the seals; barefoot. Many worked for the great institutions, paid in rations of barley, beer and oil.",
   woman: LATE ? "A woman of Sumer: a long robe draped over the left shoulder, the hair gathered in a chignon held by a band, as statues show. Women worked as weavers, millers and brewers for the temples, and ran households and businesses." : "A woman of Uruk: a long robe of wool, sometimes draped over one shoulder, the hair long or held by a band. The tablets record women weavers, millers and workers by the hundred.",
   child: "A child: in the heat, often naked. Children worked from an early age: herding, scaring birds from the crops, fetching water, helping at harvest.",
@@ -54224,7 +54256,7 @@ function interact() { if (!started) return start();
   let pa = null, pd = 3; for (const A of AG2) { if (!A.shown) continue; const d = Math.hypot(A.x - P_.x, A.z - P_.z); if (d < pd) { pd = d; pa = A; } }
   const named = pa && MARKS.find(m => m.follow === pa); if (named) best = named;
   if (best && (!pa || named || bd < 0.5)) return say(`<b>${best.name}</b> · <span style="color:${TAGC[best.tag]}">${TAGN[best.tag]}</span> · ${best.text}`, 26);
-  if (pa) return say(DRESS[pa.L.role] || "A person of Uruk.", 14);
+  if (pa) return say(DRESS[pa.L.priestess ? "priestess" : pa.L.role] || "A person of Uruk.", 14);
   if (best) return say(`<b>${best.name}</b> · <span style="color:${TAGC[best.tag]}">${TAGN[best.tag]}</span> · ${best.text}`, 26);
   say("Nothing to read right here. Walk up to a marker (or a person) and press E.", 6); }
 
