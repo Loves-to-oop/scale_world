@@ -53275,7 +53275,7 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.1), vr
   if (frameN % 6 === 0) { if (ladderG.visible) drawLadder(); drawWall(r); if (!vr) drawPanel(r); else drawVR(r); }
   msgT -= dt; if (msgT <= 0 && MSG.style.display !== "none") { MSG.style.display = "none"; lastMsg = ""; }
   if (frameN % (vr ? 30 : 10) === 1) captureRoom();
-  renderer.setRenderTarget(null); renderer.clear(); renderer.render(scene, camera);
+  renderer.clear(); renderer.render(scene, camera);   // (no setRenderTarget(null) here: in VR that would draw to the page instead of the headset)
   if (magnifier && !vr && started) { const s = Math.min(300, innerHeight * 0.38); renderer.setScissorTest(true); renderer.setScissor(innerWidth - s - 14, 14, s, s); renderer.setViewport(innerWidth - s - 14, 14, s, s); renderer.clearDepth(); renderer.render(scene, magCam); renderer.setScissorTest(false); renderer.setViewport(0, 0, innerWidth, innerHeight); } });
 camera.position.set(0, 1.6, 0);
 
