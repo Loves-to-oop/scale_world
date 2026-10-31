@@ -548,7 +548,7 @@ BH = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>A bla
 i0, i1 = BH.index('<div id="intro">'), BH.index('<button id="vr">')
 BH = BH[:i0] + """<div id="intro"><div class="card">
   <h1>A black hole in the living room</h1>
-  <p>In the middle of the room floats a black hole with the mass of the Earth. Its event horizon has a radius of 8.87 mm: a marble.
+  <p>In the middle of the room floats a black hole with the mass of the Earth. Its event horizon has a radius of 8.87 mm, so it is 1.77 cm across: a marble.
   Around it you see the room bent by its gravity, and its black shadow, bigger than the horizon. Walk up to it and watch your own clock fall
   behind "map time", the time of a clock far away; a ladder of clocks shows time slowing toward the horizon.</p>
   <p>Buttons on the coffee table drop a marble into it, set dust orbiting, and fire a laser past it, all in slow motion, because at this
