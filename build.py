@@ -498,6 +498,31 @@ out16 = HERE / "eridu.html"
 out16.write_text(ER.replace("__THREE__", three).replace("__SCENE__", (HERE / "eridu.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out16.name}, {out16.stat().st_size // 1024} KB")
 
+# Uruk, about 3200 BC
+UR = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Uruk, about 3200 BC: the first city</title>").replace("background:#c8d4d8", "background:#d8ccb4").replace("#intro.gone{", "#intro{overflow-y:auto;align-items:flex-start;padding:16px 0;box-sizing:border-box} #intro .card{margin:auto} #intro.gone{", 1)
+i0, i1 = UR.index('<div id="intro">'), UR.index('<button id="vr">')
+UR = UR[:i0] + """<div id="intro"><div class="card">
+  <h1>Uruk, about 3200 BC</h1>
+  <p>At its height in the Late Uruk period, Uruk was the largest city in the world: about 250 hectares, perhaps 25,000 to 50,000 people,
+  in the flat irrigated plain of southern Mesopotamia. Here writing was invented, to keep the accounts of its great institutions. Climb
+  the stair of the Anu terrace to the White Temple, shining with whitewash; walk east to Eanna, the precinct of the goddess Inanna, with
+  halls up to 80 metres long and columns covered in mosaics of coloured clay cones; through streets of mud-brick houses and along the
+  canals that ran through the city; out to the river, the fields at harvest, the palm groves, villages and marshes.</p>
+  <p>See how people lived and worked: potters turning out bowls by the thousand, brick-makers, reapers, boatmen, weavers. Go into the houses
+  (E at a door). The White Temple and the buildings of Eanna follow the excavated plans; the rest of the city and the country round it
+  are generated, following what is known of the time.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; shift run &nbsp;&middot;&nbsp; <kbd>−</kbd> <kbd>=</kbd> pace &nbsp;&middot;&nbsp; <kbd>E</kbd> read, ask, go in &nbsp;&middot;&nbsp;
+  <kbd>N</kbd> next moment &nbsp;&middot;&nbsp; <kbd>T</kbd> time speed &nbsp;&middot;&nbsp; <kbd>L</kbd> markers &nbsp;&middot;&nbsp; <kbd>F</kbd> fly &nbsp;&middot;&nbsp; <kbd>M</kbd> map<br>
+  In VR: left stick walk, right stick turn, trigger run, <b>A</b> read / go in, <b>B</b> next place, <b>X</b> next moment, <b>Y</b> time speed</p>
+  <p class="dim">After the German excavations at Uruk-Warka since 1912 and the study of its first tablets, seals and surveys. Much is
+  unknown (above all, the city's plan outside the sacred districts and how people dressed): every marker says whether a thing is known,
+  inferred, or typical. Click to begin.</p>
+</div></div>
+""" + UR[i1:]
+out17 = HERE / "uruk.html"
+out17.write_text(UR.replace("__THREE__", three).replace("__SCENE__", (HERE / "uruk.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out17.name}, {out17.stat().st_size // 1024} KB")
+
 # ---- the fourteenth page: an antimatter starship at 1 g ------------------------------------------------------------------
 SS = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Starship: 1 g to the stars</title>").replace("background:#c8d4d8", "background:#05080c")
 i0, i1 = SS.index('<div id="intro">'), SS.index('<button id="vr">')
