@@ -53312,9 +53312,15 @@ const CANALS = [wiggle([[-1800, -2300], [-1550, -1300], [-1350, -450], [-1150, 5
 const LAGOON = { x: 3600, z: 2700, r: 2900 };
 const marshMask = (x, z) => { const d = Math.hypot((x - LAGOON.x) * 0.85, z - LAGOON.z), n = fbm(x / 900 + 3, z / 900, 3); return 1 - sstepN(d + (n - 0.5) * 1400, LAGOON.r - 900, LAGOON.r + 300); };   // 1 in the open water, fading through the reed beds
 const desertness = (x, z) => sstepN(-(x + z) * 0.707 - 1500 + 500 * (fbm(x / 1500 + 9, z / 1500, 2) - 0.5), 0, 1600);
+// about 2040 BC: the precinct and the small town's quarters (precinct coordinates: u along the stair axis, v across), and outside them the
+// low mounds of the larger earlier town, abandoned
+const LATE_BOXES = [[-100, 118, -88, 88], [124, 215, -140, 140], [-50, 118, 94, 165], [-30, 118, -165, -94]];
+function lateRuin(x, z) { const u = (x - z) * 0.7071, v = (x + z) * 0.7071; let dm = 1e9; for (const Q of LATE_BOXES) { const du = Math.max(Q[0] - u, 0, u - Q[1]), dv = Math.max(Q[2] - v, 0, v - Q[3]); dm = Math.min(dm, Math.hypot(du, dv)); } if (dm < 8) return 0;
+  const f = fbm(x / 38 + 11, z / 38 + 3, 3); return (3.6 * sstepN(f, 0.52, 0.74) + 0.8 * sstepN(f, 0.4, 0.52)) * sstepN(dm, 8, 30) * (1 - sstepN(Math.hypot(x, z / 0.88), 400, 520)); }
 function baseH(x, z) { const n1 = fbm(x / 160, z / 160, 3), n2 = fbm(x / 1100 + 7, z / 1100, 3);
   let h = 0.9 + 0.5 * n2 + 0.25 * (n1 - 0.5);                                                                                   // the alluvial plain
   h += 3.4 * Math.exp(-((x / 400) ** 2 + (z / 340) ** 2));                                                                      // the ridge the town stands on, and centuries of its rebuilding
+  if (LATE && x * x + z * z < 2.9e5) h += lateRuin(x, z);   // the mounds of the old town
   const ds = desertness(x, z); if (ds > 0) h += ds * (1.6 + 2.2 * n2 + 1.8 * Math.pow(Math.abs(Math.sin((x * 0.6 - z * 0.8) / 70 + 4 * n1)), 3));   // the desert: sand, low dunes
   const mm = marshMask(x, z); if (mm > 0) h = lerpN(h, -1.6 - 1.2 * n2, sstepN(mm, 0, 1)) + (mm > 0.15 && mm < 0.75 ? (fbm(x / 60, z / 60, 2) - 0.55) * 1.6 : 0);   // the lagoon, shallow reed beds round it, reed islands
   if (RIVER.near(x, z, 260)) { const d = RIVER.d(x, z); h += 1.5 * (1 - sstepN(d, RIVER_HW, 200)) * sstepN(d, RIVER_HW * 0.8, RIVER_HW + 6); if (d < RIVER_HW + 10) h = Math.min(h, lerpN(-2.8, h, sstepN(d, RIVER_HW * 0.5, RIVER_HW + 10))); }   // the river on its levees
@@ -53401,6 +53407,7 @@ function groundColor(x, z, h, c) {
   const n1 = fbm(x / 40, z / 40, 3), n2 = fbm(x / 600 + 5, z / 600, 3);
   c.setRGB(0.64 + 0.06 * n2, 0.57 + 0.05 * n1, 0.43 + 0.03 * n1); c.lerp(_c1.setRGB(0.48, 0.52, 0.32), clampN((n1 - 0.45) * 2.2, 0, 0.6));   // alluvium with spring grass
   const ds = desertness(x, z); if (ds > 0) c.lerp(_c1.setRGB(0.82 + 0.05 * n1, 0.72 + 0.05 * n1, 0.54), ds);
+  if (LATE && x * x + z * z < 2.9e5) { const m = lateRuin(x, z); if (m > 0.05) c.lerp(_c1.setRGB(0.6 + 0.08 * n1, 0.52 + 0.06 * n1, 0.44), Math.min(0.85, m * 0.6)); }   // ruin mounds: eroded mud brick and sherds
   const mm = marshMask(x, z); if (mm > 0.02) c.lerp(h < 0.35 ? _c1.setRGB(0.4, 0.38, 0.3) : _c1.setRGB(0.34 + 0.05 * n1, 0.44 + 0.05 * n1, 0.22), clampN(mm * 2, 0, 0.9));   // reed beds and their mud
   if (nearWater(x, z, 40) && h > 0.3) c.lerp(_c1.setRGB(0.4, 0.5, 0.28), 0.45);                                                   // greener along the water
   if (h < WATER + 0.4) c.lerp(_c1.setRGB(0.4, 0.36, 0.28), clampN((WATER + 0.4 - h) * 1.5, 0, 0.9));
@@ -53553,12 +53560,12 @@ function gMudHouse(H) { const F = FR(H.x, H.z, H.ry, H.gy, "H" + lodKey(H.x, H.z
   for (const sx of [-1, 1]) for (const z of [-d / 4, d / 4]) gpoly(F, "dark", [[-fx * sx * 0 + sx * (w / 2 + 0.03), wh - 0.8, z - 0.12], [sx * (w / 2 + 0.03), wh - 0.8, z + 0.12], [sx * (w / 2 + 0.03), wh - 0.45, z + 0.12], [sx * (w / 2 + 0.03), wh - 0.45, z - 0.12]], [[0, 0], [1, 0], [1, 1], [0, 1]], [sx, 0, 0]);
   if (R() < 0.45) { GTINT = [0.95, 0.88, 0.72]; const sx = -H.face * w * 0.2; for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) gbox(F, "palm", sx + a * 1.2, wh + 0.9, b * 1.4, 0.1, 1.8, 0.1, "b"); gbox(F, "reedmat", sx, wh + 1.85, 0, 2.8, 0.08, 3.2, "");   // a reed shade on the roof, for sleeping in the heat
     GTINT = [1, 1, 1]; }
-  GTINT = [t * 0.9, t * 0.86, t * 0.8]; const sz = R() < 0.5 ? 1 : -1; for (let k = 0; k < 6; k++) gbox(F, "mud", H.face * (w / 2 + 0.45), (k + 0.5) * wh / 6 - wh / 12 + 0.1, sz * (d / 2 - 0.8 - k * 0.42), 0.8, (k + 1) * wh / 6, 0.42, "b");   // an outside stair to the roof
+  GTINT = [t * 0.9, t * 0.86, t * 0.8]; const sz = R() < 0.5 ? 1 : -1; for (let k = 0; k < 6; k++) gbox(F, "mud", H.face * (w / 2 + 0.45), (k + 1) * wh / 12, sz * (d / 2 - 0.8 - k * 0.42), 0.8, (k + 1) * wh / 6, 0.42, "b");   // an outside stair to the roof
   GTINT = [1, 1, 1];
   const L = FR(H.x, H.z, H.ry, H.gy, "L" + lodKey(H.x, H.z)); GTINT = [0.46 * t, 0.38 * t, 0.28 * t]; gbox(L, "lod", 0, (wh + 0.5) / 2, 0, w, wh + 0.5, d); GTINT = [1, 1, 1]; }
 // the courtyard house of Sumerian towns (excavated at Ur, Nippur, Tell Asmar): rooms round an open court, the outer walls blank but for the
 // door, flat roofs over the rooms, the court open to the sky; a vestibule inside the door, a reception room, a kitchen, stores, stairs
-function gCourtHouse(H) { const F = FR(H.x, H.z, H.ry, H.gy, "H" + lodKey(H.x, H.z)), w = H.w, d = H.d, wh = H.wh, t = H.tint, th = 0.55, rg = Math.min(3.2, w * 0.3);
+function gCourtHouse(H) { const F = FR(H.x, H.z, H.ry, H.gy, "H" + lodKey(H.x, H.z)), w = H.w, d = H.d, wh = H.wh, t = H.tint, th = 0.55, rg = Math.min(3.2, w * 0.3, d * 0.3);
   GTINT = [t, t * 0.97, t * 0.93]; for (const sx of [-1, 1]) gbox(F, "mud", sx * (w / 2 - th / 2), (wh + 0.5) / 2, 0, th, wh + 0.5, d); for (const sz of [-1, 1]) gbox(F, "mud", 0, (wh + 0.5) / 2, sz * (d / 2 - th / 2), w - 2 * th, wh + 0.5, th);   // the outer walls and parapet
   const cw = w - 2 * rg, cd = d - 2 * rg, gp = 0.6, sg = (L, f) => { const a = (L / 2 + gp) / 2, l = L / 2 - gp; for (const q of [-1, 1]) f(q * a, l); f(0, 2 * gp, true); };   // the court's walls, a doorway in the middle of each side
   for (const sx of [-1, 1]) sg(cd + 0.35, (c, l, top) => top ? gbox(F, "mud", sx * cw / 2, (wh + 2.1) / 2, 0, 0.35, wh - 2.1, l) : gbox(F, "mud", sx * cw / 2, wh / 2, c, 0.35, wh, l)); for (const sz of [-1, 1]) sg(cw - 0.35, (c, l, top) => top ? gbox(F, "mud", 0, (wh + 2.1) / 2, sz * cd / 2, l, wh - 2.1, 0.35) : gbox(F, "mud", c, wh / 2, sz * cd / 2, l, wh, 0.35));
@@ -53600,7 +53607,7 @@ const TEMPLE = { x: 0, z: 0, ry: Math.PI / 4, pw: 36, pd: 26, ph: 2.2, w: 14, d:
 if (!LATE) { const T0 = TEMPLE, gy0 = groundH(0, 0) - 0.5, top = gy0 + T0.ph, F = FR(0, 0, T0.ry, gy0, "temple"), FT = FR(0, 0, T0.ry, top, "temple"), w = T0.w, d = T0.d, wh = T0.wh, th = 1.0;
   T0.top = top; flatUnder(F, T0.pw, T0.pd, top, true); rRect(0, 0, T0.pw + 30, T0.pd + 30, T0.ry, 4);
   GTINT = [0.96, 0.92, 0.84]; gbox(F, "brick", 0, T0.ph / 2, 0, T0.pw, T0.ph, T0.pd, "b");   // the platform
-  for (let k = 0; k < 9; k++) gbox(F, "brick", T0.pw / 2 + 4.5 - k * 0.5, (k + 0.5) * T0.ph / 9 - T0.ph / 18, 0, 0.5, (k + 1) * T0.ph / 9, 5.5, "b");   // the stair, on the south-east side
+  for (let k = 0; k < 9; k++) gbox(F, "brick", T0.pw / 2 + 4.5 - k * 0.5, (k + 1) * T0.ph / 18, 0, 0.5, (k + 1) * T0.ph / 9, 5.5, "b");   // the stair, on the south-east side
   // the walls: buttressed outside, with doorways; the central hall, its side rooms
   const wall = (x0, z0, x1, z1, hgt = wh, buttress = false) => { const L = Math.hypot(x1 - x0, z1 - z0), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, along = x0 === x1, wF = FR(...gw(FT, cx, 0, cz).filter((_, i) => i !== 1), T0.ry, top, "temple");
     GTINT = [0.98, 0.95, 0.88]; gbox(wF, "brick", 0, hgt / 2, 0, along ? th : L, hgt, along ? L : th); const [sx, , sz] = gw(FT, cx, 0, cz); solid(sx, sz, along ? th : L, along ? L : th, T0.ry);
@@ -53729,15 +53736,34 @@ if (!LATE) mark("Fish offerings", ...(() => { const c = Math.cos(TEMPLE.ry), s =
 // The Ubaid town spread round the temple on its ridge; how far, and how densely, is not known (estimates range from about 10 to 40
 // hectares, with perhaps 1,000 to 4,000 people). Here: lanes winding out from the precinct, mud-brick houses with courtyards packed
 // near the centre, reed huts toward the marsh, gardens and palm groves at the edge. All typical.
-const LANES = []; { const R = seeded(4500); for (let k = 0; k < 9; k++) { const a = k / 9 * 6.283 + R() * 0.3, P = [[Math.cos(a) * 28, Math.sin(a) * 22]]; let ang = a; for (let s = 1; s <= 14; s++) { ang += (R() - 0.5) * 0.35; const r = 28 + s * 30; P.push([Math.cos(ang) * r, Math.sin(ang) * r * 0.88]); } LANES.push(line(P)); }
+const LANES = [], LATE_SQ = []; if (!LATE) { const R = seeded(4500); for (let k = 0; k < 9; k++) { const a = k / 9 * 6.283 + R() * 0.3, P = [[Math.cos(a) * 28, Math.sin(a) * 22]]; let ang = a; for (let s = 1; s <= 14; s++) { ang += (R() - 0.5) * 0.35; const r = 28 + s * 30; P.push([Math.cos(ang) * r, Math.sin(ang) * r * 0.88]); } LANES.push(line(P)); }
   for (const r of [120, 220, 320]) { const P = []; for (let k = 0; k <= 40; k++) { const a = k / 40 * 6.283; P.push([Math.cos(a) * r * (1 + 0.08 * Math.sin(a * 3 + r)), Math.sin(a) * r * 0.88 * (1 + 0.08 * Math.cos(a * 2 + r))]); } LANES.push(line(P)); }
   for (const L of LANES) rLine(L, 3.5, 1); }
-{ const R = seeded(1946); let tries = 0, nM = 0, nR = 0; const capM = IS_HEADSET ? 150 : 210, capR = IS_HEADSET ? 60 : 80;
+if (!LATE) { const R = seeded(1946); let tries = 0, nM = 0, nR = 0; const capM = IS_HEADSET ? 150 : 210, capR = IS_HEADSET ? 60 : 80;
   while ((nM < capM || nR < capR) && tries++ < 9000) { const a = R() * 6.283, r = 32 + Math.pow(R(), 1.5) * 340, x = Math.cos(a) * r, z = Math.sin(a) * r * 0.88, towardMarsh = Math.cos(a - Math.atan2(LAGOON.z, LAGOON.x)) > 0.3, reed = towardMarsh ? R() < (LATE ? 0.35 : 0.65) : R() < (LATE ? 0.04 : 0.12);
     if ((reed && nR >= capR) || (!reed && nM >= capM)) continue; if (groundH(x, z) < 1.2) continue;
     const ry = Math.PI / 4 + (R() - 0.5) * 0.5, w = reed ? 3.8 + R() * 1.6 : 7 + R() * 4, d = reed ? 7 + R() * 6 : 10 + R() * 6;
     if (!rRect(x, z, w + 2.5, d + 2.5, ry, 0, true)) continue; const H = addHouse(x, z, w, d, ry, { reed }); reed ? nR++ : nM++; yard(H, R); } }
-for (const H of HOUSES) { if (H.reed) continue; if (hash(H.x | 0, H.z | 0) < 0.35) { const c = Math.cos(H.ry), s = Math.sin(H.ry), lx = -H.face * (H.w / 2 + 4); const [gx, gz] = [H.x + lx * c, H.z - lx * s]; if (rRect(gx, gz, 6, 8, H.ry, 0, true)) rRect(gx, gz, 6, 8, H.ry, 8); } }   // kitchen gardens behind some houses
+if (!LATE) for (const H of HOUSES) { if (H.reed) continue; if (hash(H.x | 0, H.z | 0) < 0.35) { const c = Math.cos(H.ry), s = Math.sin(H.ry), lx = -H.face * (H.w / 2 + 4); const [gx, gz] = [H.x + lx * c, H.z - lx * s]; if (rRect(gx, gz, 6, 8, H.ry, 0, true)) rRect(gx, gz, 6, 8, H.ry, 8); } }   // kitchen gardens behind some houses
+// About 2040 BC: Eridu has shrunk to the temple precinct and a small town round it, courtyard houses packed wall to wall in blocks along
+// narrow lanes, a few with an upper storey, as excavated at Ur and Nippur; two small squares for workshops; beyond, the mounds of the old
+// town. The size is inferred (little of a large town of this date has been found at Eridu); the plan is typical.
+if (LATE) { const R = seeded(2040), IN = TEMPLE.IN, ZR = Math.PI / 4, HR = ZR - Math.PI / 2;
+  for (const [u, v] of [[160, -72], [168, 74]]) { const [x, z] = IN(u, v); rRect(x, z, 30, 24, ZR, 3); LATE_SQ.push([x, z]); }
+  { const [x, z] = IN(0, -133); rRect(x, z, 12, 90, ZR, 1); }   // a clear way from the south gate
+  const lane = (u0, v0, u1, v1) => { const L = line([IN(u0, v0), IN(u1, v1)]); LANES.push(L); rLine(L, 2.2, 1); };
+  const gap = () => R() < 0.22 ? 5 : 2.4 + R() * 1.2;
+  const block = (u, v, bw, bd) => { const rows = bd >= 17 ? 2 : 1;
+    for (let r = 0; r < rows; r++) { const dep = bd / rows, cv = v + dep * (r + 0.5), face = rows === 2 ? (r === 0 ? -1 : 1) : (R() < 0.5 ? -1 : 1); let lu = u;
+      while (lu < u + bw - 5) { let lw = 7 + R() * 4.5; if (u + bw - (lu + lw) < 6) lw = u + bw - lu; const [x, z] = IN(lu + lw / 2, cv); lu += lw;
+        if (groundH(x, z) < 0.3 || !rRect(x, z, dep - 1.6, lw - 1.6, HR, 0, true)) continue; if (R() < 0.05) { rRect(x, z, dep, lw, HR, 3); continue; }
+        const two = R() < 0.22, H = addHouse(x, z, dep - 0.15, lw - 0.15, HR, { court: true, face, wh: two ? 5.6 : 2.9 + R() * 0.4 }); H.upper = two; } } };
+  for (const Q of LATE_BOXES.slice(1)) { let u = Q[0]; while (u < Q[1] - 10) { const bw = Math.min(20 + R() * 12, Q[1] - u); let v = Q[2];
+      while (v < Q[3] - 9) { const bd = Math.min(17 + R() * 11, Q[3] - v); if (bd >= 9) block(u, v, bw, bd); const g = gap(); if (v + bd + g < Q[3] - 9) lane(u, v + bd + g / 2, u + bw, v + bd + g / 2); v += bd + g; }
+      const g = gap(); if (u + bw + g < Q[1] - 10) lane(u + bw + g / 2, Q[2], u + bw + g / 2, Q[3]); u += bw + g; } }
+  lane(118, 0, 215, 0); lane(0, -88, 0, -170);
+  mark("The town", ...IN(185, 30), "inferred", "About 2040 BC: courtyard houses built wall to wall in blocks along narrow, winding lanes, a few with an upper storey, as excavated at Ur and Nippur. Eridu was by now above all a holy city: a small town of the temple's priests, servants and craftsmen, and farmers, perhaps a couple of thousand people, round the precinct. Its real size and plan are not known.", { y: 9, r: 40, range: 900, big: true });
+  mark("Mounds of the old town", ...IN(-40, 230), "inferred", "Low mounds of fallen mud brick and broken pottery: the ruins of the larger town of earlier times, the Uruk and Early Dynastic periods, now abandoned. Where and how far they spread here is approximate.", { y: 6, r: 60, range: 900 }); }
 // the cemetery: graves lined with mud brick, the dead laid on their backs with pottery, food, and sometimes a model boat; about 1,000
 // graves were found at Eridu (some 200 excavated), a few hundred metres from the temple. Where exactly it lay relative to this town is
 // placed by eye.
@@ -53950,7 +53976,7 @@ if (LATE) {
     techLabel(F, 0, 0, 3.8, "The brick kiln", "Bricks for the casing are fired in kilns to over 900°C, which makes them hard and waterproof. Fuel (reeds, brush, dung, palm wood) was the great cost, so baked brick went only where weather and water would attack.");
     techLabel(F, 5.5, -2, 1.0, "Stamping the bricks", "Each damp brick is pressed with a wooden or baked-clay stamp carved (in reverse) with the king's inscription, before drying and firing."); }
   // the coppersmith: casting copper and bronze in moulds
-  { const yd = YARD_SPOTS.filter(p => Math.hypot(...p) > 160).sort((a, b) => Math.hypot(...a) - Math.hypot(...b))[2] || [180, 0], F = FR(yd[0], yd[1], Math.PI / 4, groundH(...yd), "tech"), gy = F.gy;
+  { const yd = LATE_SQ[0] || [180, 0], F = FR(yd[0], yd[1], Math.PI / 4, groundH(...yd), "tech"), gy = F.gy;
     put("tk:furnace", CYL_G, MAT.clay, ...gw(F, 0, 0, 0), 0.9, 0.6, 0.9); const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 10), new THREE.MeshStandardMaterial({ color: 0xff7a20, emissive: 0xff5a10, emissiveIntensity: 1.4 })), [gx, , gz] = gw(F, 0, 0, 0); glow.position.set(gx, gy + 0.62, gz); scene.add(glow); TECH_ANIM.push(t => glow.material.emissiveIntensity = 1 + 0.6 * Math.abs(Math.sin(t * 4)));
     for (let k = 0; k < 4; k++) put("tk:mould", BOX_G, M(0x8a8478), ...gw(F, 1.2 + k * 0.4, 0, 0.8), 0.32, 0.1, 0.5); put("tk:ingots", BOX_G, M(0xb86a3a, { metalness: 0.6, roughness: 0.4 }), ...gw(F, -1.2, 0, 1.0), 0.6, 0.1, 0.3);
     techJob("man", F, [[-0.8, 0, 0, 0, "kneel", 14], [1.4, 0.2, 1.4, 0.8, "kneel", 8]]); techJob("child", F, [[0.7, -0.7, 0, 0, "kneel", 30]], 6);
@@ -53958,7 +53984,7 @@ if (LATE) {
     techLabel(F, 1.6, 0.8, 0.6, "Moulds", "Open moulds of stone or clay: the molten metal poured in to cast axes, chisels, sickles, spearheads, pins and vessels. Metal tools have replaced the clay sickles of the Ubaid.");
     markUV2("The coppersmith", F.x, F.z, "typical", "A smith casting copper and bronze tools in a courtyard. Craftsmen of every kind worked for the temples and the state, and for themselves.", 3, 8, 300); }
   // the potter at the fast wheel, and the weavers of the temple
-  { const yd = YARD_SPOTS.filter(p => Math.hypot(...p) > 170).sort((a, b) => Math.hypot(...a) - Math.hypot(...b))[6] || [0, 200], F = FR(yd[0], yd[1], Math.PI / 4, groundH(...yd), "tech"), gy = F.gy;
+  { const yd = LATE_SQ[1] ? [LATE_SQ[1][0] - 7, LATE_SQ[1][1] + 3] : [0, 200], F = FR(yd[0], yd[1], Math.PI / 4, groundH(...yd), "tech"), gy = F.gy;
     const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.08, 16), MAT.clay), [wx, , wz] = gw(F, 0, 0, 0); wheel.position.set(wx, gy + 0.42, wz); scene.add(wheel); TECH_ANIM.push((t, dt) => wheel.rotation.y += dt * 9);
     for (let k = 0; k < 24; k++) put("tk:bowls", BOWL_G, MAT.pot, ...gw(F, 1 + (k % 6) * 0.4, 0, -1 + Math.floor(k / 6) * 0.4), 0.6, 0.8, 0.6);
     techJob("man", F, [[0, 0.7, 0, 0, "sit", 40]]); techLabel(F, 0, 0, 1.0, "The fast wheel", "A heavy wheel kept spinning fast, so the potter can throw a pot from a lump of clay in a minute: since the Uruk period pottery has been made in quantity, plain and quick, like these conical bowls.");
@@ -54030,6 +54056,7 @@ const ITEM_TXT = {
   tablets: "A basket of clay tablets: the family's documents (a house bought, a loan of barley or silver and its interest, a marriage contract, an adoption), each sealed by the parties and witnesses. Ordinary people used writing too, through scribes.",
   seal: "The householder's cylinder seal on its cord, of stone: rolled on documents to sign them.",
   chapel: "A household altar: a small bench with offerings and a clay figurine of the family's protective god. In houses of the time at Ur, family members were buried under the floor of the chapel room.",
+  upper: "Above, an upper storey: rooms over these, reached by the ladder or a stair, with a wooden gallery round the court. Some houses of the time at Ur had one; most were single-storey.",
   court: "The open court in the middle of the house, open to the sky: light and air for the rooms, which open off it. Houses of about this time excavated at Ur and Nippur are built round a court like this; bigger ones had an upper storey with a wooden gallery.",
   drain: "A drain in the middle of the court, of baked brick and clay pipe rings, to take away rain and washing water. Courtyard drains like this were found in the houses at Ur.",
   ladder: "A ladder of palm wood up to the roof (better houses had a stair of brick): the roof is used for drying dates and grain, and on hot nights the household sleeps up there.",
@@ -54041,12 +54068,12 @@ function enterBuilding(B) { const G = new THREE.Group(), F = B.F, w = B.w, d = B
   const marks = [], solids = [], folk = [], itm = (key, lx, lz, y = 1.4) => { const [x, , z] = gw(F, lx, 0, lz); marks.push(mark(key[0].toUpperCase() + key.slice(1), x, z, "typical", ITEM_TXT[key], { y: y + (F.gy - groundH(x, z)), range: 12, r: 1.8 })); }, block = (lx, lz, sx, sz) => solids.push([lx, lz, sx / 2 + 0.2, sz / 2 + 0.2]);
   iBox(G, IMAT.earth, F, 0, 0.03, 0, w, 0.04, d);
   if (B.court) {   // a courtyard house: rooms round an open court, each with a doorway onto it
-    const Hw = w + 1, Hd = d + 1, rg = Math.min(3.2, Hw * 0.3), cw = Hw - 2 * rg, cd = Hd - 2 * rg, fs = B.face, wall = (cx, cz, sx, sz) => solids.push([cx, cz, sx / 2, sz / 2]), ex = (w / 2 - cw / 2) / 2 + cw / 2, ez = (d / 2 - cd / 2) / 2 + cd / 2;
-    for (const sx of [-1, 1]) iBox(G, IMAT.plaster, F, sx * (w / 2 - 0.05), wh / 2, 0, 0.1, wh, d); for (const sz of [-1, 1]) iBox(G, IMAT.plaster, F, 0, wh / 2, sz * (d / 2 - 0.05), w, wh, 0.1);
+    const Hw = w + 1, Hd = d + 1, rg = Math.min(3.2, Hw * 0.3, Hd * 0.3), ch = wh > 4.5 ? 2.9 : wh, cw = Hw - 2 * rg, cd = Hd - 2 * rg, fs = B.face, wall = (cx, cz, sx, sz) => solids.push([cx, cz, sx / 2, sz / 2]), ex = (w / 2 - cw / 2) / 2 + cw / 2, ez = (d / 2 - cd / 2) / 2 + cd / 2;
+    for (const sx of [-1, 1]) iBox(G, IMAT.plaster, F, sx * (w / 2 - 0.05), ch / 2, 0, 0.1, ch, d); for (const sz of [-1, 1]) iBox(G, IMAT.plaster, F, 0, ch / 2, sz * (d / 2 - 0.05), w, ch, 0.1);
     for (const sx of [-1, 1]) { const L = (cd + 0.35) / 2 - 0.6, c = ((cd + 0.35) / 2 + 0.6) / 2; for (const q of [-1, 1]) wall(sx * cw / 2, q * c, 0.35, L); } for (const sz of [-1, 1]) { const L = (cw - 0.35) / 2 - 0.6, c = ((cw - 0.35) / 2 + 0.6) / 2; for (const q of [-1, 1]) wall(q * c, sz * cd / 2, L, 0.35); }   // the court's walls (drawn with the house)
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const L = d / 2 - cd / 2; iBox(G, IMAT.plaster, F, sx * cw / 2, wh / 2, sz * (cd / 2 + L / 2), 0.3, wh, L); wall(sx * cw / 2, sz * (cd / 2 + L / 2), 0.3, L); }   // cross walls closing the corners
-    for (const sx of [-1, 1]) { iBox(G, IMAT.mat, F, sx * ex, wh + 0.02, 0, w / 2 - cw / 2, 0.04, d); for (let k = 0; k < Math.floor(d / 0.9); k++) iBox(G, IMAT.palm, F, sx * ex, wh - 0.1, -d / 2 + 0.45 + k * 0.9, w / 2 - cw / 2, 0.2, 0.2); }
-    for (const sz of [-1, 1]) { iBox(G, IMAT.mat, F, 0, wh + 0.02, sz * ez, cw, 0.04, d / 2 - cd / 2); for (let k = 0; k < Math.floor(cw / 0.9); k++) iBox(G, IMAT.palm, F, -cw / 2 + 0.45 + k * 0.9, wh - 0.1, sz * ez, 0.2, 0.2, d / 2 - cd / 2); }
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const L = d / 2 - cd / 2; iBox(G, IMAT.plaster, F, sx * cw / 2, ch / 2, sz * (cd / 2 + L / 2), 0.3, ch, L); wall(sx * cw / 2, sz * (cd / 2 + L / 2), 0.3, L); }   // cross walls closing the corners
+    for (const sx of [-1, 1]) { iBox(G, IMAT.mat, F, sx * ex, ch + 0.02, 0, w / 2 - cw / 2, 0.04, d); for (let k = 0; k < Math.floor(d / 0.9); k++) iBox(G, IMAT.palm, F, sx * ex, ch - 0.1, -d / 2 + 0.45 + k * 0.9, w / 2 - cw / 2, 0.2, 0.2); }
+    for (const sz of [-1, 1]) { iBox(G, IMAT.mat, F, 0, ch + 0.02, sz * ez, cw, 0.04, d / 2 - cd / 2); for (let k = 0; k < Math.floor(cw / 0.9); k++) iBox(G, IMAT.palm, F, -cw / 2 + 0.45 + k * 0.9, ch - 0.1, sz * ez, 0.2, 0.2, d / 2 - cd / 2); }
     iPlane(G, IMAT.glow, F, fs * (w / 2 - 0.11), 0.95, 0, 1.0, 1.9, fs > 0 ? -Math.PI / 2 : Math.PI / 2);   // the street door's light
     iBox(G, IMAT.clay, F, 0, 0.06, 0, 0.5, 0.06, 0.5, 0, new THREE.CylinderGeometry(0.5, 0.5, 1, 12)); iBox(G, M(0x1a1410), F, 0, 0.08, 0, 0.3, 0.02, 0.3, 0, new THREE.CylinderGeometry(0.5, 0.5, 1, 12)); itm("drain", 0, 0, 0.6); itm("court", fs * cw * 0.25, cd * 0.25, 2.4);
     { const lx = -fs * (cw / 2 - 0.3), lz = cd * 0.3; for (const q of [-1, 1]) iBox(G, IMAT.palm, F, lx, wh / 2 + 0.3, lz + q * 0.25, 0.08, wh + 0.6, 0.08, 0.0); for (let k = 0; k < 9; k++) iBox(G, IMAT.palm, F, lx, 0.35 + k * (wh / 9), lz, 0.06, 0.06, 0.55); itm("ladder", lx, lz, 2.2); }
@@ -54063,7 +54090,7 @@ function enterBuilding(B) { const G = new THREE.Group(), F = B.F, w = B.w, d = B
       iBox(G, IMAT.stone, F, cw * 0.25, 0.09, kz, 0.45, 0.18, 0.7); itm("quern", cw * 0.25, kz, 0.8); for (let k = 0; k < 3; k++) iBox(G, IMAT.pot, F, -cw / 2 + 0.5, 0, kz + (k - 1) * 0.6, 0.8, 1.0, 0.8, k, POT_G); block(-cw / 2 + 0.5, kz, 0.8, 1.8); itm("jars", -cw / 2 + 0.6, kz, 1.4);
       for (let k = 0; k < 4; k++) iBox(G, k % 2 ? IMAT.pot : IMAT.clay, F, cw * 0.1 + (k - 1.5) * 0.3, 0.06, kz + 0.7, 0.5, 0.5, 0.5, 0, BOWL_G.clone().rotateX(Math.PI)); itm("dishes", cw * 0.1, kz + 0.7, 0.8);
       const cz = -ez; iBox(G, IMAT.plaster, F, -fs * (cw / 2 - 0.5), 0.4, cz, 0.6, 0.8, 1.2); iBox(G, IMAT.clay, F, -fs * (cw / 2 - 0.5), 0.95, cz, 0.12, 0.3, 0.1); block(-fs * (cw / 2 - 0.5), cz, 0.6, 1.2); itm("chapel", -fs * (cw / 2 - 0.5), cz, 1.4);   // the chapel room, and sleeping mats
-      iBox(G, IMAT.mat, F, fs * cw * 0.1, 0.06, cz, cw * 0.5, 0.02, d / 2 - cd / 2 - 0.6); itm("roof", fs * cw * 0.1, cz, wh - 0.3);
+      iBox(G, IMAT.mat, F, fs * cw * 0.1, 0.06, cz, cw * 0.5, 0.02, d / 2 - cd / 2 - 0.6); itm(wh > 4.5 ? "upper" : "roof", fs * cw * 0.1, cz, ch - 0.3);
       const h = SIM / 3600, meal = (h > 11.5 && h < 13) || (h > 18.5 && h < 20); folk.push([cw * 0.25, kz - 0.6, 0, "knead", "woman"]);
       if (meal) folk.push([0.9, 0.8, -2.3, "sitground", "man"], [-0.9, 0.7, 2.3, "sitground", "child"], [0.1, -0.9, 0, "sitground", "elder"], [-0.2, 1.2, Math.PI, "sitground", "woman"]);
       else folk.push([-cw * 0.2, -cd * 0.2, 0.8, "spin", "woman"], [rx + 0.5 * fs, -0.9, -fs * Math.PI / 2, "sitground", B.kind === "scribes" ? "scribe" : "man"], [cw * 0.15, cd * 0.15, 1.2, "sitground", "child"]); } }
@@ -54191,7 +54218,7 @@ function placeAmbient(A, px, pz) { const R = Math.random; propHide(A); A.prop = 
   const role = A.L.role, r = R(), door = [H.dp[0], H.dp[1]], hot = SIM > T.rest && SIM < T.work2;
   if (role === "child" && r < 0.5) { A.mode = "play"; A.c = [door[0] + (R() - 0.5) * 8, door[1] + (R() - 0.5) * 8]; A.ph = R() * 6; A.x = A.c[0]; A.z = A.c[1]; return true; }
   if (hot || r < 0.25) { A.mode = "fixed"; A.x = door[0] + (R() - 0.5) * 3; A.z = door[1] + (R() - 0.5) * 3; A.h = R() * 6.28; A.kind = R() < 0.6 ? "sitground" : "talk"; return true; }   // in the shade by the door
-  if (!H.reed && SIM > T.eve && r < 0.55) { A.mode = "fixed"; A.x = H.x + (R() - 0.5) * H.w * 0.5; A.z = H.z + (R() - 0.5) * H.d * 0.5; A.h = R() * 6.28; A.kind = R() < 0.5 ? "sitground" : "talk"; A.yOff = H.gy + H.wh + 0.12; return true; }   // up on the roof in the cool
+  if (!H.reed && SIM > T.eve && r < 0.55) { A.mode = "fixed"; const lx = H.court ? (R() < 0.5 ? -1 : 1) * (H.w / 2 - 1.3) : (R() - 0.5) * H.w * 0.5, lz = (R() - 0.5) * H.d * (H.court ? 0.7 : 0.5); A.x = H.x + lx * Math.cos(H.ry) + lz * Math.sin(H.ry); A.z = H.z - lx * Math.sin(H.ry) + lz * Math.cos(H.ry); A.h = R() * 6.28; A.kind = R() < 0.5 ? "sitground" : "talk"; A.yOff = H.gy + H.wh + 0.12; return true; }   // up on the roof in the cool
   if (r < 0.55) { const W = nearestOf(WATERPTS, door[0], door[1], 700); if (W) { A.mode = "loop"; A.path = [door, W]; A.prop = role === "woman" || role === "child" ? "jar" : null; A.pause = "kneel"; A.x = door[0]; A.z = door[1]; A.v = 0.9 + R() * 0.3; A.u = R() * 60; return true; } }   // fetching water from the canal, the jar on the head
   if (r < 0.75) { const L = LANES[(R() * LANES.length) | 0], [sx, sz] = L.at(R() * L.L); if (Math.hypot(sx - door[0], sz - door[1]) < 200) { A.mode = "loop"; A.path = [[sx, sz], door]; A.prop = R() < 0.5 ? "basket" : role === "man" && R() < 0.4 ? "reeds" : null; A.pause = "stand"; A.x = sx; A.z = sz; A.v = 0.9 + R() * 0.4; A.u = R() * 60; return true; } }
   const L = LANES[(R() * LANES.length) | 0], s = R() * L.L, [x, z] = L.at(s); if (Math.hypot(x - px, z - pz) > 330) { A.mode = "off"; return false; }
@@ -54236,7 +54263,7 @@ function lifeStep(dt, t) { frameN++; const px = P_.x, pz = P_.z, rate = Math.min
       if (A.mode === "loop" || A.mode === "fixed" || A.mode === "play") taskStep(A, dt, rate);
       if (A.mode === "walk") { A.s += A.dir * A.v * dt * rate; if (A.s < 0 || A.s > A.S.L) { A.dir *= -1; A.s = clampN(A.s, 0, A.S.L); } const [x, z, a] = A.S.at(A.s); A.x = x + Math.cos(a) * A.lane; A.z = z - Math.sin(a) * A.lane; A.h = A.dir > 0 ? a : a + Math.PI; }
       const d = Math.hypot(A.x - px, A.z - pz), step = d < 35 ? 1 : d < 120 ? 3 : 8; if ((frameN + A.i) % step && A.shown) continue;
-      if (d > 300 || rGet(A.x, A.z) === 2) { if (A.shown) {   // far away, or passing through a house: not drawn
+      if (d > 300 || (rGet(A.x, A.z) === 2 && !A.yOff)) { if (A.shown) {   // far away, or passing through a house: not drawn
         crowd.hide(A.i); propHide(A); A.shown = false; } continue; }
       const ay = A.yOff || groundH(A.x, A.z); crowd.set(A.i, A.x, ay, A.z, A.h, A.kind, t, A.mode === "walk" ? A.v * rate : A.walk ? Math.min(2, A.walk * rate) : 1); A.shown = true; if (A.prop) propSet(A, ay); continue; }
     const st = agentState(A); if (!st) { if (A.shown) { crowd.hide(A.i); propHide(A); A.shown = false; } continue; }
