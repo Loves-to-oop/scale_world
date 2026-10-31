@@ -230,8 +230,11 @@ const WATER = 0;
 const RIVER = wiggle([[-9000, -7000], [-6000, -5200], [-3500, -3600], [-1800, -2300], [-500, -1450], [700, -950], [1500, -250], [2200, 650], [3000, 1600]], 70, 11), RIVER_HW = 34;
 const CANALS = [wiggle([[-1800, -2300], [-1550, -1300], [-1350, -450], [-1150, 500], [-900, 1300]], 25, 21), wiggle([[-500, -1450], [-330, -800], [-200, -420]], 12, 22), wiggle([[700, -950], [420, -250], [560, 500], [420, 1300]], 22, 23),
   wiggle([[-3500, -3600], [-3450, -2300], [-3100, -1000], [-2800, 200]], 30, 24), wiggle([[-1550, -1300], [-2400, -1100], [-3000, -700]], 20, 25), wiggle([[1500, -250], [1100, 300], [900, 900]], 18, 26)];
-const LAGOON = { x: 3600, z: 2700, r: 2900 };
-const marshMask = (x, z) => { const d = Math.hypot((x - LAGOON.x) * 0.85, z - LAGOON.z), n = fbm(x / 900 + 3, z / 900, 3); return 1 - sstepN(d + (n - 0.5) * 1400, LAGOON.r - 900, LAGOON.r + 300); };   // 1 in the open water, fading through the reed beds
+if (LATE) CANALS.push(wiggle([[1500, -250], [1150, 250], [950, 800], [700, 1300], [300, 1700]], 20, 31), wiggle([[-1150, 500], [-500, 800], [100, 1100], [600, 1600]], 18, 32), wiggle([[-500, -1450], [-200, -900], [300, -600], [900, -500]], 16, 33), wiggle([[700, -950], [1000, -1500], [1500, -1900]], 14, 34));   // by 2040 BC: more canals, and the fields along them, where the marsh had been
+const LAGOON = { x: 3600, z: 2700, r: LATE ? 2000 : 2900 };
+const MARSH_IN = LATE ? 1500 : 340;   // where the wetland begins, toward the lagoon: close to the town in the Ubaid, further off by 2040 BC
+const marshMask = (x, z) => { const p = x * 0.8 + z * 0.6, q = -x * 0.6 + z * 0.8, n = fbm(x / 700 + 3, z / 700, 3), inner = MARSH_IN + n * 300 + Math.max(0, Math.abs(q) - 700) * 0.35;
+  return sstepN(p - inner, 0, 320) * (1 - sstepN(Math.abs(q), 2600 + p * 0.4, 3400 + p * 0.4)); };   // 0 on dry land; 1 deep in the wetland
 const desertness = (x, z) => sstepN(-(x + z) * 0.707 - 1500 + 500 * (fbm(x / 1500 + 9, z / 1500, 2) - 0.5), 0, 1600);
 // about 2040 BC: the precinct and the small town's quarters (precinct coordinates: u along the stair axis, v across), and outside them the
 // low mounds of the larger earlier town, abandoned
@@ -243,7 +246,10 @@ function baseH(x, z) { const n1 = fbm(x / 160, z / 160, 3), n2 = fbm(x / 1100 + 
   h += 3.4 * Math.exp(-((x / 400) ** 2 + (z / 340) ** 2));                                                                      // the ridge the town stands on, and centuries of its rebuilding
   if (LATE && x * x + z * z < 2.9e5) h += lateRuin(x, z);   // the mounds of the old town
   const ds = desertness(x, z); if (ds > 0) h += ds * (1.6 + 2.2 * n2 + 1.8 * Math.pow(Math.abs(Math.sin((x * 0.6 - z * 0.8) / 70 + 4 * n1)), 3));   // the desert: sand, low dunes
-  const mm = marshMask(x, z); if (mm > 0) h = lerpN(h, -1.6 - 1.2 * n2, sstepN(mm, 0, 1)) + (mm > 0.15 && mm < 0.75 ? (fbm(x / 60, z / 60, 2) - 0.55) * 1.6 : 0);   // the lagoon, shallow reed beds round it, reed islands
+  const mm = marshMask(x, z); if (mm > 0) {   // the wetland: reed beds in shallow water and mud, open pools, winding channels, low dry islands; further out the open lagoon
+    const isl = fbm(x / 260 + 21, z / 260 + 7, 3), pool = fbm(x / 140 + 5, z / 140 + 13, 3), ch = 1 - Math.abs(2 * fbm(x / 320 + 31, z / 320 + 2, 3) - 1), far = sstepN(Math.hypot((x - LAGOON.x) * 0.85, z - LAGOON.z), LAGOON.r, LAGOON.r - 1400);
+    let t = 0.12 + (fbm(x / 45, z / 45, 2) - 0.5) * 0.5; if (pool > 0.6) t = lerpN(t, -1.5, sstepN(pool, 0.6, 0.68)); if (ch > 0.93) t = lerpN(t, -1.4, sstepN(ch, 0.93, 0.97)); t = lerpN(t, -1.8 - 1.0 * n2, far);
+    if (isl > 0.63 + far * 0.05) t = lerpN(t, 0.8 + (isl - 0.63) * 3, sstepN(isl, 0.63 + far * 0.05, 0.69 + far * 0.05)); h = lerpN(h, t, sstepN(mm, 0, 1)); }
   if (RIVER.near(x, z, 260)) { const d = RIVER.d(x, z); h += 1.5 * (1 - sstepN(d, RIVER_HW, 200)) * sstepN(d, RIVER_HW * 0.8, RIVER_HW + 6); if (d < RIVER_HW + 10) h = Math.min(h, lerpN(-2.8, h, sstepN(d, RIVER_HW * 0.5, RIVER_HW + 10))); }   // the river on its levees
   for (const C of CANALS) if (C.near(x, z, 30)) { const d = C.d(x, z); if (d < 26) { h += 0.5 * (1 - sstepN(d, 3, 22)) * sstepN(d, 2.4, 4.5); if (d < 4) h = Math.min(h, lerpN(-0.9, h, sstepN(d, 1.5, 4))); } }
   for (const f of EXTRA_H) { const e = f(x, z); if (e > h) h = e; }   // built earth: the builders' ramp
@@ -329,7 +335,7 @@ function groundColor(x, z, h, c) {
   c.setRGB(0.64 + 0.06 * n2, 0.57 + 0.05 * n1, 0.43 + 0.03 * n1); c.lerp(_c1.setRGB(0.48, 0.52, 0.32), clampN((n1 - 0.45) * 2.2, 0, 0.6));   // alluvium with spring grass
   const ds = desertness(x, z); if (ds > 0) c.lerp(_c1.setRGB(0.82 + 0.05 * n1, 0.72 + 0.05 * n1, 0.54), ds);
   if (LATE && x * x + z * z < 2.9e5) { const m = lateRuin(x, z); if (m > 0.05) c.lerp(_c1.setRGB(0.6 + 0.08 * n1, 0.52 + 0.06 * n1, 0.44), Math.min(0.85, m * 0.6)); }   // ruin mounds: eroded mud brick and sherds
-  const mm = marshMask(x, z); if (mm > 0.02) c.lerp(h < 0.35 ? _c1.setRGB(0.4, 0.38, 0.3) : _c1.setRGB(0.34 + 0.05 * n1, 0.44 + 0.05 * n1, 0.22), clampN(mm * 2, 0, 0.9));   // reed beds and their mud
+  const mm = marshMask(x, z); if (mm > 0.02) { const rb = h < 0.6, tw = fbm(x / 90 + 2, z / 90 + 9, 2); c.lerp(rb ? _c1.setRGB(0.28 + 0.2 * tw, 0.4 + 0.08 * tw, 0.16 + 0.08 * tw) : _c1.setRGB(0.4 + 0.05 * n1, 0.48 + 0.05 * n1, 0.26), clampN(mm * 2, 0, 0.92)); }   // reed beds, green and tawny; islands grassy
   if (nearWater(x, z, 40) && h > 0.3) c.lerp(_c1.setRGB(0.4, 0.5, 0.28), 0.45);                                                   // greener along the water
   if (h < WATER + 0.4) c.lerp(_c1.setRGB(0.4, 0.36, 0.28), clampN((WATER + 0.4 - h) * 1.5, 0, 0.9));
   const k = rIdx(x, z), r = k < 0 ? 0 : RAS[k];
@@ -722,7 +728,7 @@ const palm = (x, z, s) => { const h = groundH(x, z), R = seeded((x * 13 + z * 7)
     if (ds > 0.5) { if (R() < 0.02) { put("tamarisk", TAM_G, tamM, x, h + 0.6, z, 1.4 + R(), 1 + R() * 0.6, 1.4 + R(), R() * 6); n++; } continue; }
     if (R() < (bank + grove + town) * 0.25) { palm(x, z, 0.8 + R() * 0.45); n++; } } }
 // palm groves: stretches along the canals near the town, planted thick
-{ const R = seeded(73); for (const C of CANALS.slice(0, 3)) for (let s = 40; s < C.L * 0.8; s += 160) { const [x, z, a] = C.at(s); for (const sg of [-1, 1]) { const cx = x + Math.cos(a) * sg * 30, cz = z - Math.sin(a) * sg * 30; if (marshMask(cx, cz) > 0.05 || !rRect(cx, cz, 40, 60, a, 0, true)) continue; rRect(cx, cz, 40, 60, a, 9);
+{ const R = seeded(73); for (const C of (LATE ? CANALS.slice(0, 3).concat(CANALS.slice(6)) : CANALS.slice(0, 3))) for (let s = 40; s < C.L * 0.8; s += LATE ? 110 : 160) { const [x, z, a] = C.at(s); for (const sg of [-1, 1]) { const cx = x + Math.cos(a) * sg * 30, cz = z - Math.sin(a) * sg * 30; if (marshMask(cx, cz) > 0.05 || !rRect(cx, cz, 40, 60, a, 0, true)) continue; rRect(cx, cz, 40, 60, a, 9);
       for (let q = 0; q < 26; q++) { const lx = (R() - 0.5) * 36, lz = (R() - 0.5) * 56; palm(cx + lx * Math.cos(a) + lz * Math.sin(a), cz - lx * Math.sin(a) + lz * Math.cos(a), 0.85 + R() * 0.4); } } } }
 // the hamlets: small settlements on the channels' levees, a few houses and reed huts each; and fishing camps on reed islands in the marsh
 const HAMLETS = []; { const R = seeded(6000); const spots = [[RIVER, 0.18], [RIVER, 0.32], [CANALS[0], 0.75], [CANALS[3], 0.55], [CANALS[2], 0.85], [RIVER, 0.62]];
@@ -730,7 +736,7 @@ const HAMLETS = []; { const R = seeded(6000); const spots = [[RIVER, 0.18], [RIV
     for (let k = 0, n = 0; k < 120 && n < 8 + R() * 8; k++) { const x = hx + (R() - 0.5) * 120, z = hz + (R() - 0.5) * 120, reed = R() < 0.4, ry = a + (R() - 0.5) * 0.6, w = reed ? 4 + R() : 7 + R() * 3, d = reed ? 7 + R() * 4 : 9 + R() * 4;
       if (groundH(x, z) < 0.6 || !rRect(x, z, w + 3, d + 3, ry, 0, true)) continue; const H = addHouse(x, z, w, d, ry, { reed }); yard(H, R); n++; for (let q = 0; q < 3; q++) palm(x + (R() - 0.5) * 30, z + (R() - 0.5) * 30, 0.9 + R() * 0.3); }
     mark("A hamlet", hx, hz, "typical", "A farming hamlet on a levee: a few families, mud-brick houses and reed huts, fields along the channel, a palm grove, sheep, goats and cattle. Ubaid settlement was a scatter of villages and hamlets round larger centres like Eridu and Ur. Generated.", { y: 6, r: 60, range: 2500 }); }
-  for (let k = 0, n = 0; k < 600 && n < 4; k++) { const a = R() * 6.283, r = 1200 + R() * 1600, x = LAGOON.x + Math.cos(a) * r * 1.15, z = LAGOON.z + Math.sin(a) * r; if (Math.hypot(x, z) > 4800) continue; const mm = marshMask(x, z), h = groundH(x, z); if (mm < 0.2 || mm > 0.8 || h < 0.2) continue;
+  for (let k = 0, n = 0; k < 3000 && n < 7; k++) { const a = R() * 6.283, r = 600 + R() * 2400, x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.hypot(x, z) > 4800) continue; const mm = marshMask(x, z), h = groundH(x, z); if (mm < 0.3 || h < 0.55) continue;   // reed-hut hamlets on the islands
     for (let q = 0; q < 3; q++) { const ux = x + (R() - 0.5) * 30, uz = z + (R() - 0.5) * 30; if (groundH(ux, uz) < 0.15) continue; addHouse(ux, uz, 4 + R(), 7 + R() * 3, R() * 6, { reed: true }); }
     mark("A fishing camp", x, z, "typical", "Reed huts on a reed island in the marsh: fishermen and fowlers, who lived on the water as the Marsh Arabs did until the 1990s. Fish was a staple at Eridu: their bones are everywhere in the town's levels. Generated.", { y: 5, r: 40, range: 2000 }); n++; } }
 // reed boats on the shores: bundles of reeds lashed into a hull with high curved ends, many coated with bitumen against the water
@@ -743,8 +749,8 @@ const RBOAT_G = reedBoatGeo(), boatBitM = M(0x221c16, { roughness: 0.45, side: T
 // tall reeds round you in the marsh and along the water: Phragmites, three or four metres high
 const REED_N = IS_HEADSET ? 2200 : 4000, REEDS = new THREE.InstancedMesh((() => { const parts = [0, Math.PI / 3, Math.PI * 2 / 3].map(a => new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0).rotateY(a).toNonIndexed()), out = new THREE.BufferGeometry();
   for (const k of ["position", "normal", "uv"]) out.setAttribute(k, new THREE.Float32BufferAttribute(parts.flatMap(g => [...g.attributes[k].array]), k === "uv" ? 2 : 3)); return out; })(),
-  new THREE.MeshStandardMaterial({ map: tex(128, 256, (g, w, h) => { g.clearRect(0, 0, w, h); for (let k = 0; k < 40; k++) { const x = rnd() * w; g.strokeStyle = ["#7a8a48", "#8a9a52", "#a8a064", "#6a7a3a"][(rnd() * 4) | 0]; g.lineWidth = 1.5 + rnd(); g.beginPath(); g.moveTo(x, h); g.lineTo(x + (rnd() - 0.5) * 14, rnd() * 30); g.stroke();
-      g.fillStyle = "#c8b890"; g.beginPath(); g.ellipse(x + (rnd() - 0.5) * 14, 10 + rnd() * 20, 4, 10, 0, 0, 6.283); g.fill(); if (k % 3 === 0) { g.strokeStyle = "#6a8a3a"; g.beginPath(); const y = 60 + rnd() * 150; g.moveTo(x, y); g.lineTo(x + (rnd() < 0.5 ? -14 : 14), y - 26); g.stroke(); } } }), alphaTest: 0.4, side: THREE.DoubleSide, roughness: 1 }), REED_N);
+  new THREE.MeshStandardMaterial({ map: tex(256, 512, (g, w, h) => { g.clearRect(0, 0, w, h); for (let k = 0; k < 90; k++) { const x = rnd() * w, tx = x + (rnd() - 0.5) * 24, ty = rnd() * 60; g.strokeStyle = ["#7a8a48", "#8a9a52", "#a8a064", "#6a7a3a"][(rnd() * 4) | 0]; g.lineWidth = 1.2 + rnd() * 0.8; g.beginPath(); g.moveTo(x, h); g.lineTo(tx, ty + 20); g.stroke();   // stems about a finger thick
+      g.fillStyle = ["#c8b890", "#b8a47a", "#d0c09a"][(rnd() * 3) | 0]; g.beginPath(); g.ellipse(tx, ty + 14, 4, 16, (rnd() - 0.5) * 0.4, 0, 6.283); g.fill(); if (k % 2 === 0) { g.strokeStyle = "#6a8a3a"; g.lineWidth = 1.4; g.beginPath(); const y = 120 + rnd() * 300, xm = x + (tx - x) * (1 - y / h); g.moveTo(xm, y); g.lineTo(xm + (rnd() < 0.5 ? -26 : 26), y - 46); g.stroke(); } } }), alphaTest: 0.4, side: THREE.DoubleSide, roughness: 1 }), REED_N);
 REEDS.frustumCulled = false; REEDS.count = 0; scene.add(REEDS); let reedAt = [1e9, 1e9];
 // scatter plants on a fixed jittered grid in the world, nearest first: the same spot always holds the same plant, so nothing jumps as you walk
 function stableScatter(IM, cap, sp, radius, accept, place) { const offs = IM.userData.offs || (IM.userData.offs = (() => { const o = [], n = Math.ceil(radius / sp); for (let j = -n; j <= n; j++) for (let i = -n; i <= n; i++) if (Math.hypot(i, j) * sp <= radius) o.push([i, j]); return o.sort((a, b) => Math.hypot(...a) - Math.hypot(...b)); })());
@@ -753,7 +759,7 @@ function stableScatter(IM, cap, sp, radius, accept, place) { const offs = IM.use
     place(x, z, hash(i * 11, j * 13), hash(i * 17 + 3, j * 19 + 7)); IM.setMatrixAt(n++, O3.matrix); }
   IM.count = n; IM.instanceMatrix.needsUpdate = true; }
 function reedStep() { if (Math.hypot(P_.x - reedAt[0], P_.z - reedAt[1]) < 6) return; reedAt = [P_.x, P_.z];
-  stableScatter(REEDS, REED_N, 1.6, 85, (x, z) => { const h = groundH(x, z); if (h < -0.7 || h > 0.9 || rGet(x, z) === 2) return false; const mm = marshMask(x, z); return (mm > 0.1 && mm < 0.9) || nearWater(x, z, 5); },
+  stableScatter(REEDS, REED_N, 1.6, 85, (x, z) => { const h = groundH(x, z); if (h < -0.7 || h > 0.9 || rGet(x, z) === 2) return false; const mm = marshMask(x, z); return mm > 0.1 || nearWater(x, z, 5); },
     (x, z, r1, r2) => { const s = 0.8 + r1 * 0.5; O3.position.set(x, Math.max(groundH(x, z), WATER - 0.6) - 0.05, z); O3.rotation.set(0, r2 * 3, 0); O3.scale.set(s * 1.3, s * (2.6 + r2 * 1.4), s * 1.3); O3.updateMatrix(); }); }
 // standing barley (and emmer) round you in the fields, ripe for the sickle
 const CROPV_N = IS_HEADSET ? 2600 : 4500, CROPV = new THREE.InstancedMesh(REEDS.geometry, new THREE.MeshStandardMaterial({ map: tex(128, 128, (g, w, h) => { g.clearRect(0, 0, w, h); for (let k = 0; k < 60; k++) { const x = rnd() * w, top = 10 + rnd() * 30; g.strokeStyle = ["#c8a850", "#d8b860", "#b89848", "#a88a40"][(rnd() * 4) | 0]; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, h); g.lineTo(x + (rnd() - 0.5) * 8, top); g.stroke(); g.fillStyle = "#e0c060"; g.beginPath(); g.ellipse(x + (rnd() - 0.5) * 8, top, 3, 9, 0.2, 0, 6.283); g.fill(); } }), alphaTest: 0.4, side: THREE.DoubleSide, roughness: 1 }), CROPV_N);
@@ -761,7 +767,7 @@ CROPV.frustumCulled = false; CROPV.count = 0; scene.add(CROPV); let cropAt = [1e
 function cropStep() { if (Math.hypot(P_.x - cropAt[0], P_.z - cropAt[1]) < 5) return; cropAt = [P_.x, P_.z];
   stableScatter(CROPV, CROPV_N, 1.05, 58, (x, z) => { const kk = rIdx(x, z); return kk >= 0 && RAS[kk] === 5 && (CROP[kk] === 1 || CROP[kk] === 4); },
     (x, z, r1, r2) => { const s = 0.8 + r1 * 0.3; O3.position.set(x, groundH(x, z) - 0.03, z); O3.rotation.set(0, r2 * 3, 0); O3.scale.set(s * 0.9, s * (0.85 + r2 * 0.2), s * 0.9); O3.updateMatrix(); }); }
-mark("The marsh", LAGOON.x - 1600, LAGOON.z - 1200, "inferred", "The reed marshes and lagoons at the head of the Gulf: fresh water fed by the river and from below, thick with reeds (for building, mats, boats, fuel), fish, birds, wild boar. In the mid-Holocene the sea stood higher and the marshes lay close to Eridu. Their exact edge in 4500 BC is not known.", { y: 5, r: 400, range: 5000, big: true });
+mark("The marsh", ...(LATE ? [1500, 1150] : [760, 560]), "inferred", LATE ? "The marshes, smaller and further off than in earlier times: the head of the Gulf had moved south as the rivers built out their delta, and canals and fields had taken land from the wetland. Reeds were still cut here in great quantities for building, mats, boats and fuel; fish and birds went to the temple. Where the edge lay is approximate." : "The wetland east of the town: reed beds standing in shallow water, open pools, winding channels, and low dry islands where people built reed huts and grazed cattle; further out, open lagoons toward the head of the Gulf. Fresh water (the Abzu of later belief), thick with reeds for building, mats, boats and fuel, with fish, birds and wild boar. Eridu probably grew on its sand ridge at the meeting of desert and marsh; how far the marshes reached in 4500 BC, and where the shore of the Gulf lay, are debated.", { y: 5, r: 300, range: 5000, big: true });
 mark("The river", ...RIVER.at(RIVER.L * 0.42).slice(0, 2), "inferred", "A branch of the Euphrates, flowing above the plain between its own levees, as rivers in Mesopotamia do: the high ground along its banks was the best land. Canals led water off it to the fields. Its course here is generated: the river's channels then are not known.", { y: 5, r: 80, range: 3000, big: true });
 mark("The desert edge", -2600, 2200, "inferred", "To the west and south-west the alluvium gives way to the sand and gravel of the desert, the edge of the Arabian plateau: grazing for sheep and goats after the rains, and the way to the shell, stone and bitumen of other lands.", { y: 4, r: 300, range: 4000, big: true });
 { const [ux, uz] = LL(30.9626, 46.1031); const d = Math.hypot(ux, uz), k = 4600 / d; mark("Toward Ur (19 km)", ux * k, uz * k, "known", "Ur lay 19 km to the north-east, then a village like this one, on the same river; Tell al-Ubaid, which gave the period its name, 6 km beyond it. Both had Ubaid temples or villages under their later cities.", { y: 4, r: 60, range: 5000, big: true }); }
@@ -1416,7 +1422,7 @@ function frame() {
   const sp = SPEEDS[speedI][0] * run;
   if (mx || my) { const ox = P_.x, oz = P_.z; P_.x += (fwd.x * -my + side.x * mx) * sp * dt; P_.z += (fwd.z * -my + side.z * mx) * sp * dt;
     const high = flying && P_.y > groundAt(P_.x, P_.z) + 6; if (INSIDE) { flying = false; insideClamp(P_); } else if (!high) pushOut(P_);
-    if (!flying && groundAt(P_.x, P_.z) < -0.8) { P_.x = ox; P_.z = oz; }
+    if (!flying && groundAt(P_.x, P_.z) < -0.8 && groundH(P_.x, P_.z) < groundH(ox, oz)) { P_.x = ox; P_.z = oz; }   // too deep to wade further in; but you can always wade out
     if (!flying && !INSIDE && groundAt(P_.x, P_.z) > P_.y + 0.75) { P_.x = ox; P_.z = oz; } }   // too high a step: a wall   // the river is too deep to wade
   const g = groundAt(P_.x, P_.z);
   if (flying) P_.y = Math.max(g, P_.y + up * Math.max(4, sp) * dt); else P_.y = g > P_.y ? Math.min(g, P_.y + Math.max(3.2, sp * 1.2) * dt) : Math.max(g, P_.y - Math.max(7, sp) * dt);
