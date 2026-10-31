@@ -523,6 +523,26 @@ out17 = HERE / "uruk.html"
 out17.write_text(UR.replace("__THREE__", three).replace("__SCENE__", (HERE / "uruk.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out17.name}, {out17.stat().st_size // 1024} KB")
 
+# Practise replacing the blower motor of a 2018 Nissan Sentra
+BL = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Practise: replacing the blower motor on a 2018 Nissan Sentra</title>").replace("background:#c8d4d8", "background:#b8d0e4")
+i0, i1 = BL.index('<div id="intro">'), BL.index('<button id="vr">')
+BL = BL[:i0] + """<div id="intro"><div class="card">
+  <h1>Replace the blower motor</h1>
+  <p>A practice run, at full size, of replacing the heater and air-conditioning blower motor on your 2018 Nissan Sentra (built 12/17;
+  the same part and job as every 2013-2019 Sentra). The car is on the driveway, your tools and parts on the bench in the garage.</p>
+  <p>You go through the whole job: working out from what the fan does whether it is really the motor (or a fuse, or the resistor),
+  what to buy and where, then each step safely: trim panel and glove box out, battery disconnected, old motor out, new one in, test,
+  and everything back together. Click the glowing parts to do each step; the panel says what to do and why.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; click to act &nbsp;&middot;&nbsp; <kbd>C</kbd> crouch &nbsp;&middot;&nbsp; <kbd>G</kbd> go to the spot &nbsp;&middot;&nbsp; <kbd>N</kbd> next step<br>
+  In VR: left stick walk, right stick turn, point and pull the trigger to act, <b>A</b> go to the spot, <b>B</b> next step. Kneel for the under-dash steps.</p>
+  <p class="dim">Follows the Nissan service manual for the 2013-2019 Sentra and parts-supplier guides. The car's parts are simplified, and
+  screw counts may differ slightly on your car: count them as you go. Click to begin.</p>
+</div></div>
+""" + BL[i1:]
+out18 = HERE / "blower.html"
+out18.write_text(BL.replace("__THREE__", three).replace("__SCENE__", (HERE / "blower.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out18.name}, {out18.stat().st_size // 1024} KB")
+
 # ---- the fourteenth page: an antimatter starship at 1 g ------------------------------------------------------------------
 SS = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Starship: 1 g to the stars</title>").replace("background:#c8d4d8", "background:#05080c")
 i0, i1 = SS.index('<div id="intro">'), SS.index('<button id="vr">')
