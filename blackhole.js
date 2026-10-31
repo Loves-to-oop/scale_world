@@ -180,6 +180,27 @@ function objStep(dt, dtMap) { for (const o of OBJS) { if (o.state === "rest" || 
     if (F.fade < 0.01) { o.state = "gone"; o.g.visible = false; } } }
 function putBack() { for (const o of OBJS) { if (o.fall) { scene.attach(o.g); scene.remove(o.fall.pivot); for (const [m, base] of o.fall.mats) m.color.copy(base); o.fall = null; } if (o.holder && o.holder !== camera) scene.attach(o.g); o.holder = null; o.g.position.copy(o.home); o.g.quaternion.copy(o.homeQ); o.g.scale.set(1, 1, 1); o.g.visible = true; o.state = "rest"; } HELD = null; say("Everything is back in its place."); }
 button("Put things back", 0, 1.235, putBack);
+// ---------- facts about this black hole: a poster on the wall, and a button that goes through them ----------
+const FACTS_LIST = (() => { const per = r => 2 * Math.PI * Math.sqrt(r ** 3 / GM), tideR = Math.cbrt(2 * GM * 1.7 / 98.1), rho = Mbh / (4 / 3 * Math.PI * rs ** 3);
+  return [["Mass", `${fmt(Mbh, " kg")}: the whole Earth.`],
+    ["Event horizon", `radius ${fmtLen(rs)}, ${fmtLen(2 * rs)} across: the size of a marble. Nothing that crosses it, not even light, can come back out.`],
+    ["Density", `the Earth's mass inside that marble would be ${fmt(rho, " kg/m³")}, about ${fmt(rho / 2.3e17)} times the density of an atomic nucleus.`],
+    ["Shadow", `light passing closer than ${fmtLen(bcrit)} is captured, so it looks like a black disc ${fmtLen(2 * bcrit)} across, wrapped in a ring of bent light.`],
+    ["Photon sphere", `at ${fmtLen(1.5 * rs)} light itself can circle the hole (unstably).`],
+    ["Last stable orbit", `${fmtLen(3 * rs)}: closer than this, nothing can orbit; it spirals in.`],
+    ["Gravity", `at 1 m, ${fmt(GM, " m/s²")}, ${fmt(GM / 9.81)} times Earth's. But 6,371 km away (the Earth's radius) it is exactly 9.8 m/s²: the same as standing on Earth.`],
+    ["Escape speed", `at 1 m, ${fmt(Math.sqrt(2 * GM) / 1000, " km/s")} (${(Math.sqrt(2 * GM) / c * 100).toFixed(1)}% of light); at the horizon, the speed of light.`],
+    ["Orbits", `at 10 cm a grain orbits in ${fmtT(per(0.1))} at ${(Math.sqrt(GM / 0.1) / c * 100).toFixed(0)}% of light speed; at 1 m in ${fmtT(per(1))}.`],
+    ["Falling in", `dropped from 1 m, an object's own clock reaches the horizon after ${fmtT(tauFall(1))}.`],
+    ["Time", `a clock held 1 m away runs ${((1 - rate(1)) * 100).toFixed(2)}% slow (${fmtT((1 - rate(1)) * 86400)} a day); at 10 cm, ${((1 - rate(0.1)) * 100).toFixed(1)}%; just outside the horizon it ticks at a quarter of the rate.`],
+    ["Tides", `the difference in pull across your body would stretch you with 10 g from about ${Math.round(tideR / 1000)} km away; a marble would be torn apart about 200 m out.`],
+    ["Hawking radiation", `its temperature is ${T_HAWK.toFixed(3)} K, colder than space (2.7 K), so it would absorb more than it emits and grow; alone, it would last about ${fmt(T_EVAP / 3.156e7)} years.`],
+    ["Brightness limit", `gas falling in could shine at most about ${fmt(L_EDD, " W")} (the Eddington limit), a tenth of the Sun's output.`],
+    ["Where from?", `nothing known in nature makes black holes this small today: stars collapse into ones several times the Sun's mass. Tiny "primordial" black holes might have formed in the Big Bang; none has been found.`]]; })();
+const posterTex = canvasTex(1100, 1820, (g, w, h) => { g.fillStyle = "#14121c"; g.fillRect(0, 0, w, h); g.fillStyle = "#ffd060"; g.font = "bold 56px sans-serif"; g.fillText("This black hole", 50, 90); g.fillStyle = "#a8a2c0"; g.font = "30px sans-serif"; g.fillText("Mass of the Earth. Everything computed from general relativity.", 50, 140);
+  let y = 210; for (const [k, v] of FACTS_LIST) { g.fillStyle = "#ffd060"; g.font = "bold 30px sans-serif"; g.fillText(k, 50, y); g.fillStyle = "#f0e8dc"; g.font = "26px sans-serif"; let ln = "", yy = y + 34; for (const wd of v.split(" ")) { if (g.measureText(ln + wd).width > 1000) { g.fillText(ln, 50, yy); yy += 32; ln = ""; } ln += wd + " "; } g.fillText(ln, 50, yy); y = yy + 50; } });
+const poster = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.655), new THREE.MeshBasicMaterial({ map: posterTex, toneMapped: false })); poster.position.set(R.x0 + 0.02, 1.45, 1.05); poster.rotation.y = Math.PI / 2; scene.add(poster);
+let factI = -1; button("Facts", -0.3, 1.235, () => { factI = (factI + 1) % FACTS_LIST.length; const [k, v] = FACTS_LIST[factI]; say(`<b>${k}</b> (${factI + 1} of ${FACTS_LIST.length}): ${v} <span style="color:#a8a2c0">Press again for the next. All of them are on the poster by the armchair.</span>`); });
 // ---------- moving about (WASD and drag; in VR, sticks, and point and pull the trigger) ----------
 const P = { x: 1.1, z: 1.2 }; let yaw = 0, pitch = 0, started = false; const keys = {};
 { const dx = BH.x - P.x, dz = BH.z - P.z; yaw = Math.atan2(-dx, -dz); pitch = Math.atan2(BH.y - 1.6, Math.hypot(dx, dz)); }
