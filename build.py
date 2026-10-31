@@ -543,6 +543,27 @@ out18 = HERE / "blower.html"
 out18.write_text(BL.replace("__THREE__", three).replace("__SCENE__", (HERE / "blower.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out18.name}, {out18.stat().st_size // 1024} KB")
 
+# An Earth-mass black hole in a living room
+BH = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>A black hole with the mass of the Earth, in the living room</title>").replace("background:#c8d4d8", "background:#1a1612")
+i0, i1 = BH.index('<div id="intro">'), BH.index('<button id="vr">')
+BH = BH[:i0] + """<div id="intro"><div class="card">
+  <h1>A black hole in the living room</h1>
+  <p>In the middle of the room floats a black hole with the mass of the Earth. Its event horizon has a radius of 8.87 mm: a marble.
+  Around it you see the room bent by its gravity, and its black shadow, bigger than the horizon. Walk up to it and watch your own clock fall
+  behind "map time", the time of a clock far away; a ladder of clocks shows time slowing toward the horizon.</p>
+  <p>Buttons on the coffee table drop a marble into it, set dust orbiting, and fire a laser past it, all in slow motion, because at this
+  scale everything happens in nanoseconds. Everything is computed from general relativity. One rule is broken on purpose: the room, its air
+  and you stay put. The panel says what would really happen.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; mouse wheel: move along your gaze &nbsp;&middot;&nbsp; click the buttons &nbsp;&middot;&nbsp; <kbd>M</kbd> magnifier<br>
+  In VR: left stick walk, right stick turn, point at a button and pull the trigger; lean in to look closely.</p>
+  <p class="dim">Schwarzschild spacetime: clock rates sqrt(1 - rs/r), radial infall and circular orbits exact, light paths from Binet's equation; the
+  bending you see is drawn within 50 cm of the hole. Click to begin.</p>
+</div></div>
+""" + BH[i1:]
+out19 = HERE / "blackhole.html"
+out19.write_text(BH.replace("__THREE__", three).replace("__SCENE__", (HERE / "blackhole.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out19.name}, {out19.stat().st_size // 1024} KB")
+
 # ---- the fourteenth page: an antimatter starship at 1 g ------------------------------------------------------------------
 SS = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Starship: 1 g to the stars</title>").replace("background:#c8d4d8", "background:#05080c")
 i0, i1 = SS.index('<div id="intro">'), SS.index('<button id="vr">')
