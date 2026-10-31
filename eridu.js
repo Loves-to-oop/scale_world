@@ -742,10 +742,12 @@ const HAMLETS = []; { const R = seeded(6000); const spots = [[RIVER, 0.18], [RIV
 // reed boats on the shores: bundles of reeds lashed into a hull with high curved ends, many coated with bitumen against the water
 function reedBoatGeo() { const NU = 14, NV = 6, pos = [], idx = []; for (let i = 0; i <= NU; i++) { const u = i / NU, z = u - 0.5, e = Math.abs(2 * u - 1), tp = Math.max(0.06, 1 - e ** 2.4), rise = 0.9 * e ** 3.5;
     for (let j = 0; j <= NV; j++) { const v = j / NV, a = Math.PI * v; pos.push(Math.cos(a) * 0.5 * tp, 0.5 - Math.sin(a) * 0.5 * Math.max(0.3, Math.sqrt(tp)) + rise, z); } }
-  for (let i = 0; i < NU; i++) for (let j = 0; j < NV; j++) { const a = i * (NV + 1) + j, b = a + NV + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); } const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g; }
+  for (let i = 0; i < NU; i++) for (let j = 0; j < NV; j++) { const a = i * (NV + 1) + j, b = a + NV + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+  const d0 = pos.length / 3; for (let i = 0; i <= NU; i++) for (const j of [0, NV]) { const k = (i * (NV + 1) + j) * 3; pos.push(pos[k], pos[k + 1] - 0.04, pos[k + 2]); } for (let i = 0; i < NU; i++) { const a = d0 + i * 2, b = a + 2; idx.push(a, b, a + 1, a + 1, b, b + 1); }   // the top: the bundles (or a floor), so the hull is closed and dry
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g; }
 const RBOAT_G = reedBoatGeo(), boatBitM = M(0x221c16, { roughness: 0.45, side: THREE.DoubleSide }), boatReedM = M(0xb09a64, { side: THREE.DoubleSide });
 { const R = seeded(808); let n = 0; for (let k = 0; k < 4000 && n < 40; k++) { const a = R() * 6.283, r = 300 + R() * 2500, x = Math.cos(a) * r, z = Math.sin(a) * r, h = groundH(x, z); if (h < -0.2 || h > 0.15) continue; if (marshMask(x, z) < 0.05 && !nearWater(x, z, 6)) continue;
-    put(R() < 0.6 ? "rboatb" : "rboatr", RBOAT_G, R() < 0.6 ? boatBitM : boatReedM, x, WATER - 0.25, z, 1.1, 0.7, 6 + R() * 4, R() * 6); n++; } }
+    put(R() < 0.6 ? "rboatb" : "rboatr", RBOAT_G, R() < 0.6 ? boatBitM : boatReedM, x, WATER - 0.12, z, 1.1, 0.7, 6 + R() * 4, R() * 6); n++; } }
 // tall reeds round you in the marsh and along the water: Phragmites, three or four metres high
 const REED_N = IS_HEADSET ? 2200 : 4000, REEDS = new THREE.InstancedMesh((() => { const parts = [0, Math.PI / 3, Math.PI * 2 / 3].map(a => new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0).rotateY(a).toNonIndexed()), out = new THREE.BufferGeometry();
   for (const k of ["position", "normal", "uv"]) out.setAttribute(k, new THREE.Float32BufferAttribute(parts.flatMap(g => [...g.attributes[k].array]), k === "uv" ? 2 : 3)); return out; })(),
@@ -1139,7 +1141,7 @@ else mark("Temple attendants", ...TL(0.5, -TEMPLE.d / 2 + 4.0), "inferred", "Peo
 // ---------- daily life about the town: placed near you as you go ----------
 const ACTIVE = () => { const h = SIM / 3600; return h < 5 ? 0.05 : h < 6 ? 0.4 : h < 12 ? 1 : h < 15 ? 0.35 : h < 19 ? 1 : h < 21 ? 0.55 : 0.08; };
 const nearestOf = (L, x, z, max = 200) => { let best = null, bd = max; for (const W of L) { const d = Math.hypot(W[0] - x, W[1] - z); if (d < bd) { bd = d; best = W; } } return best; };
-const WATERPTS = []; { for (const C of CANALS.slice(0, 3)) for (let s = 0; s < C.L; s += 60) WATERPTS.push(C.at(s).slice(0, 2)); }
+const WATERPTS = []; { for (const C of CANALS.slice(0, 3)) for (let s = 0, k = 0; s < C.L; s += 60, k++) { const [x, z, a] = C.at(s), sg = k % 2 ? 1 : -1; if (typeof CITY !== "undefined" && Math.hypot(x - CITY.x, z - CITY.z) < CITY.r + 40) continue; for (let off = 0.5; off < 14; off += 0.5) { const px = x + Math.cos(a) * sg * off, pz = z - Math.sin(a) * sg * off; if (groundH(px, pz) > WATER - 0.1) { WATERPTS.push([px, pz]); break; } } } }   // at the water's edge, not in mid-stream
 function placeAmbient(A, px, pz) { const R = Math.random; propHide(A); A.prop = null; A.yOff = 0;
   if (R() > ACTIVE()) { A.mode = "off"; return false; } const H = HOUSES[(R() * HOUSES.length) | 0]; if (Math.hypot(H.dp[0] - px, H.dp[1] - pz) > 320) { A.mode = "off"; return false; }
   const role = A.L.role, r = R(), door = [H.dp[0], H.dp[1]], hot = SIM > T.rest && SIM < T.work2;
@@ -1176,8 +1178,8 @@ function agentState(A) { const S = SIM; if (A.job) return working() ? jobPose(A,
     if (q < OFFER_L) { const [x, z, h] = routeAt(mine, q); return [x, z, h, "walk", true, 0.85]; } if (q < OFFER_L + 40) { const [x, z] = mine[mine.length - 1]; return [x, z, face(x, z, ...TL(0, -TEMPLE.d / 2 + 4.5)), q < OFFER_L + 20 ? "kneel" : "pray"]; }
     const [x, z, h] = routeAt(mine, 2 * OFFER_L + 40 - q); return [x, z, h + Math.PI, "walk", true, 0.85]; }
   if (A.attend) return [...A.fixed, A.kind];
-  if (A.boat !== undefined) { const B = BOATS[A.boat]; if (!B || SIM < T.boats || SIM > T.eve) return null; const [x, z, h] = B.pos, lz = A.seat ? -2.2 : 2.2; return [x + Math.sin(h) * lz, z + Math.cos(h) * lz, h, A.seat ? "pole" : "net", false, 0, 0.45]; }
-  if (A.sail !== undefined) { const B = sailState(); if (!B) return null; const lz = [-3.5, 0, 3][A.sail]; return [B.x + Math.sin(B.h) * lz, B.z + Math.cos(B.h) * lz, B.h, B.moving ? (A.sail ? "pole" : "stand") : "talk", false, 0, 0.5]; }
+  if (A.boat !== undefined) { const B = BOATS[A.boat]; if (!B || SIM < T.boats || SIM > T.eve) return null; const [x, z, h] = B.pos, lz = A.seat ? -2.2 : 2.2; return [x + Math.sin(h) * lz, z + Math.cos(h) * lz, h, A.seat ? "pole" : "net", false, 0, 0.27]; }
+  if (A.sail !== undefined) { const B = sailState(); if (!B) return null; const lz = [-3.5, 0, 3][A.sail]; return [B.x + Math.sin(B.h) * lz, B.z + Math.cos(B.h) * lz, B.h, B.moving ? (A.sail ? "pole" : "stand") : "talk", false, 0, 0.28]; }
   if (A.flock !== undefined) { const F = FLOCKS[A.flock], [x, z] = F.pos; return [x - 3, z - 3, F.h, F.moving ? "walk" : "stand", F.moving, 0.9]; }
   if (A.field) return working() ? [...A.fixed, "reap"] : null;
   if (A.fixed) return [...A.fixed, A.kind];
@@ -1190,19 +1192,20 @@ function lifeStep(dt, t) { frameN++; const px = P_.x, pz = P_.z, rate = Math.min
       if (A.mode === "loop" || A.mode === "fixed" || A.mode === "play") taskStep(A, dt, rate);
       if (A.mode === "walk") { A.s += A.dir * A.v * dt * rate; if (A.s < 0 || A.s > A.S.L) { A.dir *= -1; A.s = clampN(A.s, 0, A.S.L); } const [x, z, a] = A.S.at(A.s); A.x = x + Math.cos(a) * A.lane; A.z = z - Math.sin(a) * A.lane; A.h = A.dir > 0 ? a : a + Math.PI; }
       const d = Math.hypot(A.x - px, A.z - pz), step = d < 35 ? 1 : d < 120 ? 3 : 8; if ((frameN + A.i) % step && A.shown) continue;
-      if (d > 300 || (rGet(A.x, A.z) === 2 && !A.yOff)) { if (A.shown) {   // far away, or passing through a house: not drawn
+      if (d > 300 || (rGet(A.x, A.z) === 2 && !A.yOff) || groundH(A.x, A.z) < WATER - 0.45) { if (A.shown) {   // far away, or passing through a house: not drawn
         crowd.hide(A.i); propHide(A); A.shown = false; } continue; }
       const ay = A.yOff || groundH(A.x, A.z); crowd.set(A.i, A.x, ay, A.z, A.h, A.kind, t, A.mode === "walk" ? A.v * rate : A.walk ? Math.min(2, A.walk * rate) : 1); A.shown = true; if (A.prop) propSet(A, ay); continue; }
     const st = agentState(A); if (!st) { if (A.shown) { crowd.hide(A.i); propHide(A); A.shown = false; } continue; }
     let [x, z, h, kind, moving, sp, yw] = st; A.x = x; A.z = z; A.h = h; A.kind = kind; const d = Math.hypot(x - px, z - pz);
     if (d > (A.boat !== undefined || A.sail !== undefined || A.flock !== undefined ? 800 : 320)) { if (A.shown) { crowd.hide(A.i); if (A.prop) propHide(A); A.shown = false; } continue; }
     const step = d < 35 ? 1 : d < 120 ? 3 : 8; if ((frameN + A.i) % step && A.shown) continue;
+    if (yw === undefined && groundH(x, z) < WATER - 0.45) { if (A.shown) { crowd.hide(A.i); if (A.prop) propHide(A); A.shown = false; } continue; }   // no walking through deep water
     const y = yw !== undefined ? WATER + yw : Math.max(groundH(x, z), WATER - 0.4);
     crowd.set(A.i, x, y, z, h, kind, t, moving ? Math.min(2, (sp || 0.9) / 1.2) * Math.min(rate, 3) : 1); A.shown = true; if (A.prop) propSet(A, y); else propHide(A); }
   crowd.done(); }
 // boats, flocks and the oxen on the threshing floor
-function boatsStep(t) { for (const C of CARTS) { const on = working(); C.g.visible = on; if (!on) { C.pos = null; continue; } const u = (SIM * 0.9 + C.ph) % (2 * C.L), back = u > C.L, s = back ? 2 * C.L - u : u, [x, z, h0] = routeAt(C.P, s), h = back ? h0 + Math.PI : h0; C.g.position.set(x, groundH(x, z), z); C.g.rotation.y = h; C.pos = [x + Math.sin(h) * 3.6 + Math.cos(h) * 0.9, z + Math.cos(h) * 3.6 - Math.sin(h) * 0.9, h]; } for (const B of BOATS) { const on = SIM > T.boats && SIM < T.eve; B.g.visible = on; const s = ((SIM * 0.7 + B.ph) % B.L), [x, z, h] = routeAt(B.P, s); B.pos = [x, z, h]; if (on) { B.g.position.set(x, WATER - 0.22, z); B.g.rotation.y = h; } }
-  const S2 = sailState(); SAIL.g.visible = !!S2; if (S2) { SAIL.g.position.set(S2.x, WATER - 0.25, S2.z); SAIL.g.rotation.y = S2.h; } }
+function boatsStep(t) { for (const C of CARTS) { const on = working(); C.g.visible = on; if (!on) { C.pos = null; continue; } const u = (SIM * 0.9 + C.ph) % (2 * C.L), back = u > C.L, s = back ? 2 * C.L - u : u, [x, z, h0] = routeAt(C.P, s), h = back ? h0 + Math.PI : h0; C.g.position.set(x, groundH(x, z), z); C.g.rotation.y = h; C.pos = [x + Math.sin(h) * 3.6 + Math.cos(h) * 0.9, z + Math.cos(h) * 3.6 - Math.sin(h) * 0.9, h]; } for (const B of BOATS) { const on = SIM > T.boats && SIM < T.eve; B.g.visible = on; const s = ((SIM * 0.7 + B.ph) % B.L), [x, z, h] = routeAt(B.P, s); B.pos = [x, z, h]; if (on) { B.g.position.set(x, WATER - 0.12, z); B.g.rotation.y = h; } }
+  const S2 = sailState(); SAIL.g.visible = !!S2; if (S2) { SAIL.g.position.set(S2.x, WATER - 0.12, S2.z); SAIL.g.rotation.y = S2.h; } }
 const BEASTS = [], beastIM = {};
 { const R = seeded(301); for (const F of FLOCKS) for (let k = 0; k < F.n; k++) BEASTS.push({ sp: R() < 0.6 ? "sheep" : "goat", flock: F, off: [(R() - 0.5) * 24, (R() - 0.5) * 24], ph: R() * 100 });
   for (let k = 0; k < 24; k++) { const H = HOUSES[(R() * HOUSES.length) | 0]; if (Math.hypot(H.x, H.z) > 500) continue; BEASTS.push({ sp: "pig", home: [H.dp[0] + (R() - 0.5) * 8, H.dp[1] + (R() - 0.5) * 8], ph: R() * 100 }); }
