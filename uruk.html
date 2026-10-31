@@ -53324,6 +53324,7 @@ const desertness = (x, z) => sstepN(-(x + z) * 0.707 - 5600 + 500 * (fbm(x / 150
 const LATE_BOXES = [[-100, 118, -88, 88], [124, 215, -140, 140], [-50, 118, 94, 165], [-30, 118, -165, -94]];
 function lateRuin(x, z) { const u = (x - z) * 0.7071, v = (x + z) * 0.7071; let dm = 1e9; for (const Q of LATE_BOXES) { const du = Math.max(Q[0] - u, 0, u - Q[1]), dv = Math.max(Q[2] - v, 0, v - Q[3]); dm = Math.min(dm, Math.hypot(du, dv)); } if (dm < 8) return 0;
   const f = fbm(x / 38 + 11, z / 38 + 3, 3); return (3.6 * sstepN(f, 0.52, 0.74) + 0.8 * sstepN(f, 0.4, 0.52)) * sstepN(dm, 8, 30) * (1 - sstepN(Math.hypot(x, z / 0.88), 400, 520)); }
+let _NOCH = false;   // true: the ground as it would be without the city canals (for the tops of their embankments)
 function baseH(x, z) { const n1 = fbm(x / 160, z / 160, 3), n2 = fbm(x / 1100 + 7, z / 1100, 3);
   let h = 0.9 + 0.5 * n2 + 0.25 * (n1 - 0.5);                                                                                   // the alluvial plain
   h += 2.4 * Math.exp(-(((x - CITY.x) / 1000) ** 2 + ((z - CITY.z) / 850) ** 2)) + 1.2 * Math.exp(-(((x - 520) / 230) ** 2 + ((z - 80) / 210) ** 2));   // the city mound, built up over a thousand years, and Eanna's rise
@@ -53334,7 +53335,8 @@ function baseH(x, z) { const n1 = fbm(x / 160, z / 160, 3), n2 = fbm(x / 1100 + 
     let t = 0.12 + (fbm(x / 45, z / 45, 2) - 0.5) * 0.5; if (pool > 0.6) t = lerpN(t, -1.5, sstepN(pool, 0.6, 0.68)); if (ch > 0.93) t = lerpN(t, -1.4, sstepN(ch, 0.93, 0.97)); t = lerpN(t, -1.8 - 1.0 * n2, far);
     if (isl > 0.63 + far * 0.05) t = lerpN(t, 0.8 + (isl - 0.63) * 3, sstepN(isl, 0.63 + far * 0.05, 0.69 + far * 0.05)); h = lerpN(h, t, sstepN(mm, 0, 1)); }
   if (RIVER.near(x, z, 260)) { const d = RIVER.d(x, z); h += 1.5 * (1 - sstepN(d, RIVER_HW, 200)) * sstepN(d, RIVER_HW * 0.8, RIVER_HW + 6); if (d < RIVER_HW + 10) h = Math.min(h, lerpN(-2.8, h, sstepN(d, RIVER_HW * 0.5, RIVER_HW + 10))); }   // the river on its levees
-  for (const C of CANALS) if (C.near(x, z, 30)) { const d = C.d(x, z); if (d < 26) { h += 0.5 * (1 - sstepN(d, 3, 22)) * sstepN(d, 2.4, 4.5); if (d < 4) h = Math.min(h, lerpN(-0.9, h, sstepN(d, 1.5, 4))); } }
+  for (const C of CANALS) if (C.near(x, z, 30)) { const d = C.d(x, z); if ((C === CANALS[0] || C === CANALS[1]) && (x - CITY.x) ** 2 + (z - CITY.z) ** 2 < (CITY.r + 40) ** 2) { if (_NOCH) continue; if (d < 5.2) h = -1.0; else if (d < 9.6) h = lerpN(-1.0, h, sstepN(d, 5.2, 9.6)); continue; }   // in the city: a channel 10 m wide between brick embankments
+    if (d < 26) { h += 0.5 * (1 - sstepN(d, 3, 22)) * sstepN(d, 2.4, 4.5); if (d < 4) h = Math.min(h, lerpN(-0.9, h, sstepN(d, 1.5, 4))); } }
   for (const f of EXTRA_H) { const e = f(x, z); if (e > h) h = e; }   // built earth: the builders' ramp
   if (FLATS.length && x > FLAT_BB[0] && x < FLAT_BB[1] && z > FLAT_BB[2] && z < FLAT_BB[3]) for (const R of FLATS) { const dx = x - R.x, dz = z - R.z; if (dx * dx + dz * dz > R.r2) continue; const lx = dx * R.c - dz * R.s, lz = dx * R.s + dz * R.c; if (Math.abs(lx) < R.hw && Math.abs(lz) < R.hd) h = R.exact ? lerpN(h, R.y, Math.min(1, (R.hw - Math.abs(lx)) / 3, (R.hd - Math.abs(lz)) / 3)) : Math.min(h, R.y); }
   return h; }
@@ -53557,7 +53559,7 @@ const OVEN_G = new THREE.CylinderGeometry(0.42, 0.55, 0.9, 12, 1, true).translat
 // (the "hut sounding"), plastered with mud, like the reed houses still built in the marshes: arches of bundled reeds covered with mats.
 const HOUSES = [];
 function addHouse(x, z, w, d, ry, o = {}) { const gy = Math.min(...[[0, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => groundH(x + Math.cos(ry) * a * w / 2 + Math.sin(ry) * b * d / 2, z - Math.sin(ry) * a * w / 2 + Math.cos(ry) * b * d / 2))) - 0.05, R = seeded((x * 31 + z * 17) | 0);
-  const H = { x, z, w, d, ry, gy, kind: o.kind || "house", reed: !!o.reed, plain: !!o.plain, fore: o.fore || 0, court: o.court ?? (LATE && !o.reed), wh: o.wh ?? (o.reed ? 0 : 2.9 + R() * 0.5), face: o.face ?? (R() < 0.5 ? 1 : -1), name: o.name, tint: 0.88 + R() * 0.2 };
+  const H = { x, z, w, d, ry, gy, kind: o.kind || "house", reed: !!o.reed, plain: !!o.plain, fore: o.fore || 0, court: o.court ?? (LATE && !o.reed), wh: o.wh ?? (o.reed ? 0 : 2.9 + R() * 0.5), face: o.face ?? (R() < 0.5 ? 1 : -1), name: o.name, tint: 0.88 + R() * 0.2, hv: R() * 2 - 1 };   // hv: the plaster's hue, greyish to reddish
   const c = Math.cos(ry), s = Math.sin(ry), fx = H.reed ? 0 : H.face * (w / 2 + 0.7), fz = H.reed ? H.face * (d / 2 + 0.7) : 0;
   H.dp = [x + fx * c + fz * s, z - fx * s + fz * c, Math.atan2(fx * c + fz * s, -fx * s + fz * c)];
   H.coll = solid(x, z, w + 0.1, d + 0.1, ry, H); rRect(x, z, w + 1, d + 1, ry, 2); HOUSES.push(H); return H; }
@@ -53565,7 +53567,7 @@ function addHouse(x, z, w, d, ry, o = {}) { const gy = Math.min(...[[0, 0], [-1,
 function foreWalls(F, H) { const fd = H.fore, w = H.w, d = H.d, f = H.face, t = H.tint, wl = (cx, cz, sx, sz) => { gbox(F, "mud", cx, 1.0, cz, sx, 2.0, sz, "b"); const [x, , z] = gw(F, cx, 0, cz); solid(x, z, sx, sz, H.ry); };
   GTINT = [t * 0.97, t * 0.94, t * 0.9]; for (const sz of [-1, 1]) wl(f * (w / 2 + fd / 2), sz * (d / 2 - 0.2), fd, 0.4); const fx = f * (w / 2 + fd - 0.2), L = d / 2 - 0.75; for (const sz of [-1, 1]) wl(fx, sz * (0.75 + L / 2), 0.4, L); GTINT = [1, 1, 1]; }
 function gMudHouse(H) { const F = FR(H.x, H.z, H.ry, H.gy, "H" + lodKey(H.x, H.z)), w = H.w, d = H.d, wh = H.wh, R = seeded((H.x * 7 + H.z * 13) | 0), t = H.tint;
-  GTINT = [t, t * 0.97, t * 0.93]; gbox(F, "mud", 0, wh / 2, 0, w, wh, d); gbox(F, "mud", 0, wh + 0.25, 0, w + 0.1, 0.5, d + 0.1, "b");   // walls and the parapet
+  GTINT = [t * (1 + 0.07 * H.hv), t * 0.97, t * (0.93 - 0.07 * H.hv)]; gbox(F, "mud", 0, wh / 2, 0, w, wh, d); gbox(F, "mud", 0, wh + 0.25, 0, w + 0.1, 0.5, d + 0.1, "b");   // walls and the parapet
   GTINT = [t * 0.95, t * 0.92, t * 0.88]; gbox(F, "mud", 0, wh + 0.06, 0, w - 0.4, 0.1, d - 0.4, "b");   // the roof's mud surface inside the parapet
   GTINT = [0.7, 0.62, 0.5]; for (let k = 1; k < Math.round(d / 0.9); k++) for (const sx of [-1, 1]) gbox(F, "palm", sx * (w / 2 + 0.12), wh - 0.2, -d / 2 + k * 0.9, 0.24, 0.16, 0.16, "");   // the ends of the palm-trunk beams
   GTINT = [1, 1, 1]; const fx = H.face * (w / 2 + 0.03), n = [H.face, 0, 0]; gpoly(F, "dark", [[fx, 0, -0.5], [fx, 0, 0.5], [fx, 1.9, 0.5], [fx, 1.9, -0.5]], [[0, 0], [1, 0], [1, 1], [0, 1]], n);   // the doorway
@@ -53588,7 +53590,7 @@ function gCourtHouse(H) { const F = FR(H.x, H.z, H.ry, H.gy, "H" + lodKey(H.x, H
   GTINT = [0.4, 0.34, 0.28]; gpoly(F, "dark", [[-cw / 2 + 0.2, 0.06, -cd / 2 + 0.2], [cw / 2 - 0.2, 0.06, -cd / 2 + 0.2], [cw / 2 - 0.2, 0.06, cd / 2 - 0.2], [-cw / 2 + 0.2, 0.06, cd / 2 - 0.2]], [[0, 0], [1, 0], [1, 1], [0, 1]], [0, 1, 0]);   // the court's beaten floor
   GTINT = [1, 1, 1]; const L = FR(H.x, H.z, H.ry, H.gy, "L" + lodKey(H.x, H.z)); GTINT = [0.46 * t, 0.38 * t, 0.28 * t]; gbox(L, "lod", 0, (wh + 0.5) / 2, 0, w, wh + 0.5, d); GTINT = [1, 1, 1]; }
 // a house built simply, for the outer city: the same size and shape, its walls, parapet and door (the plan inside is the full one)
-function gPlainHouse(H) { const F = FR(H.x, H.z, H.ry, H.gy, "H" + lodKey(H.x, H.z)), w = H.w, d = H.d, wh = H.wh, t = H.tint; GTINT = [t, t * 0.97, t * 0.93]; gbox(F, "mud", 0, (wh + 0.45) / 2, 0, w, wh + 0.45, d, "b");
+function gPlainHouse(H) { const F = FR(H.x, H.z, H.ry, H.gy, "H" + lodKey(H.x, H.z)), w = H.w, d = H.d, wh = H.wh, t = H.tint; GTINT = [t * (1 + 0.07 * H.hv), t * 0.97, t * (0.93 - 0.07 * H.hv)]; gbox(F, "mud", 0, (wh + 0.45) / 2, 0, w, wh + 0.45, d, "b");
   GTINT = [1, 1, 1]; const fx = H.face * (w / 2 + 0.03); gpoly(F, "dark", [[fx, 0, -0.5], [fx, 0, 0.5], [fx, 1.9, 0.5], [fx, 1.9, -0.5]], [[0, 0], [1, 0], [1, 1], [0, 1]], [H.face, 0, 0]); if (H.fore) foreWalls(F, H);
   const L = FR(H.x, H.z, H.ry, H.gy, "L" + lodKey(H.x, H.z)); GTINT = [0.46 * t, 0.38 * t, 0.28 * t]; gbox(L, "lod", 0, (wh + 0.45) / 2, 0, w, wh + 0.45, d); GTINT = [1, 1, 1]; }
 // a reed hut: arches of bundled reeds, covered with mats, the ends closed with a lattice of reeds and a door
@@ -53624,6 +53626,8 @@ const drawCones = (g, w, h) => { g.fillStyle = "#8a7a62"; g.fillRect(0, 0, w, h)
     g.fillStyle = C[lz ? (band + 1) % 3 : (zz + Math.floor(y / 8)) % 4 < 2 ? band : (band + 2) % 3]; g.beginPath(); g.arc(x + 4, y + 4, 3.9, 0, 6.283); g.fill(); } };
 G_TEX.cones = GT(256, 256, drawCones, 0.64);   // cone heads about 2 cm across
 G_MAT.cones = new THREE.MeshStandardMaterial({ map: G_TEX.cones, vertexColors: true, roughness: 0.8 });
+G_TEX.painted = GT(256, 64, (g, w, h) => { g.fillStyle = "#ece6d8"; g.fillRect(0, 0, w, h); g.fillStyle = "#1e1a16"; g.fillRect(0, 4, w, 5); g.fillRect(0, h - 9, w, 5); for (let x = 0; x < w; x += 32) { g.fillStyle = "#a8442a"; g.beginPath(); g.moveTo(x, h - 12); g.lineTo(x + 16, 12); g.lineTo(x + 32, h - 12); g.fill(); g.fillStyle = "#1e1a16"; g.beginPath(); g.moveTo(x + 16, h - 12); g.lineTo(x + 24, 28); g.lineTo(x + 32, h - 12); g.fill(); } }, 1.6);   // a painted band: zigzags and triangles in black and red on white
+G_MAT.painted = new THREE.MeshStandardMaterial({ map: G_TEX.painted, vertexColors: true, roughness: 0.9 });
 const PILLAR_M = new THREE.MeshStandardMaterial({ map: (() => { const t = tex(256, 256, drawCones); t.repeat.set(12.8, 10.6); return t; })(), roughness: 0.8 });   // for the round columns (their own UVs)
 const HALLS = [];   // interiors that dim the daylight: { inside(x, y, z), lp: light position, name }
 // a tripartite building: the long central hall (T-shaped when tdepth is set), rows of rooms either side, outer walls set with niches
@@ -53670,6 +53674,17 @@ const EANNA = { x: 520, z: 80, ry: Math.PI / 4 };
   flatUnder(FE, 280, 240, gy, true); rRect(E.x, E.z, 280, 240, E.ry, 4);
   GTINT = [1, 1, 1]; gpoly(FE, "brick", [[-130, 0.03, -110], [130, 0.03, -110], [130, 0.03, 110], [-130, 0.03, 110]], [[0, 0], [60, 0], [60, 50], [0, 50]], [0, 1, 0]);   // the precinct's paving of mud brick
   const D = tripartite(...IN(10, 15), E.ry, gy, { w: 50, d: 80, wh: 9, hall: 11, room: 7, tdepth: 18, key: "eanna", name: "inside Temple D" });
+  { const F = D.F, hx = 11 / 2 - 0.03; for (const sx of [-1, 1]) gbox(F, "painted", sx * hx, 6.9, (D.z0 + 40) / 2, 0.06, 0.8, 40 - D.z0, ""); }   // a painted band high along the hall walls (inferred, as at Tell Uqair)
+  // the statue of the goddess on the altar of Temple D: a composite figure, the face of white marble as in the Warka Mask
+  { const F = D.F, G = new THREE.Group(), marble = M(0xeee8dc, { roughness: 0.35 }), inlay = M(0x1a2440, { roughness: 0.3 }), shell = M(0xf6f2ea, { roughness: 0.3 }), gold = M(0xd4a640, { metalness: 0.85, roughness: 0.3 }), robe = M(0xe8dcc4), robe2 = M(0x9a3a26), hair = M(0x16120e, { roughness: 0.5 });
+    const B = (m, geo, x, y, z, sx = 1, sy = 1, sz = 1) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.scale.set(sx, sy, sz); G.add(o); return o; };
+    B(robe, new THREE.CylinderGeometry(0.2, 0.36, 1.25, 16), 0, 0.62, 0); B(robe2, new THREE.CylinderGeometry(0.365, 0.365, 0.06, 16), 0, 0.06, 0); B(robe, new THREE.CylinderGeometry(0.17, 0.2, 0.42, 14), 0, 1.45, 0); B(robe2, new THREE.BoxGeometry(0.08, 0.5, 0.03), 0.09, 1.3, 0.16).rotation.z = -0.5;   // robe, its border, the cloth over one shoulder
+    for (const sx of [-1, 1]) { B(robe, new THREE.CylinderGeometry(0.05, 0.045, 0.5, 8), sx * 0.22, 1.36, 0.04).rotation.z = sx * 0.12; B(marble, new THREE.SphereGeometry(0.045, 8, 6), sx * 0.12, 1.12, 0.2); }   // arms, hands clasped before her
+    B(marble, new THREE.CylinderGeometry(0.06, 0.07, 0.12, 10), 0, 1.71, 0); const face = B(marble, new THREE.SphereGeometry(0.13, 16, 12), 0, 1.86, 0.01, 0.82, 1.08, 0.78);   // the marble face
+    for (const sx of [-1, 1]) { B(shell, new THREE.SphereGeometry(0.022, 8, 6), sx * 0.045, 1.89, 0.095, 1.3, 0.8, 0.5); B(inlay, new THREE.SphereGeometry(0.011, 6, 5), sx * 0.045, 1.89, 0.104); B(inlay, new THREE.BoxGeometry(0.06, 0.012, 0.012), sx * 0.046, 1.925, 0.098).rotation.z = sx * -0.15; }   // inlaid eyes and eyebrows (shell, lapis, bitumen)
+    B(hair, new THREE.SphereGeometry(0.14, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), 0, 1.9, -0.012, 0.86, 1.0, 0.86); B(hair, new THREE.CylinderGeometry(0.06, 0.03, 0.42, 8), 0, 1.66, -0.11); B(gold, new THREE.TorusGeometry(0.115, 0.014, 6, 18).rotateX(Math.PI / 2), 0, 1.97, -0.01, 1, 1, 0.95);   // dark hair down the back, a band of gold
+    const [x, y, z] = gw(F, 0, 1.3, 40 - 1.1 - 0.75); G.position.set(x, y, z); G.rotation.y = Math.atan2(F.s, F.c) + Math.PI; scene.add(G);
+    mark("The statue of Inanna", x, z, "inferred", "The Warka Mask, a life-size woman\'s face of white marble found in Eanna (about 3100 BC), was probably part of a composite cult statue of a goddess, most likely Inanna: the eyes and eyebrows were inlaid with shell, lapis lazuli or bitumen, the hair perhaps of gold or bitumen, the body of wood, dressed in real cloth. Here such a statue stands on the altar of Temple D. Which building held her, and what the body looked like, are not known. No statue is known from the White Temple.", { y: 3.2, r: 3, range: 40 }); }
   const C = tripartite(...IN(-88, -10), E.ry, gy, { w: 22, d: 54, wh: 7, hall: 6.5, room: 5.5, tdepth: 10, key: "eanna", name: "inside Temple C" });
   // Building E: rooms round a square court
   { const F = FR(...IN(88, -62), E.ry, gy, "eanna"), S = 50, R = 9, th = 1.2, wh = 6, wall = (x0, z0, x1, z1, butt) => { const L = Math.hypot(x1 - x0, z1 - z0), mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, al = Math.abs(x0 - x1) < 0.01; GTINT = [0.97, 0.93, 0.85];
@@ -53686,7 +53701,9 @@ const EANNA = { x: 520, z: 80, ry: Math.PI / 4 };
   // the Pillar Hall: a terrace fronted by two rows of great columns, columns and wall covered with cone mosaic
   { const [x, z] = IN(-88, 66), F = FR(x, z, E.ry, gy, "eanna"), PH = 1.6; flatUnder(F, 34, 22, gy + PH, true); GTINT = [0.95, 0.9, 0.82]; gbox(F, "brick", 0, PH / 2, 0, 34, PH, 22, "b"); for (let k = 0; k < 8; k++) gbox(F, "brick", 0, (k + 1) * PH / 16, -11 - 2.6 + k * 0.34, 8, (k + 1) * PH / 8, 0.36, "b");
     GTINT = [1, 1, 1]; gbox(F, "cones", 0, PH + 3.4, 9.5, 34, 6.8, 1.6); for (let k = -6; k <= 6; k++) if (k % 2 === 0) { const [cx, , cz] = gw(F, k * 2.6, 0, 8.6); put("pillar", CYL_G, PILLAR_M, cx, gy + PH, cz, 1.6, 6.8, 1.6); }   // the back wall with half-columns
-    for (const r of [-4, 2]) for (const k of [-1.5, -0.5, 0.5, 1.5]) { const [cx, , cz] = gw(F, k * 7, 0, r); put("pillar", CYL_G, PILLAR_M, cx, gy + PH, cz, 2.6, 6.8, 2.6); solid(cx, cz, 2.4, 2.4, E.ry); } }
+    for (const r of [-4, 2]) for (const k of [-1.5, -0.5, 0.5, 1.5]) { const [cx, , cz] = gw(F, k * 7, 0, r); put("pillar", CYL_G, PILLAR_M, cx, gy + PH, cz, 2.6, 6.8, 2.6); solid(cx, cz, 2.4, 2.4, E.ry); }
+    GTINT = [0.7, 0.62, 0.5]; for (const r of [-4, 2]) gbox(F, "palm", 0, PH + 7.0, r, 30, 0.45, 0.45, ""); for (let k = -14; k <= 14; k++) gbox(F, "palm", k * 1.05, PH + 7.42, 3.2, 0.26, 0.26, 15.6, "");   // the roof: beams on the columns, joists, reed matting and earth (inferred)
+    GTINT = [0.8, 0.72, 0.58]; gbox(F, "mud", 0, PH + 7.75, 3.2, 34.4, 0.4, 16.4, ""); GTINT = [1, 1, 1]; }
   // Inanna's ring-posts at the door of Temple D: bundles of reeds bent into a loop at the top, with streamers
   { const reed = M(0xc8b070), band = M(0x6a4a2a); for (const lx of [7.4, 12.6]) { const [px, pz] = IN(lx, -26.4), G = new THREE.Group(); G.position.set(px, gy, pz); G.rotation.y = E.ry;
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.24, 4.6, 10).translate(0, 2.3, 0), reed), loop = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.1, 6, 14), reed); loop.position.set(0, 5.0, 0); G.add(post, loop);
@@ -53704,7 +53721,7 @@ const EANNA = { x: 520, z: 80, ry: Math.PI / 4 };
   mark("Temple C", ...IN(-88, -10), "known", "About 54 by 22 m: a T-shaped central hall with rooms either side, entered from both long sides and the end. Plan from the excavations; height and roof inferred.", { y: 11, r: 20, range: 700 });
   mark("Building E", ...IN(88, -62), "known", "A square building about 50 m a side, rooms ranged round a central court: perhaps the seat of a ruler, or offices. Its use is not known. Plan from the excavations, simplified.", { y: 10, r: 20, range: 700 });
   mark("The Great Court", ...IN(88, 18), "known", "A court about 50 m square, sunk into the ground and surrounded by a bench of mud brick; clay pipes inside the bench may have watered a garden. Its use is unknown.", { y: 3, r: 20, range: 500 });
-  mark("The Pillar Hall", ...IN(-88, 66), "known", "A terrace fronted by two rows of columns 2.6 m across, with half-columns along the back wall, all covered with mosaic: thousands of clay cones pressed into the plaster, their heads painted black, red and white in zigzags, lozenges and chevrons. From level IVb, a little before 3200 BC; whether it still stood by then is uncertain.", { y: 9, r: 14, range: 600 });
+  mark("The Pillar Hall", ...IN(-88, 66), "known", "A hall on a terrace, its roof (inferred) carried on two rows of columns 2.6 m across, with half-columns along the back wall, all covered with mosaic: thousands of clay cones pressed into the plaster, their heads painted black, red and white in zigzags, lozenges and chevrons. From level IVb, a little before 3200 BC; whether it still stood by then is uncertain.", { y: 9, r: 14, range: 600 });
   mark("Where the first writing was found", ...IN(60, -110), "known", "Almost 5,000 of the earliest written tablets come from Eanna, most from rubbish fills of levels IVa and III, about 3300-3000 BC: accounts of barley, beer, sheep and goats, textiles and workers, and lists of words copied out by trainee scribes. The signs are pictures and numbers drawn and pressed into clay: proto-cuneiform.", { y: 3, r: 6, range: 300 }); }
 // the light and the halls: whichever hall you are in
 TEMPLE.hallAt = (x, y, z) => HALLS.find(H => H.inside(x, y, z)) || null;
@@ -53800,7 +53817,7 @@ function stableScatter(IM, cap, sp, radius, accept, place) { const offs = IM.use
     place(x, z, hash(i * 11, j * 13), hash(i * 17 + 3, j * 19 + 7)); IM.setMatrixAt(n++, O3.matrix); }
   IM.count = n; IM.instanceMatrix.needsUpdate = true; }
 function reedStep() { if (Math.hypot(P_.x - reedAt[0], P_.z - reedAt[1]) < 6) return; reedAt = [P_.x, P_.z];
-  stableScatter(REEDS, REED_N, 1.6, 85, (x, z) => { const h = groundH(x, z); if (h < -0.7 || h > 0.9 || rGet(x, z) === 2) return false; const mm = marshMask(x, z); return mm > 0.1 || nearWater(x, z, 5); },
+  stableScatter(REEDS, REED_N, 1.6, 85, (x, z) => { const h = groundH(x, z); if (h < -0.7 || h > 0.9 || rGet(x, z) === 2) return false; const mm = marshMask(x, z); return mm > 0.1 || (nearWater(x, z, 5) && Math.hypot(x - CITY.x, z - CITY.z) > CITY.r + 40); },
     (x, z, r1, r2) => { const s = 0.8 + r1 * 0.5; O3.position.set(x, Math.max(groundH(x, z), WATER - 0.6) - 0.05, z); O3.rotation.set(0, r2 * 3, 0); O3.scale.set(s * 1.3, s * (2.6 + r2 * 1.4), s * 1.3); O3.updateMatrix(); }); }
 // standing barley (and emmer) round you in the fields, ripe for the sickle
 const CROPV_N = IS_HEADSET ? 2600 : 4500, CROPV = new THREE.InstancedMesh(REEDS.geometry, new THREE.MeshStandardMaterial({ map: tex(128, 128, (g, w, h) => { g.clearRect(0, 0, w, h); for (let k = 0; k < 60; k++) { const x = rnd() * w, top = 10 + rnd() * 30; g.strokeStyle = ["#c8a850", "#d8b860", "#b89848", "#a88a40"][(rnd() * 4) | 0]; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, h); g.lineTo(x + (rnd() - 0.5) * 8, top); g.stroke(); g.fillStyle = "#e0c060"; g.beginPath(); g.ellipse(x + (rnd() - 0.5) * 8, top, 3, 9, 0.2, 0, 6.283); g.fill(); } }), alphaTest: 0.4, side: THREE.DoubleSide, roughness: 1 }), CROPV_N);
@@ -53901,6 +53918,25 @@ if (!LATE) { const yd = YARD_SPOTS.slice().sort((a, b) => Math.hypot(...a) - Mat
 
 // ---------- life in Uruk about 3200 BC: the city's own work (more to come: the scribes and their tablets, the rations, the procession) ----------
 const LATE_AG = []; let TAB_MAT = null; const WRITE = { on: false }; function writeStep() {}
+// ---------- the city's gardens, quays, boats and bridges ----------
+// Date palms in gardens and courtyards; the canals through the city with quays of mud brick, boats tied up along them, and footbridges of
+// palm logs where the streets cross. Palms and gardens are typical; quays are suggested by the magnetic survey; bridges are inferred.
+const BRIDGES = [], quayTop = (x, z) => { _NOCH = true; const t = baseH(x, z); _NOCH = false; return t + 0.12; };
+SOLID_H.push((x, z) => { if ((x - CITY.x) ** 2 + (z - CITY.z) ** 2 > (CITY.r + 40) ** 2) return -1e9; for (const C of CANALS.slice(0, 2)) if (C.near(x, z, 12)) { const d = C.d(x, z); if (d >= 5.1 && d <= 9.8) return quayTop(x, z); } return -1e9; });   // walk on the embankments
+{ const R = seeded(3201);
+  for (const [x, z] of YARD_SPOTS) { if (Math.hypot(x - CITY.x, z - CITY.z) > CITY.r) continue; for (let k = 0, n = 2 + ((R() * 3) | 0); k < n; k++) palm(x + (R() - 0.5) * 9, z + (R() - 0.5) * 9, 0.8 + R() * 0.3); }   // gardens
+  for (const H of HOUSES) { if (!H.fore) continue; const c = Math.cos(H.ry), s = Math.sin(H.ry), at = (lx, lz) => [H.x + lx * c + lz * s, H.z - lx * s + lz * c], side = R() < 0.5 ? -1 : 1;
+    if (R() < 0.2) palm(...at(H.face * (H.w / 2 + H.fore * 0.55), side * H.d * 0.28), 0.75 + R() * 0.25);   // a palm in the forecourt
+    if (!H.plain) { const [ox, oz] = at(H.face * (H.w / 2 + H.fore * 0.6), -side * (H.d / 2 - 1.2)); put("oven", OVEN_G, MAT.clay, ox, groundH(ox, oz) - 0.05, oz, 1, 1, 1); OVENS.push([ox, oz]); for (let k = 0; k < 2; k++) { const [jx, jz] = at(H.face * (H.w / 2 + 0.6), side * (1.2 + k * 0.7)); put("jar", POT_G, MAT.pot, jx, groundH(jx, jz) - 0.02, jz, 1, 0.8 + R() * 0.4, 1, R() * 6); } } }
+  for (const C of CANALS.slice(0, 2)) { let lastBoat = -1e9;
+    for (let sd = 3; sd < C.L - 3; sd += 6) { const [x, z, a] = C.at(sd); if (Math.hypot(x - CITY.x, z - CITY.z) > CITY.r + 40) continue;
+      for (const sg of [-1, 1]) { const qx = x + Math.cos(a) * sg * 7.45, qz = z - Math.sin(a) * sg * 7.45, top = quayTop(qx, qz), F = FR(qx, qz, a, -1.2, "H" + lodKey(qx, qz)); GTINT = [0.92, 0.86, 0.74]; gbox(F, "brick", 0, (top + 1.2) / 2, 0, 4.6, top + 1.2, 6.15); GTINT = [1, 1, 1]; }   // the embankments, faced with brick
+      if (sd - lastBoat > 38 && R() < 0.7) { lastBoat = sd; const sg = R() < 0.5 ? -1 : 1, bx = x + Math.cos(a) * sg * 3.4, bz = z - Math.sin(a) * sg * 3.4; put(R() < 0.5 ? "rboatb" : "rboatr", RBOAT_G, R() < 0.5 ? boatBitM : boatReedM, bx, WATER - 0.25, bz, 1.0, 0.7, 5 + R() * 3, a); } }   // boats tied up along the quay
+    for (const L of LANES.slice(0, 8)) { let last = -1e9; for (let sl = 0; sl < L.L; sl += 2) { const [px, pz] = L.at(sl); if (sl - last < 60 || C.d(px, pz) > 1.5) continue; last = sl; let best = 0, bd = 1e9; for (let s2 = 0; s2 < C.L; s2 += 3) { const [cx, cz] = C.at(s2), dd = Math.hypot(cx - px, cz - pz); if (dd < bd) { bd = dd; best = s2; } }
+        const [cx, cz, a] = C.at(best), y = Math.max(groundH(cx + Math.cos(a) * 7.5, cz - Math.sin(a) * 7.5), groundH(cx - Math.cos(a) * 7.5, cz + Math.sin(a) * 7.5)) + 0.25, F = FR(cx, cz, a, 0, "H" + lodKey(cx, cz));
+        GTINT = [0.7, 0.6, 0.46]; for (let k = -6; k <= 6; k++) gbox(F, "palm", 0, y - 0.12, k * 0.26, 15, 0.24, 0.24); for (const sx of [-1, 1]) for (const sz of [-1, 1]) gbox(F, "palm", sx * 4.4, (y - 1.4) / 2 - 0.6, sz * 1.5, 0.28, y + 1.4, 0.28); GTINT = [1, 1, 1];   // a footbridge of palm logs on posts
+        BRIDGES.push({ x: cx, z: cz, c: Math.cos(a), s: Math.sin(a), y }); } } }
+  SOLID_H.push((x, z) => { for (const B of BRIDGES) { const dx = x - B.x, dz = z - B.z, lx = dx * B.c - dz * B.s, lz = dx * B.s + dz * B.c; if (Math.abs(lx) < 7.4 && Math.abs(lz) < 1.7) return B.y; } return -1e9; }); }
 
 
 // ---------- inside the houses ----------
@@ -53928,6 +53964,7 @@ const ITEM_TXT = {
   basket: "A basket of barley, the household's staple, from the harvest.",
   roof: "The roof: palm-trunk beams across the walls, reeds and matting laid over them, and a thick layer of mud on top, reached by a stair. On hot nights people slept on the roof.",
   nets: "Fishing nets and a fish spear: for the household of a fisherman, the marsh was the field.",
+  textiles: "Woven wool: a hanging, rugs and cushions. Textiles were the great product of Uruk (the tablets count sheep, wool and cloth of many grades), and probably the main decoration of a house; no painted house walls of the period are known. Inferred.",
   tablets: "A basket of clay tablets: the family's documents (a house bought, a loan of barley or silver and its interest, a marriage contract, an adoption), each sealed by the parties and witnesses. Ordinary people used writing too, through scribes.",
   seal: "The householder's cylinder seal on its cord, of stone: rolled on documents to sign them.",
   chapel: "A household altar: a small bench with offerings and a clay figurine of the family's protective god. In houses of the time at Ur, family members were buried under the floor of the chapel room.",
@@ -53982,6 +54019,8 @@ function enterBuilding(B) { const G = new THREE.Group(), F = B.F, w = B.w, d = B
     for (let k = 0; k < 4; k++) iBox(G, k % 2 ? IMAT.pot : IMAT.clay, F, -hw + 0.4 + (k - 1.5) * 0.3, 0.5, -d * 0.36, 0.7, 0.7, 0.7, 0, BOWL_G.clone().rotateX(Math.PI)); itm("bowls", -hw + 0.4, -d * 0.4, 1.0);
     iBox(G, IMAT.basket, F, hw * 0.6, 0.2, -d * 0.1, 0.5, 0.4, 0.5, 0, new THREE.CylinderGeometry(0.5, 0.4, 1, 10)); iBox(G, IMAT.barley, F, hw * 0.6, 0.41, -d * 0.1, 0.45, 0.05, 0.45, 0, new THREE.CylinderGeometry(0.5, 0.5, 1, 10)); itm("basket", hw * 0.6, -d * 0.1, 0.9);
     itm("roof", 0, -d * 0.05, wh - 0.3);
+    { const tx = IMAT.textile || (IMAT.textile = new THREE.MeshStandardMaterial({ map: tex(128, 192, (g, W, Hh) => { g.fillStyle = "#d8ccb0"; g.fillRect(0, 0, W, Hh); for (let y = 0; y < Hh; y += 24) { g.fillStyle = ["#8a3a26", "#2a221a", "#b8a47e", "#6a5a46"][(y / 24) % 4]; g.fillRect(0, y + 8, W, 6); } for (let x = 0; x < W; x += 16) { g.fillStyle = "rgba(90,40,24,.5)"; g.fillRect(x, 0, 3, Hh); } }), roughness: 1, side: THREE.DoubleSide }));
+      iPlane(G, tx, F, hw - 0.14, 1.5, -d * 0.12, 1.4, 1.9, -Math.PI / 2); iBox(G, tx, F, -hw + 0.45, 0.55, -d * 0.36, 0.5, 0.12, 0.5); itm("textiles", hw - 0.3, -d * 0.12, 1.6); }   // a woven hanging and a cushion
     if (LATE) { iBox(G, IMAT.basket, F, -hw + 0.4, 0.5, -d * 0.22, 0.45, 0.32, 0.45, 0, new THREE.CylinderGeometry(0.5, 0.42, 1, 10)); for (let k = 0; k < 6; k++) iBox(G, M(0xb89870), F, -hw + 0.32 + (k % 3) * 0.08, 0.68, -d * 0.22 + Math.floor(k / 3) * 0.08 - 0.04, 0.07, 0.025, 0.1); itm("tablets", -hw + 0.4, -d * 0.22, 1.1);
       iBox(G, M(0x3a4a5a), F, -hw + 0.5, 0.48, -d * 0.36, 0.03, 0.05, 0.03, 0, new THREE.CylinderGeometry(0.5, 0.5, 1, 8)); itm("seal", -hw + 0.5, -d * 0.4, 0.8);
       iBox(G, IMAT.plaster, F, hw + 1.0, 0.4, -d * 0.4, 1.2, 0.8, 0.5); iBox(G, IMAT.clay, F, hw + 1.0, 0.95, -d * 0.4, 0.12, 0.3, 0.1); itm("chapel", hw + 1.0, -d * 0.4, 1.4); }
