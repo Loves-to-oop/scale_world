@@ -65,7 +65,7 @@ const skyG = new THREE.Group(); scene.add(skyG); const SKY_DIM = { value: 1 };
 // not a map of the real star. Colours: the blackbody colour of a temperature 8% lower, since titanium oxide in the cool atmosphere
 // absorbs green and blue light and makes the star redder than its temperature alone (its measured colour, B-V = 1.85, matches about
 // 3,300 K); brightness from the true temperature (3,600 K: 0.15 times the Sun's, area for area). The visible surface (photosphere)
-// of a red supergiant is not crisp like the Sun's: the gas there is thinner than a laboratory vacuum and the opaque layer is deep
+// of a red supergiant is not crisp like the Sun's: the gas there is about a millionth as dense as air (a rough vacuum) and the opaque layer is deep
 // and ragged, so the edge fades out gradually into the molecular atmosphere (the soft limb below).
 const NOISE = `vec3 h3(vec3 p){ p = vec3(dot(p, vec3(127.1, 311.7, 74.7)), dot(p, vec3(269.5, 183.3, 246.1)), dot(p, vec3(113.5, 271.9, 124.6))); return fract(sin(p) * 43758.5453); }
   float vn(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(mix(h3(i).x, h3(i + vec3(1,0,0)).x, f.x), mix(h3(i + vec3(0,1,0)).x, h3(i + vec3(1,1,0)).x, f.x), f.y), mix(mix(h3(i + vec3(0,0,1)).x, h3(i + vec3(1,0,1)).x, f.x), mix(h3(i + vec3(0,1,1)).x, h3(i + vec3(1,1,1)).x, f.x), f.y), f.z); }

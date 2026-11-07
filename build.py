@@ -607,7 +607,7 @@ BG = BG[:i0] + """<div id="intro"><div class="card">
   from the ship's long spine, standing on an open grating, so you can look down past your feet at the ship: its tanks, radiators and
   engine. A dark patch on the glass, like a welding helmet's, filters the star: its surface would burn your eyes from any distance.</p>
   <p>All its energy comes from a small, dense core, hidden deep inside a vast envelope of thin gas: at the visible surface the gas is
-  thinner than a laboratory vacuum, yet the envelope is so deep that you cannot see into it, so it still looks like a glowing ball,
+  only a millionth as dense as air (a rough vacuum; labs make far better), yet the envelope is so deep that you cannot see into it, so it still looks like a glowing ball,
   redder than its temperature because titanium oxide in its atmosphere soaks up green and blue light.
   It is no smooth ball: a few enormous convection cells churn its surface, its edge is ragged and fades out into red, a faint
   atmosphere glows round it, and clumps of dust drift farther out. Its probable companion, Siwarha, a young star of about the Sun's
