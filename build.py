@@ -570,16 +570,19 @@ i0, i1 = SH.index('<div id="intro">'), SH.index('<button id="vr">')
 SH = SH[:i0] + """<div id="intro"><div class="card">
   <h1>A stellar black hole in the neighbourhood</h1>
   <p>A black hole of three times the Sun's mass, about the lightest a dying star is likely to leave, sits in a suburb. Its event horizon is
-  8.86 km in radius: half of it rises out of the ground as a black dome 17.7 km across and 8.9 km high, and the streets ring it, from
-  Horizon Drive at its foot, past Photon Sphere Avenue (where light can circle the hole) and Last Stable Orbit Boulevard, out to 31 km.</p>
-  <p>Drive toward it and watch your clock fall behind the map clock (the time far away): at 9 km from the horizon your clock runs at 71%,
-  at 900 m 30%, and by the rail at its foot about 5%. Clock towers along East Road show the time at each distance. Look up and around:
-  the far side of the neighbourhood is wrapped round the dome by the bending of light. One rule is broken on purpose: the ground, the
-  houses, the air and you are held in place. The panel says what would really happen.</p>
-  <p>In the car: <kbd>W</kbd> / <kbd>S</kbd> faster or slower &nbsp;&middot;&nbsp; <kbd>A</kbd> / <kbd>D</kbd> steer &nbsp;&middot;&nbsp; space stop &nbsp;&middot;&nbsp; <kbd>E</kbd> get out or in &nbsp;&middot;&nbsp; drag to look<br>
-  In VR: left stick steer, push it up or down for faster or slower; right stick turn; <b>A</b> get out or in.</p>
-  <p class="dim">Schwarzschild spacetime: clock rates sqrt(1 - rs/r); the light of the far view is followed along its bent path (Binet's equation)
-  for every pixel; near you, within about 500 m, the bending is small and things are drawn straight. Click to begin.</p>
+  8.86 km in radius: half of it rises out of the ground as a black dome 17.7 km across, and the streets ring it, from Horizon Drive at its
+  foot, past Photon Sphere Avenue (where light can circle the hole, 13.5 km out) and Last Stable Orbit Boulevard (31.9 km), to 34 km.</p>
+  <p>You start by the rail at its foot, 6 m from the horizon by tape, where your clock runs at 0.034% of the time far away (the map
+  clock): each of your seconds is 49 minutes out there. Space near the hole is stretched: those 6 m of tape are 1 mm of the Schwarzschild
+  radius, and every distance here is a tape-measured one. A white line marks where the horizon meets the ground, and a field 100 m wide
+  is lined every 5 m like a football field. Clock signs along the four main roads show the time at 1, 2, 5, 10, 20, 50 and 100 m, then
+  at every mile. So close, nearly all light from outside falls in: the world is squeezed into a bright dot behind you. Drive out and
+  watch the sky open and the clocks speed up. One rule is broken on purpose: the ground, the houses, the air and you are held in place. The panel says what would really happen.</p>
+  <p>On foot: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk, shift run &nbsp;&middot;&nbsp; <kbd>E</kbd> get in or out of the car &nbsp;&middot;&nbsp; In the car: <kbd>W</kbd> / <kbd>S</kbd> faster or slower, <kbd>A</kbd> / <kbd>D</kbd> steer, space stop &nbsp;&middot;&nbsp; drag to look<br>
+  In VR: left stick walk (hold the left trigger to run) or, in the car, steer and push up or down for faster or slower; right stick turn; <b>A</b> get in or out.</p>
+  <p class="dim">Schwarzschild spacetime: clock rates sqrt(1 - rs/r); distances are proper distances for things held still; the light of the far
+  view is followed along its bent path (Binet's equation) for every pixel; near you, within about 500 m, things are drawn in a flat chart
+  of tape-measured distances. Click to begin.</p>
 </div></div>
 """ + SH[i1:]
 out20 = HERE / "stellarhole.html"
