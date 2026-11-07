@@ -46,9 +46,10 @@ const perSec = k => { const s = 1 / k; return s < 120 ? s.toFixed(1) + " s" : fm
 // Boulevard (r = 3 rs, the closest a free orbit can last: 31.9 km).
 const P_IN = 110, P_OUT = 34000, STEP = 120, NG = 650, NEAR = 520, P_PHOTON = pOfR(1.5 * rs), P_ISCO = pOfR(3 * rs), MILE = 1609.344;
 const TREES_N = ["Maple", "Oak", "Elm", "Cedar", "Birch", "Willow", "Aspen", "Linden", "Hickory", "Pine", "Chestnut", "Poplar", "Sycamore", "Walnut", "Spruce", "Magnolia"], KIND = ["Lane", "Court", "Circle", "Way", "Crescent", "Close"];
-const SPECIAL = [{ p: P_IN, name: "Horizon Drive", w: 14, col: "#3a3a3e" }, { p: P_PHOTON, name: "Photon Sphere Avenue", w: 16, col: "#4a3a2e" }, { p: P_ISCO, name: "Last Stable Orbit Boulevard", w: 16, col: "#2e3a4a" }, { p: P_OUT, name: "Outer Ring Road", w: 16, col: "#3a3a3e" }];
+const SPECIAL = [{ p: P_IN, name: "Horizon Drive", w: 14, col: "#3a3a3e" }, { p: P_PHOTON, name: "Photon Sphere Avenue", w: 16, col: "#4a3a2e" }, { p: P_ISCO, name: "Last Stable Orbit Boulevard", w: 40, col: "#2e3a4a" }, { p: P_OUT, name: "Outer Ring Road", w: 16, col: "#3a3a3e" }];
 const RINGS = []; for (let p = P_IN; p <= P_OUT + 1; p += STEP) RINGS.push({ p, name: "", w: 8 });
 for (const S of SPECIAL) { let best = 0; RINGS.forEach((q, i) => { if (Math.abs(q.p - S.p) < Math.abs(RINGS[best].p - S.p)) best = i; }); Object.assign(RINGS[best], S); }
+RINGS.forEach(q => q.off = Math.max(18, q.w / 2 + 12));
 RINGS.forEach((q, i) => { if (!q.name) q.name = `${TREES_N[i % TREES_N.length]} ${KIND[Math.floor(i / TREES_N.length) % KIND.length]}`; q.rt = rOfP(q.p); });
 // radial roads: 72 from Horizon Drive, doubling to 144 at 12.3 km and 288 at 30.1 km, so the blocks stay 500 m to 1.1 km long
 // (x is east, z is south: the angle 0 points east)
@@ -68,7 +69,7 @@ const mapTex = canvasTex(MAPN, MAPN, (g, W) => { const S = W / (2 * EXT), P = v 
   g.fillStyle = "#6f7f4c"; g.fillRect(0, 0, W, W);
   for (let i = 0; i < 2600; i++) { const x = hash(i, 1) * W, y = hash(i, 2) * W, s = 20 + hash(i, 3) * 80; g.fillStyle = ["#7c8a52", "#8a8a58", "#6a7a44", "#9a9258", "#5f7040"][i % 5]; g.fillRect(x, y, s, s * (0.5 + hash(i, 4))); }
   g.fillStyle = "#77874f"; g.beginPath(); g.arc(P(0), P(0), (rs + P_OUT + 60) * S, 0, 7); g.fill();
-  for (const q of RINGS) { const k = (rs + q.p) / q.rt; for (const off of [-18, 18]) { if (q.p === P_IN && off < 0) continue; g.strokeStyle = ["#9a6a52", "#7a7a80", "#8a5a4a", "#a8a090", "#6a5a50"][Math.abs(Math.round(q.p + off)) % 5]; g.lineWidth = 10 * S; g.setLineDash([10 * S * k, 16 * S * k]); g.beginPath(); g.arc(P(0), P(0), (rs + q.p + off) * S, 0, 7); g.stroke(); }
+  for (const q of RINGS) { const k = (rs + q.p) / q.rt; for (const off of [-q.off, q.off]) { if (q.p === P_IN && off < 0) continue; g.strokeStyle = ["#9a6a52", "#7a7a80", "#8a5a4a", "#a8a090", "#6a5a50"][Math.abs(Math.round(q.p + off)) % 5]; g.lineWidth = 10 * S; g.setLineDash([10 * S * k, 16 * S * k]); g.beginPath(); g.arc(P(0), P(0), (rs + q.p + off) * S, 0, 7); g.stroke(); }
     g.setLineDash([]); g.strokeStyle = q.col || "#8c8c86"; g.lineWidth = Math.max(0.6, q.w * S); g.beginPath(); g.arc(P(0), P(0), (rs + q.p) * S, 0, 7); g.stroke(); }
   g.strokeStyle = "#8c8c86"; for (const Sp of SPOKES) { g.lineWidth = Math.max(0.6, Sp.w * S); g.beginPath(); g.moveTo(P(Math.cos(Sp.a) * (rs + Sp.p0)), P(Math.sin(Sp.a) * (rs + Sp.p0))); g.lineTo(P(Math.cos(Sp.a) * (rs + P_OUT)), P(Math.sin(Sp.a) * (rs + P_OUT))); g.stroke(); }
   g.fillStyle = "#000"; g.beginPath(); g.arc(P(0), P(0), rs * S, 0, 7); g.fill(); });
@@ -127,7 +128,7 @@ function drawNear(pc, ac) { Object.assign(GB, { C: c0, a: ac, p: pc }); groundG.
   for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(${60 + hash(i, cx) * 40},${90 + hash(i, cz) * 40},40,0.25)`; g.beginPath(); g.arc(hash(i, 7) * W, hash(i, 9) * W, 2 + hash(i, 5) * 9, 0, 7); g.fill(); }
   const span = (NG * 1.5) / Math.max(rc, 1000);
   const arc = (R, w, col, dash) => { g.strokeStyle = col; g.lineWidth = w * S; g.setLineDash(dash ? dash.map(v => v * S) : []); g.beginPath(); g.arc(X(0), Z(0), R * S, ac - span, ac + span); g.stroke(); };
-  for (const q of RINGS) if (Math.abs(q.p - pc) < NG * 1.5) { const R = q.p + C; arc(R + q.w / 2 + 1.2, 2, "#c8c4b8"); arc(R - q.w / 2 - 1.2, 2, "#c8c4b8"); arc(R, q.w, q.col || "#5a5a5e"); if (q.w > 10) arc(R, 0.25, "#e8c840", [3, 4]); }
+  for (const q of RINGS) if (Math.abs(q.p - pc) < NG * 1.5) { const R = q.p + C; arc(R + q.w / 2 + 1.2, 2, "#c8c4b8"); arc(R - q.w / 2 - 1.2, 2, "#c8c4b8"); arc(R, q.w, q.col || "#5a5a5e"); if (q.w >= 30) { arc(R, 7, "#6f8a48"); for (const o of [-q.w / 4 - 1.7, q.w / 4 + 1.7]) arc(R + o, 0.2, "#e8e8e0", [3, 6]); } else if (q.w > 10) arc(R, 0.25, "#e8c840", [3, 4]); }
   g.setLineDash([]); for (const Sp of SPOKES) { const a0 = Math.max(Sp.p0, pc - NG * 1.5), a1 = Math.min(P_OUT, pc + NG * 1.5); if (a1 < a0 || angDist(Sp.a, ac) * rc > NG * 1.6) continue; const cs = Math.cos(Sp.a), sn = Math.sin(Sp.a);
     g.strokeStyle = "#c8c4b8"; g.lineWidth = (Sp.w + 4) * S; g.beginPath(); g.moveTo(X(cs * (a0 + C)), Z(sn * (a0 + C))); g.lineTo(X(cs * (a1 + C)), Z(sn * (a1 + C))); g.stroke(); g.strokeStyle = "#5a5a5e"; g.lineWidth = Sp.w * S; g.stroke(); }
   forHouses(pc, ac, NG * 1.2, C, (x, z, a, w, d, k, side) => { const ox = Math.cos(a) * side, oz = Math.sin(a) * side; g.strokeStyle = "#a8a49a"; g.lineWidth = 3 * S; g.beginPath(); g.moveTo(X(x), Z(z)); g.lineTo(X(x - ox * 14), Z(z - oz * 14)); g.stroke(); });
@@ -136,7 +137,7 @@ function drawNear(pc, ac) { Object.assign(GB, { C: c0, a: ac, p: pc }); groundG.
   g.globalCompositeOperation = "source-over"; nearTex.needsUpdate = true; }
 // every house within reach (tape distance) of (pc, ac): rows 18 m either side of each ring street, a house every 26 m along the row
 function forHouses(pc, ac, reach, C, fn) { const rc = pc + C;
-  RINGS.forEach((q, qi) => { for (const side of [-1, 1]) { const pr = q.p + side * 18; if (Math.abs(pr - pc) > reach || (qi === 0 && side < 0)) continue;
+  RINGS.forEach((q, qi) => { for (const side of [-1, 1]) { const pr = q.p + side * q.off; if (Math.abs(pr - pc) > reach || (qi === 0 && side < 0)) continue;
     const rt = rOfP(pr), R = pr + C, da = Math.acos(Math.max(-1, Math.min(1, (R * R + rc * rc - reach * reach) / (2 * R * rc)))), k0 = Math.ceil((ac - da) * rt / 26), k1 = Math.floor((ac + da) * rt / 26);
     for (let k = k0; k <= k1; k++) { const a = k * 26 / rt; if (nearSpoke(pr, a, rt)) continue; const hk = hash(k, pr); if (hk < 0.06) continue;
       fn(Math.cos(a) * R, Math.sin(a) * R, a, 9 + hash(k, pr + 1) * 5, 8 + hash(k, pr + 2) * 4, hk, side); } } }); }
@@ -190,7 +191,7 @@ function moversStep(pc, ac) { let n = 0, m = 0;
   const person = (pos, a, j, k, seed) => { if (n >= NP) return; const bob = 0.05 * Math.abs(Math.sin(2 * Math.PI * 1.8 * tMap * k + j)); O3.position.set(pos.x, bob, pos.z); O3.rotation.set(0, -a, 0); O3.scale.set(1, 1, 1); O3.updateMatrix(); bodyIM.setMatrixAt(n, O3.matrix); headIM.setMatrixAt(n, O3.matrix); bodyIM.setColorAt(n, tmpCol.setHex(COLP[Math.floor(hash(j, seed + 7) * COLP.length)])); n++; };
   for (const q of RINGS) { if (Math.abs(q.p - pc) > NEAR) continue;
     for (const dir of [-1, 1]) { along(q.p, q.rt, q.k, 1.4, 55, dir * (q.w / 2 + 1.6), dir, q.p + dir, pc, ac, (pos, a, j, k) => person(pos, a, j, k, q.p));
-      along(q.p, q.rt, q.k, 12, 150, dir * (q.w > 10 ? 3 : 2), dir, q.p * 3 + dir, pc, ac, (pos, a, j) => { if (m >= NCAR) return; O3.position.copy(pos); O3.rotation.set(0, -a, 0); O3.scale.set(1, 1, 1); O3.updateMatrix(); carBIM.setMatrixAt(m, O3.matrix); carCIM.setMatrixAt(m, O3.matrix); carBIM.setColorAt(m, tmpCol.setHex(COLC[Math.floor(hash(j, q.p + 9) * COLC.length)])); m++; }); } }
+      for (const lat of q.w >= 30 ? [6.5, 13] : [q.w > 10 ? 3 : 2]) along(q.p, q.rt, q.k, 12, 150, dir * lat, dir, q.p * 3 + dir + lat, pc, ac, (pos, a, j) => { if (m >= NCAR) return; O3.position.copy(pos); O3.rotation.set(0, -a, 0); O3.scale.set(1, 1, 1); O3.updateMatrix(); carBIM.setMatrixAt(m, O3.matrix); carCIM.setMatrixAt(m, O3.matrix); carBIM.setColorAt(m, tmpCol.setHex(COLC[Math.floor(hash(j, q.p + 9) * COLC.length)])); m++; }); } }
   if (pc < NEAR + 100) for (const F of FIELD_W) for (const dir of [-1, 1]) along(F.p, F.rt, F.k, 1.4, 34, 0, dir, F.p * 7 + dir, pc, ac, (pos, a, j, k) => person(pos, a, j, k, F.p));
   bodyIM.count = headIM.count = n; carBIM.count = carCIM.count = m;
   for (const im of [bodyIM, headIM, carBIM, carCIM]) { im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; } }
@@ -206,6 +207,34 @@ function planePath(s) { s = ((s % PLANE_L) + PLANE_L) % PLANE_L; const R = 300, 
   if (s < A) return [600 + s, -R, 1, 0]; s -= A; const t = s / R; return [12000 + R * Math.sin(t), -R * Math.cos(t), Math.cos(t), Math.sin(t)]; }
 function planesStep(dtMap, pc) { for (const P of PLANES) { const [p0] = planePath(P.s); P.s += 90 * dtMap * rateP(Math.max(1, p0)); const [p, lat, dp, dl] = planePath(P.s), rt = rOfP(p), a = lat / rt, pos = chart(p, a, 300);
     P.g.position.copy(pos); const ur = [Math.cos(a), Math.sin(a)], dx = dp * ur[0] - dl * ur[1], dz = dp * ur[1] + dl * ur[0]; P.g.rotation.set(0, Math.atan2(dx, dz), 0); P.g.visible = pos.distanceTo(headP) < 12000; } }
+
+// ---------- the last stable orbit: meteors every 100 yards, a big asteroid, and billboards ----------
+// At r = 3 rs (26.6 km from the centre) a circular orbit goes round in 2 pi sqrt(r^3 / GM) of map time (1.36 ms) and at half the
+// speed of light as timed by someone standing there. Meteors ride it 5 m above the boulevard's median, a meteor every 100 yards, with
+// a big asteroid higher up. (An orbit must lie in a plane through the centre, which is at ground level: 5 m up means a tilt of 0.01°,
+// unnoticeable here.) They are drawn where they are, ignoring the delay and aberration of their light at half the speed of light.
+// A frame that moves them farther than a few metres shows them as streaks; farther than the spacing, as a continuous glowing band.
+const R_ISCO = 3 * rs, OMEGA = Math.sqrt(GM / R_ISCO ** 3), ORB_T = 2 * Math.PI / OMEGA, K_ISCO = rateP(P_ISCO), K_ORB = Math.sqrt(1 - 1.5 * rs / R_ISCO), V_LOC = R_ISCO * OMEGA / K_ISCO, GAP = 91.44;
+const rockIM = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1.1, 0), M(0x8a7060, { roughness: 0.9, flatShading: true, emissive: 0x3a1a08 }), 40), streakIM = new THREE.InstancedMesh(new THREE.BoxGeometry(0.35, 0.35, 1), new THREE.MeshBasicMaterial({ color: 0xffc070, transparent: true, opacity: 0.75, depthWrite: false }), 40);
+const bigRock = new THREE.Mesh(new THREE.IcosahedronGeometry(9, 1), M(0x6a5a4c, { roughness: 1, flatShading: true })); { const pa = bigRock.geometry.attributes.position; for (let i = 0; i < pa.count; i++) { const f = 0.8 + 0.4 * hash(i, 3); pa.setXYZ(i, pa.getX(i) * f, pa.getY(i) * f * 0.8, pa.getZ(i) * f); } bigRock.geometry.computeVertexNormals(); }
+const bigStreak = new THREE.Mesh(new THREE.BoxGeometry(6, 6, 1), new THREE.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 0.6, depthWrite: false }));
+for (const o of [rockIM, streakIM, bigRock, bigStreak]) { o.frustumCulled = false; o.visible = false; scene.add(o); } rockIM.count = streakIM.count = 0;
+const ORBIT_TEXT = () => [`LAST STABLE ORBIT: r = 3 rs, ${fmtLen(R_ISCO)} from the centre, ${fmtLen(P_ISCO)} from the horizon by tape`, `The closest a free orbit can last: any closer and it spirals into the hole.`,
+  `An orbit here moves at ${(V_LOC / c).toFixed(2)} of the speed of light (timed by someone standing here) and goes round the ${fmtLen(2 * Math.PI * R_ISCO)} circle`, `in ${fmtTiny(ORB_T * K_ISCO)} of local time: ${Math.round(1 / (ORB_T * K_ISCO))} orbits a second, ${fmt(3600 / (ORB_T * K_ISCO))} an hour, ${fmt(86400 / (ORB_T * K_ISCO))} a day.`,
+  `On the orbiting rock's own clock an orbit takes ${fmtTiny(ORB_T * K_ORB)}; far away, ${fmtTiny(ORB_T)}.`, `Above the median a meteor every 100 yards rides the orbit, 5 m up: in real time, a blur. Slow time ([ or M) to watch them.`];
+const boardTex = canvasTex(1024, 512), BOARDS = Array.from({ length: 3 }, () => { const g = new THREE.Group(); for (const x of [-4.5, 4.5]) { const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 9, 8).translate(0, 4.5, 0), M(0x9a9aa2, { metalness: 0.6, roughness: 0.4 })); pole.position.x = x; g.add(pole); }
+  const b = new THREE.Mesh(new THREE.PlaneGeometry(12, 6), new THREE.MeshBasicMaterial({ map: boardTex, toneMapped: false, side: THREE.DoubleSide })); b.position.y = 9; g.add(b); g.visible = false; scene.add(g); return g; });
+function drawBoard() { const g = boardTex.userData.c.getContext("2d"); g.fillStyle = "#14202e"; g.fillRect(0, 0, 1024, 512); g.strokeStyle = "#60a0e0"; g.lineWidth = 8; g.strokeRect(4, 4, 1016, 504);
+  const L = ORBIT_TEXT(); g.fillStyle = "#9ad0ff"; g.font = "bold 30px sans-serif"; g.fillText(L[0], 24, 50, 976); g.fillStyle = "#f2eadb"; g.font = "25px sans-serif"; L.slice(1).forEach((t, i) => g.fillText(t, 24, 100 + i * 52, 976));
+  g.fillStyle = "#ffd060"; g.font = "bold 34px sans-serif"; g.fillText(`Orbits since you arrived: ${fmt(tMap / ORB_T)}`, 24, 470, 976); boardTex.needsUpdate = true; }
+function orbitStep(pc, ac, dtMap) { const near = Math.abs(pc - P_ISCO) < NEAR + 60; rockIM.visible = streakIM.visible = near; BOARDS.forEach(b => b.visible = false); bigRock.visible = bigStreak.visible = false; if (!near) return;
+  const rt = R_ISCO, total = rt * OMEGA * tMap, off = total % GAP, idx0 = Math.floor(total / GAP), D = rt * OMEGA * dtMap, da = (NEAR + 40) / rt; let n = 0, m = 0;
+  for (let j = Math.ceil(((ac - da) * rt - off) / GAP); j <= Math.floor(((ac + da) * rt - off) / GAP); j++) { const a = (j * GAP + off) / rt, pos = chart(P_ISCO, a, 5), id = j + idx0;
+    if (D < 2.5) { if (n >= 40) continue; const sc = 0.6 + 0.8 * hash(id, 5); O3.position.copy(pos); O3.rotation.set(hash(id, 6) * 6, hash(id, 7) * 6, 0); O3.scale.set(sc, sc * 0.8, sc * 1.1); O3.updateMatrix(); rockIM.setMatrixAt(n++, O3.matrix); }
+    else { if (m >= 40) continue; const Ls = Math.min(D, GAP), back = chart(P_ISCO, a - Ls / 2 / rt, 5); O3.position.copy(back); O3.rotation.set(0, -a, 0); O3.scale.set(1, 1, Ls); O3.updateMatrix(); streakIM.setMatrixAt(m++, O3.matrix); } }
+  rockIM.count = n; streakIM.count = m; rockIM.instanceMatrix.needsUpdate = streakIM.instanceMatrix.needsUpdate = true; streakIM.material.opacity = D >= GAP ? 0.45 : 0.75;
+  const ab = ((total % (2 * Math.PI * rt)) / rt + 2.1) % (2 * Math.PI), bp = chart(P_ISCO, ab, 40); if (bp.distanceTo(headP) < 4000) { if (D < 15) { bigRock.position.copy(bp); bigRock.rotation.y = ab * 3; bigRock.visible = true; } else { const Ls = Math.min(D, 3000); bigStreak.position.copy(chart(P_ISCO, ab - Ls / 2 / rt, 40)); bigStreak.rotation.set(0, -ab, 0); bigStreak.scale.set(1, 1, Ls); bigStreak.visible = true; } }
+  const j0 = Math.round(ac * rt / 1000); [-1, 0, 1].forEach((dj, i) => { const a = (j0 + dj) * 1000 / rt, B = BOARDS[i]; B.position.copy(chart(P_ISCO + 26, a)); B.rotation.y = -a - Math.PI / 2; B.visible = B.position.distanceTo(headP) < 900; }); }
 
 // ---------- comfort: in VR, a soft dark vignette narrows your view while you move ----------
 const vig = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: { s: { value: 0 } }, vertexShader: "varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
@@ -224,9 +253,12 @@ const tod = sec => { const d = new Date(T0 + sec * 1000); let h = d.getHours(); 
 // your clock receives them, faster than yours farther out, slower closer in. (Only the signs near you exist at any moment: a pool.)
 const ROADS = [[0, "East Road"], [Math.PI / 2, "South Road"], [Math.PI, "West Road"], [Math.PI * 1.5, "North Road"]], SPEC_C = {};
 const holdG = (r, k) => GM / (r * r) / k;
+// the tides: the difference in the hole's pull between a standing person's head and feet (1.7 m), along the radius, which stretches
+// them; across, they are squeezed with half that. For something held still the exact (relativistic) value equals Newton's 2GM L / r^3.
+const tideG = r => 2 * GM * 1.7 / r ** 3;
 function signSpecs(pc, ac) { const out = [], rc = pc + c0;
   for (const [A, road] of ROADS) { if (angDist(ac, A) * rc > 800) continue;
-    const add = (d, name, side, kind) => { if (Math.abs(d - pc) > 700) return; const id = road + kind + d; let S = SPEC_C[id]; if (!S) { const rt = rOfP(d), k = rateP(d); S = SPEC_C[id] = { id, d, name, road, rt, k, g: holdG(rt, k), a: A + side * (d <= 100 ? 3 : 10) / rt }; } out.push(S); };
+    const add = (d, name, side, kind) => { if (Math.abs(d - pc) > 700) return; const id = road + kind + d; let S = SPEC_C[id]; if (!S) { const rt = rOfP(d), k = rateP(d); S = SPEC_C[id] = { id, d, name, road, rt, k, g: holdG(rt, k), tide: tideG(rt), a: A + side * (d <= 100 ? 3 : 10) / rt }; } out.push(S); };
     for (const d of [1, 2, 5, 10, 20, 50]) add(d, `${d} m from the horizon`, 1, "f");
     for (let d = Math.max(100, Math.ceil((pc - 700) / 100) * 100); d <= Math.min(P_OUT, pc + 700); d += 100) add(d, `${d >= 1000 ? (d / 1000).toFixed(1) + " km" : d + " m"} from the horizon`, 1, "h");
     for (let m = Math.max(1, Math.ceil((pc - 700) / MILE)); m * MILE <= Math.min(P_OUT, pc + 700); m++) add(m * MILE, `Mile ${m} (${(m * MILE / 1000).toFixed(2)} km)`, -1, "m");
@@ -234,7 +266,7 @@ function signSpecs(pc, ac) { const out = [], rc = pc + c0;
   return out; }
 const poleG = new THREE.CylinderGeometry(0.07, 0.09, 2.95, 8).translate(0, 1.47, 0), mastG = new THREE.CylinderGeometry(0.06, 0.08, 3.6, 8).translate(0, 1.8, 0), poleM = M(0x9a9aa2, { metalness: 0.6, roughness: 0.4 }), armG = new THREE.BoxGeometry(1.5, 0.06, 0.06).translate(0.75, 0, 0), cupG = new THREE.SphereGeometry(0.14, 10, 8);
 const blurM = new THREE.MeshBasicMaterial({ color: 0xe8c040, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }), lampOn = new THREE.MeshBasicMaterial({ color: 0xff5030 }), lampOff = M(0x5a2a22);
-const POOL = Array.from({ length: 56 }, () => { const o = { id: null, rot: 0, g: new THREE.Group() }; o.g.add(new THREE.Mesh(poleG, poleM)); o.tex = canvasTex(512, 256); o.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: o.tex, toneMapped: false })); o.sprite.position.y = 4.05; o.sprite.scale.set(4.4, 2.2, 1); o.g.add(o.sprite);
+const POOL = Array.from({ length: 56 }, () => { const o = { id: null, rot: 0, g: new THREE.Group() }; o.g.add(new THREE.Mesh(poleG, poleM)); o.tex = canvasTex(512, 296); o.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: o.tex, toneMapped: false })); o.sprite.position.y = 4.25; o.sprite.scale.set(4.4, 2.54, 1); o.g.add(o.sprite);
   o.mast = new THREE.Group(); o.mast.add(new THREE.Mesh(mastG, poleM)); o.g.add(o.mast); o.spin = new THREE.Group(); o.spin.position.y = 3.7; for (let i = 0; i < 3; i++) { const arm = new THREE.Mesh(armG, M(0xd0d0d8, { metalness: 0.5 })); arm.rotation.y = i * Math.PI * 2 / 3; const cup = new THREE.Mesh(cupG, M(i ? 0xe8c040 : 0xd03020)); cup.position.set(1.5 * Math.cos(-i * Math.PI * 2 / 3), 0, 1.5 * Math.sin(-i * Math.PI * 2 / 3)); o.spin.add(arm, cup); }
   o.blur = new THREE.Mesh(new THREE.CircleGeometry(1.65, 32).rotateX(-Math.PI / 2), blurM); o.blur.position.y = 3.7; o.lamp = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 8), lampOff); o.lamp.position.y = 4.15; o.mast.add(o.spin, o.blur, o.lamp); o.g.visible = false; scene.add(o.g); return o; });
 let SPECS = [];
@@ -243,11 +275,11 @@ function placeSigns(pc, ac, k, dt) { if (frameN % 10 === 0 || !SPECS.length) { S
   for (const o of POOL) { if (!o.id) continue; const S = o.S; o.g.position.copy(chart(S.d, S.a)); o.mast.position.set(-Math.sin(S.a) * 4.5, 0, Math.cos(S.a) * 4.5); const rel = S.k / k, rps = 0.5 * rel, hz = rel;
     o.rot += dt * TS * 2 * Math.PI * rps; o.spin.rotation.y = -o.rot % (2 * Math.PI); const fast = rps * TS > 6; o.spin.visible = !fast; o.blur.visible = fast;
     o.lamp.material = hz * TS > 12 ? lampOn : ((tMap * S.k) % 1 < 0.2 ? lampOn : lampOff); o.lamp.scale.setScalar(hz > 12 ? 0.8 : 1); } }
-function drawSigns(k) { for (const o of POOL) { if (!o.id) continue; const S = o.S, g = o.tex.userData.c.getContext("2d"), rel = S.k / k; g.clearRect(0, 0, 512, 256); g.fillStyle = "rgba(16,14,22,.9)"; g.beginPath(); g.roundRect(0, 0, 512, 256, 18); g.fill();
+function drawSigns(k) { for (const o of POOL) { if (!o.id) continue; const S = o.S, g = o.tex.userData.c.getContext("2d"), rel = S.k / k; g.clearRect(0, 0, 512, 296); g.fillStyle = "rgba(16,14,22,.9)"; g.beginPath(); g.roundRect(0, 0, 512, 296, 18); g.fill();
     g.fillStyle = "#ffd060"; g.font = "bold 30px sans-serif"; g.fillText(S.name, 18, 40, 476); g.fillStyle = "#f2eadb"; g.font = "bold 48px monospace"; g.fillText(tod(tMap * S.k), 18, 98, 476); g.font = "24px sans-serif"; g.fillStyle = "#c8c0d8";
     g.fillText(`ticks at ${fmtRate(S.k)} of map time: 1 s = ${perSec(S.k)} far away`, 18, 140, 476);
     g.fillStyle = rel > 1.02 ? "#9ae08a" : rel < 0.98 ? "#e09a8a" : "#c8c0d8"; g.fillText(rel > 1.02 ? `seen from you: ${fmt(rel)}× faster than your clock` : rel < 0.98 ? `seen from you: ${fmt(1 / rel)}× slower than your clock` : "seen from you: about the same as your clock", 18, 178, 476);
-    g.fillStyle = "#e8b890"; g.fillText(`to stay put here: ${fmt(S.g / 9.81)} g`, 18, 216, 476); o.tex.needsUpdate = true; } }
+    g.fillStyle = "#e8b890"; g.fillText(`to stay put here: ${fmt(S.g / 9.81)} g`, 18, 216, 476); g.fillText(`tides, head to foot: ${fmt(S.tide / 9.81)} g`, 18, 254, 476); o.tex.needsUpdate = true; } }
 
 // ---------- the car ----------
 const car = new THREE.Group(); scene.add(car);
@@ -323,7 +355,7 @@ const BALLS = [], ballG = new THREE.SphereGeometry(0.35, 16, 12);
 let TS = 1, tsPrev = 1;
 const fmtTS = () => TS === 1 ? "real time" : TS < 1 ? `${fmt(1 / TS)}× slower than real time` : `${fmt(TS)}× faster than real time`;
 function setTS(v) { TS = Math.min(1e6, Math.max(1e-15, v)); say(`Time now runs ${fmtTS()} (for everything, your clock too). [ slower, ] faster, \\ real time, M slow motion for a fall.`); }
-function slowPreset() { if (TS !== 1) { setTS(1); return; } const pY = Math.max(0.5, toChart(headP).p), x0 = xOfP(pY), r0 = rs + x0, A = Math.sqrt(x0 / rs), B = { x0, r0, A, eH: 2 * Math.atan(A) };
+function slowPreset() { if (TS !== 1) { setTS(1); return; } if (Math.abs(toChart(headP).p - P_ISCO) < 3000) { setTS(15 * rateP(toChart(headP).p) / (R_ISCO * OMEGA)); say(`Slow motion for the orbit: time runs ${fmtTS()}, and the meteors drift past at about 15 m/s. ] speeds up, \\ real time.`); return; } const pY = Math.max(0.5, toChart(headP).p), x0 = xOfP(pY), r0 = rs + x0, A = Math.sqrt(x0 / rs), B = { x0, r0, A, eH: 2 * Math.atan(A) };
   setTS(ballT(B, 2 * Math.asin(Math.sqrt(x0 * (1 - FADE_X) / r0)), x0) * rateP(pY) / 7); }
 // the map time, after the drop, at which you see the ball at infall phase e (from where you stand now, xYou = your r - rs)
 function ballT(B, e, xYou) { const th = Math.tan(e / 2), x = Math.max(1e-300, B.x0 - B.r0 * Math.sin(e / 2) ** 2); return (rs / c) * (Math.log((B.A + th) / (B.A - th)) + B.A * (e + B.r0 / (2 * rs) * (e + Math.sin(e)))) + ((xYou - x) + rs * Math.log(xYou / x)) / c - ((xYou - B.x0) + rs * Math.log(xYou / B.x0)) / c; }
@@ -364,9 +396,10 @@ const MAPC = document.createElement("canvas"); MAPC.width = MAPC.height = 220; M
 const FACTS = `<b>The hole</b>: three times the Sun's mass (${fmt(Mbh, " kg")}), about the lightest black hole a dying star is likely to leave. Event horizon radius ${fmtLen(rs)} (its circumference is ${fmtLen(2 * Math.PI * rs)}): half of it rises from the ground as the black dome. Space round it is stretched along the radius: a tape from the horizon to where r = 1.5 rs reads ${fmtLen(P_PHOTON)}, not ${fmtLen(0.5 * rs)}. From far off its shadow looks ${fmtLen(2 * bcrit)} across. Hawking temperature ${fmt(T_HAWK, " K")}; it would take ${fmt(T_EVAP_YR, " years")} to evaporate.`;
 function drawPanel(p, k, r) { const g = GM / (r * r) / k, tide = 2 * GM * 1.7 / r ** 3, esc = Math.sqrt(2 * GM / r), S = inCar ? CAR : PL, st = streetAt(S.p, S.a);
   PANEL.innerHTML = `<div style="font-size:17px;font-weight:600;margin-bottom:4px">A stellar black hole in the neighbourhood</div><div style="color:#c8c0d8;font-size:12.5px">${FACTS}</div>
-    <div style="margin-top:8px"><b>Where you are</b>: ${fmtLen(p)} from the horizon by tape${st ? ", on " + st : ""} (Schwarzschild r is only ${fmtLen(r - rs)} above rs)<br>&middot; the hole's pull here: to stay put takes <b>${fmt(g / 9.81)} g</b> (you are held by the broken rule; you feel ordinary Earth gravity)<br>&middot; your clock <b>${tod(tYou)}</b>; map clock (far away) <b>${tod(tMap)}</b><br>&middot; your clock runs at <b>${fmtRate(k)}</b> of map time: each of your seconds is <b>${perSec(k)}</b> far away<br>&middot; you are behind map time by <b>${fmtT(tMap - tYou)}</b><br>&middot; light from far away reaches you ${fmt(1 / k)}× bluer and brighter (not shown); the outside world is squeezed into a circle ${(2 * Math.asin(Math.min(1, 1.5 * Math.sqrt(3) * k * rs / r)) * 180 / Math.PI).toFixed(k < 0.01 ? 2 : 1)}° across behind you</div>
-    <div style="margin-top:8px"><b>Clocks at other distances</b> (signs every 100 m on the main roads; spinners turn once every 2 s and lamps blink once a second, by their own time):<br>${[[1, "1 m"], [100, "100 m"], [MILE, "1 mile"], [5 * MILE, "5 miles"], [P_PHOTON, "Photon Sphere Avenue"], [P_ISCO, "Last Stable Orbit Blvd"]].map(([d, n]) => { const kk = rateP(d); return `&middot; ${n}: ${fmtRate(kk)}, reads ${tod(tMap * kk)}, looks ${kk / k > 1 ? fmt(kk / k) + "× faster" : fmt(k / kk) + "× slower"} from here, ${fmt(holdG(rOfP(d), kk) / 9.81)} g`; }).join("<br>")}</div>
+    <div style="margin-top:8px"><b>Where you are</b>: ${fmtLen(p)} from the horizon by tape${st ? ", on " + st : ""} (Schwarzschild r is only ${fmtLen(r - rs)} above rs)<br>&middot; the hole's pull here: to stay put takes <b>${fmt(g / 9.81)} g</b> (you are held by the broken rule; you feel ordinary Earth gravity)<br>&middot; its tides here: your head and feet would be pulled apart with <b>${fmt(tide / 9.81)} g</b>, and your sides squeezed with half that${tide > 1000 ? " (anything over about 100 g tears a person apart)" : tide > 30 ? " (enough to injure)" : ""}<br>&middot; your clock <b>${tod(tYou)}</b>; map clock (far away) <b>${tod(tMap)}</b><br>&middot; your clock runs at <b>${fmtRate(k)}</b> of map time: each of your seconds is <b>${perSec(k)}</b> far away<br>&middot; you are behind map time by <b>${fmtT(tMap - tYou)}</b><br>&middot; light from far away reaches you ${fmt(1 / k)}× bluer and brighter (not shown); the outside world is squeezed into a circle ${(2 * Math.asin(Math.min(1, 1.5 * Math.sqrt(3) * k * rs / r)) * 180 / Math.PI).toFixed(k < 0.01 ? 2 : 1)}° across behind you</div>
+    <div style="margin-top:8px"><b>Clocks at other distances</b> (signs every 100 m on the main roads; spinners turn once every 2 s and lamps blink once a second, by their own time):<br>${[[1, "1 m"], [100, "100 m"], [MILE, "1 mile"], [5 * MILE, "5 miles"], [P_PHOTON, "Photon Sphere Avenue"], [P_ISCO, "Last Stable Orbit Blvd"]].map(([d, n]) => { const kk = rateP(d); return `&middot; ${n}: ${fmtRate(kk)}, reads ${tod(tMap * kk)}, looks ${kk / k > 1 ? fmt(kk / k) + "× faster" : fmt(k / kk) + "× slower"} from here, pull ${fmt(holdG(rOfP(d), kk) / 9.81)} g, tides ${fmt(tideG(rOfP(d)) / 9.81)} g`; }).join("<br>")}</div>
     <div style="margin-top:8px;color:#c8c0d8;font-size:12.5px"><b>A second broken rule</b>: things near you are drawn as if their light travelled straight, so you can see them. Here light bends on a curve of radius ${fmtLen(c * c / Math.max(g, 1e-9))}${c * c / g < 2000 ? `: in truth, light from anything more than about ${fmtLen(1.5 * c * c / g)} to the side falls into the hole before it reaches you, and you would see almost nothing of the scene` : c * c / g < 2e5 ? `, so over 100 m the picture is off by about ${(100 / (2 * c * c / g) * 180 / Math.PI).toFixed(1)}°` : ", so the error is small"}. The far view (beyond about 500 m) is drawn with the bending.</div>
+    ${Math.abs(p - P_ISCO) < 3000 ? `<div style="margin-top:8px"><b>The last stable orbit</b>: meteors 5 m above the boulevard's median go round in ${fmtTiny(ORB_T * K_ISCO)} of local time at ${(V_LOC / c).toFixed(2)} c, ${Math.round(1 / (ORB_T * K_ISCO))} orbits a second; ${fmt(tMap / ORB_T)} orbits since you arrived. M slows time to watch them.</div>` : ""}
     <div style="margin-top:8px"><b>Time</b> runs ${fmtTS()}: each real second shows ${fmtTiny(TS)} of your time and ${fmtTiny(TS / k)} of map time. [ slower, ] faster, \\ real time, M slow motion for a fall.</div>
     ${BALLS.length ? `<div style="margin-top:8px"><b>Falling</b>: ${BALLS.map(B => `${B.obj ? "the " + B.obj.name : "a ball"} ${fmtLen(B.p)} from the horizon${B.op < 0.5 ? ", frozen at the edge and fading" : ""}`).join("; ")}. From outside you never see anything cross the horizon.</div>` : ""}
     <div style="margin-top:8px;color:#e8b890;font-size:12.5px"><b>What would really happen</b> (the rule broken here: the ground, houses, air and you are held in place). To hold still here takes ${fmt(g, " m/s²")}, ${fmt(g / 9.81)} times Earth's gravity; escape takes ${(esc / c * 100).toFixed(1)}% of the speed of light; the stretch between your head and feet is ${fmt(tide, " m/s²")} (people are torn apart above about 1,000 m/s²; that is reached ${fmtLen(Math.cbrt(2 * GM * 1.7 / 1000))} from the centre). The Earth itself would be torn up and swallowed in minutes.</div>
@@ -403,13 +436,13 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.1), vr
   camera.getWorldPosition(headP); const H = toChart(headP); H.p = Math.max(0.3, H.p); const xh = xOfP(H.p), rh = rs + xh, k = Math.sqrt(xh / rh);
   farMat.uniforms.camS.value.set(rh * Math.cos(H.a) / 1000, headP.y / 1000, rh * Math.sin(H.a) / 1000); farMat.uniforms.camX.value = xh / 1000;
   const dtMap = started ? dt * TS / k : 0; if (started) { tYou += dt * TS; tMap += dtMap; } objStep(dt);
-  moversStep(Y.p, Y.a); planesStep(dtMap, Y.p);
+  moversStep(Y.p, Y.a); planesStep(dtMap, Y.p); orbitStep(Y.p, Y.a, dtMap);
   vigS += ((vr && ((inCar && RIDE.on) || (!inCar && (mx || my))) ? (inCar ? 0.95 : 0.8) : 0) - vigS) * Math.min(1, dt * 4); vig.material.uniforms.s.value = vigS; vig.visible = vigS > 0.01;
   farView.position.copy(headP);
   const rc = Y.p + c0, moved = B => Math.hypot(Y.p - B.p, rc * angDist(Y.a, B.a));
   if (moved(GB) > 140) drawNear(Y.p, Y.a); if (moved(OB) > 25) fillNear(Y.p, Y.a);
   groundG.position.set((c0 - GB.C) * Math.cos(GB.a), 0, (c0 - GB.C) * Math.sin(GB.a)); objG.position.set((c0 - OB.C) * Math.cos(OB.a), 0, (c0 - OB.C) * Math.sin(OB.a));
   placeSigns(Y.p, Y.a, k, dt); ballStep(dt, H.p, k); vrPanel.visible = vr && !inCar;
-  if (frameN % 6 === 0) { drawDash(H.p, k); drawSigns(k); if (!vr) { drawPanel(H.p, k, rh); camera.getWorldDirection(fwd); drawMap(Y, Math.atan2(fwd.x, -fwd.z)); } else drawVR(H.p, k); }
+  if (frameN % 6 === 0) { drawDash(H.p, k); drawSigns(k); if (BOARDS.some(b => b.visible)) drawBoard(); if (!vr) { drawPanel(H.p, k, rh); camera.getWorldDirection(fwd); drawMap(Y, Math.atan2(fwd.x, -fwd.z)); } else drawVR(H.p, k); }
   msgT -= dt; if (msgT <= 0 && MSG.style.display !== "none") { MSG.style.display = "none"; lastMsg = ""; }
   renderer.render(scene, camera); });

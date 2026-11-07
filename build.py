@@ -571,12 +571,15 @@ SH = SH[:i0] + """<div id="intro"><div class="card">
   <h1>A stellar black hole in the neighbourhood</h1>
   <p>A black hole of three times the Sun's mass, about the lightest a dying star is likely to leave, sits in a suburb. Its event horizon is
   8.86 km in radius: half of it rises out of the ground as a black dome 17.7 km across, and the streets ring it, from Horizon Drive at its
-  foot, past Photon Sphere Avenue (where light can circle the hole, 13.5 km out) and Last Stable Orbit Boulevard (31.9 km), to 34 km.</p>
+  foot, past Photon Sphere Avenue (where light can circle the hole, 13.5 km out) and Last Stable Orbit Boulevard (31.9 km), to 34 km.
+  On the boulevard, a major road, meteors ride the last stable orbit above the median, one every 100 yards, at half the speed of light:
+  a glowing blur in real time, rocks streaming past when you slow time. Billboards there tell how fast an orbit goes and how many there
+  are each second.</p>
   <p>You start by the rail at its foot, 6 m from the horizon by tape, where your clock runs at 0.034% of the time far away (the map
   clock): each of your seconds is 49 minutes out there. Space near the hole is stretched: those 6 m of tape are 1 mm of the Schwarzschild
   radius, and every distance here is a tape-measured one. A white line marks where the horizon meets the ground, and a field 100 m wide
   is lined every 5 m like a football field. Clock signs along the four main roads show the time at 1, 2, 5, 10, 20 and 50 m, then
-  every 100 m and every mile, with the pull it takes to stay put there; on each, a spinner and a lamp run at that place's own pace, so
+  every 100 m and every mile, with the pull it takes to stay put there and the tides that would stretch a person; on each, a spinner and a lamp run at that place's own pace, so
   from near the horizon the farther ones race and the nearer ones crawl. Pick up the things lying about and let go: near the horizon they are
   gone before you could see them leave your hand; slow time (or M) and watch them freeze and fade at the edge, never seen to cross. So close, nearly all light from outside falls in: the world is squeezed into a bright dot behind
   you. Ride the car out along its track and watch the sky open and the clocks speed up. People walk the field and the streets, cars
