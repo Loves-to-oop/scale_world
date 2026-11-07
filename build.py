@@ -596,6 +596,28 @@ out20 = HERE / "stellarhole.html"
 out20.write_text(SH.replace("__THREE__", three).replace("__SCENE__", (HERE / "stellarhole.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out20.name}, {out20.stat().st_size // 1024} KB")
 
+# Betelgeuse from 30 AU, from a ship's cupola
+BG = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Betelgeuse: a red supergiant, from 30 AU</title>").replace("background:#c8d4d8", "background:#0a0810")
+i0, i1 = BG.index('<div id="intro">'), BG.index('<button id="vr">')
+BG = BG[:i0] + """<div id="intro"><div class="card">
+  <h1>Betelgeuse, from 30 AU</h1>
+  <p>Betelgeuse, the red shoulder of Orion, is a red supergiant near the end of its life: about 760 times the Sun's width (in our Solar
+  System it would reach past Mars), only 3,600 K at its surface but 126,000 times as bright as the Sun, and it should explode as a
+  supernova within about 100,000 years. You are in the glass cupola of a ship 30 AU from it, on the side facing the Sun.</p>
+  <p>It is no smooth red ball: a few enormous convection cells churn its surface, its edge is uneven and darkens to red, a faint
+  atmosphere glows round it, and clumps of dust drift farther out. Its probable companion, Siwarha, a young star of about the Sun's
+  mass, circles inside its outer atmosphere every 5.8 years. The sky is the real sky from there, recomputed from a star catalogue:
+  Rigel is the brightest star, Orion's belt stars blaze, and the Sun is too faint to see.</p>
+  <p>Drag to look &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk round the cupola &nbsp;&middot;&nbsp; <kbd>H</kbd> labels &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time<br>
+  In VR: left stick walk, right stick turn, <b>B</b> labels, <b>A</b> speed up time.</p>
+  <p class="dim">Sizes, temperature, brightness and distance are measured (with real uncertainties, given in the panel); the surface pattern, glow and dust
+  are typical, not maps; the companion is a 2025 detection, not yet certain. Stars: AT-HYG v3.2 (Gaia DR3 distances where available). Click to begin.</p>
+</div></div>
+""" + BG[i1:]
+out21 = HERE / "betelgeuse.html"
+out21.write_text(BG.replace("__THREE__", three).replace("__SCENE__", (HERE / "betelgeuse_sky.js").read_text(encoding="utf-8") + (HERE / "betelgeuse.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out21.name}, {out21.stat().st_size // 1024} KB")
+
 # ---- the fourteenth page: an antimatter starship at 1 g ------------------------------------------------------------------
 SS = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Starship: 1 g to the stars</title>").replace("background:#c8d4d8", "background:#05080c")
 i0, i1 = SS.index('<div id="intro">'), SS.index('<button id="vr">')
