@@ -564,6 +564,28 @@ out19 = HERE / "blackhole.html"
 out19.write_text(BH.replace("__THREE__", three).replace("__SCENE__", (HERE / "blackhole.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out19.name}, {out19.stat().st_size // 1024} KB")
 
+# A stellar black hole (three solar masses) in a suburb
+SH = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>A stellar black hole in the neighbourhood</title>").replace("background:#c8d4d8", "background:#1a1612")
+i0, i1 = SH.index('<div id="intro">'), SH.index('<button id="vr">')
+SH = SH[:i0] + """<div id="intro"><div class="card">
+  <h1>A stellar black hole in the neighbourhood</h1>
+  <p>A black hole of three times the Sun's mass, about the lightest a dying star is likely to leave, sits in a suburb. Its event horizon is
+  8.86 km in radius: half of it rises out of the ground as a black dome 17.7 km across and 8.9 km high, and the streets ring it, from
+  Horizon Drive at its foot, past Photon Sphere Avenue (where light can circle the hole) and Last Stable Orbit Boulevard, out to 31 km.</p>
+  <p>Drive toward it and watch your clock fall behind the map clock (the time far away): at 9 km from the horizon your clock runs at 71%,
+  at 900 m 30%, and by the rail at its foot about 5%. Clock towers along East Road show the time at each distance. Look up and around:
+  the far side of the neighbourhood is wrapped round the dome by the bending of light. One rule is broken on purpose: the ground, the
+  houses, the air and you are held in place. The panel says what would really happen.</p>
+  <p>In the car: <kbd>W</kbd> / <kbd>S</kbd> faster or slower &nbsp;&middot;&nbsp; <kbd>A</kbd> / <kbd>D</kbd> steer &nbsp;&middot;&nbsp; space stop &nbsp;&middot;&nbsp; <kbd>E</kbd> get out or in &nbsp;&middot;&nbsp; drag to look<br>
+  In VR: left stick steer, push it up or down for faster or slower; right stick turn; <b>A</b> get out or in.</p>
+  <p class="dim">Schwarzschild spacetime: clock rates sqrt(1 - rs/r); the light of the far view is followed along its bent path (Binet's equation)
+  for every pixel; near you, within about 500 m, the bending is small and things are drawn straight. Click to begin.</p>
+</div></div>
+""" + SH[i1:]
+out20 = HERE / "stellarhole.html"
+out20.write_text(SH.replace("__THREE__", three).replace("__SCENE__", (HERE / "stellarhole.js").read_text(encoding="utf-8")), encoding="utf-8")
+print(f"  wrote {out20.name}, {out20.stat().st_size // 1024} KB")
+
 # ---- the fourteenth page: an antimatter starship at 1 g ------------------------------------------------------------------
 SS = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Starship: 1 g to the stars</title>").replace("background:#c8d4d8", "background:#05080c")
 i0, i1 = SS.index('<div id="intro">'), SS.index('<button id="vr">')
