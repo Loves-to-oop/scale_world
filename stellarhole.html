@@ -22,11 +22,11 @@
   radius, and every distance here is a tape-measured one. A white line marks where the horizon meets the ground, and a field 100 m wide
   is lined every 5 m like a football field. Clock signs along the four main roads show the time at 1, 2, 5, 10, 20 and 50 m, then
   every 100 m and every mile, with the pull it takes to stay put there; on each, a spinner and a lamp run at that place's own pace, so
-  from near the horizon the farther ones race and the nearer ones crawl. Drop a ball (G) and watch it freeze and fade at the edge: from
-  outside you never see it cross. So close, nearly all light from outside falls in: the world is squeezed into a bright dot behind
+  from near the horizon the farther ones race and the nearer ones crawl. Let go of a ball (G): near the horizon it is gone before you
+  could see it leave your hand; in slow motion (M) you watch it freeze and fade at the edge, never seen to cross. So close, nearly all light from outside falls in: the world is squeezed into a bright dot behind
   you. Drive out and watch the sky open and the clocks speed up. One rule is broken on purpose: the ground, the houses, the air and you are held in place. The panel says what would really happen.</p>
-  <p>On foot: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk, shift run &nbsp;&middot;&nbsp; <kbd>E</kbd> get in or out of the car &nbsp;&middot;&nbsp; <kbd>G</kbd> drop a ball &nbsp;&middot;&nbsp; In the car: <kbd>W</kbd> / <kbd>S</kbd> faster or slower, <kbd>A</kbd> / <kbd>D</kbd> steer, space stop &nbsp;&middot;&nbsp; drag to look<br>
-  In VR: left stick walk (hold the left trigger to run) or, in the car, steer and push up or down for faster or slower; right stick turn; <b>A</b> get in or out; <b>B</b> drop a ball.</p>
+  <p>On foot: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk, shift run &nbsp;&middot;&nbsp; <kbd>E</kbd> get in or out of the car &nbsp;&middot;&nbsp; <kbd>G</kbd> let go of a ball, <kbd>M</kbd> slow motion &nbsp;&middot;&nbsp; In the car: <kbd>W</kbd> / <kbd>S</kbd> faster or slower, <kbd>A</kbd> / <kbd>D</kbd> steer, space stop &nbsp;&middot;&nbsp; drag to look<br>
+  In VR: left stick walk (hold the left trigger to run) or, in the car, steer and push up or down for faster or slower; right stick turn; <b>A</b> get in or out; <b>B</b> let go of a ball, <b>X</b> slow motion.</p>
   <p class="dim">Schwarzschild spacetime: clock rates sqrt(1 - rs/r); distances are proper distances for things held still; the light of the far
   view is followed along its bent path (Binet's equation) for every pixel; near you, within about 500 m, things are drawn in a flat chart
   of tape-measured distances. Click to begin.</p>
@@ -53116,6 +53116,7 @@ const fmt = (v, u = "") => { const a = Math.abs(v); if (a === 0) return "0" + u;
 const fmtLen = r => r >= 1000 ? (r / 1000).toFixed(r >= 1e4 ? 2 : 3) + " km" : r >= 1 ? r.toFixed(r >= 10 ? 0 : 1) + " m" : r >= 0.001 ? (r * 1000).toFixed(r >= 0.01 ? 0 : 1) + " mm" : (r * 1e6).toFixed(1) + " µm";
 const fmtT = s => { if (s < 60) return s.toFixed(2) + " s"; if (s < 3600) { const m = Math.floor(s / 60); return m + " min " + Math.floor(s - m * 60) + " s"; } if (s < 86400) { const h = Math.floor(s / 3600); return h + " h " + Math.floor((s - h * 3600) / 60) + " min"; } const d = Math.floor(s / 86400); return d + " d " + Math.floor((s - d * 86400) / 3600) + " h"; };
 const fmtRate = k => (k * 100).toFixed(k < 0.001 ? 4 : k < 0.01 ? 3 : 2) + "%";
+const fmtTiny = s => s >= 1 ? fmtT(s) : s >= 1e-3 ? (s * 1e3).toPrecision(3) + " ms" : s >= 1e-6 ? (s * 1e6).toPrecision(3) + " µs" : s >= 1e-9 ? (s * 1e9).toPrecision(3) + " ns" : (s * 1e12).toPrecision(3) + " ps";
 const perSec = k => { const s = 1 / k; return s < 120 ? s.toFixed(1) + " s" : fmtT(s); };
 
 // ---------- the neighbourhood, in tape-measured distance p from the horizon ----------
@@ -53309,7 +53310,7 @@ function drawDash(p, k) { const g = dashT.userData.c.getContext("2d"); g.fillSty
 // ---------- moving about ----------
 let yaw = Math.PI / 4, pitch = 0.05; const keys = {}; let vrYaw = 0;
 addEventListener("keydown", e => { keys[e.code] = true; if (!started) return;
-  if (e.code === "KeyE") toggleCar(); if (e.code === "KeyG") dropBall();
+  if (e.code === "KeyE") toggleCar(); if (e.code === "KeyG") dropBall(); if (e.code === "KeyM") { slowMo = !slowMo; say(slowMo ? "Slow motion on: dropped balls (G) now take a few seconds to fall and fade." : "Real time: dropped balls vanish as fast as they really would."); }
   if (inCar && (e.code === "KeyW" || e.code === "ArrowUp")) gear = Math.min(SPEEDS.length - 1, gear + 1);
   if (inCar && (e.code === "KeyS" || e.code === "ArrowDown")) gear = Math.max(0, gear - 1);
   if (inCar && e.code === "Space") gear = 0; });
@@ -53331,18 +53332,25 @@ if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { i
 // It is not held by the broken rule: it falls freely, straight in. Radial infall from rest at r0 (Misner, Thorne & Wheeler 25.37):
 // r = r0 (1 + cos e)/2; its own time tau = sqrt(r0^3 / (2 rs c^2)) (e + sin e); map time t = (rs/c) [ln((A + tan(e/2)) / (A - tan(e/2)))
 // + A (e + (r0 / 2rs)(e + sin e))] with A = sqrt(r0/rs - 1), which runs to infinity at the horizon. What you see is delayed by the
-// light's travel back out to you (the tortoise coordinate r + rs ln(r/rs - 1)). It all takes microseconds, so it is shown slowed.
-const DEMO_RATE = 4e-5, BALLS = [], ballG = new THREE.SphereGeometry(0.35, 16, 12); let demoT = 0;
+// light's travel back out to you (the tortoise coordinate r + rs ln(r/rs - 1)). By default it runs in real time, your time: near the
+// horizon the pull is so enormous that the ball is gone before you could see it leave your hand. M (X in VR) slows it down so that
+// each fall takes a few seconds to watch.
+const BALLS = [], ballG = new THREE.SphereGeometry(0.35, 16, 12); let slowMo = false;
+// the map time, after the drop, at which you see the ball at infall phase e (from where you stand now, xYou = your r - rs)
+function ballT(B, e, xYou) { const th = Math.tan(e / 2), x = Math.max(1e-300, B.x0 - B.r0 * Math.sin(e / 2) ** 2); return (rs / c) * (Math.log((B.A + th) / (B.A - th)) + B.A * (e + B.r0 / (2 * rs) * (e + Math.sin(e)))) + ((xYou - x) + rs * Math.log(xYou / x)) / c - ((xYou - B.x0) + rs * Math.log(xYou / B.x0)) / c; }
+const FADE_X = (0.02 / 1.6) ** 2;
 function dropBall() { if (!started) return; if (BALLS.length > 5) { const B = BALLS.shift(); scene.remove(B.mesh); }
   const f = V3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())), at = headP.clone().addScaledVector(f.setY(0).normalize(), 1.2), C = toChart(at), p0 = Math.max(0.5, C.p), x0 = xOfP(p0), r0 = rs + x0, A = Math.sqrt(x0 / rs), eH = 2 * Math.atan(A);
   const mesh = new THREE.Mesh(ballG, new THREE.MeshStandardMaterial({ color: 0xff8a20, emissive: 0x401800, transparent: true })); scene.add(mesh);
-  BALLS.push({ mesh, a: C.a, y: Math.max(0.6, at.y - 0.3), x0, r0, A, eH, xYou: x0, born: demoT, p: p0, op: 1, tauH: Math.sqrt(r0 ** 3 / (2 * rs * c * c)) * (eH + Math.sin(eH)) });
-  say(`You dropped a ball. It is not held, so it falls straight toward the hole, shown in slow motion (each real second shows ${fmt(DEMO_RATE * 1e6)} µs of map time, which is ${fmt(DEMO_RATE * rateP(Math.max(0.5, toChart(headP).p)) * 1e9)} ns of your own time). It speeds up, then seems to slow, redden and freeze at the white line, fading out: from outside you never see it cross the horizon, though on its own clock it crosses ${fmt(BALLS[BALLS.length - 1].tauH * 1e6)} µs after you let go.`); }
-function ballStep(dt, pYou, kYou) { if (!BALLS.length) return; demoT += dt * DEMO_RATE; const xYou = xOfP(pYou);
-  for (let i = BALLS.length - 1; i >= 0; i--) { const B = BALLS[i], T = demoT - B.born, xa = e => B.x0 - B.r0 * Math.sin(e / 2) ** 2;
-    const tObs = e => { const th = Math.tan(e / 2), x = xa(e); return (rs / c) * (Math.log((B.A + th) / (B.A - th)) + B.A * (e + B.r0 / (2 * rs) * (e + Math.sin(e)))) + ((xYou - x) + rs * Math.log(xYou / x)) / c - ((xYou - B.x0) + rs * Math.log(xYou / B.x0)) / c; };
-    let lo = 0, hi = B.eH * (1 - 1e-12); for (let it = 0; it < 70; it++) { const mid = 0.5 * (lo + hi); if (tObs(mid) < T) lo = mid; else hi = mid; }
-    const x = Math.max(1e-300, xa(lo)); B.p = pOfR(rs + x); B.op = Math.min(1, Math.sqrt(x / B.x0) * 1.6); B.mesh.position.copy(chart(B.p, B.a, B.y));
+  const B = { mesh, a: C.a, y: Math.max(0.6, at.y - 0.3), x0, r0, A, eH, T: 0, p: p0, op: 1, tauH: Math.sqrt(r0 ** 3 / (2 * rs * c * c)) * (eH + Math.sin(eH)) }, kYou = rateP(Math.max(0.5, toChart(headP).p));
+  B.tFade = ballT(B, 2 * Math.asin(Math.sqrt(x0 * (1 - FADE_X) / r0)), xOfP(Math.max(0.5, toChart(headP).p))); B.rate = B.tFade / 7; BALLS.push(B);
+  const yours = B.tFade * kYou, slowNote = `each real second shows ${fmtTiny(B.rate * kYou)} of your time (${fmtTiny(B.rate)} of map time)`;
+  say(slowMo ? `You dropped a ball, in slow motion: ${slowNote}. It is not held, so it falls straight toward the hole, speeds up, then seems to slow, redden and freeze at the white line, fading out: from outside you never see it cross the horizon. On its own clock it crosses ${fmtTiny(B.tauH)} after you let go; in your own time the whole fall and fade lasts ${fmtTiny(yours)}. M for real time.`
+    : `You let go of a ball${yours < 0.05 ? ", and it was gone before you could see it leave your hand" : ""}. The pull here is so strong that, in your own time, it fell to the horizon's edge and its image froze and faded in ${fmtTiny(yours)}${yours < 0.05 ? " (the eye needs about 50 ms to see anything)" : ""}. On its own clock it crossed the horizon ${fmtTiny(B.tauH)} after you let go; from outside you never see it cross. Press M for slow motion and drop another.`); }
+function ballStep(dt, pYou, kYou) { if (!BALLS.length) return; const xYou = xOfP(pYou);
+  for (let i = BALLS.length - 1; i >= 0; i--) { const B = BALLS[i]; B.T += slowMo ? dt * B.rate : dt / kYou;
+    let lo = 0, hi = B.eH * (1 - 1e-12); for (let it = 0; it < 70; it++) { const mid = 0.5 * (lo + hi); if (ballT(B, mid, xYou) < B.T) lo = mid; else hi = mid; }
+    const x = Math.max(1e-300, B.x0 - B.r0 * Math.sin(lo / 2) ** 2); B.p = pOfR(rs + x); B.op = Math.min(1, Math.sqrt(x / B.x0) * 1.6); B.mesh.position.copy(chart(B.p, B.a, B.y));
     B.mesh.material.opacity = B.op; B.mesh.material.color.setRGB(1, 0.54 * B.op, 0.12 * B.op); if (B.op < 0.02) { scene.remove(B.mesh); BALLS.splice(i, 1); } } }
 
 // ---------- the panel ----------
@@ -53356,7 +53364,7 @@ function drawPanel(p, k, r) { const g = GM / (r * r) / k, tide = 2 * GM * 1.7 / 
     <div style="margin-top:8px"><b>Where you are</b>: ${fmtLen(p)} from the horizon by tape${st ? ", on " + st : ""} (Schwarzschild r is only ${fmtLen(r - rs)} above rs)<br>&middot; the hole's pull here: to stay put takes <b>${fmt(g / 9.81)} g</b> (you are held by the broken rule; you feel ordinary Earth gravity)<br>&middot; your clock <b>${tod(tYou)}</b>; map clock (far away) <b>${tod(tMap)}</b><br>&middot; your clock runs at <b>${fmtRate(k)}</b> of map time: each of your seconds is <b>${perSec(k)}</b> far away<br>&middot; you are behind map time by <b>${fmtT(tMap - tYou)}</b><br>&middot; light from far away reaches you ${fmt(1 / k)}× bluer and brighter (not shown); the outside world is squeezed into a circle ${(2 * Math.asin(Math.min(1, 1.5 * Math.sqrt(3) * k * rs / r)) * 180 / Math.PI).toFixed(k < 0.01 ? 2 : 1)}° across behind you</div>
     <div style="margin-top:8px"><b>Clocks at other distances</b> (signs every 100 m on the main roads; spinners turn once every 2 s and lamps blink once a second, by their own time):<br>${[[1, "1 m"], [100, "100 m"], [MILE, "1 mile"], [5 * MILE, "5 miles"], [P_PHOTON, "Photon Sphere Avenue"], [P_ISCO, "Last Stable Orbit Blvd"]].map(([d, n]) => { const kk = rateP(d); return `&middot; ${n}: ${fmtRate(kk)}, reads ${tod(tMap * kk)}, looks ${kk / k > 1 ? fmt(kk / k) + "× faster" : fmt(k / kk) + "× slower"} from here, ${fmt(holdG(rOfP(d), kk) / 9.81)} g`; }).join("<br>")}</div>
     <div style="margin-top:8px;color:#c8c0d8;font-size:12.5px"><b>A second broken rule</b>: things near you are drawn as if their light travelled straight, so you can see them. Here light bends on a curve of radius ${fmtLen(c * c / Math.max(g, 1e-9))}${c * c / g < 2000 ? `: in truth, light from anything more than about ${fmtLen(1.5 * c * c / g)} to the side falls into the hole before it reaches you, and you would see almost nothing of the scene` : c * c / g < 2e5 ? `, so over 100 m the picture is off by about ${(100 / (2 * c * c / g) * 180 / Math.PI).toFixed(1)}°` : ", so the error is small"}. The far view (beyond about 500 m) is drawn with the bending.</div>
-    ${BALLS.length ? `<div style="margin-top:8px"><b>Dropped balls</b> (slow motion: each real second shows ${fmt(DEMO_RATE * 1e6)} µs of map time): ${BALLS.map(B => `${fmtLen(B.p)} from the horizon, ${B.op < 0.5 ? "frozen at the edge and fading" : "falling"}`).join("; ")}. On its own clock each crosses the horizon ${fmt(BALLS[0].tauH * 1e6)} µs after it is dropped; from outside you never see it cross.</div>` : ""}
+    ${BALLS.length ? `<div style="margin-top:8px"><b>Dropped balls</b> (slow motion, M: each real second shows ${fmtTiny(BALLS[0].rate * k)} of your time): ${BALLS.map(B => `${fmtLen(B.p)} from the horizon, ${B.op < 0.5 ? "frozen at the edge and fading" : "falling"}`).join("; ")}. On its own clock each crosses the horizon ${fmtTiny(BALLS[0].tauH)} after it is dropped; from outside you never see it cross.</div>` : ""}
     <div style="margin-top:8px;color:#e8b890;font-size:12.5px"><b>What would really happen</b> (the rule broken here: the ground, houses, air and you are held in place). To hold still here takes ${fmt(g, " m/s²")}, ${fmt(g / 9.81)} times Earth's gravity; escape takes ${(esc / c * 100).toFixed(1)}% of the speed of light; the stretch between your head and feet is ${fmt(tide, " m/s²")} (people are torn apart above about 1,000 m/s²; that is reached ${fmtLen(Math.cbrt(2 * GM * 1.7 / 1000))} from the centre). The Earth itself would be torn up and swallowed in minutes.</div>
     <div style="margin-top:8px;color:#c8c0d8;font-size:12.5px">${inCar ? "Driving: W / S faster or slower, A / D steer, space stop, E get out." : "Walking: WASD, shift to run, E get in the car (within 5 m)."} Drag to look.</div>`; }
 function drawMap(S, h) { const g = MAPC.getContext("2d"), W = 220, sc = W / 2 / EXT, X = v => W / 2 + v * sc; g.clearRect(0, 0, W, W);
@@ -53367,7 +53375,7 @@ function drawVR(p, k) { const g = vrC.getContext("2d"); g.clearRect(0, 0, 1024, 
   g.fillStyle = "#f0e8dc"; g.font = "30px sans-serif"; g.fillText(`you ${tod(tYou)}   map ${tod(tMap)}`, 24, 100, 980); g.fillText(`each of your seconds is ${perSec(k)} far away`, 24, 145, 980);
   if (lastMsg && msgT > 0) { g.fillStyle = "#ffc870"; g.font = "24px sans-serif"; let ln = "", y = 200; for (const w of lastMsg.replace(/<[^>]+>/g, "").split(" ")) { if (g.measureText(ln + w).width > 970) { g.fillText(ln, 24, y); y += 31; ln = ""; if (y > 540) break; } ln += w + " "; } if (y <= 540) g.fillText(ln, 24, y); } vrT.needsUpdate = true; }
 function start() { if (started) return; started = true; T0 = Date.now(); document.getElementById("intro")?.classList.add("gone"); PANEL.style.display = "block"; MAPC.style.display = "block";
-  say(`You are standing 6 m (by tape) from the event horizon of a black hole of three solar masses. The black wall is its edge; the white line on the grass is where it meets the ground. Your clock runs at ${fmtRate(rateP(6))} of the time far away: each of your seconds is ${perSec(rateP(6))} out there. So close, almost all light from outside falls in: behind you the whole world is squeezed into a tiny bright dot. The field is lined every 5 m; clock signs show the time at each distance, then a mile marker every mile. Spinners and lamps on the clock signs run at their own pace: from here the farther ones look faster. Press G to drop a ball toward the horizon. Your car is beside you (E to get in).`); }
+  say(`You are standing 6 m (by tape) from the event horizon of a black hole of three solar masses. The black wall is its edge; the white line on the grass is where it meets the ground. Your clock runs at ${fmtRate(rateP(6))} of the time far away: each of your seconds is ${perSec(rateP(6))} out there. So close, almost all light from outside falls in: behind you the whole world is squeezed into a tiny bright dot. The field is lined every 5 m; clock signs show the time at each distance, then a mile marker every mile. Spinners and lamps on the clock signs run at their own pace: from here the farther ones look faster. Press G to let go of a ball (M for slow motion). Your car is beside you (E to get in).`); }
 document.getElementById("intro")?.addEventListener("click", start);
 
 // ---------- the loop ----------
@@ -53375,7 +53383,7 @@ const clock = new THREE.Clock(), fwd = V3(0, 0, 0), headP = V3(0, 0, 0); let fra
 renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.1), vr = renderer.xr.isPresenting; frameN++;
   let mx = 0, my = 0, steer = 0, vrRun = false;
   if (vr) { const s = renderer.xr.getSession(); for (const src of s ? s.inputSources : []) { const gp = src.gamepad; if (!gp) continue; const a = gp.axes, ax = a.length >= 4 ? 2 : 0;
-      if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; vrRun = !!gp.buttons[0]?.pressed;
+      if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; vrRun = !!gp.buttons[0]?.pressed; const bX = gp.buttons[4]?.pressed; if (bX && !prevB.x) { slowMo = !slowMo; say(slowMo ? "Slow motion on for dropped balls." : "Real time for dropped balls."); } prevB.x = bX;
         if (inCar) { steer = -mx; if (my < -0.75 && !prevB.up) { gear = Math.min(SPEEDS.length - 1, gear + 1); prevB.up = true; } else if (my > -0.3) prevB.up = false; if (my > 0.75 && !prevB.dn) { gear = Math.max(0, gear - 1); prevB.dn = true; } else if (my < 0.3) prevB.dn = false; } }
       else { const tx = a[ax] || 0; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const bA = gp.buttons[4]?.pressed; if (bA && !prevB.a) toggleCar(); prevB.a = bA; const bB = gp.buttons[5]?.pressed; if (bB && !prevB.b) dropBall(); prevB.b = bB; } } }
   else { if (!inCar) { if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD) mx += 1; if (keys.KeyA) mx -= 1; } else { if (keys.KeyA || keys.ArrowLeft) steer += 1; if (keys.KeyD || keys.ArrowRight) steer -= 1; } }

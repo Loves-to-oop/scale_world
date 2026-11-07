@@ -577,11 +577,11 @@ SH = SH[:i0] + """<div id="intro"><div class="card">
   radius, and every distance here is a tape-measured one. A white line marks where the horizon meets the ground, and a field 100 m wide
   is lined every 5 m like a football field. Clock signs along the four main roads show the time at 1, 2, 5, 10, 20 and 50 m, then
   every 100 m and every mile, with the pull it takes to stay put there; on each, a spinner and a lamp run at that place's own pace, so
-  from near the horizon the farther ones race and the nearer ones crawl. Drop a ball (G) and watch it freeze and fade at the edge: from
-  outside you never see it cross. So close, nearly all light from outside falls in: the world is squeezed into a bright dot behind
+  from near the horizon the farther ones race and the nearer ones crawl. Let go of a ball (G): near the horizon it is gone before you
+  could see it leave your hand; in slow motion (M) you watch it freeze and fade at the edge, never seen to cross. So close, nearly all light from outside falls in: the world is squeezed into a bright dot behind
   you. Drive out and watch the sky open and the clocks speed up. One rule is broken on purpose: the ground, the houses, the air and you are held in place. The panel says what would really happen.</p>
-  <p>On foot: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk, shift run &nbsp;&middot;&nbsp; <kbd>E</kbd> get in or out of the car &nbsp;&middot;&nbsp; <kbd>G</kbd> drop a ball &nbsp;&middot;&nbsp; In the car: <kbd>W</kbd> / <kbd>S</kbd> faster or slower, <kbd>A</kbd> / <kbd>D</kbd> steer, space stop &nbsp;&middot;&nbsp; drag to look<br>
-  In VR: left stick walk (hold the left trigger to run) or, in the car, steer and push up or down for faster or slower; right stick turn; <b>A</b> get in or out; <b>B</b> drop a ball.</p>
+  <p>On foot: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk, shift run &nbsp;&middot;&nbsp; <kbd>E</kbd> get in or out of the car &nbsp;&middot;&nbsp; <kbd>G</kbd> let go of a ball, <kbd>M</kbd> slow motion &nbsp;&middot;&nbsp; In the car: <kbd>W</kbd> / <kbd>S</kbd> faster or slower, <kbd>A</kbd> / <kbd>D</kbd> steer, space stop &nbsp;&middot;&nbsp; drag to look<br>
+  In VR: left stick walk (hold the left trigger to run) or, in the car, steer and push up or down for faster or slower; right stick turn; <b>A</b> get in or out; <b>B</b> let go of a ball, <b>X</b> slow motion.</p>
   <p class="dim">Schwarzschild spacetime: clock rates sqrt(1 - rs/r); distances are proper distances for things held still; the light of the far
   view is followed along its bent path (Binet's equation) for every pixel; near you, within about 500 m, things are drawn in a flat chart
   of tape-measured distances. Click to begin.</p>
