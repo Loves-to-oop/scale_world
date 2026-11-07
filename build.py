@@ -611,10 +611,14 @@ BG = BG[:i0] + """<div id="intro"><div class="card">
   atmosphere glows round it, and clumps of dust drift farther out. Its probable companion, Siwarha, a young star of about the Sun's
   mass, circles inside its outer atmosphere every 5.8 years. The sky is the real sky from there, recomputed from a star catalogue:
   Rigel is the brightest star, Orion's belt stars blaze, and the Sun is too faint to see.</p>
-  <p>Drag to look &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk round the cupola &nbsp;&middot;&nbsp; <kbd>H</kbd> labels &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time<br>
-  In VR: left stick walk, right stick turn, <b>B</b> labels, <b>A</b> speed up time.</p>
+  <p>Fly the ship (the console in the dome, the list in the panel, or keys 1-9) to Siwarha inside Betelgeuse's outer atmosphere,
+  to within 6 AU of the star, to a comet with tails hundreds of millions of km long, and out to the plausible worlds a star like this
+  could have: a young super-Jupiter still glowing from its own heat, with a volcanic moon; a ringed ice giant where the light equals
+  Earth's sunlight; a brown dwarf; the far comet belt. Trips use a 1 g drive, their real durations given and shown speeded up.</p>
+  <p>Drag to look &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk round the cupola &nbsp;&middot;&nbsp; <kbd>1</kbd>-<kbd>9</kbd> fly somewhere &nbsp;&middot;&nbsp; <kbd>H</kbd> labels &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time<br>
+  In VR: left stick walk, right stick turn, point at the console and pull the trigger to fly, <b>B</b> labels, <b>A</b> speed up time.</p>
   <p class="dim">Sizes, temperature, brightness and distance are measured (with real uncertainties, given in the panel); the surface pattern, glow and dust
-  are typical, not maps; the companion is a 2025 detection, not yet certain. Stars: AT-HYG v3.2 (Gaia DR3 distances where available). Click to begin.</p>
+  are typical, not maps; the companion is a 2025 detection, not yet certain; the planets, brown dwarf and comet are plausible inventions. Stars: AT-HYG v3.2 (Gaia DR3 distances where available). Click to begin.</p>
 </div></div>
 """ + BG[i1:]
 out21 = HERE / "betelgeuse.html"

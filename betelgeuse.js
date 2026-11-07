@@ -94,7 +94,9 @@ const glowTex = canvasTex(512, 512, (g, W) => { const r = g.createRadialGradient
 const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); skyG.add(glow);
 // the soft limb: a dark orange-red veil over the outermost 10% of the disc fading out to 1.2 radii, so the star has no hard edge
 const limbTex = canvasTex(512, 512, (g, W) => { const r = g.createRadialGradient(W / 2, W / 2, 0, W / 2, W / 2, W / 2); r.addColorStop(0, "rgba(150,40,15,0)"); r.addColorStop(0.74, "rgba(150,40,15,0)"); r.addColorStop(0.83, "rgba(140,38,14,0.55)"); r.addColorStop(0.9, "rgba(120,32,12,0.35)"); r.addColorStop(1, "rgba(100,28,10,0)"); g.fillStyle = r; g.fillRect(0, 0, W, W); });
-const limb = new THREE.Sprite(new THREE.SpriteMaterial({ map: limbTex, transparent: true, depthWrite: false, depthTest: false })); limb.renderOrder = 3; skyG.add(limb);
+const limb = new THREE.Sprite(new THREE.SpriteMaterial({ map: limbTex, transparent: true, depthWrite: false })); limb.renderOrder = 3; skyG.add(limb);
+// from far away, where the disc is small, its glare: Betelgeuse from 3,000 AU is still far brighter than any star
+const bGlare = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffd0a0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); skyG.add(bGlare);
 // dust: Betelgeuse sheds about a millionth of a Sun's mass a year; some of it cools into dust, in clumps a few to tens of stellar radii
 // out (the Great Dimming of 2019-20 was such a cloud, in front of the star). The ship is 8.5 radii out, so clumps lie all round. Typical.
 const dustTex = canvasTex(256, 256, (g, W) => { for (let i = 0; i < 70; i++) { const x = W / 2 + (hash(i, 1) - 0.5) * W * 0.5, y = W / 2 + (hash(i, 2) - 0.5) * W * 0.5, r = W * (0.08 + 0.14 * hash(i, 3)); const rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, "rgba(255,255,255,0.10)"); rg.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = rg; g.fillRect(0, 0, W, W); } });
@@ -105,9 +107,78 @@ const DUST = []; for (let i = 0; i < 46; i++) { const u = hash(i, 11) * 2 - 1, p
 const compTex = canvasTex(128, 128, (g, W) => { const r = g.createRadialGradient(W / 2, W / 2, 0, W / 2, W / 2, W / 2); r.addColorStop(0, "rgba(255,252,240,1)"); r.addColorStop(0.06, "rgba(255,248,230,1)"); r.addColorStop(0.14, "rgba(255,236,205,0.55)"); r.addColorStop(0.4, "rgba(255,215,170,0.12)"); r.addColorStop(1, "rgba(255,200,160,0)"); g.fillStyle = r; g.fillRect(0, 0, W, W); });
 const comp = new THREE.Sprite(new THREE.SpriteMaterial({ map: compTex, blending: THREE.AdditiveBlending, depthWrite: true, transparent: true })); skyG.add(comp);
 const COMP_TILT = 0.9, COMP_NODE = 0.6;
-// where things are, in AU from the ship, and how they are drawn at a stand-in distance with their true direction and angular size
-const B_AU = BD.clone().multiplyScalar(D_SHIP);
-const place = (obj, au, sizeAU) => { const d = au.length(), f = FAKE * d / D_SHIP; obj.position.copy(au).multiplyScalar(f / d); if (sizeAU) obj.scale.setScalar(f * sizeAU / d); return d; };
+// where things are: positions in AU in Betelgeuse's frame (centred on it); the ship is at SHIP. Each thing is drawn at a stand-in
+// distance between 1.5 and 8 km from you that grows with the logarithm of its true distance (15 km to 10,000 AU), keeping its true
+// direction and angular size, and keeping nearer things in front of farther ones.
+const SHIP = BD.clone().multiplyScalar(-D_SHIP), fakeDist = d => 1500 + 6500 * THREE.MathUtils.clamp(Math.log10(d / 1e-7) / 11, 0, 1);
+const place = (obj, sys, sizeAU) => { const rel = sys.clone().sub(SHIP), d = rel.length(), f = fakeDist(d); obj.position.copy(rel).multiplyScalar(f / d); if (sizeAU) obj.scale.setScalar(f * sizeAU / d); return d; };
+const compPos = days => { const ca = 2 * Math.PI * days / P_COMP; return V3(Math.cos(ca) * A_COMP, 0, Math.sin(ca) * A_COMP).applyAxisAngle(V3(1, 0, 0), COMP_TILT).applyAxisAngle(V3(0, 1, 0), COMP_NODE); };
+// Siwarha up close: a young star of about 2 solar radii and 5,500 K, its own glare round it
+const R_COMP = 2 * RSUN_AU, compBall = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), new THREE.ShaderMaterial({ vertexShader: "varying vec3 vN; varying vec3 vV; void main(){ vN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }",
+  fragmentShader: "varying vec3 vN; varying vec3 vV; void main(){ float mu = max(dot(normalize(vN), normalize(vV)), 0.0); gl_FragColor = vec4(vec3(1.0, 0.86, 0.66) * (0.45 + 0.55 * mu) * 2.2, 1.0);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}" })); skyG.add(compBall);
+
+// ---------- the plausible system ----------
+// Nothing but the companion is known. Massive stars' disks are blown away by their ultraviolet light within a few million years, so
+// planets near them are rare, and anything inside about 4 AU would since have been swallowed as the star swelled. But massive disks
+// can also break up directly into giant planets and brown dwarfs far out, and icy bodies can fall in from a far comet belt. So: a
+// young super-Jupiter at 120 AU, still glowing dull red from its own heat at 8 million years old, with a volcanic and an icy moon; an
+// ice giant with rings at 350 AU, where the light equals sunlight at Earth; a brown dwarf at 900 AU, glowing orange from its heat;
+// a comet falling in at 25 AU with tails stretched by Betelgeuse's light. All invented, all plausible; positions are illustrative.
+const PN = V3(0.25, 1, 0.15).normalize(), PE1 = new THREE.Vector3().crossVectors(PN, V3(0, 0, 1)).normalize(), PE2 = new THREE.Vector3().crossVectors(PN, PE1);
+const inPlane = (r, ang, lift = 0) => PE1.clone().multiplyScalar(r * Math.cos(ang)).add(PE2.clone().multiplyScalar(r * Math.sin(ang))).add(PN.clone().multiplyScalar(lift));
+const PLANET_FS = `uniform vec3 L, lc, c1, c2, c3, glowC; uniform float I, bands, glowI, seed, rock; varying vec3 vN; varying vec3 vO; ${NOISE}
+  void main(){ vec3 o = normalize(vO); float turb = fbm(o * 4.0 + seed) * 0.6, b = sin((o.y + turb * 0.15) * bands + seed) * 0.5 + 0.5; vec3 alb;
+    if (rock > 0.5) { alb = mix(c1, c2, smoothstep(0.35, 0.7, fbm(o * 6.0 + seed))) * (0.7 + 0.6 * fbm(o * 20.0 + seed)); if (rock > 1.5) alb = mix(alb, vec3(0.08, 0.05, 0.03), smoothstep(0.7, 0.78, fbm(o * 9.0 + seed * 3.0))); }
+    else alb = mix(mix(c1, c2, b), c3, smoothstep(0.55, 0.9, fbm(o * 3.0 + seed * 2.0)));
+    float dl = max(dot(normalize(vN), L), 0.0); vec3 col = alb * lc * I * dl + glowC * glowI * (0.55 + 0.45 * (1.0 - b)) * (rock > 1.5 ? smoothstep(0.7, 0.78, fbm(o * 9.0 + seed * 3.0)) * 3.0 : 1.0);
+    gl_FragColor = vec4(col, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }`;
+const PLANET_VS = "varying vec3 vN; varying vec3 vO; void main(){ vO = normalize(position); vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
+const dotTex = canvasTex(64, 64, (g, W) => { const r = g.createRadialGradient(W / 2, W / 2, 0, W / 2, W / 2, W / 2); r.addColorStop(0, "rgba(255,255,255,1)"); r.addColorStop(0.25, "rgba(255,255,255,0.6)"); r.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = r; g.fillRect(0, 0, W, W); });
+const BODIES = [];
+function body(o) { const u = { L: { value: V3(1, 0, 0) }, lc: { value: new THREE.Color(1, 0.55, 0.3) }, I: { value: 1 }, c1: { value: new THREE.Color(...o.c1) }, c2: { value: new THREE.Color(...o.c2) }, c3: { value: new THREE.Color(...(o.c3 || o.c1)) }, glowC: { value: new THREE.Color(...(o.glowC || [0, 0, 0])) }, glowI: { value: o.glowI || 0 }, bands: { value: o.bands || 12 }, seed: { value: o.seed || 1 }, rock: { value: o.rock || 0 } };
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), new THREE.ShaderMaterial({ uniforms: u, vertexShader: PLANET_VS, fragmentShader: PLANET_FS })); mesh.rotation.z = o.tilt || 0.2; skyG.add(mesh);
+  const dot = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); skyG.add(dot);
+  let ring = null; if (o.ring) { ring = new THREE.Mesh(new THREE.RingGeometry(o.ring[0], o.ring[1], 96, 1), new THREE.ShaderMaterial({ uniforms: { lc: u.lc, I: u.I, r0: { value: o.ring[0] }, r1: { value: o.ring[1] } }, side: THREE.DoubleSide, transparent: true, depthWrite: false,
+    vertexShader: "varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }", fragmentShader: "uniform vec3 lc; uniform float I, r0, r1; varying vec2 vP; void main(){ float r = length(vP), f = (r - r0) / (r1 - r0); float a = (0.35 + 0.35 * sin(f * 60.0) * sin(f * 23.0)) * smoothstep(0.0, 0.05, f) * smoothstep(1.0, 0.9, f); gl_FragColor = vec4(vec3(0.85, 0.8, 0.72) * lc * I * 0.8, a * 0.8);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}" }));
+    ring.rotation.x = Math.PI / 2 - 0.35; mesh.add(ring); }
+  const B = { ...o, mesh, dot, ring, u }; BODIES.push(B); return B; }
+const RJ = 0.000477, RE = 4.26e-5;
+const PB = body({ name: "Betelgeuse b", tag: "plausible", pos: () => inPlane(120, 2.35), R: 1.3 * RJ, c1: [0.78, 0.62, 0.44], c2: [0.55, 0.32, 0.2], c3: [0.92, 0.86, 0.72], bands: 18, glowC: [1.0, 0.22, 0.05], glowI: 0.05, seed: 3.1, info: "a young super-Jupiter, about 8 times Jupiter's mass, 120 AU out: banded clouds lit orange by Betelgeuse, and on its night side a dull red glow from its own heat (about 1,100 K), since at 8 million years old it is still contracting." });
+const PB1 = body({ name: "b I", tag: "plausible", pos: () => PB.pos().add(inPlane(0.0042, 0.8)), R: 1.22e-5, c1: [0.86, 0.76, 0.36], c2: [0.7, 0.42, 0.16], rock: 2, glowC: [1.0, 0.35, 0.08], glowI: 0.25, seed: 7.7, info: "a volcanic moon the size of our Moon, kneaded by the giant's tides like Jupiter's Io: sulphur plains and glowing lava lakes." });
+const PB2 = body({ name: "b II", tag: "plausible", pos: () => PB.pos().add(inPlane(0.0095, 3.9)), R: 1.1e-5, c1: [0.86, 0.89, 0.93], c2: [0.55, 0.5, 0.45], rock: 1, seed: 5.2, info: "an icy moon, cracked and bright." });
+const PC = body({ name: "Betelgeuse c", tag: "plausible", pos: () => inPlane(350, 4.1, 12), R: 4 * RE, c1: [0.36, 0.62, 0.72], c2: [0.25, 0.46, 0.6], c3: [0.92, 0.96, 1.0], bands: 9, seed: 9.3, ring: [1.7, 2.6], tilt: 0.45, info: "an ice giant of about 18 Earth masses with rings, 350 AU out, where Betelgeuse's light equals the Sun's at Earth: its clouds are water clouds. Young, and under a sun 0.6° across that flickers over the years." });
+const PD = body({ name: "a brown dwarf", tag: "plausible", pos: () => inPlane(900, 0.7, -40), R: 1.03 * RJ, c1: [0.12, 0.05, 0.03], c2: [0.06, 0.02, 0.01], bands: 24, glowC: [0.9, 0.22, 0.05], glowI: 0.75, seed: 4.4, info: "a brown dwarf of about 30 Jupiter masses, 900 AU out: too small to fuse hydrogen, glowing orange-red from the heat of its contraction (about 1,800 K)." });
+// the comet: a nucleus ~10 km across falling in at 25 AU; its dust tail (curving, yellowish) and ion tail (straight, blue) point away
+// from Betelgeuse, hundreds of millions of km long in its enormous light
+const CN = () => inPlane(25, 1.15, 6), COMA = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, color: 0xfff0dc, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); skyG.add(COMA);
+const TAILS = []; for (const [kind, n, len, col] of [["dust", 220, 0.7, 0xffe2b8], ["ion", 200, 1.6, 0x8ab8ff]]) for (let i = 0; i < n; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, color: col, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })); skyG.add(sp); TAILS.push({ sp, kind, f: (i + 1) / n, len }); }
+const tailDir = () => CN().normalize();
+
+// ---------- where to go ----------
+// The ship flies by a 1 g drive: speeding up at one Earth gravity to the midpoint, then slowing; the trip's real duration is given,
+// and it is shown speeded up. (Faster than such trips would really take: a 1 g drive is far beyond any rocket today.)
+const viewNear = (B, k, ang = 0.95) => () => { const P = B.pos(), toStar = P.clone().negate().normalize(), side = new THREE.Vector3().crossVectors(toStar, PN).normalize(); return P.clone().add(toStar.applyAxisAngle(side, ang).multiplyScalar(k * B.R)); };
+const DESTS = [
+  { name: "30 AU from Betelgeuse (start)", pos: () => BD.clone().multiplyScalar(-D_SHIP), look: () => V3(0, 0, 0) },
+  { name: "Siwarha, inside the outer atmosphere", pos: () => { const c = compPos(tSec / 86400), side = new THREE.Vector3().crossVectors(c, PN).normalize(); return c.clone().add(side.multiplyScalar(0.12)).add(c.clone().normalize().multiplyScalar(0.05)); }, look: () => compPos(tSec / 86400) },
+  { name: "Close to Betelgeuse: 6 AU from its centre", pos: () => BD.clone().multiplyScalar(-6).applyAxisAngle(PN, 0.3), look: () => V3(0, 0, 0) },
+  { name: "The comet, 25 AU out", pos: () => { const c = CN(), side = new THREE.Vector3().crossVectors(c, PN).normalize(); return c.clone().add(side.multiplyScalar(0.25)).add(c.clone().normalize().multiplyScalar(0.2)); }, look: () => CN().add(tailDir().multiplyScalar(0.35)) },
+  { name: "Betelgeuse b, a young super-Jupiter (120 AU)", pos: viewNear(PB, 4.5), look: () => PB.pos() },
+  { name: "b I, its volcanic moon", pos: viewNear(PB1, 5, 0.6), look: () => PB1.pos() },
+  { name: "Betelgeuse c, a ringed ice giant (350 AU)", pos: viewNear(PC, 5.5, 0.7), look: () => PC.pos() },
+  { name: "A brown dwarf (900 AU)", pos: viewNear(PD, 4.5, 1.6), look: () => PD.pos() },
+  { name: "The comet belt, 3,000 AU out", pos: () => BD.clone().multiplyScalar(-3000).applyAxisAngle(PN, 0.5), look: () => V3(0, 0, 0) }];
+let destI = 0; const TRAVEL = { on: false };
+const AU_M = 1.496e11, fmtDays = s => s < 3 * 86400 ? (s / 3600).toFixed(0) + " hours" : (s / 86400).toFixed(0) + " days";
+function goTo(i) { if (TRAVEL.on || i === destI) return; const D = DESTS[i], to = D.pos(), dist = to.distanceTo(SHIP), t1g = 2 * Math.sqrt(dist * AU_M / 9.81), vmax = 9.81 * t1g / 2;
+  Object.assign(TRAVEL, { on: true, from: SHIP.clone(), to, dist, rmin: Math.max(1e-5, to.distanceTo(D.look())), t: 0, T: 10 + 5 * Math.log10(1 + dist * 100), t1g, i, q0: ship.quaternion.clone() }); destI = i; drawConsole();
+  say(`Setting off for ${D.name}: ${dist < 1 ? (dist * 149.6).toFixed(1) + " million km" : dist.toFixed(dist < 10 ? 1 : 0) + " AU"}. With a 1 g drive the trip takes ${fmtDays(t1g)}, reaching ${(vmax / 2.998e8 * 100).toFixed(vmax < 3e6 ? 2 : 1)}% of the speed of light at the midpoint; shown in ${TRAVEL.T.toFixed(0)} seconds.`); }
+// the ship's attitude: its front (-z) toward a point, tilted so the point stands 25° above the cupola's rim
+function faceQuat(dir) { const up = Math.abs(dir.y) > 0.95 ? V3(1, 0, 0) : V3(0, 1, 0), f = dir.clone().normalize(), side = new THREE.Vector3().crossVectors(f, up).normalize(), up2 = new THREE.Vector3().crossVectors(side, f).normalize();
+  const tilt = new THREE.Quaternion().setFromAxisAngle(side, -0.44), fwd = f.clone().applyQuaternion(tilt), upS = up2.clone().applyQuaternion(tilt); return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, upS, fwd.clone().negate())); }
 
 // ---------- the ship's cupola: a glass dome with a near-all-round view ----------
 // The dome is 7 m across on a low ring wall; from the middle you see the whole sky above the ring. The glass is darkened against
@@ -123,10 +194,19 @@ const ship = new THREE.Group(); scene.add(ship);
   const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.06, 24), metal); hub.position.y = 0.9 + 3.5; ship.add(hub);
   const desk = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.85, 0.5), dark); desk.position.set(0, 0.42, 2.9); ship.add(desk);
   const hatch = new THREE.Mesh(new THREE.CircleGeometry(0.6, 32).rotateX(-Math.PI / 2), M(0x6a5a3a, { metalness: 0.5 })); hatch.position.set(-2.2, 0.005, 1.2); ship.add(hatch); }
-// the ship's frame faces Betelgeuse: its "forward" (-z) points at the star, tilted so the star stands 25° above the cupola's rim
-{ const up = V3(0, 1, 0), f = BD.clone(), side = new THREE.Vector3().crossVectors(f, up).normalize(), up2 = new THREE.Vector3().crossVectors(side, f).normalize();
-  const tilt = new THREE.Quaternion().setFromAxisAngle(side, -0.44), fwd = f.clone().applyQuaternion(tilt), upS = up2.clone().applyQuaternion(tilt), m = new THREE.Matrix4().makeBasis(side, upS, fwd.clone().negate()); ship.quaternion.setFromRotationMatrix(m); }
+// the ship starts facing Betelgeuse
+ship.quaternion.copy(faceQuat(BD));
 scene.add(new THREE.AmbientLight(0x404858, 0.6)); const starLight = new THREE.DirectionalLight(0xffb070, 3.2); starLight.position.copy(BD).multiplyScalar(100); scene.add(starLight);
+
+// the destination console, on a stand by the dome's edge: click a line (or point a controller and pull the trigger)
+const conTex = canvasTex(640, 720), console_ = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.9), new THREE.MeshBasicMaterial({ map: conTex, toneMapped: false })); console_.position.set(1.7, 1.25, -1.4); console_.rotation.set(-0.35, -0.9, 0, "YXZ"); ship.add(console_);
+{ const st = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 0.12), M(0x2a2c32)); st.position.set(1.75, 0.5, -1.35); ship.add(st); }
+function drawConsole() { const g = conTex.userData.c.getContext("2d"); g.fillStyle = "#0c0e14"; g.fillRect(0, 0, 640, 720); g.fillStyle = "#ffb060"; g.font = "bold 34px sans-serif"; g.fillText("DESTINATIONS", 24, 50);
+  DESTS.forEach((D, i) => { const y = 82 + i * 68; g.fillStyle = i === destI ? (TRAVEL.on ? "#5a4a20" : "#2a3a5a") : "#181c26"; g.fillRect(16, y, 608, 60); g.fillStyle = i === destI ? "#ffe0a0" : "#d8e0f0"; g.font = "24px sans-serif"; g.fillText(`${i + 1}. ${D.name}`, 28, y + 38, 584); });
+  conTex.needsUpdate = true; }
+function consoleHit(origin, dir) { const ray = new THREE.Raycaster(origin, dir); const h = ray.intersectObject(console_)[0]; if (!h) return false; const i = Math.floor(((1 - h.uv.y) * 720 - 82) / 68); if (i >= 0 && i < DESTS.length) goTo(i); return true; }
+const ctrls = [0, 1].map(i => { const ct = renderer.xr.getController(i); rig.add(ct); const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(0, 0, 0), V3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xffd060 })); l.scale.z = 3; ct.add(l);
+  ct.addEventListener("selectstart", () => { const o = V3(0, 0, 0), d = V3(0, 0, -1); ct.getWorldPosition(o); d.applyQuaternion(ct.getWorldQuaternion(new THREE.Quaternion())); consoleHit(o, d); }); return ct; });
 
 // ---------- the HUD: labels on the sky ----------
 const HUD = new THREE.Group(); skyG.add(HUD); let hudOn = true;
@@ -134,8 +214,12 @@ function label(text, sub, dir, col = "#cfe6ff", scale = 1) { const t = canvasTex
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true, toneMapped: false })); s.center.set(0.02, 0.7); s.scale.set(1600 * scale, 400 * scale, 1); s.position.copy(dir).multiplyScalar(SKY_R * 0.9); s.renderOrder = 30; HUD.add(s); return s; }
 for (const L of SKY_LABELS) if (!/^(HD|HIP) /.test(L.name) || L.m < 1.5) label(L.name, `mag ${L.m.toFixed(1)} · ${L.d.toLocaleString()} ly${L.err > L.d * 0.2 ? " (distance uncertain)" : ""}`, V3(...L.dir), "#cfe6ff", 0.8);
 for (const N of SKY_NOTES) { const vis = N.m < 6.5; label(N.name, `${vis ? "mag " + N.m.toFixed(1) : "mag " + N.m.toFixed(1) + ", too faint to see"} · ${N.d.toLocaleString()} ly away${N.name === "the Sun" ? " · directly behind you" : ""}`, V3(...N.dir), N.name === "the Sun" ? "#ffd060" : vis ? "#cfe6ff" : "#8a9ab0", 0.9); }
-const starLabel = label("Betelgeuse", `3,600 K · ${Math.round(R_B * 215)} solar radii · ${D_SHIP} AU away`, BD.clone().applyAxisAngle(V3(0, 1, 0), 0.14), "#ffb060", 1.1);
-const compLabel = label("Siwarha (companion, probable)", "about 1 Sun's mass · orbit 5.8 years", V3(0, 1, 0), "#ffe8c0", 0.9);
+// labels for the things of the system, kept up to date with their distances
+function dynLabel(col, scale) { const t = canvasTex(512, 128), s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true, toneMapped: false })); s.center.set(0.02, 0.7); s.scale.set(1600 * scale, 400 * scale, 1); s.renderOrder = 30; HUD.add(s); s.userData = { t, col, last: "" }; return s; }
+function setLabel(s, text, sub, sys) { const rel = sys.clone().sub(SHIP); s.position.copy(rel.normalize()).multiplyScalar(SKY_R * 0.9); const key = text + sub; if (key === s.userData.last) return; s.userData.last = key; const g = s.userData.t.userData.c.getContext("2d"); g.clearRect(0, 0, 512, 128);
+  g.font = "bold 38px sans-serif"; g.fillStyle = s.userData.col; g.fillText(text, 30, 50); g.font = "28px sans-serif"; g.fillStyle = "rgba(220,230,255,0.75)"; g.fillText(sub, 30, 96); g.strokeStyle = s.userData.col; g.lineWidth = 3; g.beginPath(); g.arc(12, 38, 8, 0, 7); g.stroke(); s.userData.t.needsUpdate = true; }
+const fmtD = d => d < 0.01 ? Math.round(d * 1.496e8).toLocaleString() + " km" : d < 1 ? (d * 149.6).toFixed(1) + " million km" : d.toFixed(d < 10 ? 1 : 0) + " AU";
+const starLabel = dynLabel("#ffb060", 1.1), compLabel = dynLabel("#ffe8c0", 0.9), cometLabel = dynLabel("#c8e0ff", 0.85); for (const B of BODIES) B.label = dynLabel(B.glowI > 0.5 ? "#ffa070" : "#d8f0d0", 0.85);
 
 // ---------- time ----------
 // Real time by default. T steps up: an hour, a day, a month, a year per second (the cells churn over months to years, the pulsation
@@ -144,11 +228,11 @@ const RATES = [[1, "real time"], [3600, "1 hour per second"], [86400, "1 day per
 
 // ---------- you ----------
 const P = { x: 0, z: 0.8 }; let yaw = 0, pitch = 0.3, started = false, vrYaw = 0; const keys = {};
-addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (e.code === "KeyH") hudOn = !hudOn; if (e.code === "KeyT") { rateI = (rateI + 1) % RATES.length; say(`Time: ${RATES[rateI][1]}.`); } });
+addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (/^Digit[1-9]$/.test(e.code)) goTo(+e.code.slice(5) - 1); if (e.code === "KeyH") hudOn = !hudOn; if (e.code === "KeyT") { rateI = (rateI + 1) % RATES.length; say(`Time: ${RATES[rateI][1]}.`); } });
 addEventListener("keyup", e => keys[e.code] = false);
-let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY }; start(); });
-addEventListener("pointermove", e => { if (!drag) return; yaw -= (e.clientX - drag.x) * 0.004; pitch = THREE.MathUtils.clamp(pitch - (e.clientY - drag.y) * 0.004, -1.4, 1.5); drag.x = e.clientX; drag.y = e.clientY; });
-addEventListener("pointerup", () => drag = null);
+let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, moved: 0 }; start(); });
+addEventListener("pointermove", e => { if (!drag) return; drag.moved += Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y); yaw -= (e.clientX - drag.x) * 0.004; pitch = THREE.MathUtils.clamp(pitch - (e.clientY - drag.y) * 0.004, -1.4, 1.5); drag.x = e.clientX; drag.y = e.clientY; });
+addEventListener("pointerup", e => { if (drag && drag.moved < 6 && started) { const r = new THREE.Raycaster(); r.setFromCamera(new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1), camera); consoleHit(r.ray.origin, r.ray.direction); } drag = null; });
 const VRB = document.getElementById("vr"), prevB = {};
 if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); await renderer.xr.setSession(s); start(); vrYaw = yaw; }; });
 
@@ -158,15 +242,20 @@ const MSG = document.createElement("div"); MSG.style.cssText = "position:fixed;l
 let msgT = 0; function say(t) { MSG.innerHTML = t; MSG.style.display = "block"; msgT = 20; }
 const ANG = 2 * Math.asin(R_B / D_SHIP) * 180 / Math.PI;
 function drawPanel() { const days = tSec / 86400, ph = (days % P_PULSE) / P_PULSE, cph = (days % P_COMP) / P_COMP;
-  PANEL.innerHTML = `<div style="font-size:17px;font-weight:600">Betelgeuse, from 30 AU</div>
-  <div style="color:#c8c0d8;font-size:12.5px;margin:4px 0 6px">A red supergiant at the end of its life, about 548 light-years from the Sun. From this ship it is ${ANG.toFixed(1)}° across, ${Math.round(ANG / 0.52)} times the Moon's width in Earth's sky, and gives ${Math.round(SUNLIGHT)} times the sunlight at Earth: the cupola's glass is darkened.</div>
+  const dB = SHIP.length(), angB = 2 * Math.asin(Math.min(1, R_B / dB)) * 180 / Math.PI, flux = L_B / dB ** 2, near = BODIES.concat([{ name: "Siwarha", pos: () => compPos(days) }, { name: "the comet", pos: CN }]).map(B => [B, B.pos().distanceTo(SHIP)]).sort((a, b) => a[1] - b[1])[0];
+  PANEL.innerHTML = `<div style="font-size:17px;font-weight:600">Betelgeuse${TRAVEL.on ? ": travelling" : ""}</div>
+  <div style="margin:4px 0 6px"><b>Where you are</b>: ${fmtD(dB)} from Betelgeuse, which is ${angB.toFixed(angB < 1 ? 2 : 1)}° across (${fmt(angB / 0.52, angB < 5 ? 1 : 0)} times the Moon's width from Earth) and gives ${fmt(flux, flux < 10 ? 1 : 0)} times the sunlight at Earth${flux > 30 ? ": deadly without heavy shielding" : flux > 2 ? "" : flux > 0.5 ? ", much like the Sun at Earth" : ""}. Nearest: ${near[0].name}, ${fmtD(near[1])}.
+  ${TRAVEL.on ? `<br>On the way to ${DESTS[TRAVEL.i].name}: by 1 g drive the trip takes ${fmtDays(TRAVEL.t1g)}, shown speeded up.` : ""}</div>
+  <div style="margin-bottom:6px"><b>Go to</b> (click, press 1-9, or use the console in the dome):<br>${DESTS.map((D, k) => `<span data-d="${k}" style="cursor:pointer;color:${k === destI ? "#ffd070" : "#a8c8ff"}">${k + 1}. ${D.name}</span>`).join("<br>")}</div>
   <b>Measured (with uncertainties)</b><br>&middot; radius about ${Math.round(R_B * 215)} times the Sun's (${R_B.toFixed(2)} AU; estimates 640 to 1,000): in our Solar System it would reach past Mars<br>&middot; surface 3,600 K (deep orange), light about ${fmt(L_B, 0)} Suns, mass now about ${M_B} Suns<br>&middot; age about 8 to 10 million years; it should explode as a supernova within about 100,000 years<br>&middot; mean density about ${fmt(M_B * 1.989e30 / (4 / 3 * Math.PI * (R_B * 1.496e11) ** 3) / 1.2, 1)} of the air you breathe<br>&middot; it pulses every ~${P_PULSE} days, now at ${Math.round(ph * 100)}% of a cycle<br>&middot; it loses about a millionth of a Sun's mass a year, some of it as dust
   <div style="margin-top:6px"><b>Probable</b>: the companion Siwarha, about the Sun's mass, ${A_COMP.toFixed(1)} AU from Betelgeuse's centre (inside its outer atmosphere), once round every 5.8 years (now ${Math.round(cph * 100)}% round). Its orbit's tilt is assumed.</div>
   <div style="margin-top:6px"><b>Drawn as typical</b>: the pattern of giant convection cells and the uneven edge, the glow of the outer atmosphere, the dust clumps.</div>
+  <div style="margin-top:6px"><b>Plausible, invented</b>: the young super-Jupiter Betelgeuse b (120 AU) and its two moons, the ringed ice giant Betelgeuse c (350 AU, where the light equals Earth's sunlight), a brown dwarf (900 AU), the comet and the far comet belt. No planets are known; massive stars rarely keep close planets, and anything inside about 4 AU has been swallowed, but giant planets and brown dwarfs can form far out from massive disks.</div>
   <div style="margin-top:6px"><b>The sky here</b> (from the star catalogue): the brightest star is Rigel (mag −1.4), with Orion's belt stars and Saiph close behind. The Sun is magnitude 11, far too faint to see (it is directly behind you), and so is Sirius, the brightest star in Earth's sky (mag 7.6). Stars near Betelgeuse with only older distances may be misplaced by up to ~100 ly; in truth the glare of Betelgeuse would hide the faint ones.</div>
   <div style="margin-top:6px;color:#c8c0d8;font-size:12.5px">Time: ${RATES[rateI][1]} (T to change) · H labels ${hudOn ? "on" : "off"} · drag to look · WASD walk round the cupola</div>`; }
+PANEL.addEventListener("click", e => { const d = e.target.closest("[data-d]"); if (d) goTo(+d.dataset.d); });
 function start() { if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); PANEL.style.display = "block";
-  say(`You are in the glass cupola of a ship 30 AU from Betelgeuse. The star is ${ANG.toFixed(0)}° across: a churning orange surface of a few giant cells, darkening to red at its uneven edge, in a faint glow of its outer atmosphere. Its probable companion, Siwarha, is the brilliant point near it. The labels (H) name the stars as seen from here; the Sun is behind you, too faint to see. T speeds up time.`); }
+  say(`You are in the glass cupola of a ship 30 AU from Betelgeuse. The star is ${ANG.toFixed(0)}° across: a churning orange surface of a few giant cells, darkening to red at its uneven edge, in a faint glow of its outer atmosphere. Its probable companion, Siwarha, is the brilliant point near it. The labels (H) name the stars and the things of this system (the planets are plausible inventions). Fly anywhere with the console beside you, the list in the panel, or keys 1-9. T speeds up time.`); drawConsole(); }
 document.getElementById("intro")?.addEventListener("click", start);
 
 // ---------- the loop ----------
@@ -183,14 +272,30 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.1), vr
   rig.position.copy(V3(P.x, 0, P.z).applyQuaternion(ship.quaternion)); rig.quaternion.copy(ship.quaternion); rig.rotateY(vr ? vrYaw : 0);
   if (!vr) { camera.position.set(0, 1.65, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
   camera.getWorldPosition(headP); skyG.position.copy(headP);
+  // travelling: the remaining distance shrinks geometrically, so the destination grows steadily; the ship turns to face it
+  if (TRAVEL.on) { TRAVEL.t += dt; const f = Math.min(1, TRAVEL.t / TRAVEL.T), e = f * f * (3 - 2 * f), rmin = TRAVEL.rmin, rem = Math.exp(Math.log(TRAVEL.dist + rmin) * (1 - e) + Math.log(rmin) * e) - rmin;
+    SHIP.copy(TRAVEL.to).add(TRAVEL.from.clone().sub(TRAVEL.to).normalize().multiplyScalar(rem)); tSec += TRAVEL.t1g * dt / TRAVEL.T;
+    ship.quaternion.copy(TRAVEL.q0).slerp(faceQuat(DESTS[TRAVEL.i].look().sub(SHIP)), Math.min(1, f * 3));
+    if (f >= 1) { TRAVEL.on = false; drawConsole(); const D = DESTS[TRAVEL.i], B = BODIES.find(b => D.name.startsWith(b.name)); say(`Arrived: ${D.name}.${B ? " " + B.name[0].toUpperCase() + B.name.slice(1) + ": " + B.info + " (Plausible: invented to fit what such a star could have.)" : ""}`); } }
   // Betelgeuse: pulsing a few per cent in size and about 0.3 magnitude in light; its cells churning
-  const pul = Math.sin(2 * Math.PI * days / P_PULSE), Rnow = R_B * (1 + 0.03 * pul); place(star, B_AU, Rnow); starMat.uniforms.t.value = days / 220; starMat.uniforms.bright.value = 1 + 0.12 * pul;
-  glow.position.copy(star.position); glow.scale.setScalar(star.scale.x * 4.2); limb.position.copy(star.position); limb.scale.setScalar(star.scale.x * 2.4);
-  // the companion on its orbit, and the dust clumps lit from Betelgeuse
-  const ca = 2 * Math.PI * days / P_COMP, cpos = V3(Math.cos(ca) * A_COMP, 0, Math.sin(ca) * A_COMP).applyAxisAngle(V3(1, 0, 0), COMP_TILT).applyAxisAngle(V3(0, 1, 0), COMP_NODE).add(B_AU);
-  const cd = place(comp, cpos); comp.scale.setScalar(comp.position.length() * 0.035); compLabel.position.copy(cpos).normalize().multiplyScalar(SKY_R * 0.9);
-  for (const D of DUST) { const au = D.off.clone().add(B_AU), d = place(D.s, au, D.size); toCam.copy(au).normalize().negate(); const fromStar = D.off.clone().normalize(), cosT = fromStar.dot(toCam.clone().negate()), g = 0.55, hg = (1 - g * g) / Math.pow(1 + g * g - 2 * g * cosT, 1.5);
-    D.s.material.opacity = Math.min(0.5, 0.05 * hg * (R_B * 8 / D.off.length()) ** 2); }
-  HUD.visible = hudOn; compLabel.visible = hudOn;
+  const pul = Math.sin(2 * Math.PI * days / P_PULSE), Rnow = R_B * (1 + 0.03 * pul), dB = place(star, V3(0, 0, 0), Rnow); starMat.uniforms.t.value = days / 220; starMat.uniforms.bright.value = 1 + 0.12 * pul;
+  { const f = star.position.length(), rho = star.scale.x, alpha = Math.asin(Math.min(0.999, rho / f)), fr = f - rho, h = fr * Math.tan(alpha), u = star.position.clone().divideScalar(f);
+    limb.position.copy(u).multiplyScalar(fr); limb.scale.setScalar(2 * h / 0.83); glow.position.copy(u).multiplyScalar(f); glow.scale.setScalar(2 * f * Math.tan(alpha) * 2.1);
+    bGlare.position.copy(u).multiplyScalar(fr); bGlare.scale.setScalar(f * 0.06); bGlare.material.opacity = THREE.MathUtils.clamp(1 - alpha / 0.012, 0, 1); }
+  setLabel(starLabel, "Betelgeuse", `red supergiant · ${fmtD(dB)} away · ${(2 * Math.asin(Math.min(1, R_B / dB)) * 180 / Math.PI).toFixed(dB > 100 ? 2 : 1)}° across`, V3(0, 0, 0));
+  // the companion, and the dust clumps lit from Betelgeuse
+  const cpos = compPos(days), cd = place(comp, cpos); place(compBall, cpos, R_COMP); comp.scale.setScalar(Math.max(comp.position.length() * 0.035, compBall.scale.x * 7)); setLabel(compLabel, "Siwarha (companion, probable)", `about 1 Sun's mass · ${fmtD(cd)} away`, cpos);
+  for (const D of DUST) { const d = place(D.s, D.off, D.size), toShip = SHIP.clone().sub(D.off).normalize(), cosT = D.off.clone().normalize().dot(toShip), g = 0.55, hg = (1 - g * g) / Math.pow(1 + g * g - 2 * g * cosT, 1.5);
+    D.s.material.opacity = Math.min(0.5, 0.05 * hg * (R_B * 8 / D.off.length()) ** 2) * THREE.MathUtils.smoothstep(d, 0.3, 3); }
+  // the planets, moons and brown dwarf: lit by Betelgeuse (brightness compressed, as by eyes adapting), a point of light when far
+  for (const B of BODIES) { const P = B.pos(), d = place(B.mesh, P, B.R), fluxS = L_B / P.lengthSq(), ang = B.R / d; B.u.L.value.copy(P).negate().normalize(); B.u.I.value = 0.35 * Math.pow(fluxS, 0.3);
+    B.dot.position.copy(B.mesh.position); B.dot.scale.setScalar(B.mesh.position.length() * 0.004); const lit = Math.min(1, (0.6 * Math.pow(fluxS, 0.3) * 0.3 + B.glowI) * 1.5); B.dot.material.color.setRGB(lit, lit * 0.8, lit * 0.6); B.dot.material.opacity = THREE.MathUtils.clamp(1 - ang / 0.002, 0, 1); B.mesh.visible = ang > 2e-4;
+    setLabel(B.label, B.name, `${B.tag} · ${fmtD(d)} away`, P); }
+  // the comet: coma and two tails, each a chain of soft glows placed along its length
+  { const c = CN(), td = tailDir(), side = new THREE.Vector3().crossVectors(td, PN).normalize(), dc = place(COMA, c, 0.0016); COMA.material.opacity = 0.9; setLabel(cometLabel, "a comet", `plausible · ${fmtD(dc)} away`, c);
+    for (const T of TAILS) { const f = T.f, pt = c.clone().add(td.clone().multiplyScalar(T.len * Math.pow(f, 1.2))); if (T.kind === "dust") pt.add(side.clone().multiplyScalar(T.len * 0.18 * f * f)); place(T.sp, pt, 0.004 + (T.kind === "dust" ? 0.09 : 0.035) * f); T.sp.material.opacity = (T.kind === "dust" ? 0.16 : 0.12) * (1 - f) ** 1.3; } }
+  // the light on the cupola comes from Betelgeuse's direction, dimmer far away
+  starLight.position.copy(SHIP).negate().normalize().multiplyScalar(100).applyQuaternion(new THREE.Quaternion()); starLight.intensity = 3.2 * THREE.MathUtils.clamp(Math.pow(L_B / SHIP.lengthSq() / 140, 0.25), 0.1, 3);
+  HUD.visible = hudOn;
   if (frameN % 10 === 0) drawPanel(); msgT -= dt; if (msgT <= 0 && MSG.style.display !== "none") MSG.style.display = "none";
   renderer.render(scene, camera); });
