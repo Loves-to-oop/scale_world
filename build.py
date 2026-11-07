@@ -624,14 +624,19 @@ BG = BG[:i0] + """<div id="intro"><div class="card">
   (the thrust gives you weight), a turn at the midpoint, a burn to slow with it beneath your feet. A trip takes days to weeks: speed
   time up with <kbd>]</kbd> (it eases off for the arrival). With the engine off there is no weight outside the spinning ring: you would float, pulling
   yourself along handrails (your view is kept upright).</p>
-  <p>Drag to look &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk (shift runs) &nbsp;&middot;&nbsp; the SHIP MAP screens jump anywhere aboard, the ring too &nbsp;&middot;&nbsp; the console's buttons (or the top-right buttons) slow, speed up or skip a trip; the status screens and bar show where you are &nbsp;&middot;&nbsp; in the lift <kbd>E</kbd> up, <kbd>Q</kbd> down &nbsp;&middot;&nbsp; <kbd>1</kbd>-<kbd>0</kbd> fly somewhere &nbsp;&middot;&nbsp; <kbd>[</kbd> <kbd>]</kbd> slower, faster time, <kbd>\\</kbd> real time &nbsp;&middot;&nbsp; <kbd>F</kbd> filter &nbsp;&middot;&nbsp; <kbd>H</kbd> labels &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time<br>
-  In VR: left stick walk (left trigger runs), a status screen on your left wrist, right stick turn (up or down in the lift), point at the console and pull the trigger to fly, <b>X</b> filter, <b>B</b> labels, <b>A</b> faster time, <b>Y</b> slower.</p>
+  <p>Parked at a rocky world or moon, take the lander down (the MISSIONS screen, or <kbd>L</kbd>): each surface is generated
+  without end from its own rules (craters, lava, ridges), so you can drive the pressurised rover as far as you like. Where it is
+  safe you can walk out in the world's own gravity; on the hot super-Earth you stay in the rover. Parked at the giant planet or the
+  brown dwarf, drop a probe (<kbd>P</kbd>): ride its camera through the cloud decks until the heat and pressure destroy it. It takes
+  photographs as it falls (<kbd>C</kbd> for more), shown in the gallery on the bridge and in the dome.</p>
+  <p>Drag to look &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk (shift runs) &nbsp;&middot;&nbsp; the SHIP MAP screens jump anywhere aboard, the ring too &nbsp;&middot;&nbsp; the console's buttons (or the top-right buttons) slow, speed up or skip a trip; the status screens and bar show where you are &nbsp;&middot;&nbsp; in the lift <kbd>E</kbd> up, <kbd>Q</kbd> down &nbsp;&middot;&nbsp; <kbd>1</kbd>-<kbd>0</kbd> fly somewhere &nbsp;&middot;&nbsp; <kbd>[</kbd> <kbd>]</kbd> slower, faster time, <kbd>\\</kbd> real time &nbsp;&middot;&nbsp; <kbd>F</kbd> filter &nbsp;&middot;&nbsp; <kbd>H</kbd> labels &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time &nbsp;&middot;&nbsp; away: <kbd>E</kbd> rover or lander, space jumps, <kbd>C</kbd> photo<br>
+  In VR: left stick walk (left trigger runs), a status screen on your left wrist, right stick turn (up or down in the lift), point at the console and pull the trigger to fly, <b>X</b> filter, <b>B</b> labels, <b>A</b> faster time, <b>Y</b> slower. On a surface or in a probe: <b>A</b> act (rover, lander, leave the probe), <b>B</b> jump.</p>
   <p class="dim">Sizes, temperature, brightness and distance are measured (with real uncertainties, given in the panel); the surface pattern, glow and dust
   are typical, not maps; the companion is a 2025 detection, not yet certain; the giant planet, brown dwarf and comet are plausible inventions, the rocky worlds speculative. Stars: AT-HYG v3.2 (Gaia DR3 distances where available). Click to begin.</p>
 </div></div>
 """ + BG[i1:]
 out21 = HERE / "betelgeuse.html"
-out21.write_text(BG.replace("__THREE__", three).replace("__SCENE__", (HERE / "betelgeuse_sky.js").read_text(encoding="utf-8") + (HERE / "betelgeuse.js").read_text(encoding="utf-8")), encoding="utf-8")
+out21.write_text(BG.replace("__THREE__", three).replace("__SCENE__", (HERE / "betelgeuse_sky.js").read_text(encoding="utf-8") + (HERE / "betelgeuse.js").read_text(encoding="utf-8") + (HERE / "betelgeuse_away.js").read_text(encoding="utf-8")), encoding="utf-8")
 print(f"  wrote {out21.name}, {out21.stat().st_size // 1024} KB")
 
 # ---- the fourteenth page: an antimatter starship at 1 g ------------------------------------------------------------------
