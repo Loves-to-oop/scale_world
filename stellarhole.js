@@ -241,8 +241,8 @@ let SPECS = [];
 function placeSigns(pc, ac, k, dt) { if (frameN % 10 === 0 || !SPECS.length) { SPECS = signSpecs(pc, ac); const want = new Set(SPECS.map(S => S.id)); for (const o of POOL) if (o.id && !want.has(o.id)) { o.id = null; o.g.visible = false; }
     for (const S of SPECS) if (!POOL.some(o => o.id === S.id)) { const o = POOL.find(o => !o.id); if (!o) break; o.id = S.id; o.S = S; o.g.visible = true; o.drawn = false; } }
   for (const o of POOL) { if (!o.id) continue; const S = o.S; o.g.position.copy(chart(S.d, S.a)); o.mast.position.set(-Math.sin(S.a) * 4.5, 0, Math.cos(S.a) * 4.5); const rel = S.k / k, rps = 0.5 * rel, hz = rel;
-    o.rot += dt * 2 * Math.PI * rps; o.spin.rotation.y = -o.rot % (2 * Math.PI); const fast = rps > 6; o.spin.visible = !fast; o.blur.visible = fast;
-    o.lamp.material = hz > 12 ? lampOn : ((tMap * S.k) % 1 < 0.2 ? lampOn : lampOff); o.lamp.scale.setScalar(hz > 12 ? 0.8 : 1); } }
+    o.rot += dt * TS * 2 * Math.PI * rps; o.spin.rotation.y = -o.rot % (2 * Math.PI); const fast = rps * TS > 6; o.spin.visible = !fast; o.blur.visible = fast;
+    o.lamp.material = hz * TS > 12 ? lampOn : ((tMap * S.k) % 1 < 0.2 ? lampOn : lampOff); o.lamp.scale.setScalar(hz > 12 ? 0.8 : 1); } }
 function drawSigns(k) { for (const o of POOL) { if (!o.id) continue; const S = o.S, g = o.tex.userData.c.getContext("2d"), rel = S.k / k; g.clearRect(0, 0, 512, 256); g.fillStyle = "rgba(16,14,22,.9)"; g.beginPath(); g.roundRect(0, 0, 512, 256, 18); g.fill();
     g.fillStyle = "#ffd060"; g.font = "bold 30px sans-serif"; g.fillText(S.name, 18, 40, 476); g.fillStyle = "#f2eadb"; g.font = "bold 48px monospace"; g.fillText(tod(tMap * S.k), 18, 98, 476); g.font = "24px sans-serif"; g.fillStyle = "#c8c0d8";
     g.fillText(`ticks at ${fmtRate(S.k)} of map time: 1 s = ${perSec(S.k)} far away`, 18, 140, 476);
@@ -267,24 +267,29 @@ const car = new THREE.Group(); scene.add(car);
 const dashT = canvasTex(1024, 440), dash = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 0.352), new THREE.MeshBasicMaterial({ map: dashT, toneMapped: false })); dash.position.set(0.05, 1.0, -0.66); dash.rotation.x = -0.6; car.add(dash);
 let inCar = false;
 // where you and the car are: tape distance p from the horizon and angle a. The car runs on a track straight down East Road, always
-// facing away from the hole, and never turns: W (or the left stick up) rides out to the next stop, S back in, easing in and out.
-// (Turning and changing speed are what make people sick in VR; the stops and the smooth starts and stops keep that down.)
+// facing away from the hole, and never turns: W (or the left stick up) rides out to the next stop, S back in, at an ordinary road speed
+// (30 to 130 km/h, 50 by default), speeding up and slowing down gently at 1.2 m/s². (Turning and hard acceleration are what make
+// people sick in VR.)
 const PL = { p: 6, a: -3 / rs }, CAR = { p: 8, a: 0 }; car.rotation.y = -Math.PI / 2;
 const STOPS = [[8, "the fence"], [100, "Horizon Drive (100 m)"], [MILE, "Mile 1"], [3 * MILE, "Mile 3"], [P_PHOTON, "Photon Sphere Avenue"], [10 * MILE, "Mile 10"], [P_ISCO, "Last Stable Orbit Boulevard"]];
-const RIDE = { on: false, from: 8, to: 8, t: 0, T: 1 }, stopName = v => (STOPS.find(s => Math.abs(s[0] - v) < 1) || [0, fmtLen(v)])[1];
+const RIDE = { on: false, to: 8, v: 0 }, CRUISE = [[8.33, "30 km/h"], [13.9, "50 km/h"], [25, "90 km/h"], [36.1, "130 km/h"]], ACC = 1.2; let cruiseI = 1;
+const stopName = v => (STOPS.find(s => Math.abs(s[0] - v) < 1) || [0, fmtLen(v)])[1];
+const tripTime = d => { const v = CRUISE[cruiseI][0]; return d > v * v / ACC ? d / v + v / ACC : 2 * Math.sqrt(d / ACC); };
+function setCruise(dj) { cruiseI = Math.max(0, Math.min(CRUISE.length - 1, cruiseI + dj)); say(`Car speed ${CRUISE[cruiseI][1]}.`); }
 function nextStop(dir, from) { const L = STOPS.map(s => s[0]); return dir > 0 ? L.find(v => v > from + 1) : [...L].reverse().find(v => v < from - 1); }
-function rideTo(dir) { if (RIDE.on) { say("Wait for the car to reach its stop."); return; } const tgt = nextStop(dir, CAR.p); if (tgt === undefined) { say(dir > 0 ? "This is the last stop outward." : "This is the stop nearest the horizon."); return; }
-  const d = Math.abs(tgt - CAR.p); Object.assign(RIDE, { on: true, from: CAR.p, to: tgt, t: 0, T: 5 + 1.2 * Math.sqrt(d / 10) }); say(`Riding ${dir > 0 ? "out" : "in"} to ${stopName(tgt)}: ${fmtLen(d)}, ${RIDE.T.toFixed(0)} s.`); }
+function rideTo(dir) { const same = RIDE.on && Math.sign(RIDE.to - CAR.p) === dir, tgt = nextStop(dir, same ? RIDE.to : CAR.p); if (tgt === undefined) { say(dir > 0 ? "This is the last stop outward." : "This is the stop nearest the horizon."); return; }
+  const d = Math.abs(tgt - CAR.p); Object.assign(RIDE, { on: true, to: tgt }); const T = tripTime(d); say(`Riding ${dir > 0 ? "out" : "in"} to ${stopName(tgt)}: ${fmtLen(d)} at ${CRUISE[cruiseI][1]}, about ${T < 90 ? Math.round(T) + " s" : Math.round(T / 60) + " min"}. (− and = change the speed.)`); }
 function drawDash(p, k) { const g = dashT.userData.c.getContext("2d"); g.fillStyle = "#0e0c14"; g.fillRect(0, 0, 1024, 440); g.fillStyle = "#8a84a0"; g.font = "26px sans-serif"; g.fillText("YOUR CLOCK", 30, 46); g.fillText("MAP CLOCK (far away)", 540, 46);
   g.fillStyle = "#ffd060"; g.font = "bold 58px monospace"; g.fillText(tod(tYou), 30, 112, 480); g.fillStyle = "#f2eadb"; g.fillText(tod(tMap), 540, 112, 470);
   g.font = "28px sans-serif"; g.fillStyle = "#c8c0d8"; g.fillText(`Your clock runs at ${fmtRate(k)}: each of your seconds is ${perSec(k)} far away`, 30, 176, 960);
-  g.fillText(`Behind map time by ${fmtT(tMap - tYou)}`, 30, 220); g.fillText(`${fmtLen(p)} from the horizon by tape (r is ${fmtLen(xOfP(p))} above rs)`, 30, 264, 960);
-  const no = nextStop(1, CAR.p), ni = nextStop(-1, CAR.p); g.fillStyle = "#ffd060"; g.fillText(RIDE.on ? `Riding to ${stopName(RIDE.to)}` : `W: out to ${no !== undefined ? stopName(no) : "(end)"} · S: in to ${ni !== undefined ? stopName(ni) : "(end)"}`, 30, 320, 960); g.fillStyle = "#8a84a0"; g.font = "24px sans-serif"; g.fillText(streetAt(CAR.p, CAR.a) || "off the road", 30, 370); dashT.needsUpdate = true; }
+  g.fillText(`Behind map time by ${fmtT(tMap - tYou)} · time: ${fmtTS()}`, 30, 220, 960); g.fillText(`${fmtLen(p)} from the horizon by tape (r is ${fmtLen(xOfP(p))} above rs)`, 30, 264, 960);
+  const no = nextStop(1, CAR.p), ni = nextStop(-1, CAR.p); g.fillStyle = "#ffd060"; g.fillText(RIDE.on ? `Riding to ${stopName(RIDE.to)}: ${(Math.abs(RIDE.v) * 3.6).toFixed(0)} km/h, ${fmtLen(Math.abs(RIDE.to - CAR.p))} to go` : `W: out to ${no !== undefined ? stopName(no) : "(end)"} · S: in to ${ni !== undefined ? stopName(ni) : "(end)"}`, 30, 320, 960); g.fillStyle = "#8a84a0"; g.font = "24px sans-serif"; g.fillText(streetAt(CAR.p, CAR.a) || "off the road", 30, 370); dashT.needsUpdate = true; }
 
 // ---------- moving about ----------
 let yaw = Math.PI / 4, pitch = 0.05; const keys = {}; let vrYaw = 0;
 addEventListener("keydown", e => { keys[e.code] = true; if (!started) return;
-  if (e.code === "KeyE") toggleCar(); if (e.code === "KeyG") dropBall(); if (e.code === "KeyM") { slowMo = !slowMo; say(slowMo ? "Slow motion on: dropped balls (G) now take a few seconds to fall and fade." : "Real time: dropped balls vanish as fast as they really would."); }
+  if (e.code === "KeyE") toggleCar(); if (e.code === "KeyG") dropBall(); if (e.code === "KeyM") slowPreset(); if (e.code === "BracketLeft") setTS(TS / 2); if (e.code === "BracketRight") setTS(TS * 2); if (e.code === "Backslash") setTS(1);
+  if (inCar && e.code === "Minus") setCruise(-1); if (inCar && e.code === "Equal") setCruise(1);
   if (inCar && (e.code === "KeyW" || e.code === "ArrowUp")) rideTo(1);
   if (inCar && (e.code === "KeyS" || e.code === "ArrowDown")) rideTo(-1); });
 addEventListener("keyup", e => keys[e.code] = false);
@@ -293,9 +298,13 @@ function toggleCar() { if (inCar) { if (RIDE.on) { say("Wait for the car to stop
   else if (chart(PL.p, PL.a).distanceTo(car.position) < 5) { inCar = true; yaw -= car.rotation.y; vrYaw -= car.rotation.y; say("In the car, on the track down East Road. W rides out to the next stop, S back in; E gets out."); } else say("Walk back to the car (within 5 m) to get in."); }
 // moving by a velocity (vx, vz) in the chart: along the radius it is tape distance, across it true distance at your radius
 function move(S, vx, vz, dt, pmin) { const cs = Math.cos(S.a), sn = Math.sin(S.a), vr = vx * cs + vz * sn, vt = -vx * sn + vz * cs; S.p = Math.min(P_OUT + 3000, Math.max(pmin, S.p + vr * dt)); S.a += vt * dt / rOfP(S.p); }
-let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY }; start(); });
-addEventListener("pointermove", e => { if (!drag) return; yaw -= (e.clientX - drag.x) * 0.004; pitch = THREE.MathUtils.clamp(pitch - (e.clientY - drag.y) * 0.004, -1.5, 1.5); drag.x = e.clientX; drag.y = e.clientY; });
-addEventListener("pointerup", () => drag = null);
+let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, moved: 0 }; start(); });
+addEventListener("pointermove", e => { if (!drag) return; drag.moved += Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y); yaw -= (e.clientX - drag.x) * 0.004; pitch = THREE.MathUtils.clamp(pitch - (e.clientY - drag.y) * 0.004, -1.5, 1.5); drag.x = e.clientX; drag.y = e.clientY; });
+addEventListener("pointerup", e => { if (drag && drag.moved < 6 && started && !renderer.xr.isPresenting) { if (HELD) releaseHeld(); else { const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1), camera); tryGrab(ray.ray.origin, ray.ray.direction, camera); } } drag = null; });
+// VR controllers: point at a thing and hold the trigger to pick it up; release the trigger to let it go
+[0, 1].forEach(i => { const ct = renderer.xr.getController(i); rig.add(ct); const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(0, 0, 0), V3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xffd060 })); l.scale.z = 4; ct.add(l);
+  ct.addEventListener("selectstart", () => { const o = V3(0, 0, 0), d = V3(0, 0, -1); ct.getWorldPosition(o); d.applyQuaternion(ct.getWorldQuaternion(new THREE.Quaternion())); tryGrab(o, d, ct); });
+  ct.addEventListener("selectend", () => { if (HELD && HELD.holder === ct) releaseHeld(); }); });
 const VRB = document.getElementById("vr"), prevB = {};
 const vrC = document.createElement("canvas"); vrC.width = 1024; vrC.height = 560; const vrT = new THREE.CanvasTexture(vrC); vrT.colorSpace = THREE.SRGBColorSpace;
 const vrPanel = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.273), new THREE.MeshBasicMaterial({ map: vrT, transparent: true, depthTest: false, toneMapped: false })); vrPanel.renderOrder = 20; vrPanel.position.set(0, -0.32, -0.7); vrPanel.rotation.x = -0.45; vrPanel.visible = false; camera.add(vrPanel);
@@ -308,23 +317,44 @@ if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { i
 // light's travel back out to you (the tortoise coordinate r + rs ln(r/rs - 1)). By default it runs in real time, your time: near the
 // horizon the pull is so enormous that the ball is gone before you could see it leave your hand. M (X in VR) slows it down so that
 // each fall takes a few seconds to watch.
-const BALLS = [], ballG = new THREE.SphereGeometry(0.35, 16, 12); let slowMo = false;
+const BALLS = [], ballG = new THREE.SphereGeometry(0.35, 16, 12);
+// the rate of time: everything (your clock, the map clock, the signs, people, cars, planes and falling things) runs at TS times real
+// time. [ halves it, ] doubles it, \ goes back to real time, M jumps to a slow motion that shows a fall from where you are in about 7 s.
+let TS = 1, tsPrev = 1;
+const fmtTS = () => TS === 1 ? "real time" : TS < 1 ? `${fmt(1 / TS)}× slower than real time` : `${fmt(TS)}× faster than real time`;
+function setTS(v) { TS = Math.min(1e6, Math.max(1e-15, v)); say(`Time now runs ${fmtTS()} (for everything, your clock too). [ slower, ] faster, \\ real time, M slow motion for a fall.`); }
+function slowPreset() { if (TS !== 1) { setTS(1); return; } const pY = Math.max(0.5, toChart(headP).p), x0 = xOfP(pY), r0 = rs + x0, A = Math.sqrt(x0 / rs), B = { x0, r0, A, eH: 2 * Math.atan(A) };
+  setTS(ballT(B, 2 * Math.asin(Math.sqrt(x0 * (1 - FADE_X) / r0)), x0) * rateP(pY) / 7); }
 // the map time, after the drop, at which you see the ball at infall phase e (from where you stand now, xYou = your r - rs)
 function ballT(B, e, xYou) { const th = Math.tan(e / 2), x = Math.max(1e-300, B.x0 - B.r0 * Math.sin(e / 2) ** 2); return (rs / c) * (Math.log((B.A + th) / (B.A - th)) + B.A * (e + B.r0 / (2 * rs) * (e + Math.sin(e)))) + ((xYou - x) + rs * Math.log(xYou / x)) / c - ((xYou - B.x0) + rs * Math.log(xYou / B.x0)) / c; }
 const FADE_X = (0.02 / 1.6) ** 2;
-function dropBall() { if (!started) return; if (BALLS.length > 5) { const B = BALLS.shift(); scene.remove(B.mesh); }
-  const f = V3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())), at = headP.clone().addScaledVector(f.setY(0).normalize(), 1.2), C = toChart(at), p0 = Math.max(0.5, C.p), x0 = xOfP(p0), r0 = rs + x0, A = Math.sqrt(x0 / rs), eH = 2 * Math.atan(A);
-  const mesh = new THREE.Mesh(ballG, new THREE.MeshStandardMaterial({ color: 0xff8a20, emissive: 0x401800, transparent: true })); scene.add(mesh);
-  const B = { mesh, a: C.a, y: Math.max(0.6, at.y - 0.3), x0, r0, A, eH, T: 0, p: p0, op: 1, tauH: Math.sqrt(r0 ** 3 / (2 * rs * c * c)) * (eH + Math.sin(eH)) }, kYou = rateP(Math.max(0.5, toChart(headP).p));
-  B.tFade = ballT(B, 2 * Math.asin(Math.sqrt(x0 * (1 - FADE_X) / r0)), xOfP(Math.max(0.5, toChart(headP).p))); B.rate = B.tFade / 7; BALLS.push(B);
-  const yours = B.tFade * kYou, slowNote = `each real second shows ${fmtTiny(B.rate * kYou)} of your time (${fmtTiny(B.rate)} of map time)`;
-  say(slowMo ? `You dropped a ball, in slow motion: ${slowNote}. It is not held, so it falls straight toward the hole, speeds up, then seems to slow, redden and freeze at the white line, fading out: from outside you never see it cross the horizon. On its own clock it crosses ${fmtTiny(B.tauH)} after you let go; in your own time the whole fall and fade lasts ${fmtTiny(yours)}. M for real time.`
-    : `You let go of a ball${yours < 0.05 ? ", and it was gone before you could see it leave your hand" : ""}. The pull here is so strong that, in your own time, it fell to the horizon's edge and its image froze and faded in ${fmtTiny(yours)}${yours < 0.05 ? " (the eye needs about 50 ms to see anything)" : ""}. On its own clock it crossed the horizon ${fmtTiny(B.tauH)} after you let go; from outside you never see it cross. Press M for slow motion and drop another.`); }
+// start something falling from where it is: not held by the broken rule, it falls straight in
+function fallFrom(mesh, at, obj) { const C = toChart(at), p0 = Math.max(0.5, C.p), x0 = xOfP(p0), r0 = rs + x0, A = Math.sqrt(x0 / rs), eH = 2 * Math.atan(A), pY = Math.max(0.5, toChart(headP).p);
+  const B = { mesh, obj, a: C.a, y: Math.max(0.25, at.y), x0, r0, A, eH, T: 0, p: p0, op: 1, base: mesh.material.color.clone(), tauH: Math.sqrt(r0 ** 3 / (2 * rs * c * c)) * (eH + Math.sin(eH)) };
+  B.tFade = ballT(B, 2 * Math.asin(Math.sqrt(x0 * (1 - FADE_X) / r0)), xOfP(pY)); BALLS.push(B); const yours = B.tFade * rateP(pY), shown = yours / TS;
+  return `It is not held, so it falls straight toward the hole. In your own time it reaches the horizon's edge, freezes there and fades in ${fmtTiny(yours)}` + (shown < 0.05 ? `: at ${fmtTS()} that is far too fast to see${TS === 1 ? " (it is gone before you could see it leave your hand)" : ""}. Press M for slow motion, or [ to slow time, and try again.` : `; at ${fmtTS()} you watch it for about ${fmtTiny(shown)}.`) + ` On its own clock it crosses the horizon ${fmtTiny(B.tauH)} after you let go; from outside you never see it cross.`; }
+function dropBall() { if (!started) return; if (HELD) { releaseHeld(); return; } if (BALLS.filter(B => !B.obj).length > 5) { const B = BALLS.find(B => !B.obj); scene.remove(B.mesh); BALLS.splice(BALLS.indexOf(B), 1); }
+  const f = V3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())), at = headP.clone().addScaledVector(f.setY(0).normalize(), 1.2); at.y -= 0.3;
+  const mesh = new THREE.Mesh(ballG, new THREE.MeshStandardMaterial({ color: 0xff8a20, emissive: 0x401800, transparent: true })); scene.add(mesh); say("You let go of a ball. " + fallFrom(mesh, at)); }
+// things lying about to pick up (click, or point and hold the trigger in VR) and let go (click again, G, or release the trigger)
+const OBJS = []; let HELD = null;
+{ const kinds = [["crate", new THREE.BoxGeometry(0.5, 0.5, 0.5).translate(0, 0.25, 0), 0xa87a48], ["ball", new THREE.SphereGeometry(0.22, 16, 12).translate(0, 0.22, 0), 0x3a8ad8], ["cone", new THREE.ConeGeometry(0.2, 0.55, 16).translate(0, 0.275, 0), 0xf07020], ["bucket", new THREE.CylinderGeometry(0.2, 0.15, 0.35, 16).translate(0, 0.175, 0), 0xd8d040], ["melon", new THREE.SphereGeometry(0.2, 16, 12).scale(1, 0.8, 1.2).translate(0, 0.16, 0), 0x3a7a3a]];
+  const spot = (p, lat, i) => { const [name, geo, col] = kinds[i % kinds.length], mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: col, roughness: 0.7, transparent: true })); scene.add(mesh); OBJS.push({ name, mesh, home: { p, lat }, state: "rest", base: new THREE.Color(col) }); };
+  [[2.5, -2.2], [3.5, -4.5], [4, 2.6], [5, -6.5], [7, -2.0], [9, -5], [11, -2.5], [13, -7], [16, -4], [20, -1.5], [25, -6], [32, -3]].forEach(([p, lat], i) => spot(p, lat, i));
+  STOPS.slice(1).forEach(([d], si) => [[-1, 5], [1.5, 6.5], [3, 4.5], [-2.5, 7.5], [0.5, 9]].forEach(([dp, lat], i) => spot(d + dp, lat, si + i))); }
+const objRay = new THREE.Raycaster();
+function grab(o, holder) { HELD = o; o.state = "held"; o.holder = holder; holder.attach(o.mesh); o.mesh.position.set(holder === camera ? 0.22 : 0, holder === camera ? -0.28 : 0, holder === camera ? -0.6 : -0.08); say(`You picked up the ${o.name}. Click (or G) to let go; in VR, release the trigger.`); }
+function tryGrab(origin, dir, holder) { if (HELD) return false; objRay.set(origin, dir); objRay.far = 4; const hit = objRay.intersectObjects(OBJS.filter(o => o.state === "rest" && o.mesh.visible).map(o => o.mesh), false)[0]; if (!hit) return false; grab(OBJS.find(o => o.mesh === hit.object), holder); return true; }
+function releaseHeld() { const o = HELD; if (!o) return; HELD = null; const at = o.mesh.getWorldPosition(V3(0, 0, 0)); scene.attach(o.mesh); o.state = "falling"; say(`You let go of the ${o.name}. ` + fallFrom(o.mesh, at, o)); }
+function objStep(dt) { for (const o of OBJS) { if (o.state === "rest") { const rt = rOfP(o.home.p); o.mesh.position.copy(chart(o.home.p, o.home.lat / rt)); o.mesh.visible = o.mesh.position.distanceTo(headP) < 600; }
+    else if (o.state === "gone" && (o.back -= dt) <= 0) { o.state = "rest"; o.mesh.material.opacity = 1; o.mesh.material.color.copy(o.base); o.mesh.visible = true; } } }
 function ballStep(dt, pYou, kYou) { if (!BALLS.length) return; const xYou = xOfP(pYou);
-  for (let i = BALLS.length - 1; i >= 0; i--) { const B = BALLS[i]; B.T += slowMo ? dt * B.rate : dt / kYou;
+  for (let i = BALLS.length - 1; i >= 0; i--) { const B = BALLS[i]; B.T += dt * TS / kYou;
     let lo = 0, hi = B.eH * (1 - 1e-12); for (let it = 0; it < 70; it++) { const mid = 0.5 * (lo + hi); if (ballT(B, mid, xYou) < B.T) lo = mid; else hi = mid; }
     const x = Math.max(1e-300, B.x0 - B.r0 * Math.sin(lo / 2) ** 2); B.p = pOfR(rs + x); B.op = Math.min(1, Math.sqrt(x / B.x0) * 1.6); B.mesh.position.copy(chart(B.p, B.a, B.y));
-    B.mesh.material.opacity = B.op; B.mesh.material.color.setRGB(1, 0.54 * B.op, 0.12 * B.op); if (B.op < 0.02) { scene.remove(B.mesh); BALLS.splice(i, 1); } } }
+    B.mesh.material.opacity = B.op; B.mesh.material.color.copy(B.base).lerp(DEEP_RED, 1 - B.op).multiplyScalar(0.3 + 0.7 * B.op);
+    if (B.op < 0.02) { BALLS.splice(i, 1); if (B.obj) { B.obj.state = "gone"; B.obj.back = 5; B.mesh.visible = false; } else scene.remove(B.mesh); } } }
+const DEEP_RED = new THREE.Color(0x8a1008);
 
 // ---------- the panel ----------
 const PANEL = document.createElement("div"); PANEL.style.cssText = "position:fixed;left:14px;top:14px;width:420px;max-height:calc(100% - 28px);overflow:auto;z-index:2;background:rgba(18,16,24,.86);color:#f0e8dc;font:13.5px/1.45 -apple-system,sans-serif;padding:12px 15px;border-radius:12px;display:none"; document.body.appendChild(PANEL);
@@ -337,18 +367,19 @@ function drawPanel(p, k, r) { const g = GM / (r * r) / k, tide = 2 * GM * 1.7 / 
     <div style="margin-top:8px"><b>Where you are</b>: ${fmtLen(p)} from the horizon by tape${st ? ", on " + st : ""} (Schwarzschild r is only ${fmtLen(r - rs)} above rs)<br>&middot; the hole's pull here: to stay put takes <b>${fmt(g / 9.81)} g</b> (you are held by the broken rule; you feel ordinary Earth gravity)<br>&middot; your clock <b>${tod(tYou)}</b>; map clock (far away) <b>${tod(tMap)}</b><br>&middot; your clock runs at <b>${fmtRate(k)}</b> of map time: each of your seconds is <b>${perSec(k)}</b> far away<br>&middot; you are behind map time by <b>${fmtT(tMap - tYou)}</b><br>&middot; light from far away reaches you ${fmt(1 / k)}× bluer and brighter (not shown); the outside world is squeezed into a circle ${(2 * Math.asin(Math.min(1, 1.5 * Math.sqrt(3) * k * rs / r)) * 180 / Math.PI).toFixed(k < 0.01 ? 2 : 1)}° across behind you</div>
     <div style="margin-top:8px"><b>Clocks at other distances</b> (signs every 100 m on the main roads; spinners turn once every 2 s and lamps blink once a second, by their own time):<br>${[[1, "1 m"], [100, "100 m"], [MILE, "1 mile"], [5 * MILE, "5 miles"], [P_PHOTON, "Photon Sphere Avenue"], [P_ISCO, "Last Stable Orbit Blvd"]].map(([d, n]) => { const kk = rateP(d); return `&middot; ${n}: ${fmtRate(kk)}, reads ${tod(tMap * kk)}, looks ${kk / k > 1 ? fmt(kk / k) + "× faster" : fmt(k / kk) + "× slower"} from here, ${fmt(holdG(rOfP(d), kk) / 9.81)} g`; }).join("<br>")}</div>
     <div style="margin-top:8px;color:#c8c0d8;font-size:12.5px"><b>A second broken rule</b>: things near you are drawn as if their light travelled straight, so you can see them. Here light bends on a curve of radius ${fmtLen(c * c / Math.max(g, 1e-9))}${c * c / g < 2000 ? `: in truth, light from anything more than about ${fmtLen(1.5 * c * c / g)} to the side falls into the hole before it reaches you, and you would see almost nothing of the scene` : c * c / g < 2e5 ? `, so over 100 m the picture is off by about ${(100 / (2 * c * c / g) * 180 / Math.PI).toFixed(1)}°` : ", so the error is small"}. The far view (beyond about 500 m) is drawn with the bending.</div>
-    ${BALLS.length ? `<div style="margin-top:8px"><b>Dropped balls</b> (slow motion, M: each real second shows ${fmtTiny(BALLS[0].rate * k)} of your time): ${BALLS.map(B => `${fmtLen(B.p)} from the horizon, ${B.op < 0.5 ? "frozen at the edge and fading" : "falling"}`).join("; ")}. On its own clock each crosses the horizon ${fmtTiny(BALLS[0].tauH)} after it is dropped; from outside you never see it cross.</div>` : ""}
+    <div style="margin-top:8px"><b>Time</b> runs ${fmtTS()}: each real second shows ${fmtTiny(TS)} of your time and ${fmtTiny(TS / k)} of map time. [ slower, ] faster, \\ real time, M slow motion for a fall.</div>
+    ${BALLS.length ? `<div style="margin-top:8px"><b>Falling</b>: ${BALLS.map(B => `${B.obj ? "the " + B.obj.name : "a ball"} ${fmtLen(B.p)} from the horizon${B.op < 0.5 ? ", frozen at the edge and fading" : ""}`).join("; ")}. From outside you never see anything cross the horizon.</div>` : ""}
     <div style="margin-top:8px;color:#e8b890;font-size:12.5px"><b>What would really happen</b> (the rule broken here: the ground, houses, air and you are held in place). To hold still here takes ${fmt(g, " m/s²")}, ${fmt(g / 9.81)} times Earth's gravity; escape takes ${(esc / c * 100).toFixed(1)}% of the speed of light; the stretch between your head and feet is ${fmt(tide, " m/s²")} (people are torn apart above about 1,000 m/s²; that is reached ${fmtLen(Math.cbrt(2 * GM * 1.7 / 1000))} from the centre). The Earth itself would be torn up and swallowed in minutes.</div>
-    <div style="margin-top:8px;color:#c8c0d8;font-size:12.5px">${inCar ? "In the car on the track: W rides out to the next stop, S back in, E get out." : "Walking: WASD, shift to run, E get in the car (within 5 m)."} Drag to look.</div>`; }
+    <div style="margin-top:8px;color:#c8c0d8;font-size:12.5px">${inCar ? "In the car on the track: W rides out to the next stop, S back in, E get out." : "Walking: WASD, shift to run, E get in the car (within 5 m)."} Click a crate, ball, cone, bucket or melon to pick it up, click again to let go; G lets go of a ball. Drag to look.</div>`; }
 function drawMap(S, h) { const g = MAPC.getContext("2d"), W = 220, sc = W / 2 / EXT, X = v => W / 2 + v * sc; g.clearRect(0, 0, W, W);
   for (const q of SPECIAL) { g.strokeStyle = q.col === "#3a3a3e" ? "#8a8a90" : q.name.startsWith("Photon") ? "#e0a050" : "#60a0e0"; g.lineWidth = 1.5; g.beginPath(); g.arc(X(0), X(0), (rs + q.p) * sc, 0, 7); g.stroke(); }
   g.fillStyle = "#000"; g.beginPath(); g.arc(X(0), X(0), rs * sc, 0, 7); g.fill(); g.strokeStyle = "#6a6a70"; g.stroke();
   g.save(); g.translate(X((rs + S.p) * Math.cos(S.a)), X((rs + S.p) * Math.sin(S.a))); g.rotate(h); g.fillStyle = "#ff5040"; g.beginPath(); g.moveTo(0, -7); g.lineTo(5, 5); g.lineTo(-5, 5); g.fill(); g.restore(); }
 function drawVR(p, k) { const g = vrC.getContext("2d"); g.clearRect(0, 0, 1024, 560); g.fillStyle = "rgba(18,16,24,.85)"; g.beginPath(); g.roundRect(0, 0, 1024, 560, 22); g.fill(); g.fillStyle = "#ffd060"; g.font = "bold 34px sans-serif"; g.fillText(`${fmtLen(p)} from the horizon: your clock ${fmtRate(k)}`, 24, 50, 980);
-  g.fillStyle = "#f0e8dc"; g.font = "30px sans-serif"; g.fillText(`you ${tod(tYou)}   map ${tod(tMap)}`, 24, 100, 980); g.fillText(`each of your seconds is ${perSec(k)} far away`, 24, 145, 980);
+  g.fillStyle = "#f0e8dc"; g.font = "30px sans-serif"; g.fillText(`you ${tod(tYou)}   map ${tod(tMap)}`, 24, 100, 980); g.fillText(`each of your seconds is ${perSec(k)} far away · time: ${fmtTS()}`, 24, 145, 980);
   if (lastMsg && msgT > 0) { g.fillStyle = "#ffc870"; g.font = "24px sans-serif"; let ln = "", y = 200; for (const w of lastMsg.replace(/<[^>]+>/g, "").split(" ")) { if (g.measureText(ln + w).width > 970) { g.fillText(ln, 24, y); y += 31; ln = ""; if (y > 540) break; } ln += w + " "; } if (y <= 540) g.fillText(ln, 24, y); } vrT.needsUpdate = true; }
 function start() { if (started) return; started = true; T0 = Date.now(); document.getElementById("intro")?.classList.add("gone"); PANEL.style.display = "block"; MAPC.style.display = "block";
-  say(`You are standing 6 m (by tape) from the event horizon of a black hole of three solar masses. The black wall is its edge; the white line on the grass is where it meets the ground. Your clock runs at ${fmtRate(rateP(6))} of the time far away: each of your seconds is ${perSec(rateP(6))} out there. So close, almost all light from outside falls in: behind you the whole world is squeezed into a tiny bright dot. The field is lined every 5 m; clock signs show the time at each distance, then a mile marker every mile. Spinners and lamps on the clock signs run at their own pace: from here the farther ones look faster. Press G to let go of a ball (M for slow motion). Your car is beside you (E to get in).`); }
+  say(`You are standing 6 m (by tape) from the event horizon of a black hole of three solar masses. The black wall is its edge; the white line on the grass is where it meets the ground. Your clock runs at ${fmtRate(rateP(6))} of the time far away: each of your seconds is ${perSec(rateP(6))} out there. So close, almost all light from outside falls in: behind you the whole world is squeezed into a tiny bright dot. The field is lined every 5 m; clock signs show the time at each distance, then a mile marker every mile. Spinners and lamps on the clock signs run at their own pace: from here the farther ones look faster. Click the crates, balls and cones lying about to pick them up, and click again to let go (G lets go of a ball); [ and ] slow and speed up time, M is slow motion. Your car is beside you (E to get in).`); }
 document.getElementById("intro")?.addEventListener("click", start);
 
 // ---------- the loop ----------
@@ -356,11 +387,14 @@ const clock = new THREE.Clock(), fwd = V3(0, 0, 0), headP = V3(0, 0, 0); let fra
 renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.1), vr = renderer.xr.isPresenting; frameN++;
   let mx = 0, my = 0, vrRun = false;
   if (vr) { const s = renderer.xr.getSession(); for (const src of s ? s.inputSources : []) { const gp = src.gamepad; if (!gp) continue; const a = gp.axes, ax = a.length >= 4 ? 2 : 0;
-      if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; vrRun = !!gp.buttons[0]?.pressed; const bX = gp.buttons[4]?.pressed; if (bX && !prevB.x) { slowMo = !slowMo; say(slowMo ? "Slow motion on for dropped balls." : "Real time for dropped balls."); } prevB.x = bX;
+      if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; vrRun = !!gp.buttons[0]?.pressed; const bX = gp.buttons[4]?.pressed; if (bX && !prevB.x) slowPreset(); prevB.x = bX;
+        if (inCar) { if (mx > 0.75 && !prevB.rt) { setCruise(1); prevB.rt = true; } else if (mx < 0.3) prevB.rt = false; if (mx < -0.75 && !prevB.lf) { setCruise(-1); prevB.lf = true; } else if (mx > -0.3) prevB.lf = false; }
         if (inCar) { if (my < -0.75 && !prevB.up) { rideTo(1); prevB.up = true; } else if (my > -0.3) prevB.up = false; if (my > 0.75 && !prevB.dn) { rideTo(-1); prevB.dn = true; } else if (my < 0.3) prevB.dn = false; } }
-      else { const tx = a[ax] || 0; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const bA = gp.buttons[4]?.pressed; if (bA && !prevB.a) toggleCar(); prevB.a = bA; const bB = gp.buttons[5]?.pressed; if (bB && !prevB.b) dropBall(); prevB.b = bB; } } }
+      else { const tx = a[ax] || 0, ty = a[ax + 1] || 0; if (ty < -0.75 && !prevB.tu) { setTS(TS * 2); prevB.tu = true; } else if (ty > -0.3) prevB.tu = false; if (ty > 0.75 && !prevB.td) { setTS(TS / 2); prevB.td = true; } else if (ty < 0.3) prevB.td = false;
+        if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const bA = gp.buttons[4]?.pressed; if (bA && !prevB.a) toggleCar(); prevB.a = bA; const bB = gp.buttons[5]?.pressed; if (bB && !prevB.b) dropBall(); prevB.b = bB; } } }
   else if (!inCar) { if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD) mx += 1; if (keys.KeyA) mx -= 1; }
-  if (RIDE.on) { RIDE.t += dt; const f = Math.min(1, RIDE.t / RIDE.T); CAR.p = RIDE.from + (RIDE.to - RIDE.from) * (1 - Math.cos(Math.PI * f)) / 2; if (f >= 1) { RIDE.on = false; const kk = rateP(CAR.p); say(`${stopName(CAR.p)}: your clock runs at ${fmtRate(kk)}, each of your seconds ${perSec(kk)} far away. W rides on out, S back in, E gets out.`); } }
+  if (RIDE.on) { const d = RIDE.to - CAR.p, want = Math.sign(d) * Math.min(CRUISE[cruiseI][0], Math.sqrt(2 * ACC * Math.abs(d))); RIDE.v += THREE.MathUtils.clamp(want - RIDE.v, -ACC * dt, ACC * dt); CAR.p = Math.max(3, CAR.p + RIDE.v * dt);
+    if (Math.abs(RIDE.to - CAR.p) < 0.05 && Math.abs(RIDE.v) < 0.3) { CAR.p = RIDE.to; RIDE.v = 0; RIDE.on = false; const kk = rateP(CAR.p); say(`${stopName(CAR.p)}: your clock runs at ${fmtRate(kk)}, each of your seconds ${perSec(kk)} far away. W rides on out, S back in, E gets out.`); } }
   if (started && !inCar) { const f = V3(0, 0, 0); camera.getWorldDirection(f); f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize(); const sp = keys.ShiftLeft || keys.ShiftRight || vrRun ? 12 : 3; move(PL, (f.x * -my - f.z * mx) * sp, (f.z * -my + f.x * mx) * sp, dt, 1); }
   const Y = inCar ? CAR : PL; c0 = rOfP(Y.p) - Y.p;
   car.position.copy(chart(CAR.p, CAR.a)); car.rotation.x = 0;
@@ -368,7 +402,7 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.1), vr
   else { rig.position.copy(chart(PL.p, PL.a)); rig.rotation.y = vr ? vrYaw : 0; if (!vr) { camera.position.set(0, 1.65, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); } }
   camera.getWorldPosition(headP); const H = toChart(headP); H.p = Math.max(0.3, H.p); const xh = xOfP(H.p), rh = rs + xh, k = Math.sqrt(xh / rh);
   farMat.uniforms.camS.value.set(rh * Math.cos(H.a) / 1000, headP.y / 1000, rh * Math.sin(H.a) / 1000); farMat.uniforms.camX.value = xh / 1000;
-  const dtMap = started ? dt / k : 0; if (started) { tYou += dt; tMap += dtMap; }
+  const dtMap = started ? dt * TS / k : 0; if (started) { tYou += dt * TS; tMap += dtMap; } objStep(dt);
   moversStep(Y.p, Y.a); planesStep(dtMap, Y.p);
   vigS += ((vr && ((inCar && RIDE.on) || (!inCar && (mx || my))) ? (inCar ? 0.95 : 0.8) : 0) - vigS) * Math.min(1, dt * 4); vig.material.uniforms.s.value = vigS; vig.visible = vigS > 0.01;
   farView.position.copy(headP);
