@@ -603,7 +603,9 @@ BG = BG[:i0] + """<div id="intro"><div class="card">
   <h1>Betelgeuse, from 30 AU</h1>
   <p>Betelgeuse, the red shoulder of Orion, is a red supergiant near the end of its life: about 760 times the Sun's width (in our Solar
   System it would reach past Mars), only 3,600 K at its surface but 126,000 times as bright as the Sun, and it should explode as a
-  supernova within about 100,000 years. You are in the glass cupola of a ship 30 AU from it, on the side facing the Sun.</p>
+  supernova within about 100,000 years. You are in the glass observation sphere of a ship 30 AU from it, on the side facing the Sun: an 8 m bubble on an arm
+  from the ship's long spine, standing on an open grating, so you can look down past your feet at the ship: its tanks, radiators and
+  engine. A dark patch on the glass, like a welding helmet's, filters the star: its surface would burn your eyes from any distance.</p>
   <p>All its energy comes from a small, dense core, hidden deep inside a vast envelope of thin gas: at the visible surface the gas is
   thinner than a laboratory vacuum, yet the envelope is so deep that you cannot see into it, so it still looks like a glowing ball,
   redder than its temperature because titanium oxide in its atmosphere soaks up green and blue light.
@@ -614,9 +616,10 @@ BG = BG[:i0] + """<div id="intro"><div class="card">
   <p>Fly the ship (the console in the dome, the list in the panel, or keys 1-9) to Siwarha inside Betelgeuse's outer atmosphere,
   to within 6 AU of the star, to a comet with tails hundreds of millions of km long, and out to the plausible worlds a star like this
   could have: a young super-Jupiter still glowing from its own heat, with a volcanic moon; a ringed ice giant where the light equals
-  Earth's sunlight; a brown dwarf; the far comet belt. Trips use a 1 g drive, their real durations given and shown speeded up.</p>
-  <p>Drag to look &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk round the cupola &nbsp;&middot;&nbsp; <kbd>1</kbd>-<kbd>9</kbd> fly somewhere &nbsp;&middot;&nbsp; <kbd>H</kbd> labels &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time<br>
-  In VR: left stick walk, right stick turn, point at the console and pull the trigger to fly, <b>B</b> labels, <b>A</b> speed up time.</p>
+  Earth's sunlight; a brown dwarf; the far comet belt. Trips are flown like a real ship's: a slow turn (skipped), a 1 g burn with your destination overhead,
+  a turn at the midpoint, a burn to slow with it beneath your feet; real durations given, shown speeded up.</p>
+  <p>Drag to look &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk round the cupola &nbsp;&middot;&nbsp; <kbd>1</kbd>-<kbd>9</kbd> fly somewhere &nbsp;&middot;&nbsp; <kbd>F</kbd> filter &nbsp;&middot;&nbsp; <kbd>H</kbd> labels &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time<br>
+  In VR: left stick walk, right stick turn, point at the console and pull the trigger to fly, <b>X</b> filter, <b>B</b> labels, <b>A</b> speed up time.</p>
   <p class="dim">Sizes, temperature, brightness and distance are measured (with real uncertainties, given in the panel); the surface pattern, glow and dust
   are typical, not maps; the companion is a 2025 detection, not yet certain; the planets, brown dwarf and comet are plausible inventions. Stars: AT-HYG v3.2 (Gaia DR3 distances where available). Click to begin.</p>
 </div></div>
