@@ -607,7 +607,8 @@ BG = BG[:i0] + """<div id="intro"><div class="card">
   from the ship's long spine, standing on an open grating, so you can look down past your feet at the ship: its tanks, radiators and
   engine. A dark patch on the glass, like a welding helmet's, filters the star: its surface would burn your eyes from any distance.
   Walk through the arm into the crew module and take the lift between its decks: the airlock and suit room with the storm shelter,
-  the commons and galley, the bridge, the crew quarters.</p>
+  the commons and galley, the bridge, life support and the medical bay; down the spine to the hub, and out by spoke lift to the
+  spinning ring, 114 m across at 4 turns a minute, whose spin gives 1 g: the crew's quarters, the farm, the gym, the lounge.</p>
   <p>All its energy comes from a small, dense core, hidden deep inside a vast envelope of thin gas: at the visible surface the gas is
   only a millionth as dense as air (a rough vacuum; labs make far better), yet the envelope is so deep that you cannot see into it, so it still looks like a glowing ball,
   redder than its temperature because titanium oxide in its atmosphere soaks up green and blue light.
@@ -621,11 +622,12 @@ BG = BG[:i0] + """<div id="intro"><div class="card">
   super-Earth, still cooling, where the light equals Earth's sunlight (around so bright a star, rocky planets form far out); a brown
   dwarf; the far comet belt. Trips are flown in real time like a real ship's: a slow turn, a 1 g burn with your destination overhead
   (the thrust gives you weight), a turn at the midpoint, a burn to slow with it beneath your feet. A trip takes days to weeks: speed
-  time up with <kbd>]</kbd> (it eases off for the arrival). With the engine off you would float; you are held to the floor.</p>
+  time up with <kbd>]</kbd> (it eases off for the arrival). With the engine off there is no weight outside the spinning ring: you would float, pulling
+  yourself along handrails (your view is kept upright).</p>
   <p>Drag to look &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk (shift faster) &nbsp;&middot;&nbsp; in the lift <kbd>E</kbd> up, <kbd>Q</kbd> down &nbsp;&middot;&nbsp; <kbd>1</kbd>-<kbd>0</kbd> fly somewhere &nbsp;&middot;&nbsp; <kbd>[</kbd> <kbd>]</kbd> slower, faster time, <kbd>\\</kbd> real time &nbsp;&middot;&nbsp; <kbd>F</kbd> filter &nbsp;&middot;&nbsp; <kbd>H</kbd> labels &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time<br>
   In VR: left stick walk, right stick turn (up or down in the lift), point at the console and pull the trigger to fly, <b>X</b> filter, <b>B</b> labels, <b>A</b> faster time, <b>Y</b> slower.</p>
   <p class="dim">Sizes, temperature, brightness and distance are measured (with real uncertainties, given in the panel); the surface pattern, glow and dust
-  are typical, not maps; the companion is a 2025 detection, not yet certain; the planets, brown dwarf and comet are plausible inventions. Stars: AT-HYG v3.2 (Gaia DR3 distances where available). Click to begin.</p>
+  are typical, not maps; the companion is a 2025 detection, not yet certain; the giant planet, brown dwarf and comet are plausible inventions, the rocky worlds speculative. Stars: AT-HYG v3.2 (Gaia DR3 distances where available). Click to begin.</p>
 </div></div>
 """ + BG[i1:]
 out21 = HERE / "betelgeuse.html"
