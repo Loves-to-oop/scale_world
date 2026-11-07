@@ -297,7 +297,7 @@ const car = new THREE.Group(); scene.add(car);
     const h = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.25, 16).rotateZ(Math.PI / 2), chrome); h.position.copy(w.position); car.add(h); } }
 // the dashboard: your clock, the map clock, and how fast yours is running
 const dashT = canvasTex(1024, 440), dash = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 0.352), new THREE.MeshBasicMaterial({ map: dashT, toneMapped: false })); dash.position.set(0.05, 1.0, -0.66); dash.rotation.x = -0.6; car.add(dash);
-let inCar = false;
+let inCar = false, FACTS_BOARD = null;
 // where you and the car are: tape distance p from the horizon and angle a. The car runs on a track straight down East Road, always
 // facing away from the hole, and never turns: W (or the left stick up) rides out to the next stop, S back in, at an ordinary road speed
 // (30 to 130 km/h, 50 by default), speeding up and slowing down gently at 1.2 m/s². (Turning and hard acceleration are what make
@@ -315,19 +315,63 @@ function drawDash(p, k) { const g = dashT.userData.c.getContext("2d"); g.fillSty
   g.fillStyle = "#ffd060"; g.font = "bold 58px monospace"; g.fillText(tod(tYou), 30, 112, 480); g.fillStyle = "#f2eadb"; g.fillText(tod(tMap), 540, 112, 470);
   g.font = "28px sans-serif"; g.fillStyle = "#c8c0d8"; g.fillText(`Your clock runs at ${fmtRate(k)}: each of your seconds is ${perSec(k)} far away`, 30, 176, 960);
   g.fillText(`Behind map time by ${fmtT(tMap - tYou)} · time: ${fmtTS()}`, 30, 220, 960); g.fillText(`${fmtLen(p)} from the horizon by tape (r is ${fmtLen(xOfP(p))} above rs)`, 30, 264, 960);
-  const no = nextStop(1, CAR.p), ni = nextStop(-1, CAR.p); g.fillStyle = "#ffd060"; g.fillText(RIDE.on ? `Riding to ${stopName(RIDE.to)}: ${(Math.abs(RIDE.v) * 3.6).toFixed(0)} km/h, ${fmtLen(Math.abs(RIDE.to - CAR.p))} to go` : `W: out to ${no !== undefined ? stopName(no) : "(end)"} · S: in to ${ni !== undefined ? stopName(ni) : "(end)"}`, 30, 320, 960); g.fillStyle = "#8a84a0"; g.font = "24px sans-serif"; g.fillText(streetAt(CAR.p, CAR.a) || "off the road", 30, 370); dashT.needsUpdate = true; }
+  const no = nextStop(1, CAR.p), ni = nextStop(-1, CAR.p); g.fillStyle = "#ffd060"; g.fillText(RIDE.on ? `Riding to ${stopName(RIDE.to)}: ${(Math.abs(RIDE.v) * 3.6).toFixed(0)} km/h, ${fmtLen(Math.abs(RIDE.to - CAR.p))} to go` : `W: out to ${no !== undefined ? stopName(no) : "(end)"} · S: in to ${ni !== undefined ? stopName(ni) : "(end)"}`, 30, 320, 960); g.fillStyle = "#8a84a0"; g.font = "24px sans-serif"; g.fillText(`${streetAt(CAR.p, CAR.a) || "off the road"} · speed ${CRUISE[cruiseI][1]} (− and =, or left stick left / right: up to 130 km/h)`, 30, 370, 960); dashT.needsUpdate = true; }
+
+// ---------- the helicopter: from the fence to Last Stable Orbit Boulevard and back ----------
+// It takes off, climbs to 200 m, flies straight, and lands, with gentle starts and stops; it turns only on the ground, slowly.
+const HSPEEDS = [[41.7, "150 km/h"], [80.6, "290 km/h (about a helicopter's top speed)"], [278, "1,000 km/h (faster than any helicopter)"], [1111, "4,000 km/h (faster than any helicopter)"]]; let hsI = 1, inHeli = false;
+const HPADS = [{ p: 22, lat: -26, name: "the fence" }, { p: P_ISCO + 10, lat: -70, name: "Last Stable Orbit Boulevard" }];
+const HELI = { p: 22, lat: -26, a: 0, y: 0, head: -Math.PI / 2, pad: 0, fl: null, spin: 0 };
+const heli = new THREE.Group(), rotor = new THREE.Group(), trotor = new THREE.Group(); scene.add(heli);
+{ const body = M(0xd8a020, { metalness: 0.3, roughness: 0.4 }), dark = M(0x2a2a2e), glass = new THREE.MeshStandardMaterial({ color: 0x9ac8e0, transparent: true, opacity: 0.35, roughness: 0.1 });
+  const add = (geo, mat, x, y, z, par = heli) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); par.add(m); return m; };
+  add(new THREE.BoxGeometry(2.3, 1.9, 3.6), body, 0, 1.55, 0.3); add(new THREE.SphereGeometry(1.2, 16, 12).scale(1, 0.85, 1.1), glass, 0, 1.75, -1.6); add(new THREE.BoxGeometry(2.2, 0.15, 1.6), dark, 0, 0.62, -1.0);
+  add(new THREE.CylinderGeometry(0.28, 0.45, 6, 10).rotateX(Math.PI / 2), body, 0, 1.9, 4.9); add(new THREE.BoxGeometry(0.12, 1.6, 1.1), body, 0, 2.6, 7.7);
+  for (const x of [-0.42, 0.42]) { add(new THREE.BoxGeometry(0.55, 0.12, 0.55), M(0x3a3a40), x, 0.85, -0.6); add(new THREE.BoxGeometry(0.55, 0.7, 0.1), M(0x3a3a40), x, 1.2, -0.3); }
+  for (const x of [-1.1, 1.1]) { add(new THREE.CylinderGeometry(0.06, 0.06, 4.2, 6).rotateX(Math.PI / 2), dark, x, 0.08, 0.1); for (const z of [-0.9, 1.2]) add(new THREE.CylinderGeometry(0.05, 0.05, 0.6, 6), dark, x * 0.8, 0.35, z); }
+  rotor.position.set(0, 2.75, 0.3); heli.add(rotor); add(new THREE.CylinderGeometry(0.12, 0.12, 0.3, 8), dark, 0, 0, 0, rotor); for (const r of [0, Math.PI / 2]) { const b = add(new THREE.BoxGeometry(11, 0.06, 0.38), dark, 0, 0.12, 0, rotor); b.rotation.y = r; }
+  trotor.position.set(0.18, 2.6, 7.9); heli.add(trotor); add(new THREE.BoxGeometry(0.04, 1.5, 0.16), dark, 0, 0, 0, trotor); }
+const ease = f => f * f * (3 - 2 * f);
+function heliFlight() { if (HELI.fl) { say("The helicopter is already flying."); return; } const to = HPADS[1 - HELI.pad], dp = to.p - HELI.p, dl = to.lat - HELI.lat, L = Math.hypot(dp, dl), head = Math.atan2(-dp, -dl);
+  let dh = ((head - HELI.head + 3 * Math.PI) % (2 * Math.PI)) - Math.PI; HELI.fl = { from: { p: HELI.p, lat: HELI.lat }, to, L, s: 0, v: 0, stage: Math.abs(dh) > 0.05 ? "turn" : "up", t: 0, h0: HELI.head, dh };
+  const v = HSPEEDS[hsI][0], acc = Math.max(2, v / 40), T = 50 + (L > v * v / acc ? L / v + v / acc : 2 * Math.sqrt(L / acc)); say(`Taking off for ${to.name}: ${fmtLen(L)} at ${HSPEEDS[hsI][1]}, about ${T < 120 ? Math.round(T) + " s" : Math.round(T / 60) + " min"}. (− and = change the speed.)`); }
+function heliStep(dt) { const F = HELI.fl; HELI.spin += ((F ? 1 : 0) - HELI.spin) * Math.min(1, dt * 0.6);
+  if (F) { F.t += dt;
+    if (F.stage === "turn") { const T = Math.abs(F.dh) / (Math.PI / 10), f = Math.min(1, F.t / T); HELI.head = F.h0 + F.dh * ease(f); if (f >= 1) { F.stage = "up"; F.t = 0; } }
+    else if (F.stage === "up") { const f = Math.min(1, Math.max(0, F.t - 3) / 22); HELI.y = 200 * ease(f); if (f >= 1) { F.stage = "cruise"; F.t = 0; } }
+    else if (F.stage === "cruise") { F.acc = Math.max(2, HSPEEDS[hsI][0] / 40); const want = Math.min(HSPEEDS[hsI][0], Math.sqrt(2 * F.acc * Math.max(0, F.L - F.s))); F.v += THREE.MathUtils.clamp(want - F.v, -F.acc * dt, F.acc * dt); F.s = Math.min(F.L, F.s + F.v * dt);
+      HELI.p = F.from.p + (F.to.p - F.from.p) * F.s / F.L; HELI.lat = F.from.lat + (F.to.lat - F.from.lat) * F.s / F.L; if (F.L - F.s < 0.05 && F.v < 0.3) { F.stage = "down"; F.t = 0; } }
+    else if (F.stage === "down") { const f = Math.min(1, F.t / 22); HELI.y = 200 * (1 - ease(f)); if (f >= 1) { HELI.y = 0; HELI.pad = 1 - HELI.pad; HELI.fl = null; say(`Landed at ${F.to.name}. W flies back to ${HPADS[1 - HELI.pad].name}; E gets out.`); } } }
+  HELI.a = HELI.lat / rOfP(HELI.p); heli.position.copy(chart(HELI.p, HELI.a, HELI.y)); heli.rotation.y = HELI.head; rotor.rotation.y += dt * 30 * HELI.spin; trotor.rotation.x += dt * 90 * HELI.spin; heli.visible = heli.position.distanceTo(headP) < 5000 || inHeli; FACTS_BOARD.position.copy(chart(4, -16 / rOfP(4))); FACTS_BOARD.visible = FACTS_BOARD.position.distanceTo(headP) < 1500; }
+
+// ---------- a billboard at the horizon's edge: the black hole's facts ----------
+const factsTex = canvasTex(1024, 720, (g, W, Hh) => { g.fillStyle = "#101018"; g.fillRect(0, 0, W, Hh); g.strokeStyle = "#ffd060"; g.lineWidth = 8; g.strokeRect(4, 4, W - 8, Hh - 8);
+  g.fillStyle = "#ffd060"; g.font = "bold 40px sans-serif"; g.fillText("THE BLACK HOLE", 28, 56); g.font = "22px sans-serif"; g.fillStyle = "#f2eadb";
+  const lines = [`Mass: 3 Suns (${fmt(Mbh, " kg")}), about the lightest black hole a dying star can leave behind.`, `Event horizon: radius ${fmtLen(rs)} (2GM/c²), ${fmtLen(2 * Math.PI * rs)} round, ${fmt(4 * Math.PI * rs * rs / 1e6)} km² of surface.`, `Half of it is the black wall behind this sign.`,
+    `Nothing that crosses it comes back out, not even light. Inside, anything reaches the centre`, `within ${fmtTiny(Math.PI * GM / c ** 3)} of its own time.`, `At the horizon the tides would stretch a person with ${fmt(tideG(rs) / 9.81)} g: a hole this small tears you apart`, `before you reach it. (At a giant black hole you could cross without noticing.)`,
+    `Light can circle it ${fmtLen(1.5 * rs)} from the centre (the photon sphere); the closest lasting orbit is at ${fmtLen(3 * rs)}.`, `From far away its shadow looks ${fmtLen(2 * bcrit)} across.`, `Here, 6 m from the horizon by tape, one of your seconds is ${perSec(rateP(6))} far away; space is stretched too:`, `those 6 m of tape are only ${fmtLen(xOfP(6))} of radius.`,
+    `Its Hawking temperature is ${fmt(T_HAWK, " K")}, colder than the 2.7 K of space, so it grows by swallowing light;`, `alone, it would take ${fmt(T_EVAP_YR)} years to evaporate. Mean density inside the horizon: ${fmt(Mbh / (4 / 3 * Math.PI * rs ** 3), " kg/m³")}.`,
+    `The nearest known black hole, Gaia BH1, is about 1,560 light-years away, with 9.6 times the Sun's mass.`];
+  lines.forEach((t, i) => g.fillText(t, 28, 104 + i * 43, W - 56)); });
+{ const g = new THREE.Group(), at = chart(4, -16 / rs), me = chart(6, -3 / rs); g.position.copy(at); for (const x of [-5, 5]) { const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 8.5, 8).translate(0, 4.25, 0), M(0x9a9aa2, { metalness: 0.6 })); pole.position.x = x; g.add(pole); }
+  const b = new THREE.Mesh(new THREE.PlaneGeometry(11, 7.7), new THREE.MeshBasicMaterial({ map: factsTex, toneMapped: false, side: THREE.DoubleSide })); b.position.y = 5.2; g.add(b); g.rotation.y = Math.atan2(me.x - at.x, me.z - at.z); scene.add(g); FACTS_BOARD = g; }
 
 // ---------- moving about ----------
 let yaw = Math.PI / 4, pitch = 0.05; const keys = {}; let vrYaw = 0;
 addEventListener("keydown", e => { keys[e.code] = true; if (!started) return;
   if (e.code === "KeyE") toggleCar(); if (e.code === "KeyG") dropBall(); if (e.code === "KeyM") slowPreset(); if (e.code === "BracketLeft") setTS(TS / 2); if (e.code === "BracketRight") setTS(TS * 2); if (e.code === "Backslash") setTS(1);
   if (inCar && e.code === "Minus") setCruise(-1); if (inCar && e.code === "Equal") setCruise(1);
+  if (inHeli && (e.code === "Minus" || e.code === "Equal")) { hsI = Math.max(0, Math.min(HSPEEDS.length - 1, hsI + (e.code === "Equal" ? 1 : -1))); say(`Helicopter speed ${HSPEEDS[hsI][1]}.`); }
+  if (inHeli && (e.code === "KeyW" || e.code === "ArrowUp")) heliFlight();
   if (inCar && (e.code === "KeyW" || e.code === "ArrowUp")) rideTo(1);
   if (inCar && (e.code === "KeyS" || e.code === "ArrowDown")) rideTo(-1); });
 addEventListener("keyup", e => keys[e.code] = false);
 const toChart = v => { const R = Math.hypot(v.x, v.z); return { p: R - c0, a: Math.atan2(v.z, v.x) }; };
-function toggleCar() { if (inCar) { if (RIDE.on) { say("Wait for the car to stop before you get out."); return; } inCar = false; const s = V3(-2.4, 0, 0.3).applyEuler(new THREE.Euler(0, car.rotation.y, 0)).add(car.position); Object.assign(PL, toChart(s)); PL.p = Math.max(1, PL.p); yaw += car.rotation.y; vrYaw += car.rotation.y; say("On foot. WASD to walk, shift to run; E by the car to get back in."); }
-  else if (chart(PL.p, PL.a).distanceTo(car.position) < 5) { inCar = true; yaw -= car.rotation.y; vrYaw -= car.rotation.y; say("In the car, on the track down East Road. W rides out to the next stop, S back in; E gets out."); } else say("Walk back to the car (within 5 m) to get in."); }
+function toggleCar() { if (inHeli) { if (HELI.fl) { say("Wait until the helicopter has landed."); return; } inHeli = false; const sp = V3(-3, 0, 0).applyEuler(heli.rotation).add(heli.position); sp.y = 0; Object.assign(PL, toChart(sp)); PL.p = Math.max(1, PL.p); yaw += HELI.head; vrYaw += HELI.head; say("Out of the helicopter. E beside it to get back in."); return; }
+  if (inCar) { if (RIDE.on) { say("Wait for the car to stop before you get out."); return; } inCar = false; const s = V3(-2.4, 0, 0.3).applyEuler(new THREE.Euler(0, car.rotation.y, 0)).add(car.position); Object.assign(PL, toChart(s)); PL.p = Math.max(1, PL.p); yaw += car.rotation.y; vrYaw += car.rotation.y; say("On foot. WASD to walk, shift to run; E by the car or the helicopter to get in."); return; }
+  const me = chart(PL.p, PL.a);
+  if (me.distanceTo(heli.position) < 7) { inHeli = true; yaw -= HELI.head; vrYaw -= HELI.head; const to = HPADS[1 - HELI.pad], L = Math.hypot(to.p - HELI.p, to.lat - HELI.lat); say(`In the helicopter. W takes off for ${to.name} (${fmtLen(L)} at ${HSPEEDS[hsI][1]}); − and = change the speed; E gets out.`); return; }
+  if (me.distanceTo(car.position) < 5) { inCar = true; yaw -= car.rotation.y; vrYaw -= car.rotation.y; say("In the car, on the track down East Road. W rides out to the next stop, S back in, − and = set the speed (up to 130 km/h); E gets out."); } else say("Walk to the car (within 5 m) or the helicopter (within 7 m) to get in."); }
 // moving by a velocity (vx, vz) in the chart: along the radius it is tape distance, across it true distance at your radius
 function move(S, vx, vz, dt, pmin) { const cs = Math.cos(S.a), sn = Math.sin(S.a), vr = vx * cs + vz * sn, vt = -vx * sn + vz * cs; S.p = Math.min(P_OUT + 3000, Math.max(pmin, S.p + vr * dt)); S.a += vt * dt / rOfP(S.p); }
 let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, moved: 0 }; start(); });
@@ -403,7 +447,7 @@ function drawPanel(p, k, r) { const g = GM / (r * r) / k, tide = 2 * GM * 1.7 / 
     <div style="margin-top:8px"><b>Time</b> runs ${fmtTS()}: each real second shows ${fmtTiny(TS)} of your time and ${fmtTiny(TS / k)} of map time. [ slower, ] faster, \\ real time, M slow motion for a fall.</div>
     ${BALLS.length ? `<div style="margin-top:8px"><b>Falling</b>: ${BALLS.map(B => `${B.obj ? "the " + B.obj.name : "a ball"} ${fmtLen(B.p)} from the horizon${B.op < 0.5 ? ", frozen at the edge and fading" : ""}`).join("; ")}. From outside you never see anything cross the horizon.</div>` : ""}
     <div style="margin-top:8px;color:#e8b890;font-size:12.5px"><b>What would really happen</b> (the rule broken here: the ground, houses, air and you are held in place). To hold still here takes ${fmt(g, " m/s²")}, ${fmt(g / 9.81)} times Earth's gravity; escape takes ${(esc / c * 100).toFixed(1)}% of the speed of light; the stretch between your head and feet is ${fmt(tide, " m/s²")} (people are torn apart above about 1,000 m/s²; that is reached ${fmtLen(Math.cbrt(2 * GM * 1.7 / 1000))} from the centre). The Earth itself would be torn up and swallowed in minutes.</div>
-    <div style="margin-top:8px;color:#c8c0d8;font-size:12.5px">${inCar ? "In the car on the track: W rides out to the next stop, S back in, E get out." : "Walking: WASD, shift to run, E get in the car (within 5 m)."} Click a crate, ball, cone, bucket or melon to pick it up, click again to let go; G lets go of a ball. Drag to look.</div>`; }
+    <div style="margin-top:8px;color:#c8c0d8;font-size:12.5px">${inCar ? "In the car on the track: W rides out to the next stop, S back in, − and = speed (up to 130 km/h), E get out." : inHeli ? `In the helicopter: W flies to ${HPADS[1 - HELI.pad].name}, − and = speed (${HSPEEDS[hsI][1]}), E get out when landed.` : "Walking: WASD, shift to run, E get in the car (within 5 m) or the helicopter parked in the field."} Click a crate, ball, cone, bucket or melon to pick it up, click again to let go; G lets go of a ball. Drag to look.</div>`; }
 function drawMap(S, h) { const g = MAPC.getContext("2d"), W = 220, sc = W / 2 / EXT, X = v => W / 2 + v * sc; g.clearRect(0, 0, W, W);
   for (const q of SPECIAL) { g.strokeStyle = q.col === "#3a3a3e" ? "#8a8a90" : q.name.startsWith("Photon") ? "#e0a050" : "#60a0e0"; g.lineWidth = 1.5; g.beginPath(); g.arc(X(0), X(0), (rs + q.p) * sc, 0, 7); g.stroke(); }
   g.fillStyle = "#000"; g.beginPath(); g.arc(X(0), X(0), rs * sc, 0, 7); g.fill(); g.strokeStyle = "#6a6a70"; g.stroke();
@@ -422,22 +466,24 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.1), vr
   if (vr) { const s = renderer.xr.getSession(); for (const src of s ? s.inputSources : []) { const gp = src.gamepad; if (!gp) continue; const a = gp.axes, ax = a.length >= 4 ? 2 : 0;
       if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; vrRun = !!gp.buttons[0]?.pressed; const bX = gp.buttons[4]?.pressed; if (bX && !prevB.x) slowPreset(); prevB.x = bX;
         if (inCar) { if (mx > 0.75 && !prevB.rt) { setCruise(1); prevB.rt = true; } else if (mx < 0.3) prevB.rt = false; if (mx < -0.75 && !prevB.lf) { setCruise(-1); prevB.lf = true; } else if (mx > -0.3) prevB.lf = false; }
+        if (inHeli) { if (my < -0.75 && !prevB.up) { heliFlight(); prevB.up = true; } else if (my > -0.3) prevB.up = false; if (Math.abs(mx) > 0.75 && !prevB.hs) { hsI = Math.max(0, Math.min(HSPEEDS.length - 1, hsI + Math.sign(mx))); say(`Helicopter speed ${HSPEEDS[hsI][1]}.`); prevB.hs = true; } else if (Math.abs(mx) < 0.3) prevB.hs = false; }
         if (inCar) { if (my < -0.75 && !prevB.up) { rideTo(1); prevB.up = true; } else if (my > -0.3) prevB.up = false; if (my > 0.75 && !prevB.dn) { rideTo(-1); prevB.dn = true; } else if (my < 0.3) prevB.dn = false; } }
       else { const tx = a[ax] || 0, ty = a[ax + 1] || 0; if (ty < -0.75 && !prevB.tu) { setTS(TS * 2); prevB.tu = true; } else if (ty > -0.3) prevB.tu = false; if (ty > 0.75 && !prevB.td) { setTS(TS / 2); prevB.td = true; } else if (ty < 0.3) prevB.td = false;
         if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const bA = gp.buttons[4]?.pressed; if (bA && !prevB.a) toggleCar(); prevB.a = bA; const bB = gp.buttons[5]?.pressed; if (bB && !prevB.b) dropBall(); prevB.b = bB; } } }
-  else if (!inCar) { if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD) mx += 1; if (keys.KeyA) mx -= 1; }
+  else if (!inCar && !inHeli) { if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD) mx += 1; if (keys.KeyA) mx -= 1; }
   if (RIDE.on) { const d = RIDE.to - CAR.p, want = Math.sign(d) * Math.min(CRUISE[cruiseI][0], Math.sqrt(2 * ACC * Math.abs(d))); RIDE.v += THREE.MathUtils.clamp(want - RIDE.v, -ACC * dt, ACC * dt); CAR.p = Math.max(3, CAR.p + RIDE.v * dt);
     if (Math.abs(RIDE.to - CAR.p) < 0.05 && Math.abs(RIDE.v) < 0.3) { CAR.p = RIDE.to; RIDE.v = 0; RIDE.on = false; const kk = rateP(CAR.p); say(`${stopName(CAR.p)}: your clock runs at ${fmtRate(kk)}, each of your seconds ${perSec(kk)} far away. W rides on out, S back in, E gets out.`); } }
-  if (started && !inCar) { const f = V3(0, 0, 0); camera.getWorldDirection(f); f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize(); const sp = keys.ShiftLeft || keys.ShiftRight || vrRun ? 12 : 3; move(PL, (f.x * -my - f.z * mx) * sp, (f.z * -my + f.x * mx) * sp, dt, 1); }
-  const Y = inCar ? CAR : PL; c0 = rOfP(Y.p) - Y.p;
+  if (started && !inCar && !inHeli) { const f = V3(0, 0, 0); camera.getWorldDirection(f); f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize(); const sp = keys.ShiftLeft || keys.ShiftRight || vrRun ? 12 : 3; move(PL, (f.x * -my - f.z * mx) * sp, (f.z * -my + f.x * mx) * sp, dt, 1); }
+  const Y = inCar ? CAR : inHeli ? HELI : PL; c0 = rOfP(Y.p) - Y.p; heliStep(dt);
   car.position.copy(chart(CAR.p, CAR.a)); car.rotation.x = 0;
   if (inCar) { const seat = V3(-0.42, 0.72, 0.3).applyEuler(car.rotation).add(car.position); rig.position.copy(seat); rig.rotation.y = car.rotation.y + (vr ? vrYaw : 0); if (!vr) { camera.position.set(0, 0.55, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); } }
+  else if (inHeli) { const seat = V3(-0.42, 0.85, -0.6).applyEuler(heli.rotation).add(heli.position); rig.position.copy(seat); rig.rotation.y = HELI.head + (vr ? vrYaw : 0); if (!vr) { camera.position.set(0, 0.55, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); } }
   else { rig.position.copy(chart(PL.p, PL.a)); rig.rotation.y = vr ? vrYaw : 0; if (!vr) { camera.position.set(0, 1.65, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); } }
   camera.getWorldPosition(headP); const H = toChart(headP); H.p = Math.max(0.3, H.p); const xh = xOfP(H.p), rh = rs + xh, k = Math.sqrt(xh / rh);
   farMat.uniforms.camS.value.set(rh * Math.cos(H.a) / 1000, headP.y / 1000, rh * Math.sin(H.a) / 1000); farMat.uniforms.camX.value = xh / 1000;
   const dtMap = started ? dt * TS / k : 0; if (started) { tYou += dt * TS; tMap += dtMap; } objStep(dt);
   moversStep(Y.p, Y.a); planesStep(dtMap, Y.p); orbitStep(Y.p, Y.a, dtMap);
-  vigS += ((vr && ((inCar && RIDE.on) || (!inCar && (mx || my))) ? (inCar ? 0.95 : 0.8) : 0) - vigS) * Math.min(1, dt * 4); vig.material.uniforms.s.value = vigS; vig.visible = vigS > 0.01;
+  vigS += ((vr && ((inCar && RIDE.on) || (inHeli && HELI.fl) || (!inCar && !inHeli && (mx || my))) ? (inCar || inHeli ? 0.95 : 0.8) : 0) - vigS) * Math.min(1, dt * 4); vig.material.uniforms.s.value = vigS; vig.visible = vigS > 0.01;
   farView.position.copy(headP);
   const rc = Y.p + c0, moved = B => Math.hypot(Y.p - B.p, rc * angDist(Y.a, B.a));
   if (moved(GB) > 140) drawNear(Y.p, Y.a); if (moved(OB) > 25) fillNear(Y.p, Y.a);
