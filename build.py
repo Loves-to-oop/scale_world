@@ -604,7 +604,10 @@ BG = BG[:i0] + """<div id="intro"><div class="card">
   <p>Betelgeuse, the red shoulder of Orion, is a red supergiant near the end of its life: about 760 times the Sun's width (in our Solar
   System it would reach past Mars), only 3,600 K at its surface but 126,000 times as bright as the Sun, and it should explode as a
   supernova within about 100,000 years. You are in the glass cupola of a ship 30 AU from it, on the side facing the Sun.</p>
-  <p>It is no smooth red ball: a few enormous convection cells churn its surface, its edge is uneven and darkens to red, a faint
+  <p>All its energy comes from a small, dense core, hidden deep inside a vast envelope of thin gas: at the visible surface the gas is
+  thinner than a laboratory vacuum, yet the envelope is so deep that you cannot see into it, so it still looks like a glowing ball,
+  redder than its temperature because titanium oxide in its atmosphere soaks up green and blue light.
+  It is no smooth ball: a few enormous convection cells churn its surface, its edge is ragged and fades out into red, a faint
   atmosphere glows round it, and clumps of dust drift farther out. Its probable companion, Siwarha, a young star of about the Sun's
   mass, circles inside its outer atmosphere every 5.8 years. The sky is the real sky from there, recomputed from a star catalogue:
   Rigel is the brightest star, Orion's belt stars blaze, and the Sun is too faint to see.</p>

@@ -62,8 +62,11 @@ const skyG = new THREE.Group(); scene.add(skyG);
 // Its visible surface (where the gas turns opaque) is not a crisp, round ball. Simulations and interferometer images show a few
 // enormous convection cells, each a good fraction of the star's width, rising and sinking over months to years, with smaller cells
 // between; an outline a few per cent out of round; and strong darkening and reddening toward the edge. The pattern here is typical,
-// not a map of the real star. Colours are blackbody colours as the eye sees them: at 3,600 K a deep orange, its surface 0.15
-// times as bright, area for area, as the Sun's.
+// not a map of the real star. Colours: the blackbody colour of a temperature 8% lower, since titanium oxide in the cool atmosphere
+// absorbs green and blue light and makes the star redder than its temperature alone (its measured colour, B-V = 1.85, matches about
+// 3,300 K); brightness from the true temperature (3,600 K: 0.15 times the Sun's, area for area). The visible surface (photosphere)
+// of a red supergiant is not crisp like the Sun's: the gas there is thinner than a laboratory vacuum and the opaque layer is deep
+// and ragged, so the edge fades out gradually into the molecular atmosphere (the soft limb below).
 const NOISE = `vec3 h3(vec3 p){ p = vec3(dot(p, vec3(127.1, 311.7, 74.7)), dot(p, vec3(269.5, 183.3, 246.1)), dot(p, vec3(113.5, 271.9, 124.6))); return fract(sin(p) * 43758.5453); }
   float vn(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(mix(h3(i).x, h3(i + vec3(1,0,0)).x, f.x), mix(h3(i + vec3(0,1,0)).x, h3(i + vec3(1,1,0)).x, f.x), f.y), mix(mix(h3(i + vec3(0,0,1)).x, h3(i + vec3(1,0,1)).x, f.x), mix(h3(i + vec3(0,1,1)).x, h3(i + vec3(1,1,1)).x, f.x), f.y), f.z); }
   float fbm(vec3 p){ float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++) { s += a * vn(p); p *= 2.03; a *= 0.5; } return s; }
@@ -74,21 +77,24 @@ const starMat = new THREE.ShaderMaterial({ uniforms: { t: { value: 0 }, bright: 
   vertexShader: `uniform float t; varying vec3 vP; varying vec3 vNv; varying vec3 vWp; ${NOISE}
     void main(){ vec3 n = normalize(position); float bump = 0.035 * (fbm(n * 1.6 + vec3(0.0, 0.0, t * 0.05)) - 0.5) * 2.0; vec3 p = position * (1.0 + bump); vP = n; vNv = normalize(normalMatrix * n); vec4 w = modelMatrix * vec4(p, 1.0); vWp = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
   fragmentShader: `uniform float t, bright; varying vec3 vP; varying vec3 vNv; varying vec3 vWp; ${NOISE}
-    vec3 bb(float T){ float t = T / 100.0; vec3 c = vec3(255.0, 99.47 * log(t) - 161.1, t <= 19.0 ? 0.0 : 138.5 * log(t - 10.0) - 305.0); return pow(clamp(c / 255.0, 0.0, 1.0), vec3(2.2)) * pow(T / 3600.0, 4.0); }
+    vec3 bb(float T){ float t = T * 0.92 / 100.0; vec3 c = vec3(255.0, 99.47 * log(t) - 161.1, t <= 19.0 ? 0.0 : 138.5 * log(t - 10.0) - 305.0); return pow(clamp(c / 255.0, 0.0, 1.0), vec3(2.2)) * pow(T / 3600.0, 4.0); }
     void main(){ vec3 p = normalize(vP); vec3 q = p + 0.18 * vec3(fbm(p * 3.0 + t * 0.1), fbm(p * 3.0 + 7.1), fbm(p * 3.0 + 13.3)) - 0.09; vec3 w = worley(q * 0.95, t), w2 = worley(q * 3.0 + 3.1, t * 1.7);
       float big = smoothstep(0.0, 0.75, w.y - w.x), small = smoothstep(0.0, 0.5, w2.y - w2.x), cellT = fract(sin(w.z) * 43758.5);
       float T = 3050.0 + 650.0 * big * (0.5 + 0.9 * cellT) + 120.0 * small + 260.0 * (fbm(p * 6.0 + t * 0.15) - 0.5);
       vec3 V = normalize(cameraPosition - vWp); float mu = clamp(dot(normalize(vNv), normalize((viewMatrix * vec4(V, 0.0)).xyz)), 0.0, 1.0);
       float limb = 1.0 - 0.72 * (1.0 - mu) - 0.18 * (1.0 - mu) * (1.0 - mu); T *= 0.82 + 0.18 * pow(mu, 0.5);
-      vec3 col = bb(T) * limb * bright * 1.9; gl_FragColor = vec4(col, 1.0);
+      vec3 col = bb(T) * limb * bright * 1.35; gl_FragColor = vec4(col, 1.0);
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
     }` });
 const star = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 6), starMat); skyG.add(star);
 // the extended atmosphere: a warm glow of molecules (water, carbon monoxide) and gas reaching out to about 1.5 times the radius,
 // faint compared with the surface; drawn as a halo
-const glowTex = canvasTex(512, 512, (g, W) => { const r = g.createRadialGradient(W / 2, W / 2, W * 0.2, W / 2, W / 2, W / 2); r.addColorStop(0, "rgba(255,140,60,0.55)"); r.addColorStop(0.18, "rgba(255,120,50,0.22)"); r.addColorStop(0.45, "rgba(220,90,40,0.06)"); r.addColorStop(1, "rgba(200,80,40,0)"); g.fillStyle = r; g.fillRect(0, 0, W, W); });
+const glowTex = canvasTex(512, 512, (g, W) => { const r = g.createRadialGradient(W / 2, W / 2, W * 0.2, W / 2, W / 2, W / 2); r.addColorStop(0, "rgba(255,110,45,0.55)"); r.addColorStop(0.18, "rgba(240,90,40,0.22)"); r.addColorStop(0.45, "rgba(200,70,35,0.06)"); r.addColorStop(1, "rgba(180,60,30,0)"); g.fillStyle = r; g.fillRect(0, 0, W, W); });
 const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); skyG.add(glow);
+// the soft limb: a dark orange-red veil over the outermost 10% of the disc fading out to 1.2 radii, so the star has no hard edge
+const limbTex = canvasTex(512, 512, (g, W) => { const r = g.createRadialGradient(W / 2, W / 2, 0, W / 2, W / 2, W / 2); r.addColorStop(0, "rgba(150,40,15,0)"); r.addColorStop(0.74, "rgba(150,40,15,0)"); r.addColorStop(0.83, "rgba(140,38,14,0.55)"); r.addColorStop(0.9, "rgba(120,32,12,0.35)"); r.addColorStop(1, "rgba(100,28,10,0)"); g.fillStyle = r; g.fillRect(0, 0, W, W); });
+const limb = new THREE.Sprite(new THREE.SpriteMaterial({ map: limbTex, transparent: true, depthWrite: false, depthTest: false })); limb.renderOrder = 3; skyG.add(limb);
 // dust: Betelgeuse sheds about a millionth of a Sun's mass a year; some of it cools into dust, in clumps a few to tens of stellar radii
 // out (the Great Dimming of 2019-20 was such a cloud, in front of the star). The ship is 8.5 radii out, so clumps lie all round. Typical.
 const dustTex = canvasTex(256, 256, (g, W) => { for (let i = 0; i < 70; i++) { const x = W / 2 + (hash(i, 1) - 0.5) * W * 0.5, y = W / 2 + (hash(i, 2) - 0.5) * W * 0.5, r = W * (0.08 + 0.14 * hash(i, 3)); const rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, "rgba(255,255,255,0.10)"); rg.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = rg; g.fillRect(0, 0, W, W); } });
@@ -179,7 +185,7 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.1), vr
   camera.getWorldPosition(headP); skyG.position.copy(headP);
   // Betelgeuse: pulsing a few per cent in size and about 0.3 magnitude in light; its cells churning
   const pul = Math.sin(2 * Math.PI * days / P_PULSE), Rnow = R_B * (1 + 0.03 * pul); place(star, B_AU, Rnow); starMat.uniforms.t.value = days / 220; starMat.uniforms.bright.value = 1 + 0.12 * pul;
-  glow.position.copy(star.position); glow.scale.setScalar(star.scale.x * 4.2);
+  glow.position.copy(star.position); glow.scale.setScalar(star.scale.x * 4.2); limb.position.copy(star.position); limb.scale.setScalar(star.scale.x * 2.4);
   // the companion on its orbit, and the dust clumps lit from Betelgeuse
   const ca = 2 * Math.PI * days / P_COMP, cpos = V3(Math.cos(ca) * A_COMP, 0, Math.sin(ca) * A_COMP).applyAxisAngle(V3(1, 0, 0), COMP_TILT).applyAxisAngle(V3(0, 1, 0), COMP_NODE).add(B_AU);
   const cd = place(comp, cpos); comp.scale.setScalar(comp.position.length() * 0.035); compLabel.position.copy(cpos).normalize().multiplyScalar(SKY_R * 0.9);
