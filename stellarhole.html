@@ -53095,7 +53095,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, IS_HEADSET ? 1 : 2)); renderer
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.xr.enabled = true; if (IS_HEADSET) renderer.xr.setFramebufferScaleFactor(0.8);
 document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 3000);
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 14000);
 const rig = new THREE.Group(); rig.add(camera); scene.add(rig);
 addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8, ...o });
@@ -53229,7 +53229,9 @@ const railIM = new THREE.InstancedMesh(new THREE.BoxGeometry(0.2, 1.1, 0.2).tran
 const lineIM = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), M(0xf2f2ea, { roughness: 0.9 }), 7000);
 const NUMS = Array.from({ length: 10 }, (_, i) => { const t = canvasTex(256, 160, (g, w, h) => { g.fillStyle = "#f2f2ea"; g.font = "bold 150px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(String((i + 1) * 10), w / 2, h / 2 + 6); });
   const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.6, 2.25).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: t, transparent: true, roughness: 0.9, depthWrite: false }), 60); im.renderOrder = 2; return im; });
-for (const im of [houseIM, roofIM, trunkIM, crownIM, railIM, lineIM, ...NUMS]) { im.frustumCulled = false; im.count = 0; objG.add(im); }
+// the car's track: two rails on a dark bed down the middle of East Road, from the fence out to the Outer Ring Road
+const trackIM = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), M(0xb8bcc4, { metalness: 0.7, roughness: 0.35 }), 400), bedIM = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), M(0x3a3430), 200);
+for (const im of [houseIM, roofIM, trunkIM, crownIM, railIM, lineIM, ...NUMS, trackIM, bedIM]) { im.frustumCulled = false; im.count = 0; objG.add(im); }
 const O3 = new THREE.Object3D(), COLW = [0xf2ede2, 0xe8dcc4, 0xd8e0e8, 0xf0e0c8, 0xe0d0c0, 0xc8d4c0], COLR = [0x5a4a42, 0x3a3a40, 0x7a3a30, 0x4a5a6a, 0x6a6058];
 function fillNear(pc, ac) { Object.assign(OB, { C: c0, a: ac, p: pc }); objG.position.set(0, 0, 0); const C = c0; let n = 0, t = 0, rl = 0, ln = 0; const tmpC = new THREE.Color(), nn = NUMS.map(() => 0);
   forHouses(pc, ac, NEAR, C, (x, z, a, w, d, hk, side) => { if (n >= NH) return; const R = Math.hypot(x, z), dist = Math.hypot(R - pc - C, (rc => rc * angDist(a, ac))(pc + C)), f = THREE.MathUtils.smoothstep(NEAR - dist, 0, 60), h = (hk < 0.3 ? 6 : 3.4) * f;
@@ -53242,8 +53244,53 @@ function fillNear(pc, ac) { Object.assign(OB, { C: c0, a: ac, p: pc }); objG.pos
       for (let a = Math.round((ac - da) / st) * st; a < ac + da && ln < 7000; a += st) { O3.rotation.set(0, -a, 0); O3.position.set(Math.cos(a) * R, 0.03, Math.sin(a) * R); O3.scale.set(wdt, 1, 4.04); O3.updateMatrix(); lineIM.setMatrixAt(ln++, O3.matrix); }
       if (d && d % 10 === 0) { const im = NUMS[d / 10 - 1], R2 = C + d + 2.6, st2 = 30 / R2; for (let a = Math.round((ac - da) / st2) * st2; a < ac + da && nn[d / 10 - 1] < 60; a += st2) { O3.rotation.set(0, Math.PI / 2 - a, 0); O3.position.set(Math.cos(a) * R2, 0.04, Math.sin(a) * R2); O3.scale.set(1, 1, 1); O3.updateMatrix(); im.setMatrixAt(nn[d / 10 - 1]++, O3.matrix); } } }
     const R = C + 2, da = Math.min(Math.PI, (NEAR + 60) / R); for (let a = ac - da; a < ac + da && rl < 400; a += 4 / R) { O3.rotation.set(0, -a, 0); O3.position.set(Math.cos(a) * R, 0, Math.sin(a) * R); O3.scale.set(1, 1, 1); O3.updateMatrix(); railIM.setMatrixAt(rl++, O3.matrix); } }
-  houseIM.count = roofIM.count = n; trunkIM.count = crownIM.count = t; railIM.count = rl; lineIM.count = ln; NUMS.forEach((im, i) => im.count = nn[i]);
-  for (const im of [houseIM, roofIM, trunkIM, crownIM, railIM, lineIM, ...NUMS]) { im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; } }
+  let tk = 0, bd = 0; if (angDist(ac, 0) * (pc + C) < NEAR + 60) for (let q = Math.max(4, Math.ceil((pc - NEAR) / 6) * 6); q <= Math.min(P_OUT, pc + NEAR) && bd < 200; q += 6) { const R = q + C;
+    O3.rotation.set(0, Math.PI / 2, 0); O3.scale.set(2.4, 0.06, 6.05); O3.position.set(R, 0.01, 0); O3.updateMatrix(); bedIM.setMatrixAt(bd++, O3.matrix);
+    for (const lat of [-0.75, 0.75]) { O3.scale.set(0.1, 0.16, 6.05); O3.position.set(R * Math.cos(lat / R), 0.06, R * Math.sin(lat / R)); O3.updateMatrix(); trackIM.setMatrixAt(tk++, O3.matrix); } }
+  houseIM.count = roofIM.count = n; trunkIM.count = crownIM.count = t; railIM.count = rl; lineIM.count = ln; NUMS.forEach((im, i) => im.count = nn[i]); trackIM.count = tk; bedIM.count = bd;
+  for (const im of [houseIM, roofIM, trunkIM, crownIM, railIM, lineIM, ...NUMS, trackIM, bedIM]) { im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; } }
+
+// ---------- people, traffic and airplanes, each moving at its normal pace by its own clock ----------
+// Each runs on its own proper time, which advances by (map time) x sqrt(1 - rs/r) where it is. People walk at 1.4 m/s and cars drive
+// at 12 m/s by their own clocks, round the ring streets (where everyone shares one clock rate) and across the field. So from near the
+// horizon those farther out hurry and those nearer crawl; from far out, everything near the horizon creeps. (Like you, they are held
+// by the broken rule; their light is drawn straight.)
+RINGS.forEach(q => q.k = rateP(q.p));
+const FIELD_W = [3, 8, 15, 25, 40, 60, 85].map(p => ({ p, k: rateP(p), rt: rOfP(p), w: 0 }));
+const NP = 700, NCAR = 320, COLP = [0x3a5a8a, 0x8a3a3a, 0x3a7a4a, 0xc8a040, 0x6a4a7a, 0x2a2a2a, 0xd8d0c0, 0x8a6a4a];
+const bodyIM = new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.22, 0.95, 4, 10).translate(0, 0.72, 0), M(0xffffff), NP), headIM = new THREE.InstancedMesh(new THREE.SphereGeometry(0.13, 12, 8).translate(0, 1.6, 0), M(0xc8a080), NP);
+const carBIM = new THREE.InstancedMesh(new THREE.BoxGeometry(1.8, 0.75, 4.3).translate(0, 0.62, 0), M(0xffffff, { metalness: 0.4, roughness: 0.4 }), NCAR), carCIM = new THREE.InstancedMesh(new THREE.BoxGeometry(1.6, 0.6, 2.1).translate(0, 1.3, -0.2), M(0x9ab8d0, { metalness: 0.3, roughness: 0.2 }), NCAR);
+for (const im of [bodyIM, headIM, carBIM, carCIM]) { im.frustumCulled = false; im.count = 0; scene.add(im); }
+const COLC = [0xc0392b, 0x2a6ab8, 0xe8e8e8, 0x2a2a2a, 0x8a8a90, 0x3a7a4a, 0xd8b040];
+// along a ring of tape distance p (true radius rt) with clock rate k: things spaced `gap` metres apart, moving at v by their own time
+function along(p, rt, k, v, gap, lat, dir, seed, pc, ac, fn) { const base = dir * v * tMap * k, da = (NEAR + 40) / Math.max(rt, 1), s0 = (ac - da) * rt, s1 = (ac + da) * rt;
+  for (let j = Math.ceil((s0 - base) / gap); j <= Math.floor((s1 - base) / gap); j++) { if (hash(j, seed) < 0.3) continue; const sj = j * gap + base + hash(j, seed + 1) * gap * 0.5, a = sj / rt; fn(chart(p + lat, a), a, j, k); } }
+const tmpCol = new THREE.Color();
+function moversStep(pc, ac) { let n = 0, m = 0;
+  const person = (pos, a, j, k, seed) => { if (n >= NP) return; const bob = 0.05 * Math.abs(Math.sin(2 * Math.PI * 1.8 * tMap * k + j)); O3.position.set(pos.x, bob, pos.z); O3.rotation.set(0, -a, 0); O3.scale.set(1, 1, 1); O3.updateMatrix(); bodyIM.setMatrixAt(n, O3.matrix); headIM.setMatrixAt(n, O3.matrix); bodyIM.setColorAt(n, tmpCol.setHex(COLP[Math.floor(hash(j, seed + 7) * COLP.length)])); n++; };
+  for (const q of RINGS) { if (Math.abs(q.p - pc) > NEAR) continue;
+    for (const dir of [-1, 1]) { along(q.p, q.rt, q.k, 1.4, 55, dir * (q.w / 2 + 1.6), dir, q.p + dir, pc, ac, (pos, a, j, k) => person(pos, a, j, k, q.p));
+      along(q.p, q.rt, q.k, 12, 150, dir * (q.w > 10 ? 3 : 2), dir, q.p * 3 + dir, pc, ac, (pos, a, j) => { if (m >= NCAR) return; O3.position.copy(pos); O3.rotation.set(0, -a, 0); O3.scale.set(1, 1, 1); O3.updateMatrix(); carBIM.setMatrixAt(m, O3.matrix); carCIM.setMatrixAt(m, O3.matrix); carBIM.setColorAt(m, tmpCol.setHex(COLC[Math.floor(hash(j, q.p + 9) * COLC.length)])); m++; }); } }
+  if (pc < NEAR + 100) for (const F of FIELD_W) for (const dir of [-1, 1]) along(F.p, F.rt, F.k, 1.4, 34, 0, dir, F.p * 7 + dir, pc, ac, (pos, a, j, k) => person(pos, a, j, k, F.p));
+  bodyIM.count = headIM.count = n; carBIM.count = carCIM.count = m;
+  for (const im of [bodyIM, headIM, carBIM, carCIM]) { im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; } }
+// two airliners flying a long loop over East Road, 300 m up: in from 12 km to 600 m from the horizon, round, and out again, at
+// 90 m/s by their own clocks. Watch one from far out and it crawls as it nears the hole; from near the hole, it races.
+const PLANE_L = 2 * 11400 + 2 * Math.PI * 300, PLANES = [0, PLANE_L / 2].map(s => ({ s, g: new THREE.Group() }));
+for (const P of PLANES) { const w = M(0xf2f2f2, { roughness: 0.5 }), b = M(0x2a5aa8); const add = (geo, mat, x, y, z, rx = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.x = rx; P.g.add(m); };
+  add(new THREE.CylinderGeometry(1.9, 1.9, 34, 16), w, 0, 0, 0, Math.PI / 2); add(new THREE.ConeGeometry(1.9, 5, 16), w, 0, 0, 19.5, Math.PI / 2); add(new THREE.ConeGeometry(1.9, 6, 16), w, 0, 0.6, -20, -Math.PI / 2);
+  add(new THREE.BoxGeometry(34, 0.4, 5), w, 0, -0.6, 1); add(new THREE.BoxGeometry(11, 0.3, 2.6), w, 0, 0.8, -19); add(new THREE.BoxGeometry(0.4, 6, 4), b, 0, 3.6, -19.5); add(new THREE.BoxGeometry(3.85, 0.5, 30), b, 0, -0.4, 0);
+  for (const x of [-7, 7]) add(new THREE.CylinderGeometry(1.1, 1.1, 4.5, 12), M(0xb8bcc4, { metalness: 0.6 }), x, -1.8, 3, Math.PI / 2); P.g.visible = false; scene.add(P.g); }
+function planePath(s) { s = ((s % PLANE_L) + PLANE_L) % PLANE_L; const R = 300, A = 11400, T = Math.PI * R;
+  if (s < A) return [12000 - s, R, -1, 0]; s -= A; if (s < T) { const t = s / R; return [600 - R * Math.sin(t), R * Math.cos(t), -Math.cos(t), -Math.sin(t)]; } s -= T;
+  if (s < A) return [600 + s, -R, 1, 0]; s -= A; const t = s / R; return [12000 + R * Math.sin(t), -R * Math.cos(t), Math.cos(t), Math.sin(t)]; }
+function planesStep(dtMap, pc) { for (const P of PLANES) { const [p0] = planePath(P.s); P.s += 90 * dtMap * rateP(Math.max(1, p0)); const [p, lat, dp, dl] = planePath(P.s), rt = rOfP(p), a = lat / rt, pos = chart(p, a, 300);
+    P.g.position.copy(pos); const ur = [Math.cos(a), Math.sin(a)], dx = dp * ur[0] - dl * ur[1], dz = dp * ur[1] + dl * ur[0]; P.g.rotation.set(0, Math.atan2(dx, dz), 0); P.g.visible = pos.distanceTo(headP) < 12000; } }
+
+// ---------- comfort: in VR, a soft dark vignette narrows your view while you move ----------
+const vig = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: { s: { value: 0 } }, vertexShader: "varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+  fragmentShader: "uniform float s; varying vec2 vU; void main(){ float d = length(vU - 0.5) * 2.0; gl_FragColor = vec4(0.0, 0.0, 0.0, s * smoothstep(0.3, 0.8, d)); }", transparent: true, depthTest: false, depthWrite: false }));
+vig.position.set(0, 0, -0.25); vig.renderOrder = 40; vig.visible = false; camera.add(vig); let vigS = 0;
 
 // ---------- clocks: map time (far away) against proper time ----------
 // Map time is Schwarzschild coordinate time, what a clock very far from the hole reads. A clock held still at radius r ticks
@@ -53298,26 +53345,32 @@ const car = new THREE.Group(); scene.add(car);
     const h = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.25, 16).rotateZ(Math.PI / 2), chrome); h.position.copy(w.position); car.add(h); } }
 // the dashboard: your clock, the map clock, and how fast yours is running
 const dashT = canvasTex(1024, 440), dash = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 0.352), new THREE.MeshBasicMaterial({ map: dashT, toneMapped: false })); dash.position.set(0.05, 1.0, -0.66); dash.rotation.x = -0.6; car.add(dash);
-const SPEEDS = [[0, "stopped"], [5, "18 km/h"], [14, "50 km/h"], [30, "108 km/h"], [100, "360 km/h"], [400, "1,440 km/h"], [1500, "5,400 km/h"]]; let gear = 0, inCar = false;
-// where you and the car are: tape distance p from the horizon and angle a (the car parked beside you, facing away from the hole)
-const PL = { p: 6, a: -3 / rs }, CAR = { p: 14, a: 7 / rs }; car.rotation.y = -Math.PI / 2;
+let inCar = false;
+// where you and the car are: tape distance p from the horizon and angle a. The car runs on a track straight down East Road, always
+// facing away from the hole, and never turns: W (or the left stick up) rides out to the next stop, S back in, easing in and out.
+// (Turning and changing speed are what make people sick in VR; the stops and the smooth starts and stops keep that down.)
+const PL = { p: 6, a: -3 / rs }, CAR = { p: 8, a: 0 }; car.rotation.y = -Math.PI / 2;
+const STOPS = [[8, "the fence"], [100, "Horizon Drive (100 m)"], [MILE, "Mile 1"], [3 * MILE, "Mile 3"], [P_PHOTON, "Photon Sphere Avenue"], [10 * MILE, "Mile 10"], [P_ISCO, "Last Stable Orbit Boulevard"]];
+const RIDE = { on: false, from: 8, to: 8, t: 0, T: 1 }, stopName = v => (STOPS.find(s => Math.abs(s[0] - v) < 1) || [0, fmtLen(v)])[1];
+function nextStop(dir, from) { const L = STOPS.map(s => s[0]); return dir > 0 ? L.find(v => v > from + 1) : [...L].reverse().find(v => v < from - 1); }
+function rideTo(dir) { if (RIDE.on) { say("Wait for the car to reach its stop."); return; } const tgt = nextStop(dir, CAR.p); if (tgt === undefined) { say(dir > 0 ? "This is the last stop outward." : "This is the stop nearest the horizon."); return; }
+  const d = Math.abs(tgt - CAR.p); Object.assign(RIDE, { on: true, from: CAR.p, to: tgt, t: 0, T: 5 + 1.2 * Math.sqrt(d / 10) }); say(`Riding ${dir > 0 ? "out" : "in"} to ${stopName(tgt)}: ${fmtLen(d)}, ${RIDE.T.toFixed(0)} s.`); }
 function drawDash(p, k) { const g = dashT.userData.c.getContext("2d"); g.fillStyle = "#0e0c14"; g.fillRect(0, 0, 1024, 440); g.fillStyle = "#8a84a0"; g.font = "26px sans-serif"; g.fillText("YOUR CLOCK", 30, 46); g.fillText("MAP CLOCK (far away)", 540, 46);
   g.fillStyle = "#ffd060"; g.font = "bold 58px monospace"; g.fillText(tod(tYou), 30, 112, 480); g.fillStyle = "#f2eadb"; g.fillText(tod(tMap), 540, 112, 470);
   g.font = "28px sans-serif"; g.fillStyle = "#c8c0d8"; g.fillText(`Your clock runs at ${fmtRate(k)}: each of your seconds is ${perSec(k)} far away`, 30, 176, 960);
   g.fillText(`Behind map time by ${fmtT(tMap - tYou)}`, 30, 220); g.fillText(`${fmtLen(p)} from the horizon by tape (r is ${fmtLen(xOfP(p))} above rs)`, 30, 264, 960);
-  g.fillStyle = "#ffd060"; g.fillText(`Speed ${SPEEDS[gear][1]}  (W / S faster, slower · A / D steer · space stop)`, 30, 320); g.fillStyle = "#8a84a0"; g.font = "24px sans-serif"; g.fillText(streetAt(CAR.p, CAR.a) || "off the road", 30, 370); dashT.needsUpdate = true; }
+  const no = nextStop(1, CAR.p), ni = nextStop(-1, CAR.p); g.fillStyle = "#ffd060"; g.fillText(RIDE.on ? `Riding to ${stopName(RIDE.to)}` : `W: out to ${no !== undefined ? stopName(no) : "(end)"} · S: in to ${ni !== undefined ? stopName(ni) : "(end)"}`, 30, 320, 960); g.fillStyle = "#8a84a0"; g.font = "24px sans-serif"; g.fillText(streetAt(CAR.p, CAR.a) || "off the road", 30, 370); dashT.needsUpdate = true; }
 
 // ---------- moving about ----------
 let yaw = Math.PI / 4, pitch = 0.05; const keys = {}; let vrYaw = 0;
 addEventListener("keydown", e => { keys[e.code] = true; if (!started) return;
   if (e.code === "KeyE") toggleCar(); if (e.code === "KeyG") dropBall(); if (e.code === "KeyM") { slowMo = !slowMo; say(slowMo ? "Slow motion on: dropped balls (G) now take a few seconds to fall and fade." : "Real time: dropped balls vanish as fast as they really would."); }
-  if (inCar && (e.code === "KeyW" || e.code === "ArrowUp")) gear = Math.min(SPEEDS.length - 1, gear + 1);
-  if (inCar && (e.code === "KeyS" || e.code === "ArrowDown")) gear = Math.max(0, gear - 1);
-  if (inCar && e.code === "Space") gear = 0; });
+  if (inCar && (e.code === "KeyW" || e.code === "ArrowUp")) rideTo(1);
+  if (inCar && (e.code === "KeyS" || e.code === "ArrowDown")) rideTo(-1); });
 addEventListener("keyup", e => keys[e.code] = false);
 const toChart = v => { const R = Math.hypot(v.x, v.z); return { p: R - c0, a: Math.atan2(v.z, v.x) }; };
-function toggleCar() { if (inCar) { inCar = false; gear = 0; const s = V3(-2.4, 0, 0.3).applyEuler(new THREE.Euler(0, car.rotation.y, 0)).add(car.position); Object.assign(PL, toChart(s)); PL.p = Math.max(1, PL.p); yaw += car.rotation.y; vrYaw += car.rotation.y; say("On foot. WASD to walk, shift to run; E by the car to get back in."); }
-  else if (chart(PL.p, PL.a).distanceTo(car.position) < 5) { inCar = true; yaw -= car.rotation.y; vrYaw -= car.rotation.y; say("In the car. W / S faster or slower, A / D steer, space stops."); } else say("Walk back to the car (within 5 m) to get in."); }
+function toggleCar() { if (inCar) { if (RIDE.on) { say("Wait for the car to stop before you get out."); return; } inCar = false; const s = V3(-2.4, 0, 0.3).applyEuler(new THREE.Euler(0, car.rotation.y, 0)).add(car.position); Object.assign(PL, toChart(s)); PL.p = Math.max(1, PL.p); yaw += car.rotation.y; vrYaw += car.rotation.y; say("On foot. WASD to walk, shift to run; E by the car to get back in."); }
+  else if (chart(PL.p, PL.a).distanceTo(car.position) < 5) { inCar = true; yaw -= car.rotation.y; vrYaw -= car.rotation.y; say("In the car, on the track down East Road. W rides out to the next stop, S back in; E gets out."); } else say("Walk back to the car (within 5 m) to get in."); }
 // moving by a velocity (vx, vz) in the chart: along the radius it is tape distance, across it true distance at your radius
 function move(S, vx, vz, dt, pmin) { const cs = Math.cos(S.a), sn = Math.sin(S.a), vr = vx * cs + vz * sn, vt = -vx * sn + vz * cs; S.p = Math.min(P_OUT + 3000, Math.max(pmin, S.p + vr * dt)); S.a += vt * dt / rOfP(S.p); }
 let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY }; start(); });
@@ -53366,7 +53419,7 @@ function drawPanel(p, k, r) { const g = GM / (r * r) / k, tide = 2 * GM * 1.7 / 
     <div style="margin-top:8px;color:#c8c0d8;font-size:12.5px"><b>A second broken rule</b>: things near you are drawn as if their light travelled straight, so you can see them. Here light bends on a curve of radius ${fmtLen(c * c / Math.max(g, 1e-9))}${c * c / g < 2000 ? `: in truth, light from anything more than about ${fmtLen(1.5 * c * c / g)} to the side falls into the hole before it reaches you, and you would see almost nothing of the scene` : c * c / g < 2e5 ? `, so over 100 m the picture is off by about ${(100 / (2 * c * c / g) * 180 / Math.PI).toFixed(1)}°` : ", so the error is small"}. The far view (beyond about 500 m) is drawn with the bending.</div>
     ${BALLS.length ? `<div style="margin-top:8px"><b>Dropped balls</b> (slow motion, M: each real second shows ${fmtTiny(BALLS[0].rate * k)} of your time): ${BALLS.map(B => `${fmtLen(B.p)} from the horizon, ${B.op < 0.5 ? "frozen at the edge and fading" : "falling"}`).join("; ")}. On its own clock each crosses the horizon ${fmtTiny(BALLS[0].tauH)} after it is dropped; from outside you never see it cross.</div>` : ""}
     <div style="margin-top:8px;color:#e8b890;font-size:12.5px"><b>What would really happen</b> (the rule broken here: the ground, houses, air and you are held in place). To hold still here takes ${fmt(g, " m/s²")}, ${fmt(g / 9.81)} times Earth's gravity; escape takes ${(esc / c * 100).toFixed(1)}% of the speed of light; the stretch between your head and feet is ${fmt(tide, " m/s²")} (people are torn apart above about 1,000 m/s²; that is reached ${fmtLen(Math.cbrt(2 * GM * 1.7 / 1000))} from the centre). The Earth itself would be torn up and swallowed in minutes.</div>
-    <div style="margin-top:8px;color:#c8c0d8;font-size:12.5px">${inCar ? "Driving: W / S faster or slower, A / D steer, space stop, E get out." : "Walking: WASD, shift to run, E get in the car (within 5 m)."} Drag to look.</div>`; }
+    <div style="margin-top:8px;color:#c8c0d8;font-size:12.5px">${inCar ? "In the car on the track: W rides out to the next stop, S back in, E get out." : "Walking: WASD, shift to run, E get in the car (within 5 m)."} Drag to look.</div>`; }
 function drawMap(S, h) { const g = MAPC.getContext("2d"), W = 220, sc = W / 2 / EXT, X = v => W / 2 + v * sc; g.clearRect(0, 0, W, W);
   for (const q of SPECIAL) { g.strokeStyle = q.col === "#3a3a3e" ? "#8a8a90" : q.name.startsWith("Photon") ? "#e0a050" : "#60a0e0"; g.lineWidth = 1.5; g.beginPath(); g.arc(X(0), X(0), (rs + q.p) * sc, 0, 7); g.stroke(); }
   g.fillStyle = "#000"; g.beginPath(); g.arc(X(0), X(0), rs * sc, 0, 7); g.fill(); g.strokeStyle = "#6a6a70"; g.stroke();
@@ -53381,13 +53434,13 @@ document.getElementById("intro")?.addEventListener("click", start);
 // ---------- the loop ----------
 const clock = new THREE.Clock(), fwd = V3(0, 0, 0), headP = V3(0, 0, 0); let frameN = 0;
 renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.1), vr = renderer.xr.isPresenting; frameN++;
-  let mx = 0, my = 0, steer = 0, vrRun = false;
+  let mx = 0, my = 0, vrRun = false;
   if (vr) { const s = renderer.xr.getSession(); for (const src of s ? s.inputSources : []) { const gp = src.gamepad; if (!gp) continue; const a = gp.axes, ax = a.length >= 4 ? 2 : 0;
       if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; vrRun = !!gp.buttons[0]?.pressed; const bX = gp.buttons[4]?.pressed; if (bX && !prevB.x) { slowMo = !slowMo; say(slowMo ? "Slow motion on for dropped balls." : "Real time for dropped balls."); } prevB.x = bX;
-        if (inCar) { steer = -mx; if (my < -0.75 && !prevB.up) { gear = Math.min(SPEEDS.length - 1, gear + 1); prevB.up = true; } else if (my > -0.3) prevB.up = false; if (my > 0.75 && !prevB.dn) { gear = Math.max(0, gear - 1); prevB.dn = true; } else if (my < 0.3) prevB.dn = false; } }
+        if (inCar) { if (my < -0.75 && !prevB.up) { rideTo(1); prevB.up = true; } else if (my > -0.3) prevB.up = false; if (my > 0.75 && !prevB.dn) { rideTo(-1); prevB.dn = true; } else if (my < 0.3) prevB.dn = false; } }
       else { const tx = a[ax] || 0; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const bA = gp.buttons[4]?.pressed; if (bA && !prevB.a) toggleCar(); prevB.a = bA; const bB = gp.buttons[5]?.pressed; if (bB && !prevB.b) dropBall(); prevB.b = bB; } } }
-  else { if (!inCar) { if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD) mx += 1; if (keys.KeyA) mx -= 1; } else { if (keys.KeyA || keys.ArrowLeft) steer += 1; if (keys.KeyD || keys.ArrowRight) steer -= 1; } }
-  if (started && inCar) { const v = SPEEDS[gear][0]; car.rotation.y += steer * dt * 0.9 * Math.min(1, v / 6 + 0.15) * (v > 300 ? 0.5 : 1); move(CAR, -Math.sin(car.rotation.y) * v, -Math.cos(car.rotation.y) * v, dt, 3); if (CAR.p <= 3 && gear > 2) gear = 2; }
+  else if (!inCar) { if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD) mx += 1; if (keys.KeyA) mx -= 1; }
+  if (RIDE.on) { RIDE.t += dt; const f = Math.min(1, RIDE.t / RIDE.T); CAR.p = RIDE.from + (RIDE.to - RIDE.from) * (1 - Math.cos(Math.PI * f)) / 2; if (f >= 1) { RIDE.on = false; const kk = rateP(CAR.p); say(`${stopName(CAR.p)}: your clock runs at ${fmtRate(kk)}, each of your seconds ${perSec(kk)} far away. W rides on out, S back in, E gets out.`); } }
   if (started && !inCar) { const f = V3(0, 0, 0); camera.getWorldDirection(f); f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize(); const sp = keys.ShiftLeft || keys.ShiftRight || vrRun ? 12 : 3; move(PL, (f.x * -my - f.z * mx) * sp, (f.z * -my + f.x * mx) * sp, dt, 1); }
   const Y = inCar ? CAR : PL; c0 = rOfP(Y.p) - Y.p;
   car.position.copy(chart(CAR.p, CAR.a)); car.rotation.x = 0;
@@ -53395,7 +53448,9 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.1), vr
   else { rig.position.copy(chart(PL.p, PL.a)); rig.rotation.y = vr ? vrYaw : 0; if (!vr) { camera.position.set(0, 1.65, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); } }
   camera.getWorldPosition(headP); const H = toChart(headP); H.p = Math.max(0.3, H.p); const xh = xOfP(H.p), rh = rs + xh, k = Math.sqrt(xh / rh);
   farMat.uniforms.camS.value.set(rh * Math.cos(H.a) / 1000, headP.y / 1000, rh * Math.sin(H.a) / 1000); farMat.uniforms.camX.value = xh / 1000;
-  if (started) { tYou += dt; tMap += dt / k; }
+  const dtMap = started ? dt / k : 0; if (started) { tYou += dt; tMap += dtMap; }
+  moversStep(Y.p, Y.a); planesStep(dtMap, Y.p);
+  vigS += ((vr && ((inCar && RIDE.on) || (!inCar && (mx || my))) ? (inCar ? 0.95 : 0.8) : 0) - vigS) * Math.min(1, dt * 4); vig.material.uniforms.s.value = vigS; vig.visible = vigS > 0.01;
   farView.position.copy(headP);
   const rc = Y.p + c0, moved = B => Math.hypot(Y.p - B.p, rc * angDist(Y.a, B.a));
   if (moved(GB) > 140) drawNear(Y.p, Y.a); if (moved(OB) > 25) fillNear(Y.p, Y.a);
