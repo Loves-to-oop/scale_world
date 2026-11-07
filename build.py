@@ -617,11 +617,13 @@ BG = BG[:i0] + """<div id="intro"><div class="card">
   Rigel is the brightest star, Orion's belt stars blaze, and the Sun is too faint to see.</p>
   <p>Fly the ship (the console in the dome, the list in the panel, or keys 1-9) to Siwarha inside Betelgeuse's outer atmosphere,
   to within 6 AU of the star, to a comet with tails hundreds of millions of km long, and out to the plausible worlds a star like this
-  could have: a young super-Jupiter still glowing from its own heat, with a volcanic moon; a ringed ice giant where the light equals
-  Earth's sunlight; a brown dwarf; the far comet belt. Trips are flown like a real ship's: a slow turn (skipped), a 1 g burn with your destination overhead,
-  a turn at the midpoint, a burn to slow with it beneath your feet; real durations given, shown speeded up.</p>
-  <p>Drag to look &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk (shift faster) &nbsp;&middot;&nbsp; in the lift <kbd>E</kbd> up, <kbd>Q</kbd> down &nbsp;&middot;&nbsp; <kbd>1</kbd>-<kbd>9</kbd> fly somewhere &nbsp;&middot;&nbsp; <kbd>F</kbd> filter &nbsp;&middot;&nbsp; <kbd>H</kbd> labels &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time<br>
-  In VR: left stick walk, right stick turn (up or down in the lift), point at the console and pull the trigger to fly, <b>X</b> filter, <b>B</b> labels, <b>A</b> speed up time.</p>
+  could have: a scorched rocky world; a young super-Jupiter still glowing from its own heat, with a volcanic moon; a young rocky
+  super-Earth, still cooling, where the light equals Earth's sunlight (around so bright a star, rocky planets form far out); a brown
+  dwarf; the far comet belt. Trips are flown in real time like a real ship's: a slow turn, a 1 g burn with your destination overhead
+  (the thrust gives you weight), a turn at the midpoint, a burn to slow with it beneath your feet. A trip takes days to weeks: speed
+  time up with <kbd>]</kbd> (it eases off for the arrival). With the engine off you would float; you are held to the floor.</p>
+  <p>Drag to look &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk (shift faster) &nbsp;&middot;&nbsp; in the lift <kbd>E</kbd> up, <kbd>Q</kbd> down &nbsp;&middot;&nbsp; <kbd>1</kbd>-<kbd>0</kbd> fly somewhere &nbsp;&middot;&nbsp; <kbd>[</kbd> <kbd>]</kbd> slower, faster time, <kbd>\\</kbd> real time &nbsp;&middot;&nbsp; <kbd>F</kbd> filter &nbsp;&middot;&nbsp; <kbd>H</kbd> labels &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time<br>
+  In VR: left stick walk, right stick turn (up or down in the lift), point at the console and pull the trigger to fly, <b>X</b> filter, <b>B</b> labels, <b>A</b> faster time, <b>Y</b> slower.</p>
   <p class="dim">Sizes, temperature, brightness and distance are measured (with real uncertainties, given in the panel); the surface pattern, glow and dust
   are typical, not maps; the companion is a 2025 detection, not yet certain; the planets, brown dwarf and comet are plausible inventions. Stars: AT-HYG v3.2 (Gaia DR3 distances where available). Click to begin.</p>
 </div></div>

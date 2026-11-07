@@ -121,9 +121,11 @@ const R_COMP = 2 * RSUN_AU, compBall = new THREE.Mesh(new THREE.SphereGeometry(1
 // Nothing but the companion is known. Massive stars' disks are blown away by their ultraviolet light within a few million years, so
 // planets near them are rare, and anything inside about 4 AU would since have been swallowed as the star swelled. But massive disks
 // can also break up directly into giant planets and brown dwarfs far out, and icy bodies can fall in from a far comet belt. So: a
-// young super-Jupiter at 120 AU, still glowing dull red from its own heat at 8 million years old, with a volcanic and an icy moon; an
-// ice giant with rings at 350 AU, where the light equals sunlight at Earth; a brown dwarf at 900 AU, glowing orange from its heat;
-// a comet falling in at 25 AU with tails stretched by Betelgeuse's light. All invented, all plausible; positions are illustrative.
+// young super-Jupiter at 120 AU, still glowing dull red from its own heat at 8 million years old, with a volcanic and an icy moon; a
+// brown dwarf at 900 AU, glowing orange from its heat; a comet falling in at 25 AU with tails stretched by Betelgeuse's light. Rocky
+// planets: when the star was young (on the main sequence, about 50,000 Suns) its disk's snow line lay several hundred AU out, so the
+// solids inside were rock and metal and rocky planets could form tens to hundreds of AU out: a scorched Mars-sized world at 45 AU and a
+// young super-Earth at 350 AU, still cooling, where the light equals sunlight at Earth. All invented, all plausible; positions illustrative.
 const PN = V3(0.25, 1, 0.15).normalize(), PE1 = new THREE.Vector3().crossVectors(PN, V3(0, 0, 1)).normalize(), PE2 = new THREE.Vector3().crossVectors(PN, PE1);
 const inPlane = (r, ang, lift = 0) => PE1.clone().multiplyScalar(r * Math.cos(ang)).add(PE2.clone().multiplyScalar(r * Math.sin(ang))).add(PN.clone().multiplyScalar(lift));
 const PLANET_FS = `uniform vec3 L, lc, c1, c2, c3, glowC; uniform float I, bands, glowI, seed, rock; varying vec3 vN; varying vec3 vO; ${NOISE}
@@ -149,7 +151,8 @@ const RJ = 0.000477, RE = 4.26e-5;
 const PB = body({ name: "Betelgeuse b", tag: "plausible", pos: () => inPlane(120, 2.35), R: 1.3 * RJ, c1: [0.78, 0.62, 0.44], c2: [0.55, 0.32, 0.2], c3: [0.92, 0.86, 0.72], bands: 18, glowC: [1.0, 0.22, 0.05], glowI: 0.05, seed: 3.1, info: "a young super-Jupiter, about 8 times Jupiter's mass, 120 AU out: banded clouds lit orange by Betelgeuse, and on its night side a dull red glow from its own heat (about 1,100 K), since at 8 million years old it is still contracting." });
 const PB1 = body({ name: "b I", tag: "plausible", pos: () => PB.pos().add(inPlane(0.0042, 0.8)), R: 1.22e-5, c1: [0.86, 0.76, 0.36], c2: [0.7, 0.42, 0.16], rock: 2, glowC: [1.0, 0.35, 0.08], glowI: 0.25, seed: 7.7, info: "a volcanic moon the size of our Moon, kneaded by the giant's tides like Jupiter's Io: sulphur plains and glowing lava lakes." });
 const PB2 = body({ name: "b II", tag: "plausible", pos: () => PB.pos().add(inPlane(0.0095, 3.9)), R: 1.1e-5, c1: [0.86, 0.89, 0.93], c2: [0.55, 0.5, 0.45], rock: 1, seed: 5.2, info: "an icy moon, cracked and bright." });
-const PC = body({ name: "Betelgeuse c", tag: "plausible", pos: () => inPlane(350, 4.1, 12), R: 4 * RE, c1: [0.36, 0.62, 0.72], c2: [0.25, 0.46, 0.6], c3: [0.92, 0.96, 1.0], bands: 9, seed: 9.3, ring: [1.7, 2.6], tilt: 0.45, info: "an ice giant of about 18 Earth masses with rings, 350 AU out, where Betelgeuse's light equals the Sun's at Earth: its clouds are water clouds. Young, and under a sun 0.6° across that flickers over the years." });
+const PC = body({ name: "Betelgeuse c", tag: "plausible", lands: true, pos: () => inPlane(350, 4.1, 12), R: 1.6 * 6.371e6 / 1.496e11, c1: [0.16, 0.13, 0.12], c2: [0.3, 0.24, 0.2], rock: 2, glowC: [1.0, 0.32, 0.06], glowI: 0.35, seed: 9.3, tilt: 0.45, info: "a young rocky super-Earth, 1.6 times Earth's size, 350 AU out where Betelgeuse's light equals the Sun's at Earth. At 8 million years old its surface is still cooling: a dark new crust split by glowing lava, under a haze of steam and carbon dioxide outgassed from inside." });
+const PE = body({ name: "Betelgeuse e", tag: "plausible", lands: true, pos: () => inPlane(45, 5.3, -2), R: 0.55 * 6.371e6 / 1.496e11, c1: [0.5, 0.36, 0.26], c2: [0.28, 0.2, 0.16], rock: 1, glowC: [1.0, 0.3, 0.05], glowI: 0.04, seed: 2.2, info: "a scorched rocky world about Mars's size, 45 AU out, in about 60 times the sunlight at Earth: an airless, baked surface, hot enough by day (about 750 K) to soften rock." });
 const PD = body({ name: "a brown dwarf", tag: "plausible", pos: () => inPlane(900, 0.7, -40), R: 1.03 * RJ, c1: [0.12, 0.05, 0.03], c2: [0.06, 0.02, 0.01], bands: 24, glowC: [0.9, 0.22, 0.05], glowI: 0.75, seed: 4.4, info: "a brown dwarf of about 30 Jupiter masses, 900 AU out: too small to fuse hydrogen, glowing orange-red from the heat of its contraction (about 1,800 K)." });
 // the comet: a nucleus ~10 km across falling in at 25 AU; its dust tail (curving, yellowish) and ion tail (straight, blue) point away
 // from Betelgeuse, hundreds of millions of km long in its enormous light
@@ -166,16 +169,23 @@ const DESTS = [
   { name: "Siwarha, inside the outer atmosphere", pos: () => { const c = compPos(tSec / 86400), side = new THREE.Vector3().crossVectors(c, PN).normalize(); return c.clone().add(side.multiplyScalar(0.12)).add(c.clone().normalize().multiplyScalar(0.05)); }, look: () => compPos(tSec / 86400) },
   { name: "Close to Betelgeuse: 6 AU from its centre", pos: () => BD.clone().multiplyScalar(-6).applyAxisAngle(PN, 0.3), look: () => V3(0, 0, 0) },
   { name: "The comet, 25 AU out", pos: () => { const c = CN(), side = new THREE.Vector3().crossVectors(c, PN).normalize(); return c.clone().add(side.multiplyScalar(0.25)).add(c.clone().normalize().multiplyScalar(0.2)); }, look: () => CN().add(tailDir().multiplyScalar(0.35)) },
+  { name: "Betelgeuse e, a scorched rocky world (45 AU)", pos: viewNear(PE, 5, 0.8), look: () => PE.pos() },
   { name: "Betelgeuse b, a young super-Jupiter (120 AU)", pos: viewNear(PB, 4.5), look: () => PB.pos() },
   { name: "b I, its volcanic moon", pos: viewNear(PB1, 5, 0.6), look: () => PB1.pos() },
-  { name: "Betelgeuse c, a ringed ice giant (350 AU)", pos: viewNear(PC, 5.5, 0.7), look: () => PC.pos() },
+  { name: "Betelgeuse c, a young super-Earth (350 AU)", pos: viewNear(PC, 5, 0.7), look: () => PC.pos() },
   { name: "A brown dwarf (900 AU)", pos: viewNear(PD, 4.5, 1.6), look: () => PD.pos() },
   { name: "The comet belt, 3,000 AU out", pos: () => BD.clone().multiplyScalar(-3000).applyAxisAngle(PN, 0.5), look: () => V3(0, 0, 0) }];
 let destI = 0; const TRAVEL = { on: false };
-const AU_M = 1.496e11, fmtDays = s => s < 3 * 86400 ? (s / 3600).toFixed(0) + " hours" : (s / 86400).toFixed(0) + " days";
-function goTo(i) { if (TRAVEL.on || i === destI) return; const D = DESTS[i], to = D.pos(), dist = to.distanceTo(SHIP), t1g = 2 * Math.sqrt(dist * AU_M / 9.81), vmax = 9.81 * t1g / 2;
-  Object.assign(TRAVEL, { on: true, from: SHIP.clone(), to, dist, rmin: Math.max(1e-5, to.distanceTo(D.look())), b: 0, st: 0, stage: "out1", flipped: false, tau: 0, T: 14 + 6 * Math.log10(1 + dist * 100), t1g, vmax, i }); destI = i; drawConsole();
-  say(`Setting off for ${D.name}: ${fmtD(dist)}. The ship turns its nose toward it (a slow maneuver of many minutes, skipped), then burns at 1 g: halfway, it turns round and burns to slow down. The trip takes ${fmtDays(t1g)}, at up to ${(vmax / 2.998e8 * 100).toFixed(vmax < 3e6 ? 2 : 1)}% of the speed of light; shown in about ${Math.round(TRAVEL.T + 4)} seconds.`); }
+const AU_M = 1.496e11, fmtDays = s => s < 120 ? Math.round(s) + " seconds" : s < 3 * 3600 ? Math.round(s / 60) + " minutes" : s < 3 * 86400 ? (s / 3600).toFixed(0) + " hours" : (s / 86400).toFixed(s < 30 * 86400 ? 1 : 0) + " days";
+// A trip, flown in real time on the ship's clock (speed it up with ] or T): a slow turn toward the destination (0.4° a second), a 1 g
+// burn to the midpoint, a slow turn round (7.5 minutes), a 1 g burn to slow down, a slow turn to bring the destination into view.
+// Under thrust there is real gravity, 1 g toward the engine; the engine off, you would float (you are held to the floor here).
+const TURN_W = 0.4 * Math.PI / 180, G0 = 9.81;
+function goTo(i) { if (TRAVEL.on || i === destI) return; const D = DESTS[i], to = D.pos(), dist = to.distanceTo(SHIP), t1g = 2 * Math.sqrt(dist * AU_M / G0), vmax = G0 * t1g / 2, q1 = thrustQuat(to.clone().sub(SHIP)), q2 = thrustQuat(SHIP.clone().sub(to)), q3 = viewQuat(D.look().sub(to));
+  const segs = [["turn", ship.quaternion.angleTo(q1) / TURN_W, ship.quaternion.clone(), q1], ["burn1", t1g / 2], ["turn", Math.PI / TURN_W, q1, q2], ["burn2", t1g / 2], ["turn", q2.angleTo(q3) / TURN_W, q2, q3]];
+  Object.assign(TRAVEL, { on: true, from: SHIP.clone(), to, dist, t1g, vmax, i, segs, k: 0, c: 0, dir: to.clone().sub(SHIP).normalize() }); destI = i; drawConsole();
+  const total = segs.reduce((a, s) => a + s[1], 0);
+  say(`Setting off for ${D.name}: ${fmtD(dist)}. The ship turns slowly toward it, burns at 1 g to the midpoint, turns round and burns to slow down: ${fmtDays(total)} in all, at up to ${(vmax / 2.998e8 * 100).toFixed(vmax < 3e6 ? 2 : 1)}% of the speed of light. This runs in real time: ] or T speeds time up.`); }
 // the ship's attitude. Its own "up" (+y) runs along its spine toward the nose: under thrust that is up for the crew. The observation
 // sphere looks out to the ship's +x side. Parked, the ship holds the thing you came to see 30° above the sphere's horizon on that side;
 // under thrust, its nose (and so the zenith) points along the thrust.
@@ -266,9 +276,9 @@ const conTex = canvasTex(640, 720), console_ = new THREE.Mesh(new THREE.PlaneGeo
 { const st = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 0.12), M(0x2a2c32)); st.position.set(2.2, 0.5, -1.8); ship.add(st); }
 bridgeCon = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.9), new THREE.MeshBasicMaterial({ map: conTex, toneMapped: false })); bridgeCon.position.set(MOD.x + 7.0, 5.35, 0); bridgeCon.rotation.set(-0.3, -Math.PI / 2, 0, "YXZ"); ship.add(bridgeCon);
 function drawConsole() { const g = conTex.userData.c.getContext("2d"); g.fillStyle = "#0c0e14"; g.fillRect(0, 0, 640, 720); g.fillStyle = "#ffb060"; g.font = "bold 34px sans-serif"; g.fillText("DESTINATIONS", 24, 50);
-  DESTS.forEach((D, i) => { const y = 82 + i * 68; g.fillStyle = i === destI ? (TRAVEL.on ? "#5a4a20" : "#2a3a5a") : "#181c26"; g.fillRect(16, y, 608, 60); g.fillStyle = i === destI ? "#ffe0a0" : "#d8e0f0"; g.font = "24px sans-serif"; g.fillText(`${i + 1}. ${D.name}`, 28, y + 38, 584); });
+  DESTS.forEach((D, i) => { const y = 74 + i * 60; g.fillStyle = i === destI ? (TRAVEL.on ? "#5a4a20" : "#2a3a5a") : "#181c26"; g.fillRect(16, y, 608, 54); g.fillStyle = i === destI ? "#ffe0a0" : "#d8e0f0"; g.font = "23px sans-serif"; g.fillText(`${(i + 1) % 10}. ${D.name}`, 28, y + 35, 584); });
   conTex.needsUpdate = true; }
-function consoleHit(origin, dir) { const ray = new THREE.Raycaster(origin, dir); const h = ray.intersectObjects([console_, bridgeCon].filter(Boolean))[0]; if (!h) return false; const i = Math.floor(((1 - h.uv.y) * 720 - 82) / 68); if (i >= 0 && i < DESTS.length) goTo(i); return true; }
+function consoleHit(origin, dir) { const ray = new THREE.Raycaster(origin, dir); const h = ray.intersectObjects([console_, bridgeCon].filter(Boolean))[0]; if (!h) return false; const i = Math.floor(((1 - h.uv.y) * 720 - 74) / 60); if (i >= 0 && i < DESTS.length) goTo(i); return true; }
 const ctrls = [0, 1].map(i => { const ct = renderer.xr.getController(i); rig.add(ct); const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(0, 0, 0), V3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xffd060 })); l.scale.z = 3; ct.add(l);
   ct.addEventListener("selectstart", () => { const o = V3(0, 0, 0), d = V3(0, 0, -1); ct.getWorldPosition(o); d.applyQuaternion(ct.getWorldQuaternion(new THREE.Quaternion())); consoleHit(o, d); }); return ct; });
 
@@ -288,7 +298,8 @@ const starLabel = dynLabel("#ffb060", 1.1), compLabel = dynLabel("#ffe8c0", 0.9)
 // ---------- time ----------
 // Real time by default. T steps up: an hour, a day, a month, a year per second (the cells churn over months to years, the pulsation
 // takes 416 days, the companion 5.8 years).
-const RATES = [[1, "real time"], [3600, "1 hour per second"], [86400, "1 day per second"], [30 * 86400, "1 month per second"], [365.25 * 86400, "1 year per second"]]; let rateI = 0, tSec = 0;
+const RATES = [[1, "real time"], [10, "10 times faster"], [60, "1 minute per second"], [600, "10 minutes per second"], [3600, "1 hour per second"], [21600, "6 hours per second"], [86400, "1 day per second"], [604800, "1 week per second"], [30 * 86400, "1 month per second"], [365.25 * 86400, "1 year per second"]]; let rateI = 0, tSec = 0;
+function setRate(i) { rateI = Math.max(0, Math.min(RATES.length - 1, i)); say(`Time: ${RATES[rateI][1]}. ] faster, [ slower, \\ real time.`); }
 
 // ---------- you ----------
 // where you can walk: the sphere's floor, the walkway through the arm, and the decks of the crew module; the lift up its middle
@@ -298,7 +309,7 @@ function liftMove(dir) { if (LIFT.on || !onLift()) return; const i = DECKS.findI
 const areaOf = () => P.y === 0 && P.x * P.x + P.z * P.z < 10 ? "sphere" : P.y === 0 && P.x > -24 ? "arm" : onLift() ? "lift" : "deck" + P.y;
 const AREA_SAY = { arm: "The arm: a 22 m tube from the observation sphere to the crew module.", lift: "The lift up the middle of the crew module: E up, Q down (in VR, right stick up or down).", "deck-4": "Deck -4: the airlock, the spacesuits and the storm shelter.", deck0: "Deck 0: the commons and galley. The window band looks out on the arm and the sphere.", deck4: "Deck 4: the bridge, with windows all round and the destination console.", deck8: "Deck 8: the crew quarters." }; let lastArea = "sphere";
 const P = { x: -0.8, y: 0, z: 0 }; let yaw = -Math.PI / 2, pitch = 0.35, started = false, vrYaw = -Math.PI / 2; const keys = {};
-addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (/^Digit[1-9]$/.test(e.code)) goTo(+e.code.slice(5) - 1); if (e.code === "KeyH") hudOn = !hudOn; if (e.code === "KeyF") toggleFilter(); if (e.code === "KeyE") liftMove(1); if (e.code === "KeyQ") liftMove(-1); if (e.code === "KeyT") { rateI = (rateI + 1) % RATES.length; say(`Time: ${RATES[rateI][1]}.`); } });
+addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (/^Digit[0-9]$/.test(e.code)) goTo((+e.code.slice(5) + 9) % 10); if (e.code === "KeyH") hudOn = !hudOn; if (e.code === "KeyF") toggleFilter(); if (e.code === "KeyE") liftMove(1); if (e.code === "KeyQ") liftMove(-1); if (e.code === "KeyT" || e.code === "BracketRight") setRate(rateI + 1); if (e.code === "BracketLeft") setRate(rateI - 1); if (e.code === "Backslash") setRate(0); });
 addEventListener("keyup", e => keys[e.code] = false);
 let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, moved: 0 }; start(); });
 addEventListener("pointermove", e => { if (!drag) return; drag.moved += Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y); yaw -= (e.clientX - drag.x) * 0.004; pitch = THREE.MathUtils.clamp(pitch - (e.clientY - drag.y) * 0.004, -1.4, 1.5); drag.x = e.clientX; drag.y = e.clientY; });
@@ -315,7 +326,7 @@ function drawPanel() { const days = tSec / 86400, ph = (days % P_PULSE) / P_PULS
   const dB = SHIP.length(), angB = 2 * Math.asin(Math.min(1, R_B / dB)) * 180 / Math.PI, flux = L_B / dB ** 2, near = BODIES.concat([{ name: "Siwarha", pos: () => compPos(days) }, { name: "the comet", pos: CN }]).map(B => [B, B.pos().distanceTo(SHIP)]).sort((a, b) => a[1] - b[1])[0];
   PANEL.innerHTML = `<div style="font-size:17px;font-weight:600">Betelgeuse${TRAVEL.on ? ": travelling" : ""}</div>
   <div style="margin:4px 0 6px"><b>Where you are</b>: ${fmtD(dB)} from Betelgeuse, which is ${angB.toFixed(angB < 1 ? 2 : 1)}° across (${fmt(angB / 0.52, angB < 5 ? 1 : 0)} times the Moon's width from Earth) and gives ${fmt(flux, flux < 10 ? 1 : 0)} times the sunlight at Earth${flux > 30 ? ": deadly without heavy shielding" : flux > 2 ? "" : flux > 0.5 ? ", much like the Sun at Earth" : ""}. Nearest: ${near[0].name}, ${fmtD(near[1])}.
-  ${TRAVEL.on ? `<br>On the way to ${DESTS[TRAVEL.i].name}: day ${((TRAVEL.tau || 0) / 86400).toFixed(1)} of ${(TRAVEL.t1g / 86400).toFixed(1)} by 1 g drive; speed ${fmt((TRAVEL.v || 0) / 1000, 0)} km/s (${((TRAVEL.v || 0) / 2.998e6).toFixed(2)}% of light); ${TRAVEL.flipped ? "slowing, destination below" : "speeding up, destination overhead"}; time-lapse ×${fmt(Math.max(1, TRAVEL.lapse || 1), 0)}.` : ""}</div>
+  ${TRAVEL.on ? `<br>On the way to ${DESTS[TRAVEL.i].name}: ${["turning toward it", "burning at 1 g (you feel 1 g of weight), destination overhead", "engine off, turning round", "burning at 1 g to slow down, destination below your feet", "turning to view it"][TRAVEL.k]}; speed ${fmt((TRAVEL.v || 0) / 1000, 0)} km/s (${((TRAVEL.v || 0) / 2.998e6).toFixed(2)}% of light); ${fmtDays(TRAVEL.rest || 0)} to go at ${RATES[rateI][1]} (] faster).` : ""}</div>
   <div style="margin-bottom:6px"><b>Go to</b> (click, press 1-9, or use the console in the dome):<br>${DESTS.map((D, k) => `<span data-d="${k}" style="cursor:pointer;color:${k === destI ? "#ffd070" : "#a8c8ff"}">${k + 1}. ${D.name}</span>`).join("<br>")}</div>
   <b>Measured (with uncertainties)</b><br>&middot; radius about ${Math.round(R_B * 215)} times the Sun's (${R_B.toFixed(2)} AU; estimates 640 to 1,000): in our Solar System it would reach past Mars<br>&middot; surface 3,600 K (deep orange), light about ${fmt(L_B, 0)} Suns, mass now about ${M_B} Suns<br>&middot; age about 8 to 10 million years; it should explode as a supernova within about 100,000 years<br>&middot; mean density about ${fmt(M_B * 1.989e30 / (4 / 3 * Math.PI * (R_B * 1.496e11) ** 3) / 1.2, 1)} of the air you breathe<br>&middot; it pulses every ~${P_PULSE} days, now at ${Math.round(ph * 100)}% of a cycle<br>&middot; it loses about a millionth of a Sun's mass a year, some of it as dust
   <div style="margin-top:6px"><b>Probable</b>: the companion Siwarha, about the Sun's mass, ${A_COMP.toFixed(1)} AU from Betelgeuse's centre (inside its outer atmosphere), once round every 5.8 years (now ${Math.round(cph * 100)}% round). Its orbit's tilt is assumed.</div>
@@ -335,8 +346,8 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.1), vr
   if (started) tSec += dt * RATES[rateI][0]; const days = tSec / 86400;
   let mx = 0, my = 0;
   if (vr) { const s = renderer.xr.getSession(); for (const src of s ? s.inputSources : []) { const gp = src.gamepad; if (!gp) continue; const a = gp.axes, ax = a.length >= 4 ? 2 : 0;
-      if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; const bX = gp.buttons[4]?.pressed; if (bX && !prevB.x) toggleFilter(); prevB.x = bX; }
-      else { const tx = a[ax] || 0, ty = a[ax + 1] || 0; if (ty < -0.75 && !prevB.lu) { liftMove(1); prevB.lu = true; } else if (ty > -0.3) prevB.lu = false; if (ty > 0.75 && !prevB.ld) { liftMove(-1); prevB.ld = true; } else if (ty < 0.3) prevB.ld = false; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const bB = gp.buttons[5]?.pressed; if (bB && !prevB.b) hudOn = !hudOn; prevB.b = bB; const bA = gp.buttons[4]?.pressed; if (bA && !prevB.a) { rateI = (rateI + 1) % RATES.length; say(`Time: ${RATES[rateI][1]}.`); } prevB.a = bA; } } }
+      if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; const bX = gp.buttons[4]?.pressed; if (bX && !prevB.x) toggleFilter(); prevB.x = bX; const bY = gp.buttons[5]?.pressed; if (bY && !prevB.y) setRate(rateI - 1); prevB.y = bY; }
+      else { const tx = a[ax] || 0, ty = a[ax + 1] || 0; if (ty < -0.75 && !prevB.lu) { liftMove(1); prevB.lu = true; } else if (ty > -0.3) prevB.lu = false; if (ty > 0.75 && !prevB.ld) { liftMove(-1); prevB.ld = true; } else if (ty < 0.3) prevB.ld = false; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const bB = gp.buttons[5]?.pressed; if (bB && !prevB.b) hudOn = !hudOn; prevB.b = bB; const bA = gp.buttons[4]?.pressed; if (bA && !prevB.a) setRate(rateI + 1); prevB.a = bA; } } }
   else { if (keys.KeyW) my -= 1; if (keys.KeyS) my += 1; if (keys.KeyD) mx += 1; if (keys.KeyA) mx -= 1; }
   // walking round the cupola floor (in the ship's frame)
   if ((mx || my) && !LIFT.on) { const f = V3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())).applyQuaternion(ship.quaternion.clone().invert()); f.y = 0; f.normalize(); const sd = V3(-f.z, 0, f.x), sp = (keys.ShiftLeft || keys.ShiftRight ? 3.2 : 1.4) * dt;
@@ -351,15 +362,15 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.1), vr
   // feet), and park (a fade). The remaining distance shrinks geometrically in real time, so the destination grows steadily; the trip's
   // clock follows the true 1 g motion for that distance, so the time-lapse runs fast early and slows near the end.
   let fadeA = 0, burning = false;
-  if (TRAVEL.on) { const T = TRAVEL, F = 0.7; T.st += dt; const D = DESTS[T.i];
-    if (T.stage === "out1" || T.stage === "out2" || T.stage === "out3") { fadeA = Math.min(1, T.st / F); if (T.st >= F) { T.st = 0;
-        if (T.stage === "out1") { ship.quaternion.copy(thrustQuat(T.to.clone().sub(SHIP))); T.stage = "in1"; }
-        else if (T.stage === "out2") { ship.quaternion.copy(thrustQuat(SHIP.clone().sub(T.to))); T.stage = "in2"; T.flipped = true; say("Midpoint: the engine has shut down, the ship has turned round (skipped), and it burns again to slow down. Your destination is now beneath your feet: look down through the floor."); }
-        else { ship.quaternion.copy(viewQuat(D.look().sub(SHIP))); T.stage = "in3"; } } }
-    else if (T.stage === "in1" || T.stage === "in2" || T.stage === "in3") { fadeA = Math.max(0, 1 - T.st / F); if (T.st >= F) { T.st = 0; if (T.stage === "in3") { T.on = false; drawConsole(); const B = BODIES.find(b => D.name.startsWith(b.name)); say(`Arrived and parked: ${D.name}.${B ? " " + B.name[0].toUpperCase() + B.name.slice(1) + ": " + B.info + " (Plausible: invented to fit what such a star could have.)" : ""} Engine off: here you would float; you are held to the floor.`); } else T.stage = "burn"; } }
-    if (T.stage === "burn") { burning = true; T.b = Math.min(1, T.b + dt / T.T); const e = T.b * T.b * (3 - 2 * T.b), rem = Math.exp(Math.log(T.dist + T.rmin) * (1 - e) + Math.log(T.rmin) * e) - T.rmin;
-      SHIP.copy(T.to).add(T.from.clone().sub(T.to).normalize().multiplyScalar(rem)); const tau = rem > T.dist / 2 ? Math.sqrt(2 * (T.dist - rem) * AU_M / 9.81) : T.t1g - Math.sqrt(2 * rem * AU_M / 9.81); tSec += Math.max(0, tau - T.tau); T.lapse = (tau - T.tau) / Math.max(dt, 1e-3); T.tau = tau; T.v = 9.81 * Math.min(tau, T.t1g - tau);
-      if (!T.flipped && rem <= T.dist / 2) { T.stage = "out2"; T.st = 0; } else if (T.b >= 1) { T.stage = "out3"; T.st = 0; } } }
+  if (TRAVEL.on) { const T = TRAVEL; let simDt = dt * RATES[rateI][0];
+    while (T.on && simDt > 0) { const sg = T.segs[T.k], left = sg[1] - T.c, step = Math.min(left, simDt); T.c += step; simDt -= step;
+      if (sg[0] === "burn1") { const s1 = 0.5 * G0 * T.c * T.c / AU_M; SHIP.copy(T.from).addScaledVector(T.dir, s1); T.v = G0 * T.c; burning = true; }
+      else if (sg[0] === "burn2") { const vm = G0 * T.t1g / 2, s2 = T.dist / 2 + (vm * T.c - 0.5 * G0 * T.c * T.c) / AU_M; SHIP.copy(T.from).addScaledVector(T.dir, Math.min(T.dist, s2)); T.v = vm - G0 * T.c; burning = true; }
+      else { const f = sg[1] > 0 ? T.c / sg[1] : 1, e = f * f * (3 - 2 * f); ship.quaternion.copy(sg[2]).slerp(sg[3], e); T.v = 0; if (sg[1] / RATES[rateI][0] < 5) fadeA = Math.max(fadeA, Math.min(1, Math.min(T.c, sg[1] - T.c) / Math.max(1e-6, RATES[rateI][0] * 0.4))); }
+      if (T.c >= sg[1] - 1e-9) { T.k++; T.c = 0; if (T.k === 2) say("Midpoint: the engine is off (you would float), and the ship turns slowly round to burn the other way and slow down."); if (T.k === 3) say("Burning again to slow down: your destination is now beneath your feet. Look down through the floor.");
+        if (T.k >= T.segs.length) { T.on = false; SHIP.copy(T.to); drawConsole(); const D = DESTS[T.i], B = BODIES.find(b => D.name.startsWith(b.name)); say(`Arrived and parked: ${D.name}.${B ? " " + B.name[0].toUpperCase() + B.name.slice(1) + ": " + B.info + " (Plausible: invented to fit what such a star could have.)" : ""} The engine is off: you would float here; you are held to the floor.`); } } }
+    // the time-lapse eases off near the end, so the arrival does not flash past
+    if (T.on) { const rest = T.segs.slice(T.k).reduce((a, s, n) => a + (n ? s[1] : s[1] - T.c), 0); while (rateI > 0 && rest / RATES[rateI][0] < 6) { rateI--; say(`Approaching: time slows to ${RATES[rateI][1]}.`); } T.rest = rest; } }
   fadeM.opacity = fadeA; engineParts[0].plume.visible = burning; engineParts[0].radM.emissive.setRGB(burning ? 0.35 : 0, burning ? 0.08 : 0, 0);
   // Betelgeuse: pulsing a few per cent in size and about 0.3 magnitude in light; its cells churning
   const pul = Math.sin(2 * Math.PI * days / P_PULSE), Rnow = R_B * (1 + 0.03 * pul), dB = place(star, V3(0, 0, 0), Rnow); starMat.uniforms.t.value = days / 220; starMat.uniforms.bright.value = (1 + 0.12 * pul) * (filterOn ? 1 : 30); SKY_DIM.value = filterOn ? 1 : 0.06;
