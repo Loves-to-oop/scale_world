@@ -53180,9 +53180,9 @@ const starMat = new THREE.ShaderMaterial({ uniforms: { t: { value: 0 }, bright: 
       #include <colorspace_fragment>
     }` });
 const star = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 6), starMat); skyG.add(star);
-// the extended atmosphere: a warm glow of molecules (water, carbon monoxide) and gas reaching out to about 1.5 times the radius,
-// faint compared with the surface; drawn as a halo
-const glowTex = canvasTex(512, 512, (g, W) => { const r = g.createRadialGradient(W / 2, W / 2, W * 0.2, W / 2, W / 2, W / 2); r.addColorStop(0, "rgba(255,110,45,0.55)"); r.addColorStop(0.18, "rgba(240,90,40,0.22)"); r.addColorStop(0.45, "rgba(200,70,35,0.06)"); r.addColorStop(1, "rgba(180,60,30,0)"); g.fillStyle = r; g.fillRect(0, 0, W, W); });
+// the extended atmosphere: molecules (water, carbon monoxide) and gas reaching out to about 1.5 times the radius. At 1,500-2,000 K
+// it glows mostly in infrared; in visible light it is only a faint haze round the disc, drawn as a dim halo
+const glowTex = canvasTex(512, 512, (g, W) => { const r = g.createRadialGradient(W / 2, W / 2, W * 0.2, W / 2, W / 2, W / 2); r.addColorStop(0, "rgba(255,110,45,0.22)"); r.addColorStop(0.18, "rgba(240,90,40,0.08)"); r.addColorStop(0.45, "rgba(200,70,35,0.02)"); r.addColorStop(1, "rgba(180,60,30,0)"); g.fillStyle = r; g.fillRect(0, 0, W, W); });
 const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); skyG.add(glow);
 // the soft limb: a dark orange-red veil over the outermost 10% of the disc fading out to 1.2 radii, so the star has no hard edge
 const limbTex = canvasTex(512, 512, (g, W) => { const r = g.createRadialGradient(W / 2, W / 2, 0, W / 2, W / 2, W / 2); r.addColorStop(0, "rgba(150,40,15,0)"); r.addColorStop(0.74, "rgba(150,40,15,0)"); r.addColorStop(0.83, "rgba(140,38,14,0.55)"); r.addColorStop(0.9, "rgba(120,32,12,0.35)"); r.addColorStop(1, "rgba(100,28,10,0)"); g.fillStyle = r; g.fillRect(0, 0, W, W); });
@@ -53309,7 +53309,7 @@ const engineParts = [];
 // the auto-darkening patch: electrochromic glass that darkens only where the star is, like a welding helmet. What harms the eye is how
 // bright each bit of the star's surface is, not how far away it is: Betelgeuse's surface is about 15% as bright as the Sun's, enough to
 // burn your retina in seconds from any distance. F switches the patch off to show what you would see without it.
-let filterOn = true; const patch = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide })), patchRim = new THREE.Mesh(new THREE.RingGeometry(0.97, 1, 64), new THREE.MeshBasicMaterial({ color: 0x8a8e96, transparent: true, opacity: 0.6, side: THREE.DoubleSide })); ship.add(patch, patchRim);
+let filterOn = true; const patch = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25, depthWrite: false, side: THREE.DoubleSide })), patchRim = new THREE.Mesh(new THREE.RingGeometry(0.97, 1, 64), new THREE.MeshBasicMaterial({ color: 0x8a8e96, transparent: true, opacity: 0.6, side: THREE.DoubleSide })); ship.add(patch, patchRim);
 // fading to black, for the ship's slow turns
 const fadeM = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthTest: false, depthWrite: false }), fade = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), fadeM); fade.position.z = -0.12; fade.renderOrder = 50; camera.add(fade);
 // the ship starts parked with Betelgeuse in view
@@ -53426,7 +53426,7 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.1), vr
   // the darkening patch on the sphere's glass, over Betelgeuse
   // (it tracks your eye, as such glass would have to: the darkened spot is where your line of sight to the star crosses the glass)
   { const dL = SHIP.clone().negate().normalize().applyQuaternion(ship.quaternion.clone().invert()), eye = ship.worldToLocal(headP.clone()), oc = eye.clone().sub(BUB), b = oc.dot(dL), cc = oc.lengthSq() - (BUB_R - 0.05) ** 2, tHit = -b + Math.sqrt(Math.max(0, b * b - cc));
-    const hit = eye.clone().add(dL.clone().multiplyScalar(tHit)), aB = Math.asin(Math.min(1, R_B / SHIP.length())), rP = Math.min(3.2, tHit * Math.tan(Math.min(1.1, aB * 1.3 + 0.004)));
+    const hit = eye.clone().add(dL.clone().multiplyScalar(tHit)), aB = Math.asin(Math.min(1, R_B / SHIP.length())), rP = Math.min(9, tHit * Math.tan(Math.min(1.25, aB * 1.2 + 0.004)));
     for (const m of [patch, patchRim]) { m.position.copy(hit).add(dL.clone().multiplyScalar(m === patchRim ? -0.01 : 0)); m.scale.setScalar(rP); m.lookAt(headP); m.visible = filterOn; } }
   // the light on the cupola comes from Betelgeuse's direction, dimmer far away
   starLight.position.copy(SHIP).negate().normalize().multiplyScalar(100).applyQuaternion(new THREE.Quaternion()); starLight.intensity = 3.2 * THREE.MathUtils.clamp(Math.pow(L_B / SHIP.lengthSq() / 140, 0.25), 0.1, 3);
