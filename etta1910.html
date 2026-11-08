@@ -53284,7 +53284,7 @@ function build218(F) { const { WX, SX, D, SZ, PZ, UP, PL, CE, PITCH } = P218, T 
   const W = (line, at, c, out, o = {}) => op(line, at, c, o.w || 0.8, o.b ?? 0.72, o.h || 1.65, { out, sashC: SASH, ...o });
   W("z", 0, 1.45, -1); W("z", 0, 3.95, -1); W("x", 0, 3.45, -1); W("x", 0, 5.6, -1); W("x", 0, 7.9, -1, { b: 1.0, h: 1.2 }); W("x", WX, 1.1, 1); W("x", WX, 3.15, 1, { w: 0.72 });
   W("z", SZ, 6.55, -1); W("x", SX, 5.0, 1); W("x", SX, 7.8, 1); W("z", D, 3.6, 1, { b: 1.0, h: 1.2 }); W("z", D, 7.6, 1);
-  const frontDoor = op("z", SZ, 8.65, 0.95, 0, 2.2, { door: true, out: -1 }), backDoor = op("z", D, 1.25, 0.86, 0, 2.1, { door: true, out: 1 });
+  const frontDoor = op("z", SZ, 8.6, 1.0, 0, 2.2, { door: true, out: -1 }), backDoor = op("z", D, 1.25, 0.86, 0, 2.1, { door: true, out: 1 });
   const dArch = op("z", 4.4, 2.7, 2.2, 0, 2.35, { door: true, int: true }), dKit = op("z", 6.8, 4.45, 0.8, 0, 2.05, { door: true, int: true }), dDin = op("x", WX, 4.95, 0.85, 0, 2.05, { door: true, int: true }),
     dBedK = op("x", WX, 7.95, 0.8, 0, 2.05, { door: true, int: true }), dBed = op("z", 6.6, 5.85, 0.75, 0, 2.0, { door: true, int: true });
   // foundation: brick, from the ground up to the sills (the lot falls toward the street, so the front stands higher)
@@ -53355,8 +53355,8 @@ function build218(F) { const { WX, SX, D, SZ, PZ, UP, PL, CE, PITCH } = P218, T 
   chim(WX / 2, 6.8, -0.8, RW + 0.9); chim(8.9, 8.7, 2.2, RS + 0.4);
   // the porch: grey-painted boards, three steps, turned columns with groups of rings (the 1914 photograph), a shed roof, a beaded ceiling
   box(F, MAT.board, (WX + SX) / 2, -0.08, (PZ + SZ) / 2, SX - WX, 0.06, SZ - PZ, 0x9a9890); floorRect(F, WX, PZ, SX, SZ, -0.05);
-  const fy = gy(7.6, PZ - 0.9); for (let k = 0; k < 3; k++) { const y = -0.1 + (k + 1) * (fy + 0.1) / 3.4; box(F, MAT.board, 7.6, y - 0.05, PZ - 0.15 - k * 0.28, 1.6, 0.06, 0.3, 0x9a9890); box(F, MAT.plain, 7.6, (y + fy) / 2 - 0.05, PZ - 0.15 - k * 0.28, 1.6, Math.max(0.05, y - fy), 0.3, 0x8a8880); }
-  floorRect(F, 6.8, PZ - 1.0, 8.4, PZ, fy + 0.02, { y2: -0.05, along: "z" });
+  const fy = gy(8.6, PZ - 0.9); for (let k = 0; k < 3; k++) { const y = -0.1 + (k + 1) * (fy + 0.1) / 3.4; box(F, MAT.board, 8.6, y - 0.05, PZ - 0.15 - k * 0.28, 1.8, 0.06, 0.3, 0x9a9890); box(F, MAT.plain, 8.6, (y + fy) / 2 - 0.05, PZ - 0.15 - k * 0.28, 1.8, Math.max(0.05, y - fy), 0.3, 0x8a8880); }
+  floorRect(F, 7.7, PZ - 1.0, 9.5, PZ, fy + 0.02, { y2: -0.05, along: "z" });
   box(F, MAT.plank, (WX + SX) / 2, (-0.1 + Math.min(gy(WX, PZ), gy(SX, PZ))) / 2, PZ + 0.02, SX - WX, -0.1 - Math.min(gy(WX, PZ), gy(SX, PZ)) + 0.1, 0.03, 0xd8d4c8);
   const col = [[0, 0.11], [0.05, 0.1], [0.08, 0.075], [0.25, 0.075], [0.27, 0.09], [0.29, 0.075], [0.31, 0.09], [0.33, 0.075], [0.7, 0.08], [0.72, 0.095], [0.74, 0.08], [0.76, 0.095], [0.78, 0.08], [1.55, 0.085], [1.57, 0.1], [1.59, 0.085], [1.61, 0.1], [1.63, 0.085], [2.2, 0.075], [2.24, 0.1], [2.32, 0.11], [2.36, 0]];
   for (const x of [WX + 0.2, 7.6, SX - 0.15]) { lathe(F, MAT.plain, x, -0.05, PZ + 0.15, col.map(([y, r]) => [r, y]), TRIM, 12); }
@@ -53367,7 +53367,7 @@ function build218(F) { const { WX, SX, D, SZ, PZ, UP, PL, CE, PITCH } = P218, T 
   const by = gy(1.25, D + 0.6); box(F, MAT.plank, 1.25, (by - 0.1) / 2, D + 0.45, 1.1, Math.max(0.1, -0.1 - by), 0.7, 0x8a7a62); floorRect(F, 0.7, D, 1.8, D + 0.8, Math.max(by, -0.12));
   cyl(F, MAT.iron, -0.05, 1.8, D + 0.05, 0.04, 0.04, 3.9, 0x8a8a84, 8);
   // the walls you bump into outside: the house's outline, the porch's open front between its columns
-  wallSeg(F, WX, PZ, WX, SZ, -0.06, 3); wallSeg(F, SX, PZ, SX, SZ, -0.06, 3); wallSeg(F, WX, PZ, 6.8, PZ, -0.06, 3); wallSeg(F, 8.4, PZ, SX, PZ, -0.06, 3); }
+  wallSeg(F, WX, PZ, WX, SZ, -0.06, 3); wallSeg(F, SX, PZ, SX, SZ, -0.06, 3); wallSeg(F, WX, PZ, 7.7, PZ, -0.06, 3); wallSeg(F, 9.5, PZ, SX, PZ, -0.06, 3); }
 
 // ---------- inside 218: the furniture ----------
 // The parlour after the family's photographs: dark flowered paper, framed pictures (a large one of a woman, perhaps a holy picture),
@@ -53823,7 +53823,7 @@ const wl = (F, X, Z, y = null) => { const w = toWorld(F, X, 0, Z); return [w.x, 
 function person(L, name, info, o) { const p = { L, name, info, i: PEOPLE.length, t0: hash(PEOPLE.length, 3) * 50, ...o }; crowd.look(p.i, L); PEOPLE.push(p); return p; }
 const F220 = placeF(15.7, 4.1), F216 = placeF(-7.35, 11.2);
 const LOUISA_INFO = "Louisa (Aloise) Fraundorf, 37. Born in Germany, says the 1910 census; in Bohemia, says that of 1920, which also gives Bohemian as her mother tongue. She came over between 1885 and 1896 and speaks German at home. The family's photographs name her Aloise Cozl Windisch Fraundorf, and name Lulu and Joseph \"Windisch\": perhaps her children by an earlier marriage, though the census lists them as Richard's. Mother of five living children in April 1910; Bertha, counted at 10 in January 1920 but not in April 1910, may be born about now (she is not shown). Here she is making Sunday supper.";
-person(looks(1, "man", { hair: 0x5a3a20, shirt: 0xf4f2ec, vest: 0x2a2a30, braces: false, hat: null, mustache: true }), "Richard Bernhard Fraundorf", "Richard Bernhard Fraundorf, 40, the head of the house (the census taker wrote \"Benjamin\"). A bread baker, born in Saxony on 13 January 1874, in America since about 1880-83; in 1918 he worked for the Nafziger Baking Company at Sarah Street and Cook Avenue, and registered for the draft as medium height, with grey eyes and brown hair. He owns this house, with a mortgage. Bakers start in the small hours, so Sunday afternoon on the porch with the paper is his to enjoy.", { pos: wl(F218, 8.95, 3.25, -0.05), h: F218.ry + Math.PI, kind: "sit", paper: true });
+person(looks(1, "man", { hair: 0x5a3a20, shirt: 0xf4f2ec, vest: 0x2a2a30, braces: false, hat: null, mustache: true }), "Richard Bernhard Fraundorf", "Richard Bernhard Fraundorf, 40, the head of the house (the census taker wrote \"Benjamin\"). A bread baker, born in Saxony on 13 January 1874, in America since about 1880-83; in 1918 he worked for the Nafziger Baking Company at Sarah Street and Cook Avenue, and registered for the draft as medium height, with grey eyes and brown hair. He owns this house, with a mortgage. Bakers start in the small hours, so Sunday afternoon on the porch with the paper is his to enjoy.", { pos: wl(F218, 6.3, 3.25, -0.05), h: F218.ry + Math.PI - 0.3, kind: "sit", paper: true });
 person(looks(2, "woman", { hair: 0x2a1c12, waist: 0xf6f4ee, skirtC: 0x2a2a3a, apron: true }), "Louisa Fraundorf", LOUISA_INFO, { pos: wl(F218, 3.7, 7.85, 0), h: F218.ry, kind: "knead" });
 person(looks(3, "girl", { s: 0.86, hair: 0x3a2618, skirtC: 0x3a3a4a, bowC: 0x1a1a1a }), "Lulu Fraundorf", "Lulu (Louisa), 12, born in Missouri, at school (St. Andrew's had a parish school). The eldest, minding her little brother. By 1917 the city directory lists her at 218 too; in the photographs she is \"Lulu Cozl Fraundorf\" or \"Lula Windisch\".", { pos: wl(F218, 8.2, -1.6), h: F218.ry + 2.6, kind: "talk" });
 person(looks(4, "toddler", { hair: 0x8a6a42 }), "Richard Fraundorf", "Richard Thomas Fraundorf, 2, the youngest (a little boy still in a smock, as small boys were dressed). In the 1914 photograph he wears a striped cap and tie.", { path: "circle", c: wl(F218, 7.2, -2.6), r: 0.9, speed: 0.35, kind: "walk" });
@@ -53838,7 +53838,7 @@ person(looks(12, "woman", { apron: false }), "Josephine Irion", "Josephine Irion
 person(looks(13, "boy", { s: 0.84 }), "Victor Kuntz", "Victor Kuntz, 11, from 206: his father Frank is 32, his mother Frances 31.", { path: "circle", c: ON(-36, -10), r: 2.5, speed: 1.2, kind: "walk" });
 person(looks(14, "girl", { s: 0.74, skirtC: 0xd8e4ee }), "Alma Kuntz", "Alma Kuntz, 8, from 206.", { path: "circle", c: ON(-36, -10), r: 2.5, speed: 1.2, phase: 2.5, kind: "walk" });
 // chairs on the porches
-chairB(frame(F218.x, F218.z, F218.y - 0.05, F218.ry), 8.95, 3.35, Math.PI); chairB(frame(F218.x, F218.z, F218.y - 0.05, F218.ry), 6.6, 3.4, Math.PI - 0.4);
+chairB(frame(F218.x, F218.z, F218.y - 0.05, F218.ry), 6.3, 3.35, Math.PI - 0.3); chairB(frame(F218.x, F218.z, F218.y - 0.05, F218.ry), 7.2, 3.45, Math.PI);
 for (const X of [7.0, 8.6]) chairB(frame(F220.x, F220.z, F220.y - 0.07, F220.ry), X, 3.4, Math.PI);
 // passers-by on the streets and on Broadway, a few soldiers from the Barracks among them; men outside the saloon at the corner
 const walkRoads = ROADS.filter(([n]) => STREET_NAMES.has(n) || n === "South Broadway" || n === "Hoffmeister Avenue");
@@ -53909,13 +53909,13 @@ info(V3(330, ground(330, 40) + 1.8, 40), "The bluff and the river bottoms", "Her
 // ---------- moving about ----------
 function UP_INFO() { return P218.UP + 1.6; }
 const ME = { x: 0, y: 0, z: 0, vy: 0 }; let yaw = 0, pitch = -0.05, vrYaw = 0, started = false, msgT = 0, rateI = 0; const keys = {}, RATES = [1, 60, 600];
-const PLACES = [["In front of 218", () => ON(4.8, -10), Math.PI], ["On the porch", () => L218(8.0, 3.3, 0), 0], ["The parlour", () => L218(3.6, 3.7, 0), 0.75], ["The kitchen", () => L218(1.6, 8.2, 0), -Math.PI / 2],
+const PLACES = [["In front of 218", () => ON(8.6, -9), Math.PI], ["On the porch", () => L218(8.0, 3.3, 0), 0], ["The parlour", () => L218(3.6, 3.7, 0), 0.75], ["The kitchen", () => L218(1.6, 8.2, 0), -Math.PI / 2],
   ["Upstairs, the girls' room", () => L218(2.7, 3.9, P218.UP), 0], ["The back yard", () => ON(8, 19), 0], ["Broadway at Etta", () => { const b = BROADWAY.reduce((best, p) => Math.abs(p[1] + 8) < Math.abs(best[1] + 8) ? p : best, BROADWAY[0]); return V3(b[0] + 6, 0, b[1] - 6); }, -Math.PI / 2],
   ["St. Andrew's", () => CHURCH.clone().addScaledVector(HD.n, -30).addScaledVector(HD.d, -8), Math.atan2(-HD.n.x, -HD.n.z) + 0.25], ["The bluff above the bottoms", () => V3(305, 0, 40), -Math.PI / 2]]; let placeI = 0;
 const floorAt = (x, z, yRef) => { let best = ground(x, z); for (const R of FLOORS) { const [lx, lz] = toLocal(R, x, z); if (lx < R.x0 || lx > R.x1 || lz < R.z0 || lz > R.z1) continue; if (R.holes.some(([a, b, c, d]) => lx > a && lx < c && lz > b && lz < d)) continue;
     const y = R.y2 === null ? R.y : R.along === "x" ? lerpN(R.y, R.y2, (lx - R.x0) / (R.x1 - R.x0)) : lerpN(R.y, R.y2, (lz - R.z0) / (R.z1 - R.z0)); if (y <= yRef + 0.45 && y > best) best = y; } return best; };
 function goPlace(i) { placeI = (i + PLACES.length) % PLACES.length; const [n, f, h] = PLACES[placeI], p = f(); ME.x = p.x; ME.z = p.z; ME.y = floorAt(p.x, p.z, (p.y ? p.y : ground(p.x, p.z)) + 0.1); yaw = h + F218.ry; pitch = -0.05; vrYaw = yaw; say(`<b>${n}</b>`); }
-function moveTo(nx, nz) { const r = 0.26; let x = nx, z = nz;
+function moveTo(nx, nz) { const r = 0.2; let x = nx, z = nz;
   for (let it = 0; it < 3; it++) { for (const w of WALLS) { if (ME.y + 1.7 < w.y0 || ME.y > w.y1 - 0.2) continue; if (Math.max(w.ax, w.bx) < x - 1 || Math.min(w.ax, w.bx) > x + 1 || Math.max(w.az, w.bz) < z - 1 || Math.min(w.az, w.bz) > z + 1) continue;
       const dx = w.bx - w.ax, dz = w.bz - w.az, L2 = dx * dx + dz * dz || 1, t = clampN(((x - w.ax) * dx + (z - w.az) * dz) / L2, 0, 1), px = w.ax + t * dx, pz = w.az + t * dz, d = Math.hypot(x - px, z - pz); if (d < r && d > 1e-6) { x = px + (x - px) / d * r; z = pz + (z - pz) / d * r; } }
     for (const S of SOLIDS) { if (ME.y > S.y1 || ME.y < S.y0 - 1) continue; const [lx, lz] = toLocal(S, x, z); if (lx < S.x0 - r || lx > S.x1 + r || lz < S.z0 - r || lz > S.z1 + r) continue;
@@ -53963,7 +53963,7 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.1), vr
       if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; run = !!gp.buttons[0]?.pressed; const bX = gp.buttons[4]?.pressed; if (bX && !prevB.x) setRate(rateI + 1); prevB.x = bX; }
       else { const tx = a[ax] || 0; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const bA = gp.buttons[4]?.pressed, bB = gp.buttons[5]?.pressed; if (bA && !prevB.a) readNearest(); prevB.a = bA; if (bB && !prevB.b) goPlace(placeI + 1); prevB.b = bB; } } }
   else { if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD || keys.ArrowRight) mx += 1; if (keys.KeyA || keys.ArrowLeft) mx -= 1; run = keys.ShiftLeft || keys.ShiftRight; }
-  if (started && (mx || my)) { const f = V3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())); f.y = 0; f.normalize(); const sdv = V3(-f.z, 0, f.x), sp = (run ? 4.2 : 1.6) * dt; moveTo(ME.x + (f.x * -my + sdv.x * mx) * sp, ME.z + (f.z * -my + sdv.z * mx) * sp); }
+  if (started && (mx || my)) { const f = V3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())); f.y = 0; f.normalize(); const sdv = V3(-f.z, 0, f.x), sp = (run ? 5.5 : 2.6) * dt; moveTo(ME.x + (f.x * -my + sdv.x * mx) * sp, ME.z + (f.z * -my + sdv.z * mx) * sp); }
   { const fy = floorAt(ME.x, ME.z, ME.y); if (fy >= ME.y - 0.02) { ME.y = fy; ME.vy = 0; } else { ME.vy -= 9.8 * dt; ME.y = Math.max(fy, ME.y + ME.vy * dt); } }
   rig.position.set(ME.x, ME.y, ME.z); rig.rotation.set(0, vr ? vrYaw : 0, 0); if (!vr) { camera.position.set(0, 1.6, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
   sunL.position.set(ME.x + sd.x * 200, ME.y + Math.max(sd.y, 0.05) * 200, ME.z + sd.z * 200); sunL.target.position.set(ME.x, ME.y, ME.z); sky.position.copy(rig.position);
