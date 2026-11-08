@@ -842,8 +842,8 @@ function moveTo(nx, nz) { const r = 0.2; let x = nx, z = nz;
 // the message box, and in VR a panel before your eyes
 const MSG = document.createElement("div"); MSG.style.cssText = "position:fixed;left:50%;bottom:16px;transform:translateX(-50%);max-width:700px;z-index:2;background:rgba(30,22,12,.88);color:#f6ecd8;font:14.5px/1.5 Georgia,serif;padding:12px 16px;border-radius:10px;display:none"; document.body.appendChild(MSG);
 const CLOCK = document.createElement("div"); CLOCK.style.cssText = "position:fixed;right:14px;top:12px;z-index:2;background:rgba(30,22,12,.75);color:#f6ecd8;font:13px Georgia,serif;padding:6px 10px;border-radius:8px;display:none"; document.body.appendChild(CLOCK);
-const vrPanelT = tex(1024, 512, () => { }), vrPanel = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.45), new THREE.MeshBasicMaterial({ map: vrPanelT, transparent: true, depthTest: false })); vrPanel.position.set(0, -0.15, -0.9); vrPanel.renderOrder = 99; vrPanel.visible = false; camera.add(vrPanel);
-function say(html, secs = 18) { MSG.innerHTML = html; MSG.style.display = "block"; msgT = secs; const g = vrPanelT.image.getContext("2d"); g.clearRect(0, 0, 1024, 512); g.fillStyle = "rgba(30,22,12,0.9)"; g.fillRect(0, 0, 1024, 512); g.fillStyle = "#f6ecd8"; g.font = "28px Georgia";
+const vrPanelT = tex(1024, 512, () => { }), vrPanel = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.28), new THREE.MeshBasicMaterial({ map: vrPanelT, transparent: true, depthTest: false })); vrPanel.position.set(0, -0.42, -0.62); vrPanel.rotation.x = -0.75; vrPanel.renderOrder = 99; vrPanel.visible = false; camera.add(vrPanel);
+let msgAge = 0; function say(html, secs = 18) { MSG.innerHTML = html; MSG.style.display = "block"; msgT = secs; msgAge = 0; const g = vrPanelT.image.getContext("2d"); g.clearRect(0, 0, 1024, 512); g.fillStyle = "rgba(30,22,12,0.9)"; g.fillRect(0, 0, 1024, 512); g.fillStyle = "#f6ecd8"; g.font = "28px Georgia";
   const words = html.replace(/<[^>]+>/g, "").split(" "); let line = "", y = 50; for (const w of words) { if (g.measureText(line + w).width > 960) { g.fillText(line, 32, y); line = ""; y += 36; if (y > 490) break; } line += w + " "; } if (y <= 490) g.fillText(line, 32, y); vrPanelT.needsUpdate = true; vrPanel.visible = renderer.xr.isPresenting; }
 function readNearest() { let best = null, bd = 6; for (const I of INFO) { const d = Math.hypot(I.pos.x - ME.x, I.pos.z - ME.z) + Math.abs(I.pos.y - ME.y - 1.6) * 0.5; if (d < bd) { bd = d; best = ["i", I]; } }
   for (const p of PEOPLE) { if (!p.name || !p.at) continue; const d = Math.hypot(p.at[0] - ME.x, p.at[2] - ME.z) + Math.abs(p.at[1] - ME.y) * 0.5; if (d < Math.min(bd, 3.5)) { bd = d; best = ["p", p]; } }
@@ -904,5 +904,5 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.1), vr
   crowd.done();
   for (const I of INFO) { const d = Math.hypot(I.pos.x - ME.x, I.pos.z - ME.z); I.sp.visible = d < 60 && d > 1.2; }
   if (frameN % 15 === 0) { const hh = Math.floor(hour), mm = Math.floor((hour - hh) * 60); CLOCK.textContent = `Sunday 19 June 1910 · ${hh > 12 ? hh - 12 : hh}:${String(mm).padStart(2, "0")} ${hh >= 12 ? "pm" : "am"}${rateI ? " (fast)" : ""}`; }
-  msgT -= dt; if (msgT <= 0) { MSG.style.display = "none"; vrPanel.visible = false; }
+  msgT -= dt; msgAge += dt; if (vr && vrPanel.visible && msgAge > 4 && (mx || my)) msgT = 0; if (msgT <= 0) { MSG.style.display = "none"; vrPanel.visible = false; }
   renderer.render(scene, camera); });
