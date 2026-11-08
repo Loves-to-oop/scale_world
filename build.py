@@ -618,19 +618,22 @@ BG = BG[:i0] + """<div id="intro"><div class="card">
   Rigel is the brightest star, Orion's belt stars blaze, and the Sun is too faint to see.</p>
   <p>Fly the ship (the console in the dome, the list in the panel, or keys 1-9) to Siwarha inside Betelgeuse's outer atmosphere,
   to within 6 AU of the star, to a comet with tails hundreds of millions of km long, and out to the plausible worlds a star like this
-  could have: a scorched rocky world; a young super-Jupiter still glowing from its own heat, with a volcanic moon; a young rocky
+  could have: a scorched rocky world; a young super-Jupiter still glowing from its own heat, with three rocky moons; a young rocky
   super-Earth, still cooling, where the light equals Earth's sunlight (around so bright a star, rocky planets form far out); a brown
-  dwarf; the far comet belt. Trips are flown in real time like a real ship's: a slow turn, a 1 g burn with your destination overhead
+  dwarf, young enough to shine like a small red sun, with an icy moon; the far comet belt. Trips are flown in real time like a real ship's: a slow turn, a 1 g burn with your destination overhead
   (the thrust gives you weight), a turn at the midpoint, a burn to slow with it beneath your feet. A trip takes days to weeks: speed
   time up with <kbd>]</kbd> (it eases off for the arrival). With the engine off there is no weight outside the spinning ring: you would float, pulling
   yourself along handrails (your view is kept upright).</p>
-  <p>Parked at a rocky world or moon, take the lander down (the MISSIONS screen, or <kbd>L</kbd>): each surface is generated
-  without end from its own rules (craters, lava, ridges), so you can drive the pressurised rover as far as you like. Where it is
-  safe you can walk out in the world's own gravity; on the hot super-Earth you stay in the rover. Parked at the giant planet or the
-  brown dwarf, drop a probe (<kbd>P</kbd>): ride its camera through the cloud decks until the heat and pressure destroy it. It takes
-  photographs as it falls (<kbd>C</kbd> for more), shown in the gallery on the bridge and in the dome.</p>
-  <p>Drag to look &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk (shift runs) &nbsp;&middot;&nbsp; the SHIP MAP screens jump anywhere aboard, the ring too &nbsp;&middot;&nbsp; the console's buttons (or the top-right buttons) slow, speed up or skip a trip; the status screens and bar show where you are &nbsp;&middot;&nbsp; in the lift <kbd>E</kbd> up, <kbd>Q</kbd> down &nbsp;&middot;&nbsp; <kbd>1</kbd>-<kbd>0</kbd> fly somewhere &nbsp;&middot;&nbsp; <kbd>[</kbd> <kbd>]</kbd> slower, faster time, <kbd>\\</kbd> real time &nbsp;&middot;&nbsp; <kbd>F</kbd> filter &nbsp;&middot;&nbsp; <kbd>H</kbd> labels &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time &nbsp;&middot;&nbsp; away: <kbd>E</kbd> rover or lander, space jumps, <kbd>C</kbd> photo<br>
-  In VR: left stick walk (left trigger runs), a status screen on your left wrist, right stick turn (up or down in the lift), point at the console and pull the trigger to fly, <b>X</b> filter, <b>B</b> labels, <b>A</b> faster time, <b>Y</b> slower. On a surface or in a probe: <b>A</b> act (rover, lander, leave the probe), <b>B</b> jump.</p>
+  <p>Parked at a rocky world or moon, go to the lander bay at the foot of the spine (the lift, the SHIP MAP, or <kbd>L</kbd>), climb
+  the lander's ladder (<kbd>E</kbd>), and sit at the controls (<kbd>E</kbd>). The flight down and back is real orbital mechanics in real time,
+  about 4 to 6 hours each way (speed it up with <kbd>]</kbd>): undocking, a deorbit burn, half an orbit coasting down, a braking burn (on the
+  super-Earth, a fiery entry through its thick air), the hover to touchdown. Each surface is generated without end from its own
+  rules (craters, lava, ice ridges), so you can walk or drive the pressurised rover as far as you like, in the world's own gravity;
+  on the hot super-Earth you walk in a powered hard suit. Parked at the giant planet or the brown dwarf, drop a probe (<kbd>P</kbd>):
+  ride its camera through the cloud decks until the heat destroys it. It takes photographs as it falls (<kbd>C</kbd> for more), shown in
+  the gallery on the bridge and in the dome. Labels (<kbd>H</kbd>) name the stars and planets wherever you are.</p>
+  <p>Drag to look &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk (shift runs) &nbsp;&middot;&nbsp; the SHIP MAP screens jump anywhere aboard, the ring too &nbsp;&middot;&nbsp; the console's buttons (or the top-right buttons) slow, speed up or skip a trip; the status screens and bar show where you are &nbsp;&middot;&nbsp; in the lift <kbd>E</kbd> up, <kbd>Q</kbd> down &nbsp;&middot;&nbsp; <kbd>1</kbd>-<kbd>0</kbd> fly somewhere &nbsp;&middot;&nbsp; <kbd>[</kbd> <kbd>]</kbd> slower, faster time, <kbd>\\</kbd> real time &nbsp;&middot;&nbsp; <kbd>F</kbd> filter &nbsp;&middot;&nbsp; <kbd>H</kbd> labels &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time &nbsp;&middot;&nbsp; away: <kbd>E</kbd> ladder, hatch, seats or rover, space jumps, <kbd>C</kbd> photo<br>
+  In VR: left stick walk (left trigger runs), a status screen on your left wrist, right stick turn (up or down in the lift), point at the console and pull the trigger to fly, <b>X</b> filter, <b>B</b> labels, <b>A</b> faster time, <b>Y</b> slower. On a surface, in the lander or in a probe: <b>A</b> act (ladder, hatch, seats, rover, leave the probe), <b>B</b> jump, <b>X</b> labels; in the ship, right stick up at the lander's ladder to climb in.</p>
   <p class="dim">Sizes, temperature, brightness and distance are measured (with real uncertainties, given in the panel); the surface pattern, glow and dust
   are typical, not maps; the companion is a 2025 detection, not yet certain; the giant planet, brown dwarf and comet are plausible inventions, the rocky worlds speculative. Stars: AT-HYG v3.2 (Gaia DR3 distances where available). Click to begin.</p>
 </div></div>
