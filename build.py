@@ -668,3 +668,26 @@ SS = SS[:i0] + """<div id="intro"><div class="card">
 SS = SS.replace("__SCENE__", 'const EARTH_JPG = "__EARTH__", MOON_JPG = "__MOON__";\n__SCENE__')
 out14 = HERE / "starship.html"
 out14.write_text(SS.replace("__THREE__", three).replace("__EARTH__", img("earth.jpg")).replace("__MOON__", img("moon.jpg")).replace("__SCENE__", (HERE / "starship.js").read_text(encoding="utf-8")), encoding="utf-8")
+
+# 218 Etta Avenue, 1910
+ET = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>218 Etta Avenue, 1910</title>").replace("background:#c8d4d8", "background:#c8ccc0").replace("#intro.gone{", "#intro{overflow-y:auto;align-items:flex-start;padding:16px 0;box-sizing:border-box} #intro .card{margin:auto} #intro.gone{", 1)
+i0, i1 = ET.index('<div id="intro">'), ET.index('<button id="vr">')
+ET = ET[:i0] + """<div id="intro"><div class="card">
+  <h1>218 Etta Avenue, Sunday 19 June 1910</h1>
+  <p>The Fraundorf family's house in the Luxemburg district of St. Louis County, just south of the city line and the River Des Peres:
+  Richard Bernhard Fraundorf, 40, a bread baker from Saxony; Louisa, 37; Lulu 12, Joseph 8, Annie 6, Jennie 4 and Richard 2. A frame
+  cottage of a storey and a half, L-shaped, its porch in the corner of the L, on a dirt street of cottages, gardens, sheds and chicken
+  houses, a few minutes' walk from Broadway and the Barracks streetcar; St. Andrew's frame church up the road; east, the bluff, the
+  Iron Mountain railroad and the Mississippi.</p>
+  <p>It is late on a Sunday afternoon. Walk up onto the porch and in through the front door, through the parlour, dining room and
+  kitchen, up the steep stair to the rooms under the roof; out to the yard, the shed and privy, along Etta Avenue, to Broadway, the
+  church and the bluff. Stay into the evening and the lamps are lit.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; shift run &nbsp;&middot;&nbsp; <kbd>E</kbd> read an <b>i</b> point or ask about a person &nbsp;&middot;&nbsp; <kbd>1</kbd>-<kbd>9</kbd> places &nbsp;&middot;&nbsp; <kbd>T</kbd> time speed<br>
+  In VR: left stick walk (trigger runs), right stick turn, <b>A</b> read or ask, <b>B</b> next place, <b>X</b> time speed</p>
+  <p class="dim">The house's outline, its storeys, materials and neighbours are from the Sanborn fire insurance map of 1908; the family from
+  the 1910 census and their photographs; the land from the USGS elevation model. No plan of the inside survives: the rooms and furniture
+  are typical of the time, guided by the family's photographs of their parlour. Every <b>i</b> says what is known. Click to begin.</p>
+</div></div>
+""" + ET[i1:]
+out22 = HERE / "etta1910.html"
+out22.write_text(ET.replace("__THREE__", three).replace("__SCENE__", (HERE / "etta1910_data.js").read_text(encoding="utf-8") + (HERE / "etta1910.js").read_text(encoding="utf-8")), encoding="utf-8")
