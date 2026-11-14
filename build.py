@@ -691,3 +691,22 @@ ET = ET[:i0] + """<div id="intro"><div class="card">
 """ + ET[i1:]
 out22 = HERE / "etta1910.html"
 out22.write_text(ET.replace("__THREE__", three).replace("__SCENE__", (HERE / "etta1910_data.js").read_text(encoding="utf-8") + (HERE / "etta1910.js").read_text(encoding="utf-8")), encoding="utf-8")
+
+# Titan: the shore of Ligeia Mare
+TI = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>The shore of Ligeia Mare, Titan</title>").replace("background:#c8d4d8", "background:#3a2414")
+i0, i1 = TI.index('<div id="intro">'), TI.index('<button id="vr">')
+TI = TI[:i0] + """<div id="intro"><div class="card">
+  <h1>The shore of Ligeia Mare, Titan</h1>
+  <p>Saturn's largest moon, 73 degrees north, in 2026. You stand on the southern shore of Ligeia Mare, a sea of liquid methane larger than
+  Lake Superior, beside the mouth of Vid Flumina, a river that runs 400 km through canyons half a kilometre deep. The air is four times as
+  thick as Earth's and 94 K (-179 C); gravity is a seventh of Earth's; the light, through orange haze, a thousandth of a sunny day.
+  Rounded cobbles of water ice lie on the dark shore, as the Huygens probe saw them.</p>
+  <p>Walk the shore, climb the hills, jump, bound along, look out over the still, mirror-flat sea. Walk into it and you sink: it is half as
+  dense as you.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>shift</kbd> bound &nbsp;&middot;&nbsp; <kbd>space</kbd> jump &nbsp;&middot;&nbsp; <kbd>E</kbd> what you are seeing &nbsp;&middot;&nbsp; <kbd>H</kbd> readout &nbsp;&middot;&nbsp; <kbd>R</kbd> back to the start<br>
+  In VR: left stick walk (trigger bounds), right stick turn, <b>B</b> jump, <b>A</b> what you are seeing, <b>X</b> readout</p>
+  <p class="dim">The sea, its depth and the canyon's size are Cassini's measurements; the shore is the Huygens landing site's; the ground between
+  is generated to match Cassini's radar maps, which show nothing smaller than about 300 m. Click to begin.</p>
+</div></div>
+""" + TI[i1:]
+(HERE / "titan.html").write_text(TI.replace("__THREE__", three).replace("__SCENE__", (HERE / "titan.js").read_text(encoding="utf-8")), encoding="utf-8")
