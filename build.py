@@ -729,3 +729,22 @@ IO = IO[:i0] + """<div id="intro"><div class="card">
 </div></div>
 """ + IO[i1:]
 (HERE / "io.html").write_text(IO.replace("__THREE__", three).replace("__SCENE__", (HERE / "io.js").read_text(encoding="utf-8")), encoding="utf-8")
+
+# Eskabo Daan: stick sparring with a computer partner
+ES = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Stick sparring: Eskabo Daan and Serrada</title>").replace("background:#c8d4d8", "background:#2a2620")
+i0, i1 = ES.index('<div id="intro">'), ES.index('<button id="vr">')
+ES = ES[:i0] + """<div id="intro"><div class="card">
+  <h1>Stick sparring: Eskabo Daan and Serrada</h1>
+  <p>A training hall, an 18-inch rattan stick in your right hand, and in your left a live hand, a training dagger or a second stick.
+  Your partner, a computer, wears a helmet with a face grille. It feeds you Serrada's 12 angles of attack, defends against your strikes,
+  counters, and spars two-minute rounds. Eskabo Daan (Grandmaster Robert Castro, San Francisco) grew out of Angel Cabales' Serrada
+  Eskrima, close-range fighting with a short stick; the angles are Serrada's.</p>
+  <p><b>Clear a space at least 2 m across and put on your wrist straps</b>: you will be swinging your arms hard.</p>
+  <p>In VR: <b>A</b> start / pause &nbsp;·&nbsp; <b>B</b> speed &nbsp;·&nbsp; <b>X</b> mode (angles 1-12, random angles, your strikes, sparring) &nbsp;·&nbsp; <b>Y</b> live hand / dagger / second stick &nbsp;·&nbsp;
+  right stick up/down: stick angle in your hand &nbsp;·&nbsp; click the right stick: stick in the other hand &nbsp;·&nbsp; click the left stick: seated &nbsp;·&nbsp; left stick: step &nbsp;·&nbsp; right stick left/right: turn</p>
+  <p>On a computer (for trying it out): the mouse moves the stick &nbsp;·&nbsp; <kbd>space</kbd> start / pause &nbsp;·&nbsp; <kbd>1</kbd>-<kbd>4</kbd> mode &nbsp;·&nbsp; <kbd>=</kbd><kbd>−</kbd> speed &nbsp;·&nbsp; <kbd>H</kbd> other hand &nbsp;·&nbsp; <kbd>L</kbd> swap hands &nbsp;·&nbsp; <kbd>V</kbd> voice &nbsp;·&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> step</p>
+  <p class="dim">Not a substitute for a teacher or a live partner: the partner's attacks follow the angles but not any school's exact form.
+  Click to begin.</p>
+</div></div>
+""" + ES[i1:]
+(HERE / "eskabo.html").write_text(ES.replace("__THREE__", three).replace("__SCENE__", (HERE / "eskabo.js").read_text(encoding="utf-8")), encoding="utf-8")
