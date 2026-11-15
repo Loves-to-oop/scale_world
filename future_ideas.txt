@@ -1,0 +1,36 @@
+Future scale_world VR ideas (suggested November 2026)
+
+SPACE: REAL PLACES, REAL SKIES
+1. Pluto, Sputnik Planitia: a plain of nitrogen ice with slowly churning cells, and 3 km mountains of water ice, from New Horizons' maps.
+   Charon never moves in the sky (like Jupiter from Io). The haze turns blue at sunset.
+2. Mars, Jezero Crater: the real terrain from orbital maps, with Perseverance and the Ingenuity helicopter where they actually are.
+   Dust devils and a blue sunset.
+3. Europa: Jupiter about half as wide as it looks from Io. Cracked ridges, maybe a water plume. Could even drop through the ice
+   into the ocean below.
+4. Venus, at the Venera 13 landing site: dim orange light, air 90 times as thick as Earth's, 465 °C. A survival readout would work
+   like Io's radiation counter.
+
+EARTH'S DEEP PAST (to go with cambrian and devonian)
+5. Ice Age St. Louis, about 15,000 years ago: Mastodon State Park at Kimmswick, just south of the city, where mastodon bones were found
+   with stone spear points. Mastodons, ground sloths, spruce forest along the Mississippi.
+6. A Carboniferous coal forest: trees 30 m tall that are really giant clubmosses, millipedes 2 m long, dragonflies the size of hawks,
+   air with more oxygen than today's.
+
+HISTORY
+7. The 1904 World's Fair in Forest Park: the same St. Louis and nearly the same era as 218 Etta Avenue, so the family could plausibly
+   have gone. Plans and photographs survive for almost every building. Enormous: 1,200 acres, with a giant Ferris wheel.
+8. Göbekli Tepe, about 9500 BC: stone circles carved with animals, built before farming, about 2,000 years before Çatalhöyük.
+   Would come before Çatalhöyük, Eridu and Uruk in the ancient-cities series.
+
+TOP PICKS
+- The 1904 World's Fair: ties into etta1910 and stlouis1800, unusually good sources, a lot to explore.
+- Ice Age Kimmswick: a close second, for the same local reason.
+
+ALREADY BUILT (so suggestions don't repeat)
+betelgeuse, blackhole, blower, cahokia, cambrian, catalhoyuk, devonian, eridu, etta1910, galileo_probe, great_red_spot, io,
+london1066, medieval_train, moon_baseball, president, scale_world, solar_system, starship, stellarhole, stlouis1800, time_train,
+titan, uruk
+
+RULED OUT
+- King's Quest I in VR: Activision still owns it, and the site is public even if the link isn't shared.
+  An original fairy-tale kingdom in the same 1984 look would be fine.
