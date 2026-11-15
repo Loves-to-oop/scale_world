@@ -53419,9 +53419,9 @@ function start() { if (started) return; started = true; ac().resume?.(); documen
 document.getElementById("intro")?.addEventListener("click", start);
 const VRB = document.getElementById("vr");
 async function enterXR(mode) { const s = await navigator.xr.requestSession(mode, { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); setMixed(mode === "immersive-ar"); await renderer.xr.setSession(s); start(); setTimeout(() => { updateBody(); arm(); showMenu(true); }, 600); }
-const MRB = VRB ? VRB.cloneNode() : null; if (MRB) { MRB.id = "mr"; MRB.textContent = "Mixed reality"; MRB.style.right = "auto"; MRB.style.left = "18px"; document.body.appendChild(MRB); }
+const MRB = document.createElement("button"); MRB.id = "mr"; MRB.textContent = "Mixed reality"; MRB.style.cssText = "display:none;position:fixed;left:18px;bottom:18px;z-index:3;padding:12px 20px;font:600 15px -apple-system,sans-serif;border:0;border-radius:10px;background:#5a3a8a;color:#fff;cursor:pointer"; document.body.appendChild(MRB);
 if (navigator.xr) { navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = () => enterXR("immersive-vr"); });
-  navigator.xr.isSessionSupported("immersive-ar").then(ok => { if (!ok || !MRB) return; MRB.style.display = "block"; MRB.onclick = () => enterXR("immersive-ar"); }); }
+  navigator.xr.isSessionSupported("immersive-ar").then(ok => { MRB.style.display = "block"; if (ok) MRB.onclick = () => enterXR("immersive-ar"); else { MRB.textContent = "Mixed reality: not available in this browser"; MRB.style.opacity = "0.6"; MRB.style.cursor = "default"; } }).catch(e => { MRB.style.display = "block"; MRB.textContent = "Mixed reality: " + e.message; }); }
 
 // ---------- the loop ----------
 const clock = new THREE.Clock(); let frameN = 0; equip(); updateBody(); arm();
