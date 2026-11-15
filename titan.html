@@ -53245,7 +53245,7 @@ vrPanel.position.set(0, -0.42, -0.62); vrPanel.rotation.x = -0.75; vrPanel.rende
 function say(html, secs = 30) { MSG.innerHTML = html; MSG.style.display = "block"; msgT = secs; msgAge = 0; const g = panT.userData.c.getContext("2d"); g.clearRect(0, 0, 1024, 512); g.fillStyle = "rgba(30,18,8,0.9)"; g.fillRect(0, 0, 1024, 512); g.fillStyle = "#f6e6cc"; g.font = "28px sans-serif";
   const words = html.replace(/<[^>]+>/g, "").split(" "); let line = "", y = 48; for (const w of words) { if (g.measureText(line + w).width > 960) { g.fillText(line, 32, y); line = ""; y += 35; if (y > 495) break; } line += w + " "; } if (y <= 495) g.fillText(line, 32, y); panT.needsUpdate = true; vrPanel.visible = renderer.xr.isPresenting; }
 const nextFact = () => { if (typeof ITEMS !== "undefined") { let best = null, bd = 1e9; for (const I of ITEMS) { const d = Math.hypot(ME.x - I.x, ME.z - I.z) - I.r; if (d < 0 && d < bd) { bd = d; best = I; } } if (best) { say(`<b>${best.title}</b><br>${best.text}`, 45); return; } } factI = (factI + 1) % FACTS.length; say(FACTS[factI] + ` <span style="opacity:.6">(${factI + 1}/${FACTS.length}: E for the next)</span>`, 45); };
-addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (e.code === "KeyE") nextFact(); if (e.code === "KeyH") hud = !hud; if (e.code === "KeyR") { ME.x = ME.x0s; ME.z = ME.z0s; ME.y = land(ME.x, ME.z); ME.vx = ME.vz = ME.vy = 0; } });
+addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (e.code === "KeyE") act(); if (e.code === "KeyH") hud = !hud; if (e.code === "KeyR") { ME.x = ME.x0s; ME.z = ME.z0s; ME.y = land(ME.x, ME.z); ME.vx = ME.vz = ME.vy = 0; } });
 addEventListener("keyup", e => keys[e.code] = false);
 let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY }; start(); });
 addEventListener("pointermove", e => { if (!drag) return; yaw -= (e.clientX - drag.x) * 0.004; pitch = clampN(pitch - (e.clientY - drag.y) * 0.004, -1.45, 1.45); drag.x = e.clientX; drag.y = e.clientY; }); addEventListener("pointerup", () => drag = null);
@@ -53280,7 +53280,7 @@ function item(c, r, title, text) { ITEMS.push({ x: c.x, z: c.z, r, title, text }
 { const g = site(SITE, -0.4), H = 3.6;
   part(new THREE.CylinderGeometry(2.6, 2.6, 4.4, 24), M_QUILT, 0, H + 1.2, 0, 0, 0, 0, g); part(new THREE.SphereGeometry(2.6, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), M_QUILT, 0, H + 3.4, 0, 0, 0, 0, g);
   for (const [a, name] of [[0, "quarters"], [Math.PI * 2 / 3, "laboratory"], [-Math.PI * 2 / 3, "workshop and greenhouse"]]) { const mod = new THREE.Group(); mod.rotation.y = a; g.add(mod);
-    part(new THREE.CylinderGeometry(2.25, 2.25, 10, 24).rotateZ(Math.PI / 2), M_QUILT, 7.4, H + 1.2, 0, 0, 0, 0, mod); for (const x of [2.4, 12.4]) part(new THREE.CylinderGeometry(2.32, 2.32, 0.25, 24).rotateZ(Math.PI / 2), M_ORANGE, x, H + 1.2, 0, 0, 0, 0, mod);
+    part(new THREE.CylinderGeometry(2.25, 2.25, 10, 24).rotateZ(Math.PI / 2), M_QUILT, 7.4, H + 1.2, 0, 0, 0, 0, mod); for (const x of [2.4, 12.4]) part(new THREE.CylinderGeometry(2.32, 2.32, 0.25, 24, 1, true).rotateZ(Math.PI / 2), M_ORANGE, x, H + 1.2, 0, 0, 0, 0, mod);
     part(new THREE.SphereGeometry(2.25, 20, 10, 0, Math.PI), M_QUILT, 12.4, H + 1.2, 0, 0, Math.PI / 2, 0, mod);
     for (const x of [5, 8, 11]) for (const s of [-1, 1]) part(new THREE.CircleGeometry(0.22, 16), M_WIN, x, H + 1.7, s * 2.27, 0, s > 0 ? 0 : Math.PI, 0, mod);
     for (const x of [4.5, 10.5]) for (const s of [-1, 1]) { part(new THREE.CylinderGeometry(0.12, 0.12, H + 0.6, 8), M_METAL, x, (H - 0.6) / 2 + 0.1, s * 1.5, s * 0.25, 0, 0, mod); part(new THREE.CylinderGeometry(0.5, 0.55, 0.12, 14), M_METAL, x, 0.06, s * 2.2, 0, 0, 0, mod); } }
@@ -53332,8 +53332,229 @@ function placeBase() { for (const g of BLD) { const c = g.userData.w, y = g.user
   BASE.userData.pipeMesh = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length * 2, 0.14, 8), M_METAL); BASE.add(BASE.userData.pipeMesh);
   if (BASE.userData.cabMesh) BASE.remove(BASE.userData.cabMesh); const cp = BASE.userData.cable.map(([x, z]) => V3(x - ME.x0, land(x, z) + 1.15, z - ME.z0)); BASE.userData.cabMesh = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cp), cp.length * 3, 0.03, 5), M_DARK); BASE.add(BASE.userData.cabMesh); }
 BASE.traverse(o => o.layers.enable(1));
-FACTS.push("<b>The base</b> (imagined: no one has yet planned one) sits on the shore east of you, with its lander on a pad 300 m off and a reactor half a kilometre inland. Walk up to anything there and press E to hear what it is for.");
+FACTS.push("<b>The base</b> (imagined: no one has yet planned one) sits on the shore east of you, with its lander on a pad 300 m off and a reactor half a kilometre inland. Climb the stairs into the habitat (the airlock door opens as you come near); get into the rover by its orange door (E) and drive it. Walk up to anything, or anyone, and press E.");
 
+// ---------- inside the habitat ----------
+// Floors are 3.45 m above the ground, flat across the lower part of each 4.5 m tube. The airlock leads in from the stairs; the node joins the
+// three modules: the crew's quarters, the laboratory (where samples are kept at Titan's own 94 K in a nitrogen-cooled glovebox and freezer,
+// or their methane and other volatiles would boil off), and the workshop with the greenhouse at its end.
+const HAB = BLD.find(g => g.userData.w === SITE), FL = 3.45, MODS = [0, Math.PI * 2 / 3, -Math.PI * 2 / 3], HAB_RY = -0.4;
+const M_PANEL = new THREE.MeshStandardMaterial({ map: (() => { const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d"); g.fillStyle = "#e4e6e8"; g.fillRect(0, 0, 128, 128); g.strokeStyle = "#b8bcc2"; g.lineWidth = 3; g.strokeRect(2, 2, 124, 124); g.fillStyle = "#c8ccd2"; g.fillRect(10, 100, 30, 8); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(8, 4); t.colorSpace = THREE.SRGBColorSpace; return t; })(), roughness: 0.7, side: THREE.BackSide });
+const M_FLOOR = BM(0x5a6068, { roughness: 0.9 }), M_LIGHT = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xf4f8ff, emissiveIntensity: 1.4 }), M_BENCH = BM(0xd8dce0), M_SCREEN = new THREE.MeshStandardMaterial({ color: 0x0a1420, emissive: 0x2a6a9a, emissiveIntensity: 1.2 }), M_GROW = new THREE.MeshStandardMaterial({ color: 0x400040, emissive: 0xff40c0, emissiveIntensity: 1.6 }), M_LEAF = BM(0x3a8a3a), M_FROST = BM(0xd8e8f0, { transparent: true, opacity: 0.7 }), M_BLUE = BM(0x3a5a8a), M_PORT = new THREE.MeshBasicMaterial({ color: 0x8a5a2a });
+{ const g = HAB, H = 3.6, ax = H + 1.2;
+  for (const [k, a] of MODS.entries()) { const m = new THREE.Group(); m.rotation.y = a; g.add(m);
+    part(new THREE.CylinderGeometry(2.14, 2.14, 10, 28, 1, true).rotateZ(Math.PI / 2), M_PANEL, 7.4, ax, 0, 0, 0, 0, m); part(new THREE.CircleGeometry(2.14, 28), M_PANEL, 12.35, ax, 0, 0, Math.PI / 2, 0, m);
+    part(new THREE.BoxGeometry(10, 0.1, 3.5), M_FLOOR, 7.4, FL - 0.05, 0, 0, 0, 0, m); part(new THREE.BoxGeometry(9.4, 0.04, 0.3), M_LIGHT, 7.4, ax + 2.05, 0, 0, 0, 0, m);
+    for (const x of [5, 8, 11]) for (const s of [-1, 1]) part(new THREE.CircleGeometry(0.2, 16), M_PORT, x, ax + 0.5, s * 2.1, 0, s > 0 ? Math.PI : 0, 0, m);
+    const L = new THREE.PointLight(0xf0f4ff, 9, 10, 1.6); L.position.set(7.4, ax + 1.5, 0); m.add(L);
+    const B = (x, y, z, sx, sy, sz, mat) => part(new THREE.BoxGeometry(sx, sy, sz), mat, x, FL + y, z, 0, 0, 0, m);
+    if (k === 0) { for (const x of [4.0, 6.3, 8.6]) { for (const y of [0.35, 1.4]) { B(x, y, -1.15, 2.0, 0.08, 0.85, M_METAL); B(x, y + 0.12, -1.15, 1.9, 0.15, 0.8, M_BLUE); B(x - 0.75, y + 0.2, -1.15, 0.35, 0.1, 0.6, M_WHITE); } B(x, 1.0, -0.72, 2.0, 2.0, 0.02, BM(0x6a7a9a, { transparent: true, opacity: 0.6 })); }
+      B(10.7, 0.75, 0.4, 1.3, 0.05, 0.9, M_BENCH); B(10.7, 0.37, 0.4, 0.1, 0.74, 0.1, M_METAL); for (const [dx, dz] of [[-0.6, -0.5], [0.6, -0.5], [-0.6, 1.2], [0.6, 1.2]]) B(10.7 + dx, 0.25, 0.4 + dz * 0.6, 0.35, 0.5, 0.35, M_METAL);
+      B(4.5, 0.47, 1.35, 3, 0.94, 0.55, M_BENCH); B(4.5, 1.6, 1.55, 3, 0.7, 0.2, M_BENCH); B(3.6, 1.3, 1.6, 0.5, 0.35, 0.02, M_SCREEN); B(11.9, 0.5, -0.8, 0.8, 1.0, 0.5, M_DARK); }
+    if (k === 1) { for (const s of [-1, 1]) B(7.2, 0.47, s * 1.32, 8.4, 0.94, 0.6, M_BENCH);
+      B(5.6, 1.3, 1.3, 1.6, 0.75, 0.7, M_METAL); B(5.6, 1.3, 0.94, 1.4, 0.55, 0.02, M_FROST); for (const dx of [-0.35, 0.35]) part(new THREE.TorusGeometry(0.12, 0.03, 6, 14), M_DARK, 5.6 + dx, FL + 1.2, 0.93, 0, 0, 0, m);
+      B(8.9, 0.47, -1.32, 1.2, 0.94, 0.62, M_WHITE); B(8.9, 1.02, -1.32, 1.0, 0.12, 0.5, M_FROST); B(4.0, 1.25, -1.3, 1.1, 0.6, 0.55, BM(0x8a9098, { metalness: 0.4 })); B(4.0, 1.25, -1.02, 0.4, 0.25, 0.02, M_SCREEN);
+      B(10.5, 1.15, 1.3, 0.25, 0.4, 0.25, M_DARK); B(10.5, 1.42, 1.25, 0.06, 0.3, 0.06, M_METAL); for (let t = 0; t < 8; t++) part(new THREE.CylinderGeometry(0.04, 0.04, 0.9, 8).rotateZ(Math.PI / 2), BM(0x5a3a22), 11.4, FL + 1.2 + (t % 4) * 0.12, -0.6 + Math.floor(t / 4) * 1.2, 0, 0, 0, m);
+      for (const x of [6.8, 9.8]) B(x, 1.45, -1.55, 0.6, 0.38, 0.03, M_SCREEN); }
+    if (k === 2) { for (let n = 0; n < 3; n++) { B(3.4 + n * 0.75, 1.0, -1.35, 0.55, 1.1, 0.35, M_QUILT); B(3.4 + n * 0.75, 1.75, -1.35, 0.32, 0.32, 0.32, BM(0xffe0a0, { transparent: true, opacity: 0.5 })); }
+      B(6.8, 0.47, 1.32, 2.4, 0.94, 0.6, BM(0x8a6a4a)); B(6.8, 1.5, 1.6, 2.4, 1.0, 0.04, BM(0x6a6e74)); for (let t = 0; t < 7; t++) B(6.0 + t * 0.25, 1.5, 1.57, 0.04, 0.3, 0.03, M_DARK); B(6.9, 0.5, -1.3, 0.8, 1.0, 0.7, M_BENCH);
+      for (const s of [-1, 1]) for (const y of [0.3, 0.9, 1.5]) { B(10.8, y, s * 1.3, 2.8, 0.05, 0.55, M_METAL); B(10.8, y + 0.35, s * 1.3, 2.8, 0.03, 0.12, M_GROW); for (let p = 0; p < 6; p++) part(new THREE.SphereGeometry(0.13, 8, 6), M_LEAF, 9.6 + p * 0.45, FL + y + 0.12, s * 1.3, 0, 0, 0, m); }
+      const GL = new THREE.PointLight(0xff60d0, 5, 6, 1.6); GL.position.set(10.8, ax + 0.6, 0); m.add(GL); } }
+  part(new THREE.CylinderGeometry(2.5, 2.5, 0.1, 28), M_FLOOR, 0, FL - 0.05, 0, 0, 0, 0, g);
+  { const open = [0, ...MODS.map(a => Math.atan2(Math.cos(a), -Math.sin(a)))].map(t => (t + Math.PI * 4) % (Math.PI * 2)).sort((p, q) => p - q), hw = 0.5;
+    for (const t of open) part(new THREE.CylinderGeometry(2.5, 2.5, 0.8, 8, 1, true, t - hw, 2 * hw), M_PANEL, 0, H + 3.0, 0, 0, 0, 0, g);
+    for (let i = 0; i < open.length; i++) { const a0 = open[i] + hw, a1 = (i + 1 < open.length ? open[i + 1] : open[0] + Math.PI * 2) - hw; if (a1 > a0) part(new THREE.CylinderGeometry(2.5, 2.5, 4.3, 20, 1, true, a0, a1 - a0), M_PANEL, 0, H + 1.25, 0, 0, 0, 0, g); } }
+  part(new THREE.CircleGeometry(2.5, 24), M_PANEL, 0, H + 3.35, 0, -Math.PI / 2, 0, 0, g); part(new THREE.CylinderGeometry(0.5, 0.5, 0.9, 16), M_BENCH, 0, FL + 0.45, 0, 0, 0, 0, g); part(new THREE.CylinderGeometry(0.62, 0.62, 0.04, 20), M_SCREEN, 0, FL + 0.92, 0, 0, 0, 0, g);
+  const NL = new THREE.PointLight(0xf0f4ff, 7, 8, 1.6); NL.position.set(0, H + 2.6, 0); g.add(NL);
+  for (const s of [-1, 1]) part(new THREE.PlaneGeometry(2.4, 2.4), M_PANEL, s * 1.0, FL + 1.2, 3.4, 0, s * Math.PI / 2, 0, g); part(new THREE.PlaneGeometry(2.0, 2.4), M_PANEL, 0, FL + 2.4, 3.4, -Math.PI / 2, 0, 0, g); part(new THREE.BoxGeometry(2.0, 0.08, 2.4), M_FLOOR, 0, FL - 0.04, 3.4, 0, 0, 0, g);
+  for (const s of [-1, 1]) part(new THREE.BoxGeometry(0.5, 2.0, 0.5), M_ORANGE, s * 0.7, FL + 1.0, 3.6, 0, 0, 0, g); }
+// the airlock's outer door slides aside as you come near
+const DOOR = HAB.children.find(o => o.geometry && o.geometry.parameters && o.geometry.parameters.width === 1.2 && o.geometry.parameters.height === 1.9); if (DOOR) DOOR.userData.x0 = DOOR.position.x;
+// where you can stand inside, in the habitat's own frame (x, z): the node, the airlock, the modules, the stairs
+const habLocal = (x, z) => { const dx = x - SITE.x, dz = z - SITE.z, c = Math.cos(HAB_RY), s = Math.sin(HAB_RY); return [dx * c - dz * s, dx * s + dz * c]; };
+function inHab(lx, lz) { if (lx * lx + lz * lz < 2.3 * 2.3) return true; if (Math.abs(lx) < 0.9 && lz > 1.8 && lz < 4.6) return true;
+  for (const a of MODS) { const u = lx * Math.cos(a) - lz * Math.sin(a), w = lx * Math.sin(a) + lz * Math.cos(a); if (u > 1.9 && u < 12.1 && Math.abs(w) < 1.6) return true; } return false; }
+const onStairs = (lx, lz) => Math.abs(lx) < 0.68 && lz >= 4.5 && lz < 8.3;
+function habFloor(x, z, yRef) { const gy = HAB.userData.y, [lx, lz] = habLocal(x, z); if (inHab(lx, lz) && yRef > gy + 2.6) return gy + FL; if (onStairs(lx, lz)) { const y = gy + FL * (1 - (lz - 4.5) / 3.8); if (y <= yRef + 0.55) return Math.max(y, land(x, z)); } return null; }
+const insideHab = () => { const [lx, lz] = habLocal(ME.x, ME.z); return inHab(lx, lz) && ME.y > HAB.userData.y + 2.6; };
+
+// ---------- the crew: who would be sent, and what they would really be doing ----------
+// A first science base would have room for few people, so each would have to count. Titan is above all a world of geology (rivers, rain, seas,
+// dunes, canyons, perhaps ice volcanoes), so two of the eight are geologists; then a limnologist for the seas, a geophysicist for the ocean deep
+// under the ice, an astrobiologist and organic chemist for the chemistry that might lead toward life, an atmospheric scientist; two engineers
+// keep everyone alive, one of them also the physician and commander. The people are imagined; the work is what such a crew would do.
+function mergeG(parts) { let n = 0; const gs = parts.map(([g, m]) => { const q = (g.index ? g.toNonIndexed() : g.clone()).applyMatrix4(m); n += q.attributes.position.count; return q; });
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3); let o = 0;
+  for (const q of gs) { const c = q.attributes.position.count; pos.set(q.attributes.position.array, o * 3); nor.set(q.attributes.normal.array, o * 3);
+    for (let i = 0; i < c; i++) { const sh = q.attributes.color ? q.attributes.color.getX(i) : 1, ny = q.attributes.normal.getY(i), v = sh * (0.8 + 0.2 * (ny * 0.5 + 0.5)); col[(o + i) * 3] = col[(o + i) * 3 + 1] = col[(o + i) * 3 + 2] = v; } o += c; }
+  const out = new THREE.BufferGeometry(); out.setAttribute("position", new THREE.BufferAttribute(pos, 3)); out.setAttribute("normal", new THREE.BufferAttribute(nor, 3)); out.setAttribute("color", new THREE.BufferAttribute(col, 3)); return out; }
+const MT = (x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) => new THREE.Matrix4().compose(V3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, 0, rz)), V3(sx, sy, sz));
+const G1 = (g, m = MT(0, 0, 0)) => mergeG([[g, m]]);
+// cloth that hangs in folds: a tapered tube whose radius ripples more toward the hem, shaded in the valleys
+function foldTube(rTop, rBot, h, segs, folds, amp, open = 0, thetaStart = 0, seed = 0) { const g = new THREE.CylinderGeometry(rTop, rBot, h, segs, 4, true, thetaStart, Math.PI * 2 - open), p = g.attributes.position, sh = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), t = (h / 2 - y) / h, a = Math.atan2(x, z), wv = Math.sin(a * folds + seed) + 0.4 * Math.sin(a * folds * 2.3 + seed * 3), k = 1 + amp * t * wv;
+    p.setXYZ(i, x * k, y - t * t * 0.015 * (1 + Math.sin(a * 3 + seed)), z * k); const s = 0.86 + 0.14 * wv * t - 0.08 * t; sh[i * 3] = sh[i * 3 + 1] = sh[i * 3 + 2] = s; }
+  g.setAttribute("color", new THREE.BufferAttribute(sh, 3)); g.computeVertexNormals(); return g; }
+// a head: a sphere shaped into skull, cheeks and jaw, with nose, ears and brow
+function headGeo() { const g = new THREE.SphereGeometry(0.1, 16, 12), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { let x = p.getX(i) / 0.1, y = p.getY(i) / 0.1, z = p.getZ(i) / 0.1;
+    x *= 0.84; y *= 1.12; if (y < 0) { x *= 1 - 0.28 * -y; if (z > 0) z = z * (1 - 0.1 * -y) + 0.06 * -y; } if (z < 0) z *= 1.06; if (z > 0.6 && y > 0.32 && y < 0.5) z += 0.025;
+    p.setXYZ(i, x * 0.1, y * 0.1, z * 0.1); } g.computeVertexNormals();
+  return mergeG([[g, MT(0, 0.67, 0)], [new THREE.ConeGeometry(0.016, 0.05, 4).rotateX(-Math.PI / 2 - 0.35), MT(0, 0.663, 0.104)], [new THREE.SphereGeometry(0.02, 6, 4), MT(0.087, 0.668, -0.005, 0.35, 1.2, 0.9)], [new THREE.SphereGeometry(0.02, 6, 4), MT(-0.087, 0.668, -0.005, 0.35, 1.2, 0.9)],
+    [new THREE.CylinderGeometry(0.045, 0.05, 0.1, 10), MT(0, 0.55, -0.005)]]); }
+// a cap of hair or cloth over the head that stops at the hairline in front (leaving the face open) and comes lower at the sides and back
+function faceCap(r, backT, frontT, width, segs = 14) { const g = new THREE.SphereGeometry(r, segs, 9, 0, Math.PI * 2, 0, backT), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), th = Math.acos(clampN(y / r, -1, 1)), a = Math.atan2(x, z), f = clampN(1 - Math.abs(a) / width, 0, 1), fs = f * f * (3 - 2 * f), mt = backT + (frontT - backT) * fs;
+    if (th > mt) p.setXYZ(i, r * Math.sin(mt) * Math.sin(a), r * Math.cos(mt), r * Math.sin(mt) * Math.cos(a)); }
+  g.computeVertexNormals(); return g; }
+const HIPY = 0.92, THIGH = 0.44, SHIN = 0.42, UARM = 0.28, FARM = 0.26;
+const PG = {
+  thigh: G1(new THREE.CylinderGeometry(0.078, 0.058, THIGH, 9).translate(0, -THIGH / 2, 0)),
+  shin: mergeG([[new THREE.SphereGeometry(0.058, 7, 5), MT(0, 0, 0)], [new THREE.LatheGeometry([[0.044, -SHIN], [0.048, -SHIN * 0.75], [0.058, -SHIN * 0.35], [0.055, -0.04], [0.05, 0]].map(([r, y]) => new THREE.Vector2(r, y)), 9), MT(0, 0, 0)]]),
+  shoe: mergeG([[new THREE.BoxGeometry(0.09, 0.065, 0.2), MT(0, -0.035, 0.035)], [new THREE.SphereGeometry(0.046, 7, 4, 0, Math.PI * 2, 0, Math.PI / 2), MT(0, -0.068, 0.13, 1, 0.9, 1.15)], [new THREE.SphereGeometry(0.048, 7, 4), MT(0, -0.03, -0.035, 1, 0.8, 1)]]),
+  uarm: mergeG([[new THREE.SphereGeometry(0.062, 8, 6), MT(0, 0, 0)], [new THREE.CylinderGeometry(0.058, 0.047, UARM, 9).translate(0, -UARM / 2, 0), MT(0, 0, 0)]]),
+  farm: mergeG([[new THREE.SphereGeometry(0.048, 7, 5), MT(0, 0, 0)], [new THREE.CylinderGeometry(0.047, 0.036, FARM, 9).translate(0, -FARM / 2, 0), MT(0, 0, 0)]]),
+  hand: mergeG([[new THREE.SphereGeometry(0.038, 7, 5), MT(0, -0.05, 0.005, 0.85, 1.35, 0.6)], [new THREE.SphereGeometry(0.016, 5, 4), MT(0.03, -0.03, 0.02, 1, 1.9, 1, 0, 0.5)]]),
+  torso: mergeG([[new THREE.LatheGeometry([[0.14, -0.02], [0.13, 0.12], [0.15, 0.25], [0.165, 0.34], [0.17, 0.42], [0.12, 0.49], [0.055, 0.52]].map(([r, y]) => new THREE.Vector2(r, y)), 14), MT(0, 0, 0, 1, 1, 0.68)],
+    [new THREE.SphereGeometry(0.07, 8, 6), MT(0.155, 0.43, 0)], [new THREE.SphereGeometry(0.07, 8, 6), MT(-0.155, 0.43, 0)]]),
+  head: headGeo(),
+  eyeW: mergeG([[new THREE.SphereGeometry(0.014, 6, 4), MT(0.033, 0.694, 0.089, 1, 0.75, 0.55)], [new THREE.SphereGeometry(0.014, 6, 4), MT(-0.033, 0.694, 0.089, 1, 0.75, 0.55)]]),
+  eyes: mergeG([[new THREE.SphereGeometry(0.0065, 5, 4), MT(0.033, 0.694, 0.096)], [new THREE.SphereGeometry(0.0065, 5, 4), MT(-0.033, 0.694, 0.096)], [new THREE.BoxGeometry(0.03, 0.004, 0.008), MT(0, 0.632, 0.097)]]),
+  brows: mergeG([[new THREE.BoxGeometry(0.03, 0.005, 0.008), MT(0.033, 0.712, 0.097, 1, 1, 1, 0, -0.12)], [new THREE.BoxGeometry(0.03, 0.005, 0.008), MT(-0.033, 0.712, 0.097, 1, 1, 1, 0, 0.12)]]),
+  helmet: G1(new THREE.SphereGeometry(0.17, 16, 12), MT(0, 0.69, 0.015)),
+  pack: G1(new THREE.BoxGeometry(0.34, 0.46, 0.2), MT(0, 0.3, -0.2)),
+  suitBody: G1(foldTube(0.19, 0.2, 0.62, 16, 6, 0.03, 0, 0, 2).scale(1, 1, 0.8), MT(0, 0.22, 0)),
+  collar: G1(new THREE.TorusGeometry(0.11, 0.035, 6, 16).rotateX(Math.PI / 2), MT(0, 0.53, 0)),
+  badge: G1(new THREE.BoxGeometry(0.06, 0.04, 0.01), MT(0.08, 0.42, 0.125)),
+  hairShort: G1(faceCap(0.108, Math.PI * 0.52, Math.PI * 0.3, Math.PI * 0.42).scale(0.9, 1.12, 1.04).translate(0, 0.672, -0.006)),
+  hairUp: mergeG([[faceCap(0.112, Math.PI * 0.55, Math.PI * 0.3, Math.PI * 0.42), MT(0, 0.68, -0.004, 0.96, 1.18, 1.08)], [new THREE.SphereGeometry(0.06, 8, 6), MT(0, 0.72, -0.11)]]) };
+const PARTS = ["legL", "legR", "shinL", "shinR", "shoeL", "shoeR", "armL", "armR", "foreL", "foreR", "handL", "handR", "torso", "head", "eyeW", "eyes", "brows", "hairShort", "hairUp", "suitBody", "pack", "collar", "badge", "helmet"];
+const PGEO = { legL: PG.thigh, legR: PG.thigh, shinL: PG.shin, shinR: PG.shin, shoeL: PG.shoe, shoeR: PG.shoe, armL: PG.uarm, armR: PG.uarm, foreL: PG.farm, foreR: PG.farm, handL: PG.hand, handR: PG.hand };
+for (const k in PG) if (!PG[k].attributes.color) PG[k] = G1(PG[k]);
+const personMat = new THREE.MeshStandardMaterial({ roughness: 0.85, side: THREE.DoubleSide, vertexColors: true });
+// poses: hip flex (l), knee bend (k), shoulder swing (a), elbow bend (e, negative = forearm forward), skirt tilt (sk)
+function poseOf(kind, t, ph, walkAmt = 1) { const c = t * 7 + ph, w = Math.sin(c), sway = 0.04 * Math.sin(t * 0.8 + ph);
+  const P = { drop: 0, lean: 0, lL: 0, lR: 0, kL: 0.05, kR: 0.05, aL: sway, aR: -sway, eL: -0.15, eR: -0.15, sk: 0 };
+  const walk = (amp = 1) => { const A = walkAmt * amp; P.lL = 0.42 * w * A; P.lR = -0.42 * w * A; P.kL = 0.08 + 0.6 * Math.max(0, Math.cos(c)) * A; P.kR = 0.08 + 0.6 * Math.max(0, -Math.cos(c)) * A; P.lean = 0.05; P.aL = -0.35 * w * A; P.aR = 0.35 * w * A; P.eL = -0.25 - 0.15 * Math.max(0, -w) * A; P.eR = -0.25 - 0.15 * Math.max(0, w) * A; };
+  const sit = () => Object.assign(P, { drop: HIPY - 0.47, lL: -1.5, lR: -1.45, kL: 1.5, kR: 1.45, lean: -0.04, sk: -1.15 });
+  switch (kind) {
+    case "walk": walk(); break;
+    case "carry": walk(0.9); Object.assign(P, { aL: -0.45, aR: -0.45, eL: -1.15, eR: -1.15 }); break;
+    case "shoulder": walk(0.85); Object.assign(P, { aL: -2.6, eL: -1.0, aR: 0.35 * w, eR: -0.3 }); break;
+    case "pull": walk(0.7); Object.assign(P, { lean: 0.45, aL: -1.2, aR: -1.0, eL: -0.3, eR: -0.4 }); break;
+    case "guard": Object.assign(P, { aR: -0.3, eR: -1.05, aL: -0.15, eL: -0.6 }); break;
+    case "kneel": Object.assign(P, { drop: HIPY - 0.5, lL: 0.05, lR: 0.05, kL: 1.55, kR: 1.55, lean: 0.06, aL: -0.45, aR: -0.45, eL: -1.25, eR: -1.25 }); break;
+    case "pray": Object.assign(P, { drop: HIPY - 0.5, lL: 0.05, lR: 0.05, kL: 1.55, kR: 1.55, lean: 0.12, aL: -0.7, aR: -0.7, eL: -1.55, eR: -1.55 }); break;
+    case "sit": sit(); Object.assign(P, { aL: -0.55, aR: -0.5, eL: -0.95, eR: -1.0 - 0.15 * Math.max(0, Math.sin(t * 0.9 + ph)) }); break;
+    case "sitground": Object.assign(P, { drop: HIPY - 0.12, lL: -1.4, lR: -1.3, kL: 0.4, kR: 0.6, lean: -0.15, aL: -0.3, aR: -0.4, eL: -0.6, eR: -0.8 - 0.2 * Math.max(0, Math.sin(t * 0.5 + ph)), sk: -1.0 }); break;
+    case "row": { sit(); const r = Math.sin(t * 2.4); Object.assign(P, { lean: 0.22 * r, aL: -1.05 - 0.35 * r, aR: -1.05 - 0.35 * r, eL: -0.4 + 0.35 * r, eR: -0.4 + 0.35 * r }); break; }
+    case "paddle": { const r = Math.sin(t * 2.1 + ph); Object.assign(P, { drop: HIPY - 0.5, lL: 0.05, lR: 0.05, kL: 1.55, kR: 1.55, lean: 0.25 + 0.15 * r, aL: -1.4 - 0.4 * r, aR: -0.6 - 0.5 * r, eL: -0.3, eR: -0.6 }); break; }
+    case "pole": { const q = (t * 0.35 + ph) % 1; Object.assign(P, { lean: 0.35 + 0.3 * Math.sin(q * 6.283), aL: -1.5 + 0.6 * q, aR: -1.3 + 0.6 * q, eL: -0.3, eR: -0.4, lL: 0.2, lR: -0.2 }); walk(0.5); break; }
+    case "hammer": { const q = (t * 1.6 + ph) % 1, up = q < 0.6 ? q / 0.6 : 1 - (q - 0.6) / 0.4; Object.assign(P, { lean: 0.22, lL: -0.1, lR: 0.12, kL: 0.15, kR: 0.1, aL: -0.55, eL: -0.9, aR: -0.5 - 1.9 * up, eR: -0.4 - 0.6 * up }); break; }
+    case "hoe": { const q = (t * 0.9 + ph) % 1, up = q < 0.5 ? q / 0.5 : 1 - (q - 0.5) / 0.5; Object.assign(P, { lean: 0.35 + 0.2 * (1 - up), lL: -0.25, lR: 0.15, kL: 0.3, kR: 0.15, aL: -0.9 - 1.0 * up, aR: -0.7 - 1.0 * up, eL: -0.5, eR: -0.6 }); break; }
+    case "lever": { const q = Math.sin(t * 0.8 + ph); Object.assign(P, { lean: 0.3 + 0.25 * q, aL: -1.6 - 0.5 * q, aR: -1.6 - 0.5 * q, eL: -0.2, eR: -0.2, lL: -0.2, lR: 0.25, kL: 0.2, kR: 0.1 }); break; }
+    case "knead": { const q = Math.sin(t * 3 + ph); Object.assign(P, { lean: 0.3, aL: -0.9 - 0.15 * q, aR: -0.9 + 0.15 * q, eL: -0.9, eR: -0.9 }); break; }
+    case "talk": { const g = Math.pow(Math.max(0, Math.sin(t * 0.55 + ph)), 4); Object.assign(P, { aL: 0.04, eL: -0.2, aR: -0.08 - 0.45 * g, eR: -0.28 - 0.85 * g - 0.15 * g * Math.sin(t * 2.1 + ph) }); break; }
+    case "ride": Object.assign(P, { drop: HIPY - 0.5, lL: -0.4, lR: -0.4, kL: 0.95, kR: 0.95, spr: 0.42, aL: -0.45, aR: -0.45, eL: -0.95, eR: -0.95, lean: 0.05 }); break;
+    case "dance": { const q = Math.sin(t * 4 + ph); walk(0.6); Object.assign(P, { aL: -0.6 + 0.3 * q, aR: -1.4 - 0.3 * q, eL: -0.6, eR: -0.5, lean: -0.03 }); break; }
+    case "fiddle": Object.assign(P, { aL: -1.25, eL: -1.4, aR: -0.6 - 0.25 * Math.sin(t * 7 + ph), eR: -1.2 }); break;
+    case "spin": Object.assign(P, { aL: -0.55, eL: -1.55, aR: -0.35, eR: -0.75 - 0.25 * Math.sin(t * 3 + ph) }); break;
+    case "bow": Object.assign(P, { lean: 0.38, aL: -0.15, aR: -0.15, eL: -0.3, eR: -0.3 }); break;
+    case "sell": { const g = Math.pow(Math.max(0, Math.sin(t * 0.45 + ph)), 3); Object.assign(P, { lean: 0.06, aL: -0.12, eL: -0.35, aR: -0.1 - 0.5 * g, eR: -0.3 - 0.75 * g }); break; } }
+  return P; }
+const _b = new THREE.Matrix4(), _hm = new THREE.Matrix4(), _sk = new THREE.Matrix4(), _j = new THREE.Matrix4(), _tmp = new THREE.Matrix4(), _q2 = new THREE.Quaternion(), _e2 = new THREE.Euler(), ZEROM = new THREE.Matrix4().makeScale(0, 0, 0), _p = V3(0, 0, 0), _s = V3(1, 1, 1);
+
+const _M = {}, LIMB = new Set(["legL", "legR", "shinL", "shinR", "shoeL", "shoeR", "armL", "armR", "foreL", "foreR", "handL", "handR"]), SKIRT = new Set([]);
+function partMatrices(x, y, z, h, L, P, out) { _e2.set(0, h, 0); _q2.setFromEuler(_e2); _b.compose(_p.set(x, y, z), _q2, _s.set(L.s, L.s, L.s));
+  _hm.copy(_b).multiply(_tmp.makeTranslation(0, HIPY - P.drop, 0)).multiply(_j.makeRotationX(P.lean)); _sk.copy(_hm).multiply(_j.makeRotationX(P.sk - P.lean * 0.5));
+  const leg = (sx, l, k, side) => { const th = _b.clone().multiply(_tmp.makeTranslation(sx, HIPY - P.drop, 0)); if (P.spr) th.multiply(_tmp.makeRotationZ(P.spr * Math.sign(sx))); th.multiply(_j.makeRotationX(l));
+    const sh = th.clone().multiply(_tmp.makeTranslation(0, -THIGH, 0)).multiply(_j.makeRotationX(k));
+    _M["leg" + side] = th; _M["shin" + side] = sh; _M["shoe" + side] = sh.clone().multiply(_tmp.makeTranslation(0, -SHIN, 0)).multiply(_j.makeRotationX(-(l + k) * 0.85)); };
+  leg(0.085, P.lL, P.kL, "L"); leg(-0.085, P.lR, P.kR, "R");
+  const arm = (sx, a, e, sp, side) => { const u = _hm.clone().multiply(_tmp.makeTranslation(sx, 0.43, 0)).multiply(_j.makeRotationX(a)).multiply(_tmp.makeRotationZ(sp)), f = u.clone().multiply(_tmp.makeTranslation(0, -UARM, 0)).multiply(_j.makeRotationX(e)), hd = f.clone().multiply(_tmp.makeTranslation(0, -FARM, 0));
+    _M["arm" + side] = u; _M["fore" + side] = f; _M["hand" + side] = hd; return [f, hd]; };
+  arm(0.19, P.aL, P.eL, -0.07, "L"); const [, hR] = arm(-0.19, P.aR, P.eR, 0.07, "R");
+  _M.musket = hR.clone().multiply(_tmp.makeTranslation(0, -0.04, 0.02)).multiply(_j.makeRotationX(-(P.aR + P.eR) - P.lean));
+  for (const p of PARTS) { if (!shows(L, p)) { out.push(ZEROM); continue; } out.push(LIMB.has(p) ? _M[p] : SKIRT.has(p) ? _sk.clone() : _hm.clone()); } }
+// the crowd: one instanced mesh per garment or part; each packs only the people wearing it into its first slots, so nothing unworn is drawn
+class Crowd { constructor(n) { this.n = n; this.L = []; this.P = PARTS.map(p => { const im = new THREE.InstancedMesh(PGEO[p] || PG[p], PARTMAT[p] || personMat, n);
+      im.frustumCulled = false; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.setColorAt(0, new THREE.Color()); im.count = 0; scene.add(im); return { p, im, slot: new Int32Array(n).fill(-1), who: new Int32Array(n), count: 0 }; });
+    this.ms = []; this._m = new THREE.Matrix4(); this._c = new THREE.Color(); this.count = 0; this.on = new Uint8Array(n); }
+  free(Q, i) { const s = Q.slot[i]; if (s < 0) return; const last = --Q.count, j = Q.who[last];
+    if (s !== last) { Q.im.getMatrixAt(last, this._m); Q.im.setMatrixAt(s, this._m); Q.im.getColorAt(last, this._c); Q.im.setColorAt(s, this._c); Q.slot[j] = s; Q.who[s] = j; } Q.slot[i] = -1; Q.dirty = true; }
+  look(i, L) { this.L[i] = L; for (const Q of this.P) if (Q.slot[i] >= 0) { if (shows(L, Q.p)) { Q.im.setColorAt(Q.slot[i], this._c.setHex(colorOf(L, Q.p))); Q.dirty = true; } else this.free(Q, i); } }
+  set(i, x, y, z, h, kind, t, walkAmt = 1) { const L = this.L[i]; this.ms.length = 0; partMatrices(x, y, z, h, L, poseOf(kind, t, i * 1.7, walkAmt), this.ms); if (!this.on[i]) { this.on[i] = 1; this.count++; }
+    this.P.forEach((Q, k) => { const m = this.ms[k]; if (m === ZEROM) { if (Q.slot[i] >= 0) this.free(Q, i); return; }
+      if (Q.slot[i] < 0) { const s = Q.count++; Q.slot[i] = s; Q.who[s] = i; Q.im.setColorAt(s, this._c.setHex(colorOf(L, Q.p))); Q.dirty = true; } Q.im.setMatrixAt(Q.slot[i], m); }); }
+  hide(i) { if (this.on[i]) { this.on[i] = 0; this.count--; } for (const Q of this.P) this.free(Q, i); }
+  done() { for (const Q of this.P) { Q.im.count = Q.count; Q.im.instanceMatrix.needsUpdate = true; if (Q.dirty && Q.im.instanceColor) { Q.im.instanceColor.needsUpdate = true; Q.dirty = false; } } } }
+
+const PARTMAT = { helmet: new THREE.MeshStandardMaterial({ color: 0xc8d4dc, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.32, depthWrite: false }) };
+const SK = [0xecc8ae, 0xc89870, 0x8a5a3a, 0x5a3a24, 0xe2b898, 0xb07850], HAIR = [0x1a120c, 0x3a2618, 0x5a3a20, 0x2a1c12, 0x8a6a42];
+function crewLook(i, o) { return { s: 0.96 + hash(i, 5) * 0.08, skin: SK[i % SK.length], hair: HAIR[i % HAIR.length], suit: 0xe8e4dc, accent: 0xd86a28, inside: false, long: false, ...o }; }
+function shows(L, p) { if (p === "helmet" || p === "pack" || p === "suitBody" || p === "collar") return !L.inside; if (p === "hairShort") return !L.long; if (p === "hairUp") return L.long; if (p === "badge") return L.inside; return true; }
+function colorOf(L, p) { if (p === "head" || p.startsWith("hand") && L.inside) return L.skin; if (p.startsWith("hand")) return 0x5a5a5e; if (p === "eyes") return 0x2a1e16; if (p === "eyeW") return 0xe8e4dc; if (p === "brows" || p === "hairShort" || p === "hairUp") return L.hair;
+  if (p.startsWith("shoe")) return L.inside ? 0x2a2a2e : 0x4a4a4e; if (p === "pack") return 0xd0ccc4; if (p === "collar") return L.accent; if (p === "badge") return L.accent; if (p === "helmet") return 0xffffff; return L.inside ? L.suit : (p.startsWith("leg") || p.startsWith("shin") ? 0xdcd8d0 : L.suit); }
+const crowd = new Crowd(16), CREW = [];
+function crew(L, name, role, info, o) { const p = { L, name, role, info, i: CREW.length, ...o }; crowd.look(p.i, L); CREW.push(p); return p; }
+const modPos = (k, x, z) => { const a = MODS[k]; return [x * Math.cos(a) + z * Math.sin(a), -x * Math.sin(a) + z * Math.cos(a)]; };
+// outside, in suits: warm, bulky, a breathing set and a clear helmet; no pressure suit needed at 1.5 bar
+{ let zs = S0.z; while (land(S0.x + 60, zs) > 0.6) zs -= 2; const RIG = { x: S0.x + 60, z: zs + 4 };
+  crew(crewLook(1, { accent: 0xd86a28 }), "Dr. Amara Okafor", "planetary geologist", "Logging the core from the drill: layer by layer, the sediments of the shore, each a record of the sea's level and the rains. Titan's climate swings over tens of thousands of years as the seasons' strength shifts between the poles (an orbital cycle like the one that brought Earth's ice ages), moving the seas from one pole to the other; cores like this one would show it. She notes grain size, colour, the rounded ice pebbles washed down Vid Flumina, and seals each section in a cold canister: brought indoors warm, its methane would boil away.", { wx: RIG.x + 1.6, wz: RIG.z + 0.6, h: -1.2, kind: "kneel" });
+  const ax = CANYON.x0 + CANYON.dx * 700, az = CANYON.z0 + CANYON.dz * 700; let bx = ax; while (land(bx, az) < 25) bx -= 3;
+  crew(crewLook(2, { accent: 0x3a7ac8 }), "Kenji Watanabe", "field geologist (geomorphology)", "Sampling the canyon wall a kilometre east, up Vid Flumina. A canyon half a kilometre deep with its floor flooded to the sea's level means the land rose or the sea fell, faster than the river could keep up; the layers he chips out with his hammer (water ice, hard as granite at 94 K, interbedded with organic sediment) will tell which. Fieldwork is slow in the bulky suit, but in a seventh of Earth's gravity the climb is easy.", { wx: bx + 2.5, wz: az, h: -Math.PI / 2, kind: "hammer" });
+  let zb = S0.z; while (land(S0.x - 40, zb) > 0.05) zb -= 1;
+  crew(crewLook(3, { long: true, accent: 0x3ab87a }), "Sofia Lindqvist", "limnologist (the seas)", "At the water's edge with a sampling pole, drawing liquid from Ligeia Mare. Its make-up (mostly methane, with nitrogen and some ethane; how much of each sets its density and how cold it can get before freezing) changes with the seasons, the rain and the inflow from the rivers. She also tends the buoy's mooring, and watches for the 'magic islands' Cassini saw: perhaps bubbles of nitrogen fizzing out as the sea warms.", { wx: S0.x - 40, wz: zb + 1.2, h: 0, kind: "pole" });
+  crew(crewLook(4, { accent: 0xc8b830 }), "Dr. Nadia El-Sayed", "geophysicist", "Checking the seismometer. Under the ice shell, 50 to 100 km down, lies an ocean of salty water bigger than all Earth's oceans; Saturn's tides squeeze Titan every 16 days, and the shell creaks. The seismometer, with Titan's own tides and its slight wobble, can measure how thick the shell is and how deep the ocean, the most likely place in the Saturn system for life.", { wx: at(190, 150).x + 1.0, wz: at(190, 150).z + 0.4, h: -2.0, kind: "kneel" });
+  crew(crewLook(5, { accent: 0x8a8a8a }), "Rafael Mendes", "engineer (power and fuel)", "Walking the methane pipe from the fuel plant to the shore, checking the joints and the heaters that stop it clogging: at 94 K, impurities freeze out and ethane and other hydrocarbons can coat the pipe. He also looks after the reactor and the oxygen plant; on Titan, oxygen is the precious thing, and fuel lies all around.", { path: [[ISRU.x + 2, ISRU.z - 8], [ISRU.x + 2, BASE.userData.pipe.z1 + 6]], speed: 0.9, kind: "walk" }); }
+// inside, in coveralls
+crew(crewLook(6, { inside: true, long: true, suit: 0x2a5a7a, accent: 0xe8c040 }), "Dr. Priya Raman", "astrobiologist and organic chemist", "At the cryogenic glovebox, her hands in its gloves, working at 94 K under dry nitrogen on the organic sediment from the core. Titan's haze makes complex organic molecules (tholins) from sunlight, methane and nitrogen; where they meet liquid water (melted by an impact, or erupted from below) they can form amino acids and other building blocks of life. She is looking for them, and for any sign of chemistry that organises itself in liquid methane, life as we do not know it.", { local: [1, 5.6, 0.45], h: 0, kind: "knead" });
+crew(crewLook(7, { inside: true, suit: 0x2a5a7a, accent: 0x6ab8e8 }), "Dr. Lukas Becker", "atmospheric scientist", "At the lab's screens with the weather mast's records and the drone's last flight: methane humidity, wind, the thin clouds. Titan has a full methane weather cycle (evaporation, clouds, rain, rivers, seas) but rain is rare and violent, and he wants to catch a storm. Its haze, too: the same chemistry that may have hazed the young Earth.", { local: [1, 9.8, -0.75], h: Math.PI, kind: "talk" });
+crew(crewLook(8, { inside: true, long: true, suit: 0x6a3a3a, accent: 0xe8e4dc }), "Dr. Hana Kowalczyk", "physician and commander", "At the galley table with the day's plan and the medical checks: low gravity weakens bones and muscles, so everyone exercises daily on the bike; she also watches the crew's radiation dose (Titan's thick air shields the surface well, far better than Mars) and their spirits, nine light-minutes... no, more than an hour's signal from home.", { local: [0, 10.7, -0.05], h: 0, kind: "sit" });
+crew(crewLook(9, { inside: true, suit: 0x5a5a5e, accent: 0xd86a28 }), "Tomas Reyes", "engineer (life support and suits)", "Repairing a suit glove at the workbench. The cold is the hardest thing on equipment here: seals stiffen, batteries fade, joints wear; at 94 K plastics shatter like glass. He also keeps the habitat's air (oxygen from the plant, carbon dioxide scrubbed) and heat (from the reactor) running.", { local: [2, 6.8, 0.75], h: 0, kind: "hammer" });
+CREW.find(p => p.name === "Dr. Hana Kowalczyk").info = CREW.find(p => p.name === "Dr. Hana Kowalczyk").info.replace("nine light-minutes... no, more than an hour's signal from home", "more than an hour's signal from home");
+function crewPos(p, t) { if (p.local) { const [k, x, z] = p.local, [lx, lz] = k === null ? [x, z] : modPos(k, x, z), v = HAB.localToWorld(V3(lx, FL, lz)); return [v.x, v.y, v.z, HAB_RY + MODS[k] + p.h + (p.kind === "sit" ? 0 : 0)]; }
+  if (p.path) { const [[x0, z0], [x1, z1]] = p.path, L = Math.hypot(x1 - x0, z1 - z0), s = (t * p.speed) % (2 * L), f = s < L ? s / L : 2 - s / L, x = x0 + (x1 - x0) * f, z = z0 + (z1 - z0) * f; return [x - ME.x0, land(x, z), z - ME.z0, s < L ? Math.atan2(x1 - x0, z1 - z0) : Math.atan2(x0 - x1, z0 - z1)]; }
+  return [p.wx - ME.x0, land(p.wx, p.wz), p.wz - ME.z0, p.h]; }
+// their tools: a rock hammer, a sampling pole, a core tray
+const PROPS = new THREE.Group(); scene.add(PROPS); const corePart = (geo, mat) => { const m = new THREE.Mesh(geo, mat); PROPS.add(m); return m; };
+const coreTray = corePart(new THREE.BoxGeometry(1.4, 0.12, 0.35), M_DARK), coreRod = corePart(new THREE.CylinderGeometry(0.05, 0.05, 1.3, 10).rotateZ(Math.PI / 2), BM(0x5a3a22)), poleM = corePart(new THREE.CylinderGeometry(0.02, 0.02, 3.2, 6), M_METAL);
+
+// ---------- the rover: get in (E beside its door) and drive ----------
+// A pressurised cabin on six soft wheels for loose organic sand; electric drive from methane-oxygen fuel cells. Top speed about 15 km/h:
+// with a seventh of Earth's gravity the wheels grip weakly, so it cannot brake or corner hard.
+const RV = { x: at(85, 150).x, z: at(85, 150).z, head: 1.1, v: 0, steer: 0, y: null, pitch: 0, roll: 0, in: false };
+const rover = new THREE.Group(); scene.add(rover); rover.traverse(o => o.layers.enable(1));
+{ const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => part(geo, mat, x, y, z, rx, ry, rz, rover), GL = new THREE.MeshStandardMaterial({ color: 0x9ab0b8, transparent: true, opacity: 0.18, roughness: 0.05, side: THREE.DoubleSide, depthWrite: false }), IN = new THREE.MeshStandardMaterial({ color: 0x6a7078, roughness: 0.8, side: THREE.DoubleSide });
+  add(new THREE.BoxGeometry(3, 0.9, 4.3), M_QUILT, 0, 2.15, -1.1); add(new THREE.BoxGeometry(3, 1.4, 4.3), M_QUILT, 0, 3.3, -1.1); add(new THREE.BoxGeometry(3, 0.9, 0.1), M_QUILT, 0, 2.15, 3.2); for (const sx of [-1, 1]) add(new THREE.BoxGeometry(0.1, 0.9, 2.2), M_QUILT, sx * 1.47, 2.15, 2.15); add(new THREE.BoxGeometry(3, 0.12, 2.2), M_QUILT, 0, 1.66, 2.15); add(new THREE.BoxGeometry(3, 0.1, 2.25), M_QUILT, 0, 4.0, 2.15);
+  add(new THREE.PlaneGeometry(2.9, 1.42), GL, 0, 3.28, 3.12, -0.25); for (const sx of [-1, 1]) { add(new THREE.PlaneGeometry(2.1, 1.35), GL, sx * 1.49, 3.3, 2.15, 0, Math.PI / 2, 0); add(new THREE.BoxGeometry(0.1, 1.4, 0.1), M_QUILT, sx * 1.45, 3.3, 3.2); }
+  add(new THREE.PlaneGeometry(2.9, 2.2), IN, 0, 3.93, 2.15, Math.PI / 2); add(new THREE.PlaneGeometry(2.9, 1.35), IN, 0, 3.3, 1.08); add(new THREE.BoxGeometry(0.9, 1.25, 0.04), M_ORANGE, 0, 3.0, 1.1);
+  for (const sx of [-1, 1]) add(new THREE.PlaneGeometry(2.2, 0.85), IN, sx * 1.42, 2.18, 2.15, 0, Math.PI / 2, 0); add(new THREE.BoxGeometry(2.8, 0.05, 2.2), M_FLOOR, 0, 1.73, 2.15);
+  for (const sx of [-0.65, 0.65]) { add(new THREE.BoxGeometry(0.6, 0.45, 0.6), M_BLUE, sx, 1.98, 1.75); add(new THREE.BoxGeometry(0.6, 0.85, 0.12), M_BLUE, sx, 2.45, 1.45); } add(new THREE.BoxGeometry(2.6, 0.5, 0.55), M_DARK, 0, 2.35, 2.85); add(new THREE.BoxGeometry(0.9, 0.3, 0.02), M_SCREEN, -0.5, 2.68, 2.6, -0.6); add(new THREE.BoxGeometry(0.6, 0.3, 0.02), M_SCREEN, 0.6, 2.68, 2.6, -0.6);
+  add(new THREE.TorusGeometry(0.17, 0.025, 6, 18), M_DARK, -0.65, 2.75, 2.45, -0.9); add(new THREE.BoxGeometry(1.0, 1.8, 0.08), M_ORANGE, 1.52, 2.5, -1.4, 0, Math.PI / 2, 0);
+  for (const sx of [-1, 1]) add(new THREE.CircleGeometry(0.3, 14), new THREE.MeshStandardMaterial({ color: 0x302010, emissive: 0xfff0d0, emissiveIntensity: 2 }), sx * 1.0, 2.3, 3.26);
+  const RL = new THREE.PointLight(0xffe8c8, 4, 5, 1.6); RL.position.set(0, 3.7, 2.0); rover.add(RL);
+  RV.wheels = []; for (const z of [-2.3, 0, 2.3]) for (const sx of [-1, 1]) { const w = add(new THREE.CylinderGeometry(0.85, 0.85, 0.7, 20).rotateZ(Math.PI / 2), M_DARK, sx * 1.75, 0.85, z); RV.wheels.push(w); } }
+rover.traverse(o => o.layers.enable(1));
+const rvBld = BLD.find(g => Math.abs(g.userData.w.x - RV.x) < 0.1 && Math.abs(g.userData.w.z - RV.z) < 0.1); if (rvBld) { rvBld.visible = false; }
+for (let i = SOLID.length - 1; i >= 0; i--) if (Math.abs(SOLID[i].x - RV.x) < 0.1 && Math.abs(SOLID[i].z - RV.z) < 0.1 || Math.abs(SOLID[i].x - SITE.x) < 0.1 && Math.abs(SOLID[i].z - SITE.z) < 0.1) SOLID.splice(i, 1);
+for (let i = ITEMS.length - 1; i >= 0; i--) if (ITEMS[i].title === "The pressurised rover") ITEMS.splice(i, 1);
+function updateRover(dt, mx, my) { const c = Math.cos(RV.head), s = Math.sin(RV.head);
+  if (RV.in) { const thr = -my; RV.steer += clampN(-mx - RV.steer, -1.2 * dt, 1.2 * dt); RV.v = clampN(RV.v + thr * 0.7 * dt - RV.v * (thr ? 0 : 0.25) * dt, -1.5, 4.2); RV.head += RV.steer * 0.32 * Math.min(1, Math.abs(RV.v) / 2 + 0.15) * dt * Math.sign(RV.v || 1); }
+  else RV.v *= Math.max(0, 1 - dt * 2);
+  let nx = RV.x + Math.sin(RV.head) * RV.v * dt, nz = RV.z + Math.cos(RV.head) * RV.v * dt; let hit = false; for (const S of SOLID) if (Math.hypot(nx - S.x, nz - S.z) < S.r + 3.2) hit = true; { const [lx, lz] = habLocal(nx, nz); if (inHab(lx, lz) || onStairs(lx, lz)) hit = true; } if (land(nx, nz) < -1.4) hit = true;
+  if (hit) { if (Math.abs(RV.v) > 0.4 && RV.in) say("The rover stops: something is in the way."); RV.v = 0; } else { RV.x = nx; RV.z = nz; }
+  const wh = (f, sd) => land(RV.x + Math.sin(RV.head) * f + Math.cos(RV.head) * sd, RV.z + Math.cos(RV.head) * f - Math.sin(RV.head) * sd), w = []; for (const f of [2.3, 0, -2.3]) for (const sd of [-1.75, 1.75]) w.push(wh(f, sd));
+  const yT = w.reduce((a, b) => a + b) / 6, pT = Math.atan2((w[0] + w[1]) - (w[4] + w[5]), 2 * 4.6), rT = Math.atan2((w[0] + w[2] + w[4]) - (w[1] + w[3] + w[5]), 3 * 3.5), k = 1 - Math.exp(-dt / 0.5);
+  if (RV.y === null) { RV.y = yT; RV.pitch = pT; RV.roll = rT; } else { RV.y += (yT - RV.y) * k; RV.pitch += (pT - RV.pitch) * k; RV.roll += (rT - RV.roll) * k; }
+  rover.position.set(RV.x - ME.x0, RV.y, RV.z - ME.z0); rover.rotation.set(-RV.pitch, RV.head, -RV.roll, "YXZ"); for (const wl of RV.wheels) wl.rotation.x -= RV.v * dt / 0.85; }
+
+const groundAt = (x, z, yRef) => { const hf = habFloor(x, z, yRef); return hf === null ? land(x, z) : Math.max(land(x, z), hf); };
+function act() { const door = V3(1.6, 0, -1.4).applyAxisAngle(V3(0, 1, 0), RV.head);
+  if (RV.in) { if (Math.abs(RV.v) > 0.3) { say("Stop the rover first (S to brake)."); return; } RV.in = false; const o = door.clone().multiplyScalar(1.9); ME.x = RV.x + o.x; ME.z = RV.z + o.z; ME.y = land(ME.x, ME.z); ME.vx = ME.vz = ME.vy = 0; yaw = RV.head + Math.PI / 2; say("Out of the rover. E beside its orange door to get back in."); return; }
+  if (!insideHab() && Math.hypot(ME.x - (RV.x + door.x), ME.z - (RV.z + door.z)) < 3.5) { RV.in = true; yaw = Math.PI; pitch = -0.08; say("In the rover's cab. <b>W</b>/<b>S</b> drive and brake, <b>A</b>/<b>D</b> steer (left stick in VR); top speed about 15 km/h: in a seventh of Earth's gravity the wheels grip weakly. <b>E</b> to get out."); return; }
+  let bp = null, bd = 3.2; for (const p of CREW) { if (!p.at) continue; const d = Math.hypot(p.at[0] + ME.x0 - ME.x, p.at[2] + ME.z0 - ME.z) + Math.abs(p.at[1] - ME.y) * 0.5; if (d < bd) { bd = d; bp = p; } }
+  if (bp) { say(`<b>${bp.name}</b>, ${bp.role}<br>${bp.info}`, 50); return; } nextFact(); }
 // ---------- the loop ----------
 const clock = new THREE.Clock(); let T = 0, frameN = 0, underFog = false;
 updateGround(true); fillCobbles(); fillSea(); placeBase(); BASE.traverse(o => o.layers.enable(1));
@@ -53341,29 +53562,37 @@ renderer.setAnimationLoop(() => { const dt = clampN(clock.getDelta(), 0, 0.05), 
   let mx = 0, my = 0, run = false, jump = false;
   if (vr) { const s = renderer.xr.getSession(); for (const src of s ? s.inputSources : []) { const gp = src.gamepad; if (!gp) continue; const a = gp.axes, ax = a.length >= 4 ? 2 : 0;
       if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; run = !!gp.buttons[0]?.pressed; const bX = gp.buttons[4]?.pressed; if (bX && !prevB.x) hud = !hud; prevB.x = bX; }
-      else { const tx = a[ax] || 0; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const bA = gp.buttons[4]?.pressed, bB = gp.buttons[5]?.pressed; if (bA && !prevB.a) nextFact(); prevB.a = bA; if (bB && !prevB.b) jump = true; prevB.b = bB; } } }
+      else { const tx = a[ax] || 0; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const bA = gp.buttons[4]?.pressed, bB = gp.buttons[5]?.pressed; if (bA && !prevB.a) act(); prevB.a = bA; if (bB && !prevB.b) jump = true; prevB.b = bB; } } }
   else { if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD || keys.ArrowRight) mx += 1; if (keys.KeyA || keys.ArrowLeft) mx -= 1; run = keys.ShiftLeft || keys.ShiftRight; if (keys.Space) jump = true; }
   // physics: on the ground you push off and steer; in the air only gravity and drag act; in the liquid, buoyancy and heavy drag
-  const gY = land(ME.x, ME.z), sub = clampN((0 - ME.y) / 1.7, 0, 1), onGround = ME.y <= gY + 0.03;
-  if (started && (mx || my) && (onGround || sub > 0.3)) { const f = V3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())); f.y = 0; f.normalize(); const sd = V3(-f.z, 0, f.x), sp = sub > 0.5 ? 0.7 : run ? 5.5 : 2.5;
+  if (RV.in) { updateRover(dt, mx, my); ME.x = RV.x; ME.z = RV.z; ME.y = RV.y; ME.vx = ME.vz = ME.vy = 0; } else { updateRover(dt, 0, 0);
+  const gY = groundAt(ME.x, ME.z, ME.y), sub = clampN((0 - ME.y) / 1.7, 0, 1), onGround = ME.y <= gY + 0.03, inH = insideHab();
+  if (started && (mx || my) && (onGround || sub > 0.3)) { const f = V3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())); f.y = 0; f.normalize(); const sd = V3(-f.z, 0, f.x), sp = inH ? (run ? 2.2 : 1.4) : sub > 0.5 ? 0.7 : run ? 5.5 : 2.5;
     const tx = (f.x * -my + sd.x * mx) * sp, tz = (f.z * -my + sd.z * mx) * sp, k = 1 - Math.exp(-dt * (sub > 0.5 ? 1.5 : 6)); ME.vx += (tx - ME.vx) * k; ME.vz += (tz - ME.vz) * k; }
   else if (onGround) { const k = 1 - Math.exp(-dt * (sub > 0.5 ? 2 : 5)); ME.vx -= ME.vx * k; ME.vz -= ME.vz * k; }
-  if (jump && onGround && started) ME.vy = sub > 0.6 ? 0.8 : 2.6;
+  if (jump && onGround && started) ME.vy = inH ? 1.0 : sub > 0.6 ? 0.8 : 2.6;
   const v = Math.hypot(ME.vx, ME.vy, ME.vz), rho = lerpN(RHO_AIR, RHO_LIQ, sub), dragK = 0.5 * rho * CDA * v / MASS, gEff = G_T * (1 - rho / 1000 * (sub > 0 ? 1 : 0.0055));
   ME.vy -= gEff * dt; ME.vx -= ME.vx * dragK * dt; ME.vy -= ME.vy * Math.min(1, dragK * dt); ME.vz -= ME.vz * dragK * dt;
-  const ox = ME.x, oz = ME.z; ME.x += ME.vx * dt; ME.z += ME.vz * dt; ME.y += ME.vy * dt; walked += Math.hypot(ME.x - ox, ME.z - oz);
+  const ox = ME.x, oz = ME.z, [l0x, l0z] = habLocal(ox, oz), wasIn = inHab(l0x, l0z) && ME.y > HAB.userData.y + 2.6 || onStairs(l0x, l0z) && ME.y > land(ox, oz) + 0.3;
+  ME.x += ME.vx * dt; ME.z += ME.vz * dt; ME.y += ME.vy * dt; walked += Math.hypot(ME.x - ox, ME.z - oz);
+  { const [lx, lz] = habLocal(ME.x, ME.z); if (wasIn && !inHab(lx, lz) && !onStairs(lx, lz)) { ME.x = ox; ME.z = oz; ME.vx = ME.vz = 0; } if (inH && ME.y > HAB.userData.y + FL + 0.9) { ME.y = HAB.userData.y + FL + 0.9; ME.vy = Math.min(ME.vy, 0); } }
   for (const c of SOLID) { const dx = ME.x - c.x, dz = ME.z - c.z, d = Math.hypot(dx, dz); if (d < c.r && d > 0.01 && ME.y < land(c.x, c.z) + 12) { ME.x = c.x + dx / d * c.r; ME.z = c.z + dz / d * c.r; } }
-  const gN = land(ME.x, ME.z); if (ME.y < gN) { if (gN - ME.y > 1.2 && onGround) { ME.x = ox; ME.z = oz; ME.vx *= -0.2; ME.vz *= -0.2; ME.y = land(ox, oz); } else { ME.y = gN; if (ME.vy < 0) ME.vy = 0; } }
+  const gN = groundAt(ME.x, ME.z, ME.y - ME.vy * dt); if (ME.y < gN) { if (gN - ME.y > 1.2 && onGround) { ME.x = ox; ME.z = oz; ME.vx *= -0.2; ME.vz *= -0.2; ME.y = groundAt(ox, oz, ME.y + 0.5); } else { ME.y = gN; if (ME.vy < 0) ME.vy = 0; } } }
   // the world is kept near the origin; far moves shift the origin and rebuild the ground
   if (Math.hypot(ME.x - ME.x0, ME.z - ME.z0) > 3000) { ME.x0 = ME.x; ME.z0 = ME.z; updateGround(true); fillCobbles(); fillSea(); placeBase(); BASE.traverse(o => o.layers.enable(1)); }
   else { updateGround(); if (Math.hypot(ME.x - cobC[0], ME.z - cobC[1]) > 6) fillCobbles(); if (Math.hypot(ME.x - seaC[0], ME.z - seaC[1]) > 40) fillSea(); }
-  rig.position.set(ME.x - ME.x0, ME.y, ME.z - ME.z0); rig.rotation.set(0, vr ? vrYaw : 0, 0); if (!vr) { camera.position.set(0, 1.6, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
+  if (RV.in) { rover.updateMatrixWorld(); rig.position.copy(rover.localToWorld(V3(-0.65, 1.35, 1.45))); rig.rotation.set(0, RV.head + (vr ? vrYaw : 0), 0); } else { rig.position.set(ME.x - ME.x0, ME.y, ME.z - ME.z0); rig.rotation.set(0, vr ? vrYaw : 0, 0); } if (!vr) { camera.position.set(0, 1.6, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
   sky.position.copy(rig.position);
   // under the surface: a dim brown murk
   const eyeY = ME.y + 1.6, under = eyeY < 0; if (under !== underFog) { underFog = under; scene.fog.density = under ? 0.12 : 1 / 26000; scene.fog.color.copy(under ? new THREE.Color(0.16, 0.1, 0.05) : FOGC); seaU.under.value = under ? 1 : 0; }
   BASE.traverse(o => { if (o.userData.blink) o.material.emissiveIntensity = (T % 2) < 0.15 ? 3 : 0.2; if (o.userData.spin) o.rotation.y += dt * 2.5; });
+  if (DOOR) { const dw = HAB.localToWorld(V3(DOOR.userData.x0, FL, 4.62)), near = Math.hypot(dw.x - rig.position.x, dw.z - rig.position.z) < 4.5; DOOR.position.x += ((near ? DOOR.userData.x0 + 1.3 : DOOR.userData.x0) - DOOR.position.x) * Math.min(1, dt * 3); }
+  for (const p of CREW) { const [x, y, z, h] = crewPos(p, T); p.at = [x, y, z]; crowd.set(p.i, x, y, z, h, p.kind, T + p.i, p.kind === "walk" ? 1 : 0);
+    if (p.name === "Dr. Amara Okafor") { coreTray.position.set(x + Math.sin(h) * 0.7, y + 0.06, z + Math.cos(h) * 0.7); coreTray.rotation.y = h + Math.PI / 2; coreRod.position.copy(coreTray.position).y += 0.1; coreRod.rotation.y = h + Math.PI / 2; }
+    if (p.name === "Sofia Lindqvist") { poleM.position.set(x + Math.sin(h) * 1.3, y + 0.9, z + Math.cos(h) * 1.3); poleM.rotation.set(0, h, 0); poleM.rotateX(1.05); } }
+  crowd.done();
   seaU.t.value = T; if (!under && (!IS_HEADSET || frameN % 2 === 0)) { sea.visible = false; COB.visible = false; updateReflection(); sea.visible = true; COB.visible = true; }
-  if (hud && frameN % 10 === 0) HUD.innerHTML = `Ligeia Mare, Titan · 73° N<br>${ME.y >= 0 ? (ME.y < 1000 ? ME.y.toFixed(1) + " m" : (ME.y / 1000).toFixed(2) + " km") + " above the sea" : (-ME.y).toFixed(1) + " m under the surface"} · walked ${walked < 1000 ? Math.round(walked) + " m" : (walked / 1000).toFixed(2) + " km"}<br>gravity 0.14 g · 94 K (−179 °C) · 1.47 bar${onGround ? "" : " · in the air " + (ME.y - gN).toFixed(1) + " m"}`;
+  if (hud && frameN % 10 === 0) HUD.innerHTML = RV.in ? `In the rover · ${(Math.abs(RV.v) * 3.6).toFixed(1)} km/h<br>W/S drive, A/D steer, E to get out` : insideHab() ? `Inside the habitat · 21 °C, 1 bar of air<br>outside: 94 K (−179 °C), 1.47 bar of nitrogen` : `Ligeia Mare, Titan · 73° N<br>${ME.y >= 0 ? (ME.y < 1000 ? ME.y.toFixed(1) + " m" : (ME.y / 1000).toFixed(2) + " km") + " above the sea" : (-ME.y).toFixed(1) + " m under the surface"} · walked ${walked < 1000 ? Math.round(walked) + " m" : (walked / 1000).toFixed(2) + " km"}<br>gravity 0.14 g · 94 K (−179 °C) · 1.47 bar${ME.y - groundAt(ME.x, ME.z, ME.y) < 0.05 ? "" : " · in the air " + (ME.y - groundAt(ME.x, ME.z, ME.y)).toFixed(1) + " m"}`;
   HUD.style.display = hud && started ? "block" : "none";
   msgT -= dt; msgAge += dt; if (vr && vrPanel.visible && msgAge > 4 && (mx || my)) msgT = 0; if (msgT <= 0) { MSG.style.display = "none"; vrPanel.visible = false; }
   renderer.render(scene, camera); });
