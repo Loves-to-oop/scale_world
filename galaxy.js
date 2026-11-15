@@ -15,7 +15,7 @@ const IS_HEADSET = /OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent);
 const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: !IS_HEADSET });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.xr.enabled = true; renderer.xr.setFoveation(1); document.body.appendChild(renderer.domElement);
-const scene = new THREE.Scene(); scene.background = new THREE.Color(0x000000);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a1028);
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, IS_HEADSET ? 0.05 : 0.01, IS_HEADSET ? 4e5 : 2e6);
 const rig = new THREE.Group(); rig.add(camera); scene.add(rig); camera.position.y = 1.6;
 addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
@@ -32,17 +32,21 @@ for (let i = 0; i < N; i++) { const o = i * 6; let x = STAR_NUM[o], y = STAR_NUM
   STARS.push({ i, name, bayer: STAR_BAYER[i] || "", spect: STAR_SPECT[i] || "", M: ABS[i], m0: STAR_NUM[o + 5], d0: Math.hypot(x, y, z), p: V3(SUN.x + x, SUN.y + y, SUN.z + z) }); }
 const starGeo = new THREE.BufferGeometry(); starGeo.setAttribute("position", new THREE.BufferAttribute(POS, 3)); starGeo.setAttribute("absmag", new THREE.BufferAttribute(ABS, 1)); starGeo.setAttribute("color", new THREE.BufferAttribute(COL, 3));
 // each star's brightness as seen from the eye: apparent magnitude m = M + 5 log10(d / 10 parsecs); fainter than about 6.5 fades out
-const starMat = new THREE.ShaderMaterial({ uniforms: { px: { value: renderer.getPixelRatio() }, glass: { value: 0 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  vertexShader: `attribute float absmag; attribute vec3 color; uniform float px; varying vec3 vC; varying float vA;
+// each star is a glowing bulb 30 cm across (a carnival light) that you can walk up to, with the glow of its real brightness seen from where
+// you stand (m = M + 5 log10(d / 10 parsecs)) round it; the bulb's tint is the star's colour
+const starMat = new THREE.ShaderMaterial({ uniforms: { px: { value: renderer.getPixelRatio() }, vh: { value: 900 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  vertexShader: `attribute float absmag; attribute vec3 color; uniform float px, vh; varying vec3 vC; varying float vA, vB;
     #include <common>
     #include <logdepthbuf_pars_vertex>
     void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); float d = max(length(mv.xyz), 0.0005); float m = absmag + 5.0 * log2(d / ${LYPC} / 10.0) / log2(10.0);
-      float s = clamp(1.6 + (6.5 - m) * 0.85, 1.2, 46.0); vA = clamp(pow(10.0, -0.4 * (m - 6.5)), 0.0, 1.0); vC = color; gl_PointSize = s * px; gl_Position = projectionMatrix * mv;
+      float s = clamp(1.6 + (6.5 - m) * 0.85, 1.2, 46.0) * px, bulb = 0.3 * projectionMatrix[1][1] * vh * 0.5 / d; float sz = max(s, bulb); vB = clamp(bulb / sz, 0.0, 1.0) * step(1.2, bulb);
+      vA = clamp(pow(10.0, -0.4 * (m - 6.5)), 0.0, 1.0); vC = color; gl_PointSize = min(sz, 160.0); gl_Position = projectionMatrix * mv;
       #include <logdepthbuf_vertex>
     }`,
-  fragmentShader: `varying vec3 vC; varying float vA;
+  fragmentShader: `varying vec3 vC; varying float vA, vB;
     #include <logdepthbuf_pars_fragment>
-    void main() { vec2 c = gl_PointCoord - 0.5; float r = length(c) * 2.0; if (r > 1.0) discard; float core = exp(-r * r * 9.0), halo = exp(-r * 3.5) * 0.35; gl_FragColor = vec4(vC * (core + halo) * vA * 1.6, 1.0);
+    void main() { vec2 c = gl_PointCoord - 0.5; float r = length(c) * 2.0; if (r > 1.0) discard; float core = exp(-r * r * 9.0), halo = exp(-r * 3.5) * 0.35, bulb = vB > 0.0 ? smoothstep(vB, vB * 0.8, r) : 0.0;
+      vec3 col = vC * (core + halo) * vA * 1.6 + mix(vC, vec3(1.0), 0.45) * bulb * 1.3 + vC * 0.5 * exp(-r * 4.0) * vB; gl_FragColor = vec4(col, 1.0);
       #include <logdepthbuf_fragment>
     }` });
 const starPts = new THREE.Points(starGeo, starMat); starPts.frustumCulled = false; scene.add(starPts);
@@ -60,9 +64,15 @@ const figLines = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints
 
 // ---------- the desk, the Sun on it, the Oort cloud round it ----------
 const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, ...o });
-scene.add(new THREE.HemisphereLight(0x8090b0, 0x202020, 0.5));
+// ---------- Starlight Park: the whole model as a theme park at night ----------
+// a night sky over the park, deep blue overhead and a warm glow of park lights low down; the stars themselves are the bulbs
+const SKYDOME = new THREE.Mesh(new THREE.SphereGeometry(IS_HEADSET ? 3e5 : 1.5e6, 32, 16), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
+  vertexShader: "varying vec3 vD; void main() { vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+  fragmentShader: "varying vec3 vD; void main() { float h = vD.y; vec3 top = vec3(0.02, 0.03, 0.09), mid = vec3(0.07, 0.06, 0.16), low = vec3(0.32, 0.14, 0.18); vec3 c = h > 0.0 ? mix(mid, top, smoothstep(0.0, 0.6, h)) : mix(mid, low * 0.6, smoothstep(0.0, -0.4, h)); c += low * exp(-abs(h) * 9.0) * 0.8; gl_FragColor = vec4(c, 1.0); }" }));
+SKYDOME.renderOrder = -10; SKYDOME.frustumCulled = false; scene.add(SKYDOME);
+scene.add(new THREE.HemisphereLight(0x9aa8ff, 0x4a2a3a, 0.9));
 // light from one side, so buildings and mountains show solid faces (in space, starlight: an artist's floodlight, really)
-const keyLight = new THREE.DirectionalLight(0xfff0e0, 1.5); keyLight.position.set(0.6, 1, 0.35); scene.add(keyLight);
+const keyLight = new THREE.DirectionalLight(0xc8d4ff, 1.3); keyLight.position.set(0.6, 1, 0.35); scene.add(keyLight);
 const lamp = new THREE.PointLight(0xffe8c0, 3, 8, 1.5); lamp.position.set(-0.5, 1.6, 0.3); scene.add(lamp);
 { const top = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.05, 0.7), M(0x6a4428)); top.position.set(0, 0.74, 0); scene.add(top); for (const [x, z] of [[-0.65, -0.3], [0.65, -0.3], [-0.65, 0.3], [0.65, 0.3]]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.72, 0.05), M(0x4a2e1a)); l.position.set(x, 0.36, z); scene.add(l); }
   const st = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.24, 8), M(0xb0b0b0, { metalness: 0.8 })); st.position.set(0, 0.88, 0); scene.add(st); const base = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.02, 24), M(0x303030)); base.position.set(0, 0.775, 0); scene.add(base);
@@ -227,7 +237,7 @@ function windowTex(base, lit, cols, rows, p = 0.55) { const c = document.createE
 function landmark(dist, base, side, fwd, name, kind, col) { const type = LPICK[name] || "house", [rad, h, what, real] = LSTY[type], pr = kind === "road" ? 4 : 2, R = rad * 1.15 + 1.2, at = base.clone().addScaledVector(side, pr + 1.6 + R);
   platform(at, R, col); strip(base, base.clone().addScaledVector(side, pr + 2.2), "walk");
   const g = new THREE.Group(); g.position.copy(at); g.lookAt(at.x - side.x, at.y, at.z - side.z); scene.add(g); LMS.push({ name, type, at: at.clone(), h, g });
-  const add = (geo, m, x, y, z, ry = 0) => { if (m.isMeshStandardMaterial && !m.vertexColors && !m.emissiveMap) { m.emissive = m.color.clone(); m.emissiveIntensity = 0.12; } const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); me.rotation.y = ry; g.add(me); return me; }, B = c => new THREE.MeshBasicMaterial({ color: c });
+  const add = (geo, m, x, y, z, ry = 0) => { if (m.isMeshStandardMaterial && !m.vertexColors && !m.emissiveMap) { m.emissive = m.color.clone(); m.emissiveIntensity = 0.3; } const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); me.rotation.y = ry; g.add(me); return me; }, B = c => new THREE.MeshBasicMaterial({ color: c });
   const box = (w, hh, d, c, x, y, z, ry) => add(new THREE.BoxGeometry(w, hh, d), typeof c === "number" ? M(c) : c, x, y, z, ry), cyl = (r0, r1, hh, c, x, y, z, n = 16) => add(new THREE.CylinderGeometry(r1, r0, hh, n), typeof c === "number" ? M(c) : c, x, y, z);
   const gable = (w, d, hh, c, y) => { const s = new THREE.Shape(); s.moveTo(-w / 2, 0); s.lineTo(w / 2, 0); s.lineTo(0, hh); s.lineTo(-w / 2, 0); const geo = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: false }); geo.translate(0, 0, -d / 2); return add(geo, M(c), 0, y, 0); };
   const wins = (list, c = 0xffd890) => list.forEach(([x, y, z, w = 1.1, hh = 1.1, ry = 0]) => add(new THREE.BoxGeometry(w, hh, 0.1), B(c), x, y, z, ry));
@@ -462,7 +472,7 @@ function updateRides(dt) { if (!ridesOn) return; updateGenRides(dt); for (const 
       for (const [x, y, u, v] of [[-1, -1, cx, cy + CH], [1, -1, cx + CW, cy + CH], [-1, 1, cx, cy], [1, 1, cx + CW, cy]]) { const p = at.clone().addScaledVector(right, x * sw / 2).add(V3(0, y * sh / 2, 0)); Q.pos.push(p.x, p.y, p.z); Q.uv.push(u / W, 1 - v / W); } Q.idx.push(k0, k0 + 1, k0 + 2, k0 + 1, k0 + 3, k0 + 2);
       box(at.clone().add(V3(0, -(at.y - A.y) / 2 - sh / 2, 0)), 0.08, at.y - A.y - sh / 2 + 0.6, 0.08, 0, 0x9aa0a8); } }
   for (const Q of atlases) { const t = new THREE.CanvasTexture(Q.c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(Q.pos, 3)); g.setAttribute("uv", new THREE.Float32BufferAttribute(Q.uv, 2)); g.setIndex(Q.idx); g.computeBoundingSphere();
-    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide, toneMapped: false })); scene.add(m); STRIPS.push(m); } }
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: t, side: THREE.FrontSide, toneMapped: false })); scene.add(m); STRIPS.push(m); const bk = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x2a3a30, side: THREE.BackSide })); scene.add(bk); STRIPS.push(bk); } }
 buildPlatforms(); buildStrips(); buildLifts();
 { const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(RWL.pos, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(RWL.col, 3)); scene.add(new THREE.Points(g, new THREE.PointsMaterial({ size: 1.4, map: glowT, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }))); }
 function buildLifts() { const quadsGeo = list => { const g = new THREE.BufferGeometry(), p = [], ix = []; for (const q of list) { const k = p.length / 3; p.push(...q.flat()); ix.push(k, k + 1, k + 2, k, k + 2, k + 3); } g.setAttribute("position", new THREE.Float32BufferAttribute(p, 3)); g.setIndex(ix); g.computeVertexNormals(); return g; };
@@ -583,7 +593,7 @@ function setFly(i) { flySpeedI = clampN(i, 0, FLY.length - 1); say(`Flying speed
 function nearVeh() { camera.getWorldPosition(_cp); for (const V of Object.values(VEH)) if (V.mesh.position.distanceTo(_cp) < (V.jet ? 70 : V.air ? 6 : 3)) return V; return null; }
 function use() { if (!riding && scopeUse()) return; if (riding) { openMenu(); return; } const V = !flying && nearVeh(); if (V) { mount(V); return; } act(); }
 function act() { const T = tagsOn ? lookedAt() : null; camera.getWorldPosition(_cp); if (T) { say(T.infoF(_cp), 45); return; } factI = (factI + 1) % FACTS.length; say(FACTS[factI] + ` <span style="opacity:.6">(${factI + 1}/${FACTS.length}: E for the next)</span>`, 40); }
-function start() { if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); HUD.style.display = "block"; say("<b>The stars at one light-year to the metre.</b> The Sun is the glint on the desk. Every star is in its real direction and distance and shines as it would from where you stand. Walkways lead to the nearest stars; the bike (on the hub) and the car (in the car park behind you) take trails and roads to far ones: E beside them. Look at a label and press <b>E</b>.", 30); }
+function start() { if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); HUD.style.display = "block"; say("<b>Starlight Park: the stars at one light-year to the metre, as a theme park at night.</b> Every star is a bulb at its real place; the Sun is the glint on the desk. Every star is in its real direction and distance and shines as it would from where you stand. Walkways lead to the nearest stars; the bike (on the hub) and the car (in the car park behind you) take trails and roads to far ones: E beside them. Look at a label and press <b>E</b>.", 30); }
 document.getElementById("intro")?.addEventListener("click", start);
 // sitting or standing (in VR, sitting raises your view to a standing eye height); remembered between visits
 seated = localStorage.getItem("vrPosture") === "sitting";
@@ -595,6 +605,18 @@ if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { i
 const VRB = document.getElementById("vr");
 if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); await renderer.xr.setSession(s); start(); vrYaw = yaw; }; });
 
+// fireworks over the park now and then, and strings of festoon lights round the hub, the car park and the helipad
+const FW = []; const fwMat = new THREE.PointsMaterial({ size: 1.6, map: glowT, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+function firework() { const n = 260, pos = new Float32Array(n * 3), vel = [], col = new Float32Array(n * 3), c = new THREE.Color().setHSL(Math.random(), 0.9, 0.6), at = V3((Math.random() - 0.5) * 120, 50 + Math.random() * 40, -40 - Math.random() * 120);
+  for (let i = 0; i < n; i++) { const u = Math.random() * 2 - 1, f = Math.random() * 6.283, q = Math.sqrt(1 - u * u), sp = 14 + Math.random() * 6; vel.push(V3(q * Math.cos(f), u, q * Math.sin(f)).multiplyScalar(sp)); pos.set([at.x, at.y, at.z], i * 3); col.set([c.r, c.g, c.b], i * 3); }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3)); const p = new THREE.Points(g, fwMat.clone()); p.frustumCulled = false; scene.add(p); FW.push({ p, vel, t: 0 }); }
+function updateFireworks(dt) { if (Math.random() < dt / 5) firework(); for (let k = FW.length - 1; k >= 0; k--) { const F = FW[k], a = F.p.geometry.attributes.position; F.t += dt; for (let i = 0; i < F.vel.length; i++) { F.vel[i].y -= 9.8 * dt; F.vel[i].multiplyScalar(1 - dt * 0.9); a.setXYZ(i, a.getX(i) + F.vel[i].x * dt, a.getY(i) + F.vel[i].y * dt, a.getZ(i) + F.vel[i].z * dt); } a.needsUpdate = true; F.p.material.opacity = Math.max(0, 1 - F.t / 2.6); if (F.t > 2.6) { scene.remove(F.p); F.p.geometry.dispose(); F.p.material.dispose(); FW.splice(k, 1); } } }
+{ const pos = [], col = [], cols = [[1, 0.3, 0.3], [1, 0.85, 0.3], [0.3, 1, 0.5], [0.35, 0.6, 1], [1, 0.4, 1]]; const ring = (c, r, n, h) => { for (let k = 0; k < n; k++) { const a = k / n * 6.283; pos.push(c.x + Math.cos(a) * r, c.y + h + 0.15 * Math.sin(k * 0.7), c.z + Math.sin(a) * r); col.push(...cols[k % cols.length]); } };
+  ring(HUB, 2.6, 48, 2.4); ring(PARK, 2.7, 48, 2.4); ring(HELI, 6.2, 80, 2.2); for (let k = 0; k <= 12; k++) { const z = 2.3 + k / 12 * 2.3; for (const x of [-0.6, 0.6]) { pos.push(x, 2.3 + 0.12 * Math.sin(k), z); col.push(...cols[k % cols.length]); } }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); scene.add(new THREE.Points(g, new THREE.PointsMaterial({ size: 0.22, map: glowT, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+  const arch = new THREE.Group(), am = M(0xd84a8a, { emissive: 0xd84a8a, emissiveIntensity: 0.5 }); for (const x of [-1.4, 1.4]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 3.6, 12), am); p.position.set(x, 1.8, 0); arch.add(p); }
+  const top = new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.1, 8, 24, Math.PI), am); top.position.y = 3.6; arch.add(top); const sc = document.createElement("canvas"); sc.width = 512; sc.height = 128; const sg = sc.getContext("2d"); sg.fillStyle = "#1a1040"; sg.fillRect(0, 0, 512, 128); sg.fillStyle = "#ffe08a"; sg.font = "bold 64px Georgia, serif"; sg.textAlign = "center"; sg.fillText("★ STARLIGHT PARK ★", 256, 86);
+  const st = new THREE.CanvasTexture(sc); st.colorSpace = THREE.SRGBColorSpace; for (const ry of [0, Math.PI]) { const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.65), new THREE.MeshBasicMaterial({ map: st, toneMapped: false })); sign.position.y = 4.3; sign.rotation.y = ry; arch.add(sign); } arch.position.set(0, 0, 5.2); scene.add(arch); }
 // ---------- the loop ----------
 const clock = new THREE.Clock(); let frameN = 0, T = 0;
 renderer.setAnimationLoop(() => { const dt = clampN(clock.getDelta(), 0, 0.05), vr = renderer.xr.isPresenting; frameN++; T += dt;
@@ -615,6 +637,7 @@ renderer.setAnimationLoop(() => { const dt = clampN(clock.getDelta(), 0, 0.05), 
     else if (mx || my) { const h = groundAt(nx, nz, ME.y); if (h !== null && Math.abs(h - ME.y) < 1.5) { ME.x = nx; ME.z = nz; ME.y = h; } else { const hx = groundAt(nx, ME.z, ME.y), hz = groundAt(ME.x, nz, ME.y); if (hx !== null && Math.abs(hx - ME.y) < 1.5) { ME.x = nx; ME.y = hx; } else if (hz !== null && Math.abs(hz - ME.y) < 1.5) { ME.z = nz; ME.y = hz; } } } }
   const lift = vr && seated ? 0.45 : 0; rig.position.set(ME.x, ME.y + lift, ME.z); rig.rotation.set(0, vr ? vrYaw + heading : heading, 0); if (!vr) { camera.position.set(0, riding ? riding.eye : 1.6, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
   for (const b of BEACONS) b.material.opacity = 0.7 + 0.3 * Math.sin(T * 2.5);
+  SKYDOME.position.copy(rig.position); starMat.uniforms.vh.value = vr ? 1800 : renderer.domElement.height; if (started) updateFireworks(dt);
   if (started && !riding) { camera.getWorldPosition(_cp); if (viewing && viewing.eye.distanceTo(_cp) > (viewing.auto ? 0.4 : 2.5)) closeView(); if (vr && !viewing) { const S = nearScope(0.22); if (S && S.kind === "light") { showView(S); S.auto = true; } } }
   updateTags(); if (frameN % 20 === 0) { camera.getWorldPosition(_cp); for (const S of SCOPES) S.g.visible = S.eye.distanceTo(_cp) < 60; }
   if (frameN % 10 === 0) { camera.getWorldPosition(_cp); const dSun = _cp.distanceTo(SUN); let near = null, nd = 1e9; for (const S of STARS) { const d = _cp.distanceToSquared(S.p); if (d < nd) { nd = d; near = S; } } nd = Math.sqrt(nd);

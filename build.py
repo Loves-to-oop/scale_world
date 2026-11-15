@@ -753,11 +753,11 @@ ES = ES[:i0] + """<div id="intro"><div class="card">
 (HERE / "eskabo.html").write_text(ES.replace("__THREE__", three).replace("__SCENE__", (HERE / "eskabo.js").read_text(encoding="utf-8")), encoding="utf-8")
 
 # The stars at one light-year to the metre
-GX = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>The stars at one light-year to the metre</title>").replace("background:#c8d4d8", "background:#05070c")
+GX = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Starlight Park: the stars at one light-year to the metre</title>").replace("background:#c8d4d8", "background:#05070c")
 i0, i1 = GX.index('<div id="intro">'), GX.index('<button id="vr">')
 GX = GX[:i0] + """<div id="intro"><div class="card">
-  <h1>The stars at one light-year to the metre</h1>
-  <p>The Sun is a glint on a desk. Around it, every star you can see with the naked eye, and every star within 81 light-years, stands in
+  <h1>Starlight Park: the stars at one light-year to the metre</h1>
+  <p>A theme park at night where every star is a light bulb at its real place. The Sun is a glint on a desk. Around it, every star you can see with the naked eye, and every star within 81 light-years, stands in
   its real direction at its real distance: Proxima Centauri 4.2 m away, Sirius 8.6 m, Vega 25 m, Polaris 433 m, Betelgeuse 500 m, the
   centre of the Milky Way 26.7 km straight ahead. Each shines as bright as it would from where you stand: at the desk the sky is our
   night sky; walk away and the constellations come apart. The ground is the plane of the Milky Way; the Oort cloud is a haze 1.6 m round
