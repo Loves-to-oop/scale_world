@@ -765,6 +765,9 @@ GX = GX[:i0] + """<div id="intro"><div class="card">
   <p>There is no ground: platforms float by the stars. Walkways join the nearest stars; a bike on the hub takes trails to stars up to a
   kilometre away (Betelgeuse is a 500 m ride); a car in the car park takes roads to places kilometres off, as far as the Large Magellanic
   Cloud, 163 km. Beacon towers mark where the trails and roads end.</p>
+  <p>The stars themselves are far too small to see at this scale: the Sun is 147 nm across, the size of a flu virus. So each platform has
+  the instrument it would take: an electron microscope at the desk, light microscopes for the big stars (Betelgeuse is the width of a hair).
+  <kbd>E</kbd> beside one to look; in VR, lean into a light microscope's eyepiece. Sitting or standing: the button at the bottom right, or click the left stick in VR.</p>
   <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;·&nbsp; drag to look &nbsp;·&nbsp; <kbd>shift</kbd> faster &nbsp;·&nbsp; <kbd>E</kbd> beside the bike or car to ride (then <kbd>A</kbd><kbd>D</kbd> choose where, <kbd>W</kbd> go, <kbd>S</kbd> back, <kbd>E</kbd> off), or info on what you look at
   &nbsp;·&nbsp; <kbd>F</kbd> fly (<kbd>space</kbd> / <kbd>C</kbd> up and down, <kbd>=</kbd><kbd>−</kbd> speed) &nbsp;·&nbsp; <kbd>C</kbd> constellation lines &nbsp;·&nbsp; <kbd>L</kbd> labels &nbsp;·&nbsp; <kbd>H</kbd> readout &nbsp;·&nbsp; <kbd>R</kbd> back to the desk<br>
   In VR: left stick walk or ride (left trigger faster; sideways at the start chooses where), right stick turn, <b>A</b> or right trigger: ride / get off / info, <b>B</b> fly (right stick up/down to climb), <b>X</b> labels, <b>Y</b> constellation lines, click the left stick: seated</p>

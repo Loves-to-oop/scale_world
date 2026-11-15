@@ -135,7 +135,7 @@ function groundAt(x, z, yRef) { let best = null; for (const S of SURF) { let h =
 const HUB = platform(V3(0, 0, 0), 2.5, 0xffd080), PARK = platform(V3(0, 0, 7), 2.6, 0xffd080); strip(V3(0, 0, 2.3), V3(0, 0, 4.6), "walk");
 // near stars: a platform under each (the star glows just above it), joined to the hub and to each other by the shortest network of walkways
 const NEAR = [], usedP = [];
-for (const S of STARS.filter(s => s.name && s.d0 < 21).sort((a, b) => a.d0 - b.d0)) { const c = V3(S.p.x, S.p.y - 1.25, S.p.z); if (Math.hypot(c.x, c.z) < 2.5 + 1.3 || usedP.some(q => Math.hypot(q.x - c.x, q.z - c.z) < 2.4)) { const q = usedP.find(q => Math.hypot(q.x - c.x, q.z - c.z) < 2.4); if (q) q.names.push(S.name); continue; }
+for (const S of STARS.filter(s => s.name && s.d0 < 21).sort((a, b) => a.d0 - b.d0)) { const c = V3(S.p.x, S.p.y - 1.25, S.p.z); if (Math.hypot(c.x, c.z) < 2.5 + 1.3 || usedP.some(q => q.distanceTo(c) < 2.4)) { const q = usedP.find(q => q.distanceTo(c) < 2.4); if (q) q.names.push(S.name); continue; }
   c.names = [S.name]; usedP.push(c); platform(c, 1.1); NEAR.push(c); }
 { const nodes = [HUB, ...NEAR], inT = [true], best = nodes.map(n => n.distanceTo(HUB)), from = nodes.map(() => 0); for (let k = 1; k < nodes.length; k++) inT.push(false);
   for (let it = 1; it < nodes.length; it++) { let j = -1; for (let i = 0; i < nodes.length; i++) if (!inT[i] && (j < 0 || best[i] < best[j])) j = i; inT[j] = true; strip(nodes[from[j]], nodes[j], "walk", 0.004 * (it % 3));
@@ -162,6 +162,68 @@ function destination(kind, D) { let S = null, name, p, R = 0, col = 0xffffff; if
     const T = tag(p.clone().add(V3(0, R * 0.8, 0)), name.replace(/^the /, "The "), () => fmtM(dist) + " from the Sun · " + fmtLy(dist) + " ly", () => D.info, "#ffd8a8"); T.far = true; }
   const sign = tag(a.clone().add(V3(0, 1.9, 0)).addScaledVector(hdir, 0.2), (kind === "road" ? "🚗 " : "🚲 ") + name.replace(/^the /, "The "), () => fmtM(dist) + (kind === "road" ? " by road" : " by bike trail"), () => `<b>${kind === "road" ? "Road" : "Bike trail"} to ${name}</b>: ${fmtM(dist)}, ${p.y - SUN.y > 0 ? "climbing" : "descending"} ${fmtM(Math.abs(p.y - SUN.y))} on the way. Take the ${kind === "road" ? "car from the car park" : "bike from the hub"}: E beside it.`, kind === "road" ? "#ffe08a" : "#a8f0b8"); sign.near = 25; }
 BIKE.forEach(D => destination("trail", D)); CAR.forEach(D => destination("road", D));
+
+// ---------- microscopes: whatever it would take to see each thing at this scale ----------
+// At a light-year to the metre the Sun is 147 nm across, the size of a flu virus: smaller than a light microscope can resolve (about
+// 200 nm), so an electron microscope stands at the desk. Each platform has the instrument its star needs: an electron microscope
+// below about 250 nm, a light microscope up to a couple of millimetres. Star radii (in Suns) from published measurements; for stars
+// without one, estimated from luminosity and colour (R = √L × (5,772 K / T)²).
+const LY_M = 9.4607e15, RSUN = 6.957e8, RAD = { Sun: 1, "Proxima Centauri": 0.154, "Rigil Kentaurus": 1.22, Toliman: 0.86, "Barnard's Star": 0.19, "Wolf 359": 0.16, "Lalande 21185": 0.39, Sirius: 1.71, Procyon: 2.05, Ran: 0.74, Altair: 1.8,
+  Vega: 2.4, Fomalhaut: 1.84, Arcturus: 25.4, Capella: 12, Aldebaran: 45, Regulus: 4.2, Achernar: 9, Spica: 7.5, Canopus: 71, Alcyone: 9.3, Polaris: 46, Betelgeuse: 764, Antares: 680, Rigel: 79, Deneb: 203, "Luyten's Star": 0.29, Keid: 0.81, "Ross 128": 0.2, "Kapteyn's Star": 0.29, "Ross 154": 0.24, "Ross 248": 0.16, "Groombridge 34": 0.38, "Lacaille 9352": 0.47, "EZ Aqr": 0.15, "Struve 2398 A": 0.35, "Struve 2398 B": 0.28, "Kruger 60": 0.35, "Ross 614": 0.24,
+  "Van Maanen's Star": 0.011, "Wolf 1061": 0.31, "Lacaille 8760": 0.51, Alsafi: 0.78, Guniibuu: 0.69, Achird: 1.04, "82 G. Eri": 0.92 };
+const BC = bv => bv < -0.2 ? -2.5 : bv < 0 ? -2.0 + 8.5 * (bv + 0.2) : bv < 0.6 ? -0.3 + 0.42 * bv : bv < 1.0 ? -0.05 - 0.875 * (bv - 0.6) : bv < 1.4 ? -0.4 - 2 * (bv - 1.0) : bv < 1.8 ? -1.2 - 3.25 * (bv - 1.4) : Math.max(-4.5, -2.5 - 3 * (bv - 1.8));
+function radiusOf(S) { if (RAD[S.name]) return RAD[S.name]; const bv = STAR_NUM[S.i * 6 + 4], L = Math.pow(10, -0.4 * (S.M + BC(bv) - 4.74)), T = 4600 * (1 / (0.92 * bv + 1.7) + 1 / (0.92 * bv + 0.62)); return Math.sqrt(L) * (5772 / T) ** 2; }
+const SIZES = [[1e-10, "the size of an atom"], [1.4e-9, "the size of a small protein molecule"], [5e-9, "the size of a large protein"], [2.5e-8, "the size of a ribosome or the smallest viruses"], [1.2e-7, "the size of a flu virus"], [2.5e-7, "the size of the smallest bacteria"], [2e-6, "the size of a bacterium"], [7e-6, "the size of a red blood cell"], [2.5e-5, "the size of a skin cell"], [8e-5, "the width of a hair"], [1e-3, "the size of a grain of sand"]];
+const likeSize = sz => { let best = SIZES[0]; for (const s of SIZES) if (Math.abs(Math.log(s[0] / sz)) < Math.abs(Math.log(best[0] / sz))) best = s; return best[1]; };
+const p3 = x => String(parseFloat(x.toPrecision(3))), fmtLen = m => m < 1e-9 ? p3(m * 1e12) + " pm" : m < 1e-6 ? p3(m * 1e9) + " nm" : m < 1e-3 ? p3(m * 1e6) + " µm" : p3(m * 1e3) + " mm";
+const niceMag = x => { const e = Math.pow(10, Math.floor(Math.log10(x))), f = x / e; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * e; };
+function instrument(sz) { if (sz < 5e-11) return { kind: "none" }; if (sz < 2.5e-7) return { kind: "em", mag: niceMag(0.06 / sz) }; return { kind: "light", mag: [40, 100, 400, 1000].slice().reverse().find(m => m * sz <= 0.06) || 40 }; }
+// one view = one thing seen down an instrument
+function starView(S, name) { const R = radiusOf(S), sz = 2 * R * RSUN / LY_M, real = 2 * R * RSUN / 1000; return { name: name || S.name, sz, real, col: COL.slice(S.i * 3, S.i * 3 + 3), kind: "star", giant: R > 30, est: !RAD[S.name] }; }
+const VIEWS_SUN = { name: "the Sun", sz: 2 * RSUN / LY_M, real: 1392700, col: [1, 0.96, 0.85], kind: "star" }, VIEW_EARTH = { name: "the Earth", sz: 12742e3 / LY_M, real: 12742, col: [0.35, 0.55, 0.9], kind: "planet" };
+const VIEW_SYS = { name: "the solar system", sz: 60 * 1.496e11 / LY_M, real: 60 * 1.496e8, kind: "system" };
+function drawView(g, V, W) { const I = V.inst || instrument(V.sz), em = I.kind === "em", cx = W / 2, cy = W / 2 - 30, R0 = W * 0.42;
+  g.fillStyle = "#000"; g.fillRect(0, 0, W, W); g.save(); g.beginPath(); g.arc(cx, cy, R0, 0, 7); g.clip(); g.fillStyle = em ? "#2a2a2a" : V.kind === "system" ? "#05060a" : "#e8e4d8"; g.fillRect(0, 0, W, W);
+  if (I.kind === "none") { g.fillStyle = "#3a3a3a"; g.fillRect(0, 0, W, W); for (let i = 0; i < 4000; i++) { const v = 40 + Math.random() * 40; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(Math.random() * W, Math.random() * W, 2, 2); } }
+  else { const app = V.sz * I.mag, pxPerM = (2 * R0) / 0.09, r = Math.max(1.5, app * pxPerM / 2);
+    if (em) { for (let i = 0; i < 9000; i++) { const v = 30 + Math.random() * 30; g.fillStyle = `rgba(${v},${v},${v},0.6)`; g.fillRect(Math.random() * W, Math.random() * W, 2, 2); } const gr = g.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r); gr.addColorStop(0, "#e8e8e8"); gr.addColorStop(0.7, "#9a9a9a"); gr.addColorStop(1, "#d8d8d8"); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill(); g.strokeStyle = "rgba(255,255,255,0.5)"; g.lineWidth = 2; g.stroke(); }
+    else if (V.kind === "system") { const AUpx = r / 30; for (const a of [0.39, 0.72, 1, 1.52, 5.2, 9.58, 19.2, 30.1]) { g.strokeStyle = a === 1 ? "rgba(120,180,255,0.9)" : "rgba(200,200,220,0.5)"; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, a * AUpx, 0, 7); g.stroke(); } g.fillStyle = "#fff4c0"; g.beginPath(); g.arc(cx, cy, 2.5, 0, 7); g.fill();
+      g.fillStyle = "#c8d4ec"; g.font = "22px sans-serif"; g.fillText("Neptune", cx + 30.1 * AUpx * 0.72, cy - 30.1 * AUpx * 0.72); g.fillText("Earth's orbit", cx + AUpx * 1.2, cy + AUpx * 3 + 20); }
+    else { const [cr, cg, cb] = V.col.map(c => Math.round(c * 255)), gr = g.createRadialGradient(cx, cy, 0, cx, cy, r); gr.addColorStop(0, `rgb(${cr},${cg},${cb})`); gr.addColorStop(0.85, `rgb(${Math.round(cr * 0.75)},${Math.round(cg * 0.6)},${Math.round(cb * 0.5)})`); gr.addColorStop(1, `rgb(${Math.round(cr * 0.5)},${Math.round(cg * 0.35)},${Math.round(cb * 0.25)})`);
+      g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill(); if (V.giant) for (let i = 0; i < 14; i++) { const a = Math.random() * 7, d = Math.random() * r * 0.7, s = r * (0.12 + Math.random() * 0.15); g.fillStyle = `rgba(255,240,200,${0.08 + Math.random() * 0.1})`; g.beginPath(); g.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, s, 0, 7); g.fill(); } }
+    if (V.kind === "bh") { g.fillStyle = "#000"; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill(); g.strokeStyle = "rgba(255,170,80,0.8)"; g.lineWidth = r * 0.25; g.beginPath(); g.arc(cx, cy, r * 1.35, 0, 7); g.stroke(); }
+    const fieldM = 0.09 / I.mag * 0.35, bar = (() => { const t = fieldM * 0.8, e = Math.pow(10, Math.floor(Math.log10(t))), f = t / e; return (f < 2 ? 1 : f < 5 ? 2 : 5) * e; })(), bpx = bar * I.mag * pxPerM;
+    g.fillStyle = em ? "#fff" : V.kind === "system" ? "#fff" : "#111"; g.fillRect(cx - bpx / 2, cy + R0 * 0.8, bpx, 8); g.font = "bold 26px sans-serif"; g.textAlign = "center"; g.fillText(fmtLen(bar), cx, cy + R0 * 0.76); g.textAlign = "left"; }
+  g.restore(); g.strokeStyle = "#555"; g.lineWidth = 10; g.beginPath(); g.arc(cx, cy, R0, 0, 7); g.stroke();
+  g.fillStyle = "#e4ecff"; g.font = "bold 34px sans-serif"; g.textAlign = "center"; g.fillText(V.name.replace(/^the /, "The ") + (I.kind === "none" ? "" : I.kind === "em" ? `: electron microscope, ×${I.mag.toLocaleString()}` : `: light microscope, ×${I.mag}`), cx, W - 78, W - 30);
+  g.font = "25px sans-serif"; g.fillStyle = "#c8d4ec"; g.fillText(V.note || (I.kind === "none" ? "" : `${fmtLen(V.sz)} here (really ${Number(V.real.toPrecision(3)).toLocaleString()} km): about ${likeSize(V.sz)}${V.est ? " (size estimated)" : ""}`), cx, W - 36, W - 30); g.textAlign = "left"; }
+// the instruments
+const scopeM = M(0xe8e8e4, { roughness: 0.4 }), scopeDark = M(0x2a2a2e, { roughness: 0.5 }), SCOPES = [];
+function scope(pos, faceTo, views) { const kind = (views[0].inst || instrument(views[0].sz)).kind, g = new THREE.Group(); g.position.copy(pos); g.lookAt(faceTo.x, pos.y, faceTo.z); scene.add(g);
+  const add = (geo, m, x, y, z) => { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); g.add(me); return me; };
+  let eye, screen = null;
+  if (kind === "em") { add(new THREE.BoxGeometry(1.0, 0.75, 0.6), scopeM, 0, 0.375, 0); add(new THREE.CylinderGeometry(0.16, 0.2, 1.7, 20), scopeM, -0.35, 1.6, -0.1); add(new THREE.CylinderGeometry(0.22, 0.22, 0.25, 20), scopeDark, -0.35, 0.88, -0.1);
+    const c = document.createElement("canvas"); c.width = c.height = 512; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; screen = add(new THREE.PlaneGeometry(0.5, 0.5), new THREE.MeshBasicMaterial({ map: t, toneMapped: false }), 0.2, 1.05, 0.05); screen.rotation.x = -0.25; screen.userData.c = c; screen.userData.t = t; add(new THREE.BoxGeometry(0.54, 0.54, 0.03), scopeDark, 0.2, 1.05, 0.03).rotation.x = -0.25; eye = V3(0.2, 1.05, 0.3); }
+  else if (kind === "light") { add(new THREE.BoxGeometry(0.45, 0.95, 0.45), scopeDark, 0, 0.475, 0); add(new THREE.BoxGeometry(0.22, 0.04, 0.28), scopeM, 0, 0.97, 0); const arm = add(new THREE.BoxGeometry(0.05, 0.3, 0.06), scopeM, 0, 1.12, -0.1); arm.rotation.x = 0.25;
+    add(new THREE.BoxGeometry(0.14, 0.015, 0.12), scopeDark, 0, 1.08, 0.02); const tube = add(new THREE.CylinderGeometry(0.022, 0.022, 0.2, 12), scopeDark, 0, 1.26, 0.04); tube.rotation.x = -0.5; add(new THREE.CylinderGeometry(0.018, 0.026, 0.05, 12), M(0x888888, { metalness: 0.7 }), 0, 1.15, 0.02); eye = V3(0, 1.36, 0.1); }
+  else { add(new THREE.BoxGeometry(0.6, 1.0, 0.1), scopeDark, 0, 0.5, 0); const c = document.createElement("canvas"); c.width = c.height = 512; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; screen = add(new THREE.PlaneGeometry(0.5, 0.5), new THREE.MeshBasicMaterial({ map: t, toneMapped: false }), 0, 1.3, 0.06); screen.userData.c = c; screen.userData.t = t; eye = V3(0, 1.3, 0.3); }
+  g.updateMatrixWorld(true); const S = { g, views, i: 0, eye: g.localToWorld(eye.clone()), screen, kind }; SCOPES.push(S); if (screen) { drawView(screen.userData.c.getContext("2d"), views[0], 512); screen.userData.t.needsUpdate = true; } return S; }
+// the desk: a light microscope for the planets' orbits, an electron microscope for the Sun and the Earth
+scope(V3(-1.3, 0, -0.9), V3(0, 0, 1.6), [{ ...VIEW_SYS, inst: { kind: "light", mag: 40 } }]);
+scope(V3(1.4, 0, -0.9), V3(0, 0, 1.6), [VIEWS_SUN, VIEW_EARTH]);
+for (const c of NEAR) { const stars = c.names.map(byName).filter(Boolean), hd = V3(-c.x, 0, -c.z).normalize(), side = V3(hd.z, 0, -hd.x); scope(c.clone().addScaledVector(side, 0.65).addScaledVector(hd, 0.2), c.clone().addScaledVector(hd, 2), stars.map(s => starView(s))); }
+for (const P of PATHS) { const at = P.end.clone().addScaledVector(P.sd, P.kind === "road" ? -2.4 : -1.2), face = P.end.clone().addScaledVector(P.d, -3);
+  if (P.S) scope(at, face, [starView(P.S, P.name)]);
+  else if (P.name.includes("Crab")) scope(at, face, [{ name: "the Crab pulsar", sz: 20000 / LY_M, real: 20, kind: "star", col: [0.8, 0.9, 1], inst: { kind: "none" }, note: "a neutron star 20 km across: here 2 picometres, a fiftieth of an atom. No microscope could ever show it." }]);
+  else if (P.name.includes("centre")) scope(at, face, [{ name: "Sagittarius A*", sz: 2.54e10 / LY_M, real: 25400000, kind: "bh", col: [0, 0, 0], note: "the black hole's event horizon: 25 million km across, here 2.7 µm, the size of a bacterium" }]); }
+// looking: E (A) beside an instrument, or in VR lean your head into a light microscope's eyepiece
+const viewC = document.createElement("canvas"); viewC.width = viewC.height = 1024; viewC.style.cssText = "position:fixed;left:50%;top:50%;width:min(86vh,86vw);height:min(86vh,86vw);transform:translate(-50%,-50%);z-index:4;display:none;border-radius:50%"; document.body.appendChild(viewC);
+const viewT = new THREE.CanvasTexture(viewC); viewT.colorSpace = THREE.SRGBColorSpace; const viewPanel = new THREE.Mesh(new THREE.CircleGeometry(0.2, 48), new THREE.MeshBasicMaterial({ map: viewT, toneMapped: false, depthTest: false })); viewPanel.position.set(0, 0, -0.45); viewPanel.renderOrder = 100; viewPanel.visible = false; camera.add(viewPanel);
+let viewing = null;
+function showView(S) { S.auto = false; viewing = S; drawView(viewC.getContext("2d"), S.views[S.i], 1024); viewT.needsUpdate = true; if (renderer.xr.isPresenting) viewPanel.visible = true; else viewC.style.display = "block"; }
+function closeView() { viewing = null; viewC.style.display = "none"; viewPanel.visible = false; }
+function nearScope(r = 1.8) { camera.getWorldPosition(_cp); let best = null, bd = r; for (const S of SCOPES) { const d = S.eye.distanceTo(_cp); if (d < bd) { bd = d; best = S; } } return best; }
+function scopeUse() { if (viewing) { if (viewing.i < viewing.views.length - 1) { viewing.i++; showView(viewing); } else { viewing.i = 0; closeView(); } return true; } const S = nearScope(); if (S) { S.i = 0; showView(S); if (S.views.length > 1) say("E again for the next view; it closes after the last.", 5); return true; } return false; }
 
 // ---------- the bike and the car: ride along a trail or road; choose where at the start ----------
 function makeBike() { const g = new THREE.Group(), m = M(0x2a8a4a, { metalness: 0.5 }), dark = M(0x202020); for (const z of [-0.5, 0.5]) { const w = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.03, 8, 24).rotateY(Math.PI / 2), dark); w.position.set(0, 0.34, z); g.add(w); }
@@ -192,7 +254,7 @@ const FACTS = [
   "<b>Bike trails</b> run from the hub to stars up to a kilometre away; <b>roads</b> from the car park to places kilometres off, as far as the Large Magellanic Cloud, 163 km. Each ends at a platform with a beacon tower; towers are taller the farther they are.",
   "<b>Up and down</b> here are north and south of the Milky Way's disc. Trails and roads climb or drop straight to their stars: the road to the Large Magellanic Cloud descends 89 km.",
   "<b>The stars you see at night</b> are mostly within a kilometre here: bright, luminous stars far off and a few faint ones nearby. The Milky Way's band is the glow of millions farther away."];
-addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (e.code === "KeyE") use(); if (e.code === "KeyF") toggleFly(); if (e.code === "KeyL") tagsOn = !tagsOn; if (e.code === "KeyC") figLines.visible = !figLines.visible; if (e.code === "KeyH") hud = !hud; if (e.code === "KeyM") seated = !seated;
+addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (e.code === "KeyE") use(); if (e.code === "KeyF") toggleFly(); if (e.code === "KeyL") tagsOn = !tagsOn; if (e.code === "KeyC") figLines.visible = !figLines.visible; if (e.code === "KeyH") hud = !hud; if (e.code === "KeyM") setSeated(!seated);
   if (riding && riding.v === 0 && riding.s < 1 && (e.code === "KeyA" || e.code === "KeyD")) choose(e.code === "KeyD" ? 1 : -1);
   if (e.code === "Equal") setFly(flySpeedI + 1); if (e.code === "Minus") setFly(flySpeedI - 1); if (e.code === "KeyR") { if (riding) dismount(); ME.x = 0; ME.y = 0; ME.z = 1.6; flying = false; yaw = 0; } });
 addEventListener("keyup", e => keys[e.code] = false);
@@ -203,10 +265,17 @@ function toggleFly() { if (riding) return; flying = !flying; if (!flying) { cons
   say(flying ? `<b>Flying</b> at ${FLY[flySpeedI]} m/s (${FLY[flySpeedI]} light-years a second). Space / C up and down (right stick up/down in VR); = and − change speed. F again to land on whatever is below.` : "<b>Landed.</b>", 8); }
 function setFly(i) { flySpeedI = clampN(i, 0, FLY.length - 1); say(`Flying speed: ${FLY[flySpeedI]} m/s: ${FLY[flySpeedI]} light-years a second`, 5); }
 function nearVeh() { camera.getWorldPosition(_cp); for (const V of Object.values(VEH)) if (V.mesh.position.distanceTo(_cp) < 3) return V; return null; }
-function use() { if (riding) { dismount(); return; } const V = !flying && nearVeh(); if (V) { mount(V); return; } act(); }
+function use() { if (!riding && scopeUse()) return; if (riding) { dismount(); return; } const V = !flying && nearVeh(); if (V) { mount(V); return; } act(); }
 function act() { const T = tagsOn ? lookedAt() : null; camera.getWorldPosition(_cp); if (T) { say(T.infoF(_cp), 45); return; } factI = (factI + 1) % FACTS.length; say(FACTS[factI] + ` <span style="opacity:.6">(${factI + 1}/${FACTS.length}: E for the next)</span>`, 40); }
 function start() { if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); HUD.style.display = "block"; say("<b>The stars at one light-year to the metre.</b> The Sun is the glint on the desk. Every star is in its real direction and distance and shines as it would from where you stand. Walkways lead to the nearest stars; the bike (on the hub) and the car (in the car park behind you) take trails and roads to far ones: E beside them. Look at a label and press <b>E</b>.", 30); }
 document.getElementById("intro")?.addEventListener("click", start);
+// sitting or standing (in VR, sitting raises your view to a standing eye height); remembered between visits
+seated = localStorage.getItem("vrPosture") === "sitting";
+const POSB = document.createElement("button"); POSB.style.cssText = "display:none;position:fixed;right:18px;bottom:72px;z-index:3;padding:10px 16px;font:600 14px -apple-system,sans-serif;border:0;border-radius:10px;background:#2a3a5a;color:#fff;cursor:pointer";
+const posLabel = () => seated ? "🪑 Sitting (tap for standing)" : "🧍 Standing (tap for sitting)"; POSB.textContent = posLabel(); document.body.appendChild(POSB);
+function setSeated(v) { seated = v; localStorage.setItem("vrPosture", v ? "sitting" : "standing"); POSB.textContent = posLabel(); if (started) say(v ? "<b>Sitting</b>: your view is raised to a standing eye height." : "<b>Standing</b>.", 4); }
+POSB.onclick = e => { e.stopPropagation(); setSeated(!seated); };
+if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (ok) POSB.style.display = "block"; });
 const VRB = document.getElementById("vr");
 if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); await renderer.xr.setSession(s); start(); vrYaw = yaw; }; });
 
@@ -215,7 +284,7 @@ const clock = new THREE.Clock(); let frameN = 0, T = 0; VEH.bike.P = Math.max(0,
 renderer.setAnimationLoop(() => { const dt = clampN(clock.getDelta(), 0, 0.05), vr = renderer.xr.isPresenting; frameN++; T += dt;
   let mx = 0, my = 0, up = 0, run = false;
   if (vr) { const s = renderer.xr.getSession(); for (const src of s ? s.inputSources : []) { const gp = src.gamepad; if (!gp) continue; const a = gp.axes, ax = a.length >= 4 ? 2 : 0, b = gp.buttons; const edge = (k, on) => { const r = on && !prevB[k]; prevB[k] = on; return r; };
-      if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; run = !!b[0]?.pressed; if (edge("x", b[4]?.pressed)) tagsOn = !tagsOn; if (edge("y", b[5]?.pressed)) figLines.visible = !figLines.visible; if (edge("ls", b[3]?.pressed)) seated = !seated;
+      if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; run = !!b[0]?.pressed; if (edge("x", b[4]?.pressed)) tagsOn = !tagsOn; if (edge("y", b[5]?.pressed)) figLines.visible = !figLines.visible; if (edge("ls", b[3]?.pressed)) setSeated(!seated);
         if (riding && riding.v === 0 && riding.s < 1) { if (Math.abs(mx) > 0.7 && !prevB.ch) { choose(Math.sign(mx)); prevB.ch = true; } else if (Math.abs(mx) < 0.3) prevB.ch = false; } }
       else { const tx = a[ax] || 0, ty = a[ax + 1] || 0; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; if (flying && Math.abs(ty) > 0.2) up = -ty;
         if (edge("a", b[4]?.pressed) || edge("tr", b[0]?.pressed)) use(); if (edge("b", b[5]?.pressed)) toggleFly(); } } }
@@ -231,6 +300,7 @@ renderer.setAnimationLoop(() => { const dt = clampN(clock.getDelta(), 0, 0.05), 
     else if (mx || my) { const h = groundAt(nx, nz, ME.y); if (h !== null && Math.abs(h - ME.y) < 1.5) { ME.x = nx; ME.z = nz; ME.y = h; } else { const hx = groundAt(nx, ME.z, ME.y), hz = groundAt(ME.x, nz, ME.y); if (hx !== null && Math.abs(hx - ME.y) < 1.5) { ME.x = nx; ME.y = hx; } else if (hz !== null && Math.abs(hz - ME.y) < 1.5) { ME.z = nz; ME.y = hz; } } } }
   const lift = vr && seated ? 0.45 : 0; rig.position.set(ME.x, ME.y + lift, ME.z); rig.rotation.set(0, vr ? vrYaw + heading : heading, 0); if (!vr) { camera.position.set(0, riding ? riding.eye : 1.6, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
   for (const b of BEACONS) b.material.opacity = 0.7 + 0.3 * Math.sin(T * 2.5);
+  if (started && !riding) { camera.getWorldPosition(_cp); if (viewing && viewing.eye.distanceTo(_cp) > (viewing.auto ? 0.4 : 2.5)) closeView(); if (vr && !viewing) { const S = nearScope(0.22); if (S && S.kind === "light") { showView(S); S.auto = true; } } }
   updateTags();
   if (frameN % 10 === 0) { camera.getWorldPosition(_cp); const dSun = _cp.distanceTo(SUN); let near = null, nd = 1e9; for (const S of STARS) { const d = _cp.distanceToSquared(S.p); if (d < nd) { nd = d; near = S; } } nd = Math.sqrt(nd);
     const v = riding ? Math.abs(riding.v) : flying ? FLY[flySpeedI] : 3, how = riding ? (riding.name === "car" ? "Driving" : "Cycling") + " to " + pathsOf(riding)[riding.P].name : flying ? "Flying" : "Walking";
