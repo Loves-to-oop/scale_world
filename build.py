@@ -745,7 +745,7 @@ ES = ES[:i0] + """<div id="intro"><div class="card">
   In VR point your stick at a line and pull the trigger; <b>A</b> or <b>X</b> pauses and brings the menu back. Right stick up/down: the
   stick's angle in your hand; left stick: step; right stick left/right: turn; click the left stick: seated.</p>
   <p>On a computer (for trying it out): click the menu &nbsp;·&nbsp; the mouse moves the stick &nbsp;·&nbsp; <kbd>space</kbd> pause / menu &nbsp;·&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> step &nbsp;·&nbsp; arrows turn</p>
-  <p class="dim">Not a substitute for a teacher or a live partner: the partner's attacks follow the angles but not any school's exact form.
+  <p class="dim">Unofficial: not affiliated with or endorsed by Eskabo Daan or the Cabales family. Not a substitute for a teacher or a live partner: the partner's attacks follow the angles but not any school's exact form.
   Click to begin.</p>
 </div></div>
 """ + ES[i1:]

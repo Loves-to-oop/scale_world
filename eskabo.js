@@ -101,7 +101,7 @@ function playerTarget(i, F) { const h = PB.head, s = PB.s, R = PB.r, L = R.clone
   switch (i) { case 1: t.addScaledVector(L, 0.08); break; case 2: t.addScaledVector(R, 0.08); break; case 3: t.addScaledVector(UP, -0.42 * s).addScaledVector(L, 0.24); break; case 4: t.addScaledVector(UP, -0.42 * s).addScaledVector(R, 0.24); break;
     case 5: case 13: t.addScaledVector(UP, -0.62 * s).addScaledVector(tw, 0.1); break; case 6: t.addScaledVector(UP, -0.36 * s).addScaledVector(L, 0.1).addScaledVector(tw, 0.1); break; case 7: t.addScaledVector(UP, -0.36 * s).addScaledVector(R, 0.1).addScaledVector(tw, 0.1); break;
     case 8: t.set(h.x, FLOOR_Y + 0.5 * s, h.z).addScaledVector(R, 0.12).addScaledVector(tw, 0.04); break; case 9: t.set(h.x, FLOOR_Y + 0.5 * s, h.z).addScaledVector(L, 0.12).addScaledVector(tw, 0.04); break;
-    case 10: t.addScaledVector(L, 0.035).addScaledVector(tw, 0.07); break; case 11: t.addScaledVector(R, 0.035).addScaledVector(tw, 0.07); break; case 12: t.addScaledVector(UP, 0.1); break; case 14: t.addScaledVector(tw, 0.08).addScaledVector(UP, -0.04); break; case 15: t.addScaledVector(UP, -0.55 * s).addScaledVector(tw, 0.12); break; }
+    case 10: t.addScaledVector(L, 0.035).addScaledVector(tw, 0.07); break; case 11: t.addScaledVector(R, 0.035).addScaledVector(tw, 0.07); break; case 12: t.addScaledVector(UP, 0.1); break; case 14: t.addScaledVector(tw, 0.08).addScaledVector(UP, -0.04); break; case 15: t.addScaledVector(UP, -0.55 * s).addScaledVector(tw, 0.12); break; case 16: t.copy(handPos(mainSide())); break; }
   return t; }
 // your volumes: head, torso, legs, and both hands (a struck hand is the commonest hit in stick fighting)
 function playerVolumes() { const v = [{ a: PB.head.clone().addScaledVector(PB.f, -0.04), b: null, r: 0.11, n: "head" }, { a: PB.neck, b: PB.hips, r: 0.16, n: "body" }];
@@ -121,7 +121,9 @@ const ANG = [null,
   { n: "dagger thrust", k: "t", left: true, ch: [0.05, -0.45, -0.05] }];
 const PUNCH = { jab: { n: "jab", k: "p", left: true, tgt: 14, ch: [0.05, -0.02, 0.12] }, cross: { n: "cross", k: "p", tgt: 14, ch: [-0.05, -0.02, 0.05] }, hook: { n: "hook", k: "s", tgt: 1, hookP: true, ch: [0.25, -0.05, 0.1], cd: [0.4, 0.3, 0.2] }, body: { n: "body shot", k: "p", tgt: 15, ch: [0.0, -0.25, 0.05] }, lbody: { n: "body shot", k: "p", left: true, tgt: 15, ch: [0.0, -0.25, 0.08] } };
 const NUMW = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "dagger"];
-const SPEEDS = [[0.35, "very slow"], [0.55, "slow"], [0.75, "medium"], [1.0, "fast"], [1.2, "full speed"]], BLOCKP = [0.3, 0.45, 0.6, 0.75, 0.85], REACT = [0.3, 0.22, 0.15, 0.09, 0.05];
+const SPEEDS = [[0.35, "very slow"], [0.55, "slow"], [0.75, "medium"], [1.0, "fast"], [1.2, "full speed"], [1.4, "master"]], BLOCKP = [0.3, 0.45, 0.6, 0.75, 0.85, 0.93], REACT = [0.3, 0.22, 0.15, 0.09, 0.05, 0.03];
+// master: fastest, blocks nearly everything, counters every block, feints, attacks your stick hand and whatever you leave open
+const MASTER = () => speedI === SPEEDS.length - 1;
 const MODES = ["Angles 1 to 12", "Random angles", "Your strikes", "Sparring", "Combat"];
 const ATTW = ["sticks", "knives", "empty hands", "mixed"];
 let modeI = 0, speedI = 1, running = false, nAtt = 2, attW = 0;
@@ -169,6 +171,8 @@ function deflect(F, normal) { F.st = "deflect"; F.t = 0; F.dur = 0.3; F.fromH.co
   F.defH = (left ? F.handL : F.hand).clone().addScaledVector(normal, 0.14).addScaledVector(F.f, -0.08); F.defD = slerpDir(left ? F.dirL : F.dir, UP, 0.5); }
 // what an attacker throws next
 function chooseAttack(F) { const w = F.weapon;
+  if (MASTER() && w !== "hand") { const hi = handPos(mainSide()).y > PB.head.y - 0.3, r = Math.random(); if (r < 0.35) return [{ n: "your stick hand", k: "s", tgt: 16, ch: ANG[1].ch, cd: ANG[1].cd }, { ...ANG[hi ? 5 : 1], idx: hi ? 5 : 1 }];
+    const open = hi ? [5, 8, 9, 3, 4] : [1, 2, 12, 10, 11]; return [0, 1, 2].slice(0, 1 + Math.floor(Math.random() * 3)).map(() => { const i = open[Math.floor(Math.random() * open.length)]; return { ...ANG[i], idx: i }; }).filter(a => !(seated && (a.idx === 8 || a.idx === 9))); }
   if (w === "hand") { const c = [["jab", "cross"], ["jab", "jab", "cross"], ["cross", "hook"], ["jab", "body"], ["lbody", "hook"], ["jab", "cross", "hook"]][Math.floor(Math.random() * 6)]; return c.map(k => PUNCH[k]); }
   const combos = w === "knife" ? [[5], [1, 5], [2], [6], [7, 1], [10], [3, 4], [5, 5]] : [[1], [2], [1, 2], [1, 5], [12], [3, 4], [1, 2, 12], [8], [9, 2], [5], [10], [4, 1], [1, 9]];
   let c = combos[Math.floor(Math.random() * combos.length)].filter(i => !(seated && (i === 8 || i === 9))); if (!c.length) c = [1]; const out = c.map(i => ({ ...ANG[i], idx: i })); if (F.off === "knife" && Math.random() < 0.35) out.push({ ...ANG[13], idx: 13 }); return out; }
@@ -188,7 +192,8 @@ function aiUpdate(F, dt, others) { const spd = SPEEDS[speedI][0], G = guardPose(
         else if (modeI === 3 || combat) { const striking = others.filter(o => o !== F && (o.st === "chamber" || o.st === "strike")).length; if (combat && striking >= 2) F.wait = 0.15; else { if (!F.queue.length) F.queue = chooseAttack(F); startAttack(F, F.queue.shift()); F.wait = F.queue.length ? 0.04 : combat ? (0.35 + Math.random() * 0.9) / spd : (0.8 + Math.random() * 1.6) / spd; } } } } }
   else if (F.st === "chamber") { const P = F.plan; planGeometry(F); const u = ease(Math.min(1, F.t / F.dur));
     if (P.left) { F.handL.lerpVectors(F.fromHL, P.Hch, u); F.dirL.copy(slerpDir(F.fromDL, P.chD, u)); } else { F.hand.lerpVectors(F.fromH, P.Hch, u); F.dir.copy(slerpDir(F.fromD, P.chD, u)); }
-    if (F.t >= F.dur) { F.st = "strike"; F.t = 0; F.dur = (P.A.k === "p" ? 0.14 : 0.2) / spd; } }
+    if (F.t >= F.dur && MASTER() && !P.feint && P.A.k !== "p" && modeI >= 3 && Math.random() < 0.25) { P.feint = true; const opp = { 1: 8, 2: 9, 3: 12, 4: 12, 5: 1, 6: 2, 7: 1, 8: 2, 9: 1, 10: 5, 11: 5, 12: 5 }[P.A.idx] || 5; P.A = { ...ANG[opp], idx: opp }; P.i = opp; F.t = 0; F.dur = 0.12 / spd; F.fromH.copy(F.hand); F.fromD.copy(F.dir); F.fromHL.copy(F.handL); F.fromDL.copy(F.dirL); }
+    else if (F.t >= F.dur) { F.st = "strike"; F.t = 0; F.dur = (P.A.k === "p" ? 0.14 : 0.2) / spd; } }
   else if (F.st === "strike") { const P = F.plan, u = Math.min(1, F.t / F.dur), c = 0.55; let h, dd; lungeT = Math.sin(Math.PI * Math.min(1, u * 1.3)) * (F.weapon === "stick" ? 0.22 : 0.15);
     if (u < c) { const w = ease(u / c); h = V3().lerpVectors(P.Hch, P.Hc, w); dd = slerpDir(P.chD, P.cD, w); } else { const w = (u - c) / (1 - c); h = V3().lerpVectors(P.Hc, P.Hf, w); dd = slerpDir(P.cD, P.fD, w); }
     if (P.left) { F.handL.copy(h); F.dirL.copy(dd); } else { F.hand.copy(h); F.dir.copy(dd); }
@@ -199,7 +204,7 @@ function aiUpdate(F, dt, others) { const spd = SPEEDS[speedI][0], G = guardPose(
     let bd = V3().crossVectors(F.threatV || UP, F.f); if (bd.lengthSq() < 1e-8) bd.copy(dirW(F, 0.3, 1, 0.2)); bd.normalize(); if (bd.dot(UP) < -0.2) bd.negate();
     const center = Tp.clone().addScaledVector(side, 0.2).addScaledVector(F.f, 0.1), h = F.weapon === "stick" ? center.clone().addScaledVector(bd, -0.2) : center.clone().addScaledVector(F.f, -0.02); const k = 1 - Math.exp(-dt * 30); F.hand.lerp(h, k); F.dir.copy(slerpDir(F.dir, bd, k)); F.blockT -= dt;
     if (F.off === "hand" || F.weapon === "hand") F.handL.lerp(F.weapon === "hand" ? L2W(F, F.shL, 0.12, 0.12, 0.18) : handPos(mainSide()).lerp(F.shL, 0.3), 1 - Math.exp(-dt * 12));
-    if (F.blockT <= 0) { toRecover(F, 0.22 / spd); if ((modeI === 3 && Math.random() < 0.55) || (combat && Math.random() < 0.7)) { F.st = "guard"; F.queue = chooseAttack(F).slice(0, 1); F.wait = 0.05; } } }
+    if (F.blockT <= 0) { toRecover(F, 0.22 / spd); if ((modeI === 3 && Math.random() < (MASTER() ? 0.95 : 0.55)) || (combat && Math.random() < (MASTER() ? 0.95 : 0.7))) { F.st = "guard"; F.queue = chooseAttack(F).slice(0, 1); F.wait = MASTER() ? 0.0 : 0.05; } } }
   // defending: when your weapon comes in fast, block (or not), after a human reaction time
   if (F.noBlock > 0) F.noBlock -= dt;
   if ((modeI >= 2) && running && (F.st === "guard" || F.st === "recover") && F.blockIn < 0 && !(F.noBlock > 0)) { for (const which of ["main", "off"]) { const S = WS[which]; if (S.v < KIND[kindOf(which)].need) continue; const v = V3().subVectors(S.b, S.pb).divideScalar(Math.max(dt, 1e-3)), to = V3().subVectors(F.chest, S.b), dist = to.length();
