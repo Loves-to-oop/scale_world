@@ -14,14 +14,15 @@
 </style></head><body>
 <div id="intro"><div class="card">
   <h1>The shore of Ligeia Mare, Titan</h1>
-  <p>Saturn's largest moon, 73 degrees north, in 2026. You stand on the southern shore of Ligeia Mare, a sea of liquid methane larger than
+  <p>Saturn's largest moon, 73 degrees north, in late 2144. You are the software engineer of a small science base on the southern shore of Ligeia Mare, a sea of liquid methane larger than
   Lake Superior, beside the mouth of Vid Flumina, a river that runs 400 km through canyons half a kilometre deep. The air is four times as
   thick as Earth's and 94 K (-179 C); gravity is a seventh of Earth's; the light, through orange haze, a thousandth of a sunny day.
   Rounded cobbles of water ice lie on the dark shore, as the Huygens probe saw them.</p>
   <p>Walk the shore, climb the hills, jump, bound along, look out over the still, mirror-flat sea. Walk into it and you sink: it is half as
   dense as you.</p>
   <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>shift</kbd> bound &nbsp;&middot;&nbsp; <kbd>space</kbd> jump &nbsp;&middot;&nbsp; <kbd>E</kbd> info on what you look at, or get in/out of the rover &nbsp;&middot;&nbsp; <kbd>L</kbd> labels &nbsp;&middot;&nbsp; <kbd>G</kbd> wind and waves &nbsp;&middot;&nbsp; <kbd>H</kbd> readout &nbsp;&middot;&nbsp; <kbd>R</kbd> back to the start<br>
-  In VR: left stick walk (left trigger bounds), right stick turn, <b>B</b> jump, <b>A</b> or right trigger: info, or get in/out of the rover, <b>X</b> labels, <b>Y</b> wind and waves</p>
+  <kbd>M</kbd> sitting / standing<br>
+  In VR: left stick walk (left trigger bounds), right stick turn, <b>B</b> jump, <b>A</b> or right trigger: info, hatches, rover, <b>X</b> labels, <b>Y</b> wind and waves, click the left stick: sitting / standing</p>
   <p class="dim">The sea, its depth and the canyon's size are Cassini's measurements; the shore is the Huygens landing site's; the ground between
   is generated to match Cassini's radar maps, which show nothing smaller than about 300 m. Click to begin.</p>
 </div></div>
@@ -53083,7 +53084,8 @@ const THREE = {ACESFilmicToneMapping, AddEquation, AddOperation, AdditiveAnimati
 // winds are light. The shore underfoot follows the Huygens probe's pictures from its landing site: rounded cobbles of water ice a few
 // centimetres across on dark, damp, sandy ground. The air: 1.47 bar, 94 K (-179 C), mostly nitrogen, four times as dense as the air at
 // sea level on Earth; gravity 1.352 m/s2 (0.14 g); daylight about a thousandth of Earth's, orange, from a sky of haze in which the Sun
-// is only a brighter glow and Saturn cannot be seen. It is 2026, a year and a half after the equinox: at 73 N the Sun stands at most
+// is only a brighter glow and Saturn cannot be seen. It is late 2144, a year and a half after a northern autumn equinox (they come every
+// 29.5 years: 2025, 2055 ... 2143): at 73 N the Sun stands at most
 // about 12 degrees up. The ground beyond what Cassini resolved (its radar saw 300 m at best) is generated, in keeping with those maps.
 const IS_HEADSET = /OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent);
 const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
@@ -53231,7 +53233,7 @@ function updateReflection() { const cam = renderer.xr.isPresenting ? renderer.xr
 // A person in a suit (say 110 kg) who jumps as hard as on Earth leaves the ground at about 2.6 m/s and rises more than 2 m, coming down
 // after nearly four seconds; the dense air drags a little (it would carry a winged person aloft). The sea is about half as dense as you:
 // walk in and you sink, slowly, to the bottom, where you can wade on, weighing half as much again less; moving through the liquid is slow.
-const CDA = 0.8, MASS = 110, keys = {}, prevB = {}; let yaw = -1.2, pitch = -0.02, vrYaw = -1.2, started = false, factI = -1, hud = true, msgT = 0, walked = 0;
+const CDA = 0.8, MASS = 110, keys = {}, prevB = {}; let seated = false, yaw = -1.2, pitch = -0.02, vrYaw = -1.2, started = false, factI = -1, hud = true, msgT = 0, walked = 0;
 const surfaceAt = (x, z) => land(x, z) - ((x - ME.x) ** 2 + (z - ME.z) ** 2) / (2 * R_T);
 // the start: on the shore west of the canyon's mouth, a couple of metres above the liquid, looking north across the sea
 { let x = 450, z = -5000; while (z < 5000 && land(x, z) < 2.2) z += 2; ME.x = x; ME.z = z; ME.y = land(ME.x, ME.z); ME.x0 = ME.x; ME.z0 = ME.z; }
@@ -53240,7 +53242,7 @@ const FACTS = [
   "<b>Vid Flumina</b>, the river to your east, flows into the sea's southern shore here, straight along faults for more than 400 km through canyons about a kilometre wide and up to 570 m deep, with walls of about 40 degrees. Cassini's altimeter found the liquid in the canyon at the same level as the sea. The coast around is \"crenulated\": hummocky, eroded ground with bays that are drowned river mouths.",
   "<b>The gravity</b> is 1.35 m/s2, a seventh of Earth's. Jump (space, or B in VR): you rise over 2 m and hang in the air nearly four seconds. Walking is a loping bound.",
   "<b>The air</b> is 1.47 bar, nearly all nitrogen, at 94 K (-179 C), and four times as dense as Earth's at sea level: you would need warmth and oxygen but no pressure suit. With wings strapped to your arms you could fly.",
-  "<b>The light</b>: the Sun gives Titan a hundredth of Earth's sunlight, and the haze lets through a tenth of that: about 0.1% of a sunny day on Earth, like a heavily overcast day or a well-lit room. Your eyes adapt, as they are shown here. The Sun is only a brighter glow in the orange sky; Saturn, 20 times the Moon's width, cannot be seen through the haze. It is 2026, just after the equinox: here at 73 N the Sun never climbs above about 12 degrees, and a day lasts 16 Earth days.",
+  "<b>The light</b>: the Sun gives Titan a hundredth of Earth's sunlight, and the haze lets through a tenth of that: about 0.1% of a sunny day on Earth, like a heavily overcast day or a well-lit room. Your eyes adapt, as they are shown here. The Sun is only a brighter glow in the orange sky; Saturn, 20 times the Moon's width, cannot be seen through the haze. It is late 2144, a year and a half after a northern autumn equinox (they come every 29.5 years: 2025, 2055 ... 2143): here at 73 N the Sun never climbs above about 12 degrees, and a day lasts 16 Earth days.",
   "<b>The horizon</b> is close: Titan is 5,150 km across, so standing at the shore the sea's horizon is only about 3 km away (on Earth, 5 km). Climb the hills and you see far, until the haze swallows the distance.",
   "<b>The sea</b> is clear liquid methane. It reflects only 1.4% of light straight down (its refractive index is about 1.27), so near your feet you see the dark bottom; farther off, at a glancing angle, it is a mirror. Walk in: being about half as dense as you, it will not hold you up. You sink, and walk on the bottom.",
   "<b>The ground</b> follows the Huygens probe's pictures from its landing site in 2005: rounded cobbles of water ice, frozen hard as rock at this cold, a few centimetres across, lying on dark sandy ground damp with methane. The ground farther off is generated in keeping with Cassini's radar maps, which saw details no smaller than about 300 m."];
@@ -53251,13 +53253,13 @@ vrPanel.position.set(0, -0.42, -0.62); vrPanel.rotation.x = -0.75; vrPanel.rende
 function say(html, secs = 30) { MSG.innerHTML = html; MSG.style.display = "block"; msgT = secs; msgAge = 0; const g = panT.userData.c.getContext("2d"); g.clearRect(0, 0, 1024, 512); g.fillStyle = "rgba(30,18,8,0.9)"; g.fillRect(0, 0, 1024, 512); g.fillStyle = "#f6e6cc"; g.font = "28px sans-serif";
   const words = html.replace(/<[^>]+>/g, "").split(" "); let line = "", y = 48; for (const w of words) { if (g.measureText(line + w).width > 960) { g.fillText(line, 32, y); line = ""; y += 35; if (y > 495) break; } line += w + " "; } if (y <= 495) g.fillText(line, 32, y); panT.needsUpdate = true; vrPanel.visible = renderer.xr.isPresenting; }
 const nextFact = () => { if (typeof ITEMS !== "undefined") { let best = null, bd = 1e9; for (const I of ITEMS) { const d = Math.hypot(ME.x - I.x, ME.z - I.z) - I.r; if (d < 0 && d < bd) { bd = d; best = I; } } if (best) { say(`<b>${best.title}</b><br>${best.text}`, 45); return; } } factI = (factI + 1) % FACTS.length; say(FACTS[factI] + ` <span style="opacity:.6">(${factI + 1}/${FACTS.length}: E for the next)</span>`, 45); };
-addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (e.code === "KeyE") act(); if (e.code === "KeyH") hud = !hud; if (e.code === "KeyL") { tagsOn = !tagsOn; say(tagsOn ? "Labels on (L)." : "Labels off (L)."); } if (e.code === "KeyG") setWind(windI + 1); if (e.code === "KeyR") { ME.x = ME.x0s; ME.z = ME.z0s; ME.y = land(ME.x, ME.z); ME.vx = ME.vz = ME.vy = 0; } });
+addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (e.code === "KeyE") act(); if (e.code === "KeyH") hud = !hud; if (e.code === "KeyM") toggleSeated(); if (e.code === "KeyL") { tagsOn = !tagsOn; say(tagsOn ? "Labels on (L)." : "Labels off (L)."); } if (e.code === "KeyG") setWind(windI + 1); if (e.code === "KeyR") { ME.x = ME.x0s; ME.z = ME.z0s; ME.y = land(ME.x, ME.z); ME.vx = ME.vz = ME.vy = 0; } });
 addEventListener("keyup", e => keys[e.code] = false);
 let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY }; start(); });
 addEventListener("pointermove", e => { if (!drag) return; yaw -= (e.clientX - drag.x) * 0.004; pitch = clampN(pitch - (e.clientY - drag.y) * 0.004, -1.45, 1.45); drag.x = e.clientX; drag.y = e.clientY; }); addEventListener("pointerup", () => drag = null);
 ME.x0s = ME.x; ME.z0s = ME.z;
 function start() { if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); HUD.style.display = "block";
-  say("<b>The southern shore of Ligeia Mare, Titan.</b> A sea of liquid methane stretches north past a horizon only 3 km away; to the east, the canyon of Vid Flumina comes down to the shore. It is 94 K, the air four times as thick as Earth's, gravity a seventh. <b>Space</b> jumps (B in VR), <b>shift</b> bounds, <b>E</b> tells you about what you see (A in VR). Walk into the sea if you like: you will sink.", 35); }
+  say("<b>The southern shore of Ligeia Mare, Titan, late 2144.</b> You are the science base's software engineer; your desk is in the workshop. A sea of liquid methane stretches north past a horizon only 3 km away; to the east, the canyon of Vid Flumina comes down to the shore. It is 94 K, the air four times as thick as Earth's, gravity a seventh. <b>Space</b> jumps (B in VR), <b>shift</b> bounds, <b>E</b> tells you about what you see (A in VR). Walk into the sea if you like: you will sink.", 35); }
 document.getElementById("intro")?.addEventListener("click", start);
 const VRB = document.getElementById("vr");
 if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); await renderer.xr.setSession(s); start(); vrYaw = yaw; }; });
@@ -53353,6 +53355,7 @@ const M_FLOOR = BM(0x5a6068, { roughness: 0.9 }), M_LIGHT = new THREE.MeshStanda
     part(new THREE.BoxGeometry(10, 0.1, 3.5), M_FLOOR, 7.4, FL - 0.05, 0, 0, 0, 0, m); part(new THREE.BoxGeometry(9.4, 0.04, 0.3), M_LIGHT, 7.4, ax + 2.05, 0, 0, 0, 0, m);
     for (const x of [5, 8, 11]) for (const s of [-1, 1]) part(new THREE.CircleGeometry(0.2, 16), M_PORT, x, ax + 0.5, s * 2.1, 0, s > 0 ? Math.PI : 0, 0, m);
     const L = new THREE.PointLight(0xf0f4ff, 9, 10, 1.6); L.position.set(7.4, ax + 1.5, 0); m.add(L);
+    part(new THREE.TorusGeometry(1.15, 0.09, 8, 24).rotateY(Math.PI / 2), M_METAL, 2.45, FL + 1.2, 0, 0, 0, 0, m); part(new THREE.CylinderGeometry(1.1, 1.1, 0.1, 24).rotateZ(Math.PI / 2), M_METAL, 2.95, FL + 1.2, -1.4, 0, -1.2, 0, m);
     const B = (x, y, z, sx, sy, sz, mat) => part(new THREE.BoxGeometry(sx, sy, sz), mat, x, FL + y, z, 0, 0, 0, m);
     if (k === 0) { for (const x of [4.0, 6.3, 8.6]) { for (const y of [0.35, 1.4]) { B(x, y, -1.15, 2.0, 0.08, 0.85, M_METAL); B(x, y + 0.12, -1.15, 1.9, 0.15, 0.8, M_BLUE); B(x - 0.75, y + 0.2, -1.15, 0.35, 0.1, 0.6, M_WHITE); } B(x, 1.0, -0.72, 2.0, 2.0, 0.02, BM(0x6a7a9a, { transparent: true, opacity: 0.6 })); }
       B(10.7, 0.75, 0.4, 1.3, 0.05, 0.9, M_BENCH); B(10.7, 0.37, 0.4, 0.1, 0.74, 0.1, M_METAL); for (const [dx, dz] of [[-0.6, -0.5], [0.6, -0.5], [-0.6, 1.2], [0.6, 1.2]]) B(10.7 + dx, 0.25, 0.4 + dz * 0.6, 0.35, 0.5, 0.35, M_METAL);
@@ -53374,8 +53377,26 @@ const M_FLOOR = BM(0x5a6068, { roughness: 0.9 }), M_LIGHT = new THREE.MeshStanda
   const NL = new THREE.PointLight(0xf0f4ff, 7, 8, 1.6); NL.position.set(0, H + 2.6, 0); g.add(NL);
   for (const s of [-1, 1]) part(new THREE.PlaneGeometry(2.4, 2.4), M_PANEL, s * 1.0, FL + 1.2, 3.4, 0, s * Math.PI / 2, 0, g); part(new THREE.PlaneGeometry(2.0, 2.4), M_PANEL, 0, FL + 2.4, 3.4, -Math.PI / 2, 0, 0, g); part(new THREE.BoxGeometry(2.0, 0.08, 2.4), M_FLOOR, 0, FL - 0.04, 3.4, 0, 0, 0, g);
   for (const s of [-1, 1]) part(new THREE.BoxGeometry(0.5, 2.0, 0.5), M_ORANGE, s * 0.7, FL + 1.0, 3.6, 0, 0, 0, g); }
-// the airlock's outer door slides aside as you come near
+// the airlock: cycled by hand (E, or A in VR). Outer hatch open, step in, close it; the cold nitrogen and methane that came in with you are
+// purged and the air warmed (methane mixing with the habitat's oxygen could burn or explode, so nothing opens until the purge is done);
+// then the inner hatch opens to the node. Going out, the same backwards. (Shortened here: a real cycle would take a few minutes.)
+// The habitat is held at Titan's own pressure, 1.5 bar, with normal oxygen: the hull barely strains, a gift of Titan's thick air.
 const DOOR = HAB.children.find(o => o.geometry && o.geometry.parameters && o.geometry.parameters.width === 1.2 && o.geometry.parameters.height === 1.9); if (DOOR) DOOR.userData.x0 = DOOR.position.x;
+const IDOOR = part(new THREE.BoxGeometry(1.2, 1.9, 0.08), M_ORANGE, 0, FL + 0.95, 2.25, 0, 0, 0, HAB); IDOOR.userData.x0 = 0;
+const AL = { outer: 0, inner: 1, busy: 0, step: "", after: null };
+const alTex = (() => { const c = document.createElement("canvas"); c.width = 256; c.height = 128; const t = new THREE.CanvasTexture(c); t.userData.c = c; t.colorSpace = THREE.SRGBColorSpace; return t; })();
+part(new THREE.PlaneGeometry(0.5, 0.25), new THREE.MeshBasicMaterial({ map: alTex, toneMapped: false }), -0.98, FL + 1.5, 3.4, 0, Math.PI / 2, 0, HAB);
+function alPanel(lines, col = "#7ae0a0") { const g = alTex.userData.c.getContext("2d"); g.fillStyle = "#0a1410"; g.fillRect(0, 0, 256, 128); g.fillStyle = col; g.font = "bold 20px monospace"; lines.forEach((l, i) => g.fillText(l, 10, 30 + i * 30)); alTex.needsUpdate = true; }
+alPanel(["AIRLOCK", "inner open", "outer closed"]);
+function alRun(steps) { AL.busy = 1; let t = 0; for (const [dt, fn] of steps) { t += dt; setTimeout(fn, t * 1000); } setTimeout(() => AL.busy = 0, (t + 0.2) * 1000); }
+const zoneOf = (lx, lz) => Math.abs(lx) < 0.9 && lz > 2.25 && lz < 4.6 ? "lock" : inHab(lx, lz) ? "hab" : "out";
+function airlockAct() { if (AL.busy) { say("The airlock is cycling: wait."); return true; } const [lx, lz] = habLocal(ME.x, ME.z), z = insideHab() || onStairs(lx, lz) ? zoneOf(lx, lz) : "far";
+  if (z === "far") return false; const nearOuter = z === "out" && lz < 6.5, nearInner = z === "hab" && Math.hypot(lx, lz - 2.25) < 2.0;
+  if (z === "lock") { if (AL.outer > 0.5) { say("Closing the outer hatch. Purging the methane and nitrogen that came in with you, and warming the air..."); alRun([[0, () => { AL.outer = 0; alPanel(["CYCLING", "outer closed", "purge CH4 2.1%"], "#ffc060"); }], [2.5, () => alPanel(["CYCLING", "purge CH4 0.4%", "temp -40 C"], "#ffc060")], [2.5, () => alPanel(["CYCLING", "CH4 <0.01%", "temp 18 C"], "#ffc060")], [1.5, () => { AL.inner = 1; alPanel(["READY", "inner open", "1.47 bar"]); say("Purge done: the inner hatch opens to the node. Inside the air is held at Titan's own 1.5 bar, so the hull barely strains."); }]]); }
+    else { say("Closing the inner hatch. The outer hatch opens: 94 K and 1.47 bar of nitrogen outside."); alRun([[0, () => { AL.inner = 0; alPanel(["CYCLING", "inner closed", "suits sealed?"], "#ffc060"); }], [2.0, () => { AL.outer = 1; alPanel(["OUTER OPEN", "-179 C outside", "1.47 bar"], "#ff8060"); }]]); } return true; }
+  if (nearOuter && AL.outer < 0.5) { if (AL.inner > 0.5) { AL.inner = 0; } say("The outer hatch opens. Step into the airlock, then E (A) to cycle it."); AL.outer = 1; alPanel(["OUTER OPEN", "-179 C outside", "1.47 bar"], "#ff8060"); return true; }
+  if (nearInner && AL.inner < 0.5) { if (AL.outer > 0.5) { say("The outer hatch is open: step into the airlock and cycle it first."); return true; } AL.inner = 1; alPanel(["READY", "inner open", "1.47 bar"]); say("The inner hatch opens. Step into the airlock, then E (A) to cycle out."); return true; }
+  return false; }
 // where you can stand inside, in the habitat's own frame (x, z): the node, the airlock, the modules, the stairs
 const habLocal = (x, z) => { const dx = x - SITE.x, dz = z - SITE.z, c = Math.cos(HAB_RY), s = Math.sin(HAB_RY); return [dx * c - dz * s, dx * s + dz * c]; };
 function inHab(lx, lz) { if (lx * lx + lz * lz < 2.3 * 2.3) return true; if (Math.abs(lx) < 0.9 && lz > 1.8 && lz < 4.6) return true;
@@ -53580,12 +53601,38 @@ tag(() => V3(RV.x - ME.x0, (RV.y ?? land(RV.x, RV.z)) + 4.8, RV.z - ME.z0), "Pre
 { const lm = { x: S0.x, z: S0.z - 2600 }; tag(() => V3(lm.x - ME.x0, 25, lm.z - ME.z0), "Ligeia Mare", "a sea of liquid methane, 420 by 350 km", FACTS[0], 60000); }
 { const cx = CANYON.x0 + CANYON.dx * 1800, cz = CANYON.z0 + CANYON.dz * 1800; tag(() => V3(cx - ME.x0, land(cx, cz) + 60, cz - ME.z0), "Vid Flumina", "a river 400 km long, in a canyon 1 km wide", FACTS[1], 60000); }
 const _cd = V3(0, 0, 0), _cp = V3(0, 0, 0);
-function updateTags() { camera.getWorldPosition(_cp); for (const T of TAGS) { const p = T.get(), d = p.distanceTo(_cp); T.sp.visible = tagsOn && d < T.maxD && d > 1.2 && (T.indoor === undefined || T.indoor === insideHab()); if (!T.sp.visible) continue; T.sp.position.copy(p); const w = clampN(d * 0.12, 0.7, 900); T.sp.scale.set(w, w / 4, 1);
+function updateTags() { camera.getWorldPosition(_cp); for (const T of TAGS) { const p = T.get(), d = p.distanceTo(_cp); T.sp.visible = tagsOn && d < T.maxD && d > (T.indoor ? 0.5 : 1.2) && (T.indoor === undefined || T.indoor === insideHab()); if (!T.sp.visible) continue; T.sp.position.copy(p); const w = clampN(d * 0.12, 0.7, 900); T.sp.scale.set(w, w / 4, 1);
     const ds = d < 1000 ? Math.round(d / (d < 100 ? 1 : 10)) * (d < 100 ? 1 : 10) + " m" : (d / 1000).toFixed(1) + " km", sub = (T.sub ? T.sub + " · " : "") + ds; if (sub !== T.last) { T.last = sub; T.sp.material.map.dispose(); T.sp.material.map = tagTex(T.title, sub); } } }
 function lookedAt() { camera.getWorldDirection(_cd); camera.getWorldPosition(_cp); let best = null, ba = 0.07; for (const T of TAGS) { if (!T.sp.visible) continue; const v = T.sp.position.clone().sub(_cp), d = v.length(), a = v.normalize().angleTo(_cd); if (a < ba + 0.5 / d) { ba = a; best = T; } } return best; }
 
+// sitting or standing (M, or click the left stick in VR): if you play seated, your eyes are lower, so the world is raised to meet them, to
+// standing height outside and to the windscreen in the rover's cab
+function toggleSeated() { seated = !seated; say(seated ? "<b>Sitting mode</b>: your view is raised about 45 cm, to standing height outside and to the windscreen in the rover. (M, or click the left stick, for standing.)" : "<b>Standing mode</b>: your own height. (M, or click the left stick, for sitting.)", 8); }
+
+// ---------- your desk: you are the base's software engineer ----------
+// A real crew this small would have someone who writes and keeps the software: every system here runs on it, and Earth is more than an hour
+// away by signal, too far to help when something breaks. Most of the work would be in C, C++ and Rust (memory-safe, now used in spacecraft),
+// on radiation-tolerant computers, inside a flight-software framework like NASA's F Prime; Python for the science data; a little hardware
+// description for the instruments' FPGAs; assembly almost never. The code assistant would be a model running on the base's own computers:
+// no cloud an hour and a half away.
+const deskTex = (() => { const c = document.createElement("canvas"); c.width = 1024; c.height = 512; const g = c.getContext("2d"); g.fillStyle = "#0e1418"; g.fillRect(0, 0, 1024, 512); g.font = "18px monospace";
+  const L = [["#7a8a9a", "// rover/traction.rs  -  tuned for 0.14 g, organic sand at 94 K"], ["#c8a0e8", "pub fn wheel_torque(&mut self, slip: f32, load_n: f32) -> f32 {"], ["#e8e4dc", "    let mu = self.surface.friction(); // ~0.35 on damp tholin sand"],
+    ["#e8e4dc", "    let max = mu * load_n;            // 110 kg x 1.352 m/s2 / 6 wheels"], ["#e8e4dc", "    self.pid.update(slip - TARGET_SLIP).clamp(-max, max)"], ["#c8a0e8", "}"], ["#7a8a9a", ""],
+    ["#7a8a9a", "// seismo/filter.rs  -  tidal flexing every 15.95 days, notch it out"], ["#c8a0e8", "const TIDE_PERIOD_S: f64 = 15.945 * 86_400.0;"], ["#7a8a9a", ""],
+    ["#9ae8a0", "$ cargo test --release --target rad750-titan"], ["#9ae8a0", "running 214 tests ... ok. 0 failed"], ["#ffd070", "uplink queue: 3 bundles, next window 14:20  (light time 79 min)"]];
+  L.forEach(([c2, t], i) => { g.fillStyle = c2; g.fillText(t, 20, 34 + i * 34); });
+  g.fillStyle = "#1a2a3a"; g.fillRect(700, 300, 310, 200); g.fillStyle = "#9ad0ff"; g.font = "15px sans-serif"; ["assistant (local model, offline)", "Suggest: clamp the slip target lower", "below 2 km/h; the sand shears at", "low load. Want a test for it?"].forEach((t, i) => g.fillText(t, 712, 326 + i * 26));
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+{ const m = new THREE.Group(); m.rotation.y = MODS[2]; HAB.add(m); const B = (x, y, z, sx, sy, sz, mat) => part(new THREE.BoxGeometry(sx, sy, sz), mat, x, FL + y, z, 0, 0, 0, m);
+  B(8.6, 0.74, -1.25, 1.5, 0.05, 0.7, M_BENCH); B(8.6, 0.37, -1.25, 0.06, 0.72, 0.06, M_METAL); part(new THREE.PlaneGeometry(1.2, 0.6), new THREE.MeshBasicMaterial({ map: deskTex, toneMapped: false }), 8.6, FL + 1.25, -1.5, 0, 0, 0, m);
+  B(8.6, 0.78, -1.15, 0.5, 0.02, 0.18, M_DARK); B(8.6, 0.25, -0.65, 0.5, 0.5, 0.5, M_BLUE); B(8.05, 1.25, -1.48, 0.12, 0.12, 0.01, BM(0xf0e070)); }
+{ const [plx, plz] = modPos(2, 8.6, -0.6), c = Math.cos(HAB_RY), sn = Math.sin(HAB_RY), dw = { x: SITE.x + plx * c + plz * sn, z: SITE.z - plx * sn + plz * c }; ITEMS.push({ x: dw.x, z: dw.z, r: 2.5, title: "Your desk", text: "You are the base's software engineer. Every system here runs on code you look after: the life support, the reactor's controls, the airlock's purge interlocks, the rover's traction control (rewritten for a seventh of Earth's gravity), the drone's autonomy (it flies itself: Earth is 70-90 minutes away by signal), and the pipelines that turn the instruments' data into science. Most of it is C, C++ and Rust, built in a flight-software framework like NASA's F Prime and run on radiation-tolerant computers; Python for the science; hardware description for the instruments' FPGAs; assembly almost never. Your code assistant is a model running on the base's own computers, with no cloud to call. Nothing ships without tests: a bug in the airlock could kill." }); } { const I = ITEMS[ITEMS.length - 1], T = tag(() => V3(I.x - ME.x0, HAB.userData.y + FL + 1.65, I.z - ME.z0), "Your desk", "software engineering", `<b>${I.title}</b><br>${I.text}`, 40); T.indoor = true; }
+FACTS.push("<b>Who would be here?</b> A first base would hold few people, each with two jobs. Most would be scientists: geologists above all (Titan is a world of geology), a limnologist for the seas, a geophysicist for the deep ocean, an astrobiologist and organic chemist, an atmospheric scientist. Then the people who keep them alive: engineers for power, fuel, life support and suits, a physician, someone who can fly the lander, and a software engineer: you. Walk up to anyone and press E (A).");
+FACTS.push("<b>Titan's geology</b>: the bedrock is water ice, frozen as hard as granite. On it lie organic sediments that settle out of the haze and wash down rivers: sand, mud, the rounded ice cobbles at your feet. There are river valleys and canyons like Vid Flumina; seas and lakes, some in steep-sided pits that may have formed like limestone sinkholes, dissolved out of the ground; bright evaporite rings where lakes dried up; dunes of organic sand girdling the equator; mountains pushed up by the crust; few impact craters (they are buried or eroded fast); and perhaps ice volcanoes, like Sotra Patera. Few worlds have so many Earth-like landforms made of such unearthly stuff.");
+FACTS.push("<b>Saturn</b>, 20 times the Moon's width, would never be seen from here, and not only because of the haze: Titan always keeps the same face to Saturn, and Ligeia Mare lies on its far side. Saturn sits for ever about 6 degrees below the horizon to the west-northwest. From Titan's Saturn-facing side it would hang motionless in the sky, if the haze ever cleared (it never does, in visible light).");
+
 const groundAt = (x, z, yRef) => { const hf = habFloor(x, z, yRef); return hf === null ? land(x, z) : Math.max(land(x, z), hf); };
-function act() { const door = V3(1.6, 0, -1.4).applyAxisAngle(V3(0, 1, 0), RV.head);
+function act() { const door = V3(1.6, 0, -1.4).applyAxisAngle(V3(0, 1, 0), RV.head); if (!RV.in && airlockAct()) return;
   if (RV.in) { if (Math.abs(RV.v) > 0.3) { say("Stop the rover first (S to brake)."); return; } RV.in = false; const o = door.clone().multiplyScalar(1.9); ME.x = RV.x + o.x; ME.z = RV.z + o.z; ME.y = land(ME.x, ME.z); ME.vx = ME.vz = ME.vy = 0; yaw = RV.head + Math.PI / 2; say("Out of the rover. E beside its orange door to get back in."); return; }
   if (!insideHab() && Math.hypot(ME.x - (RV.x + door.x), ME.z - (RV.z + door.z)) < 3.5) { RV.in = true; yaw = Math.PI; pitch = -0.08; say("In the rover's cab. <b>W</b>/<b>S</b> drive and brake, <b>A</b>/<b>D</b> steer (left stick in VR); top speed about 15 km/h: in a seventh of Earth's gravity the wheels grip weakly. <b>E</b> to get out."); return; }
   if (tagsOn) { const T = lookedAt(); if (T) { say(T.info, 50); return; } }
@@ -53597,7 +53644,7 @@ updateGround(true); fillCobbles(); fillSea(); placeBase(); BASE.traverse(o => o.
 renderer.setAnimationLoop(() => { const dt = clampN(clock.getDelta(), 0, 0.05), vr = renderer.xr.isPresenting; T += dt; frameN++;
   let mx = 0, my = 0, run = false, jump = false;
   if (vr) { const s = renderer.xr.getSession(); for (const src of s ? s.inputSources : []) { const gp = src.gamepad; if (!gp) continue; const a = gp.axes, ax = a.length >= 4 ? 2 : 0;
-      if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; run = !!gp.buttons[0]?.pressed; const bX = gp.buttons[4]?.pressed; if (bX && !prevB.x) { tagsOn = !tagsOn; } prevB.x = bX; const bY = gp.buttons[5]?.pressed; if (bY && !prevB.y) setWind(windI + 1); prevB.y = bY; }
+      if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; run = !!gp.buttons[0]?.pressed; const bX = gp.buttons[4]?.pressed; if (bX && !prevB.x) { tagsOn = !tagsOn; } prevB.x = bX; const bS = gp.buttons[3]?.pressed; if (bS && !prevB.st) toggleSeated(); prevB.st = bS; const bY = gp.buttons[5]?.pressed; if (bY && !prevB.y) setWind(windI + 1); prevB.y = bY; }
       else { const tx = a[ax] || 0; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const bA = gp.buttons[4]?.pressed, bB = gp.buttons[5]?.pressed; if (bA && !prevB.a) act(); prevB.a = bA; const tr = gp.buttons[0]?.pressed; if (tr && !prevB.tr) act(); prevB.tr = tr; if (bB && !prevB.b) jump = true; prevB.b = bB; } } }
   else { if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD || keys.ArrowRight) mx += 1; if (keys.KeyA || keys.ArrowLeft) mx -= 1; run = keys.ShiftLeft || keys.ShiftRight; if (keys.Space) jump = true; }
   // physics: on the ground you push off and steer; in the air only gravity and drag act; in the liquid, buoyancy and heavy drag
@@ -53611,18 +53658,20 @@ renderer.setAnimationLoop(() => { const dt = clampN(clock.getDelta(), 0, 0.05), 
   ME.vy -= gEff * dt; ME.vx -= ME.vx * dragK * dt; ME.vy -= ME.vy * Math.min(1, dragK * dt); ME.vz -= ME.vz * dragK * dt;
   const ox = ME.x, oz = ME.z, [l0x, l0z] = habLocal(ox, oz), wasIn = inHab(l0x, l0z) && ME.y > HAB.userData.y + 2.6 || onStairs(l0x, l0z) && ME.y > land(ox, oz) + 0.3;
   ME.x += ME.vx * dt; ME.z += ME.vz * dt; ME.y += ME.vy * dt; walked += Math.hypot(ME.x - ox, ME.z - oz);
-  { const [lx, lz] = habLocal(ME.x, ME.z); if (wasIn && !inHab(lx, lz) && !onStairs(lx, lz)) { ME.x = ox; ME.z = oz; ME.vx = ME.vz = 0; } if (inH && ME.y > HAB.userData.y + FL + 0.9) { ME.y = HAB.userData.y + FL + 0.9; ME.vy = Math.min(ME.vy, 0); } }
+  { const [lx, lz] = habLocal(ME.x, ME.z); if (wasIn && !inHab(lx, lz) && !onStairs(lx, lz)) { ME.x = ox; ME.z = oz; ME.vx = ME.vz = 0; }
+    if (wasIn || ME.y > HAB.userData.y + 2.6) { const z0 = zoneOf(l0x, l0z), z1 = zoneOf(lx, lz); if (z0 !== z1 && ((z0 === "lock" || z1 === "lock") && (z0 === "out" || z1 === "out") ? AL.outer < 0.9 : AL.inner < 0.9)) { ME.x = ox; ME.z = oz; ME.vx = ME.vz = 0; } } if (inH && ME.y > HAB.userData.y + FL + 0.9) { ME.y = HAB.userData.y + FL + 0.9; ME.vy = Math.min(ME.vy, 0); } }
   for (const c of SOLID) { const dx = ME.x - c.x, dz = ME.z - c.z, d = Math.hypot(dx, dz); if (d < c.r && d > 0.01 && ME.y < land(c.x, c.z) + 12) { ME.x = c.x + dx / d * c.r; ME.z = c.z + dz / d * c.r; } }
   const gN = groundAt(ME.x, ME.z, ME.y - ME.vy * dt); if (ME.y < gN) { if (gN - ME.y > 1.2 && onGround) { ME.x = ox; ME.z = oz; ME.vx *= -0.2; ME.vz *= -0.2; ME.y = groundAt(ox, oz, ME.y + 0.5); } else { ME.y = gN; if (ME.vy < 0) ME.vy = 0; } } }
   // the world is kept near the origin; far moves shift the origin and rebuild the ground
   if (Math.hypot(ME.x - ME.x0, ME.z - ME.z0) > 3000) { ME.x0 = ME.x; ME.z0 = ME.z; updateGround(true); fillCobbles(); fillSea(); placeBase(); BASE.traverse(o => o.layers.enable(1)); }
   else { updateGround(); if (Math.hypot(ME.x - cobC[0], ME.z - cobC[1]) > 6) fillCobbles(); if (Math.hypot(ME.x - seaC[0], ME.z - seaC[1]) > 40) fillSea(); }
-  if (RV.in) { rover.updateMatrixWorld(); rig.position.copy(rover.localToWorld(V3(-0.65, 1.35, 1.45))); rig.rotation.set(0, RV.head + (vr ? vrYaw : 0), 0); } else { rig.position.set(ME.x - ME.x0, ME.y, ME.z - ME.z0); rig.rotation.set(0, vr ? vrYaw : 0, 0); } if (!vr) { camera.position.set(0, 1.6, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
+  const lift = vr && seated ? 0.45 : 0;
+  if (RV.in) { rover.updateMatrixWorld(); rig.position.copy(rover.localToWorld(V3(-0.65, 1.35 + lift, 1.45))); rig.rotation.set(0, RV.head + (vr ? vrYaw : 0), 0); } else { rig.position.set(ME.x - ME.x0, ME.y + lift, ME.z - ME.z0); rig.rotation.set(0, vr ? vrYaw : 0, 0); } if (!vr) { camera.position.set(0, 1.6, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
   sky.position.copy(rig.position);
   // under the surface: a dim brown murk
   const eyeY = ME.y + 1.6, under = eyeY < 0; if (under !== underFog) { underFog = under; scene.fog.density = under ? 0.12 : 1 / 26000; scene.fog.color.copy(under ? new THREE.Color(0.16, 0.1, 0.05) : FOGC); seaU.under.value = under ? 1 : 0; }
   BASE.traverse(o => { if (o.userData.blink) o.material.emissiveIntensity = (T % 2) < 0.15 ? 3 : 0.2; if (o.userData.spin) o.rotation.y += dt * 2.5; });
-  if (DOOR) { const dw = HAB.localToWorld(V3(DOOR.userData.x0, FL, 4.62)), near = Math.hypot(dw.x - rig.position.x, dw.z - rig.position.z) < 4.5; DOOR.position.x += ((near ? DOOR.userData.x0 + 1.3 : DOOR.userData.x0) - DOOR.position.x) * Math.min(1, dt * 3); }
+  if (DOOR) DOOR.position.x += (DOOR.userData.x0 + 1.3 * AL.outer - DOOR.position.x) * Math.min(1, dt * 2); IDOOR.position.x += (1.3 * AL.inner - IDOOR.position.x) * Math.min(1, dt * 2);
   for (const p of CREW) { const [x, y, z, h] = crewPos(p, T); p.at = [x, y, z]; crowd.set(p.i, x, y, z, h, p.kind, T + p.i, p.kind === "walk" ? 1 : 0);
     if (p.name === "Dr. Amara Okafor") { coreTray.position.set(x + Math.sin(h) * 0.7, y + 0.06, z + Math.cos(h) * 0.7); coreTray.rotation.y = h + Math.PI / 2; coreRod.position.copy(coreTray.position).y += 0.1; coreRod.rotation.y = h + Math.PI / 2; }
     if (p.name === "Sofia Lindqvist") { poleM.position.set(x + Math.sin(h) * 1.3, y + 0.9, z + Math.cos(h) * 1.3); poleM.rotation.set(0, h, 0); poleM.rotateX(1.05); } }
@@ -53630,7 +53679,7 @@ renderer.setAnimationLoop(() => { const dt = clampN(clock.getDelta(), 0, 0.05), 
   updateTags();
   { const door = V3(1.6, 0, -1.4).applyAxisAngle(V3(0, 1, 0), RV.head), nearDoor = !RV.in && !insideHab() && Math.hypot(ME.x - (RV.x + door.x), ME.z - (RV.z + door.z)) < 3.5; if (nearDoor && !prevB.door) say(vr ? "<b>A</b> (or the right trigger): get into the rover." : "<b>E</b>: get into the rover.", 6); prevB.door = nearDoor; }
   seaU.t.value = T; if (!under && (!IS_HEADSET || frameN % 2 === 0)) { sea.visible = false; COB.visible = false; updateReflection(); sea.visible = true; COB.visible = true; }
-  if (hud && frameN % 10 === 0) HUD.innerHTML = RV.in ? `In the rover · ${(Math.abs(RV.v) * 3.6).toFixed(1)} km/h<br>W/S drive, A/D steer, E to get out` : insideHab() ? `Inside the habitat · 21 °C, 1 bar of air<br>outside: 94 K (−179 °C), 1.47 bar of nitrogen` : `Ligeia Mare, Titan · 73° N<br>${ME.y >= 0 ? (ME.y < 1000 ? ME.y.toFixed(1) + " m" : (ME.y / 1000).toFixed(2) + " km") + " above the sea" : (-ME.y).toFixed(1) + " m under the surface"} · walked ${walked < 1000 ? Math.round(walked) + " m" : (walked / 1000).toFixed(2) + " km"}<br>gravity 0.14 g · 94 K (−179 °C) · 1.47 bar${ME.y - groundAt(ME.x, ME.z, ME.y) < 0.05 ? "" : " · in the air " + (ME.y - groundAt(ME.x, ME.z, ME.y)).toFixed(1) + " m"}`;
+  if (hud && frameN % 10 === 0) HUD.innerHTML = RV.in ? `In the rover · ${(Math.abs(RV.v) * 3.6).toFixed(1)} km/h<br>W/S drive, A/D steer, E to get out` : insideHab() ? `Inside the habitat · 21 °C, 1.47 bar (matched to outside), 21 kPa of oxygen<br>outside: 94 K (−179 °C), 1.47 bar of nitrogen and methane` : `Ligeia Mare, Titan · 73° N<br>${ME.y >= 0 ? (ME.y < 1000 ? ME.y.toFixed(1) + " m" : (ME.y / 1000).toFixed(2) + " km") + " above the sea" : (-ME.y).toFixed(1) + " m under the surface"} · walked ${walked < 1000 ? Math.round(walked) + " m" : (walked / 1000).toFixed(2) + " km"}<br>gravity 0.14 g · 94 K (−179 °C) · 1.47 bar${ME.y - groundAt(ME.x, ME.z, ME.y) < 0.05 ? "" : " · in the air " + (ME.y - groundAt(ME.x, ME.z, ME.y)).toFixed(1) + " m"}`;
   HUD.style.display = hud && started ? "block" : "none";
   msgT -= dt; msgAge += dt; if (vr && vrPanel.visible && msgAge > 4 && (mx || my)) msgT = 0; if (msgT <= 0) { MSG.style.display = "none"; vrPanel.visible = false; }
   renderer.render(scene, camera); });
