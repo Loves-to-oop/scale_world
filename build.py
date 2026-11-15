@@ -739,9 +739,10 @@ ES = ES[:i0] + """<div id="intro"><div class="card">
   Your partner, a computer, wears a helmet with a face grille. It feeds you Serrada's 12 angles of attack, defends against your strikes,
   counters, and spars two-minute rounds. Eskabo Daan (Grandmaster Robert Castro, San Francisco) grew out of Angel Cabales' Serrada
   Eskrima, close-range fighting with a short stick; the angles are Serrada's.</p>
-  <p><b>Clear a space at least 2 m across and put on your wrist straps</b>: you will be swinging your arms hard.</p>
+  <p><b>Clear a space at least 2 m across and put on your wrist straps</b>: you will be swinging your arms hard. Safest of all, choose
+  <b>Mixed reality</b>: you see your own room through the headset, with the fighters in it (keep them clear of furniture).</p>
   <p>A menu sets everything: the mode (angles 1-12, random angles, your strikes, sparring, combat), your weapons (stick and live hand,
-  stick and dagger, two sticks, knife, empty hands), the number of attackers and what they carry, speed, stick hand, seated.
+  stick and dagger, two sticks, knife, empty hands), the number of attackers and what they carry, rounds in a row (with a short break between), your toughness, speed, stick hand, seated.
   In VR point your stick at a line and pull the trigger; <b>A</b> or <b>X</b> pauses and brings the menu back. Right stick up/down: the
   stick's angle in your hand; left stick: step; right stick left/right: turn; click the left stick: seated.</p>
   <p>On a computer (for trying it out): click the menu &nbsp;·&nbsp; the mouse moves the stick &nbsp;·&nbsp; <kbd>space</kbd> pause / menu &nbsp;·&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> step &nbsp;·&nbsp; arrows turn</p>

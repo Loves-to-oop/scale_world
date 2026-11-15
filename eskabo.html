@@ -18,9 +18,10 @@
   Your partner, a computer, wears a helmet with a face grille. It feeds you Serrada's 12 angles of attack, defends against your strikes,
   counters, and spars two-minute rounds. Eskabo Daan (Grandmaster Robert Castro, San Francisco) grew out of Angel Cabales' Serrada
   Eskrima, close-range fighting with a short stick; the angles are Serrada's.</p>
-  <p><b>Clear a space at least 2 m across and put on your wrist straps</b>: you will be swinging your arms hard.</p>
+  <p><b>Clear a space at least 2 m across and put on your wrist straps</b>: you will be swinging your arms hard. Safest of all, choose
+  <b>Mixed reality</b>: you see your own room through the headset, with the fighters in it (keep them clear of furniture).</p>
   <p>A menu sets everything: the mode (angles 1-12, random angles, your strikes, sparring, combat), your weapons (stick and live hand,
-  stick and dagger, two sticks, knife, empty hands), the number of attackers and what they carry, speed, stick hand, seated.
+  stick and dagger, two sticks, knife, empty hands), the number of attackers and what they carry, rounds in a row (with a short break between), your toughness, speed, stick hand, seated.
   In VR point your stick at a line and pull the trigger; <b>A</b> or <b>X</b> pauses and brings the menu back. Right stick up/down: the
   stick's angle in your hand; left stick: step; right stick left/right: turn; click the left stick: seated.</p>
   <p>On a computer (for trying it out): click the menu &nbsp;·&nbsp; the mouse moves the stick &nbsp;·&nbsp; <kbd>space</kbd> pause / menu &nbsp;·&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> step &nbsp;·&nbsp; arrows turn</p>
@@ -53086,7 +53087,7 @@ const THREE = {ACESFilmicToneMapping, AddEquation, AddOperation, AdditiveAnimati
 // empty live hand, a training dagger, or a second stick; or a knife, or empty hands. A computer partner feeds angles, defends, counters
 // and spars; in combat, one to four attackers with sticks, knives or fists come at you at full intensity and spread round you.
 const IS_HEADSET = /OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1; renderer.xr.enabled = true;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -53137,6 +53138,13 @@ function segDist(p1, q1, p2, q2, out1, out2) { _d1.subVectors(q1, p1); _d2.subVe
   if (a < 1e-9 && e < 1e-9) { s = t = 0; } else if (a < 1e-9) { s = 0; t = clampN(f / e, 0, 1); } else { const c = _d1.dot(_r); if (e < 1e-9) { t = 0; s = clampN(-c / a, 0, 1); } else { const b = _d1.dot(_d2), den = a * e - b * b; s = den > 1e-9 ? clampN((b * f - c * e) / den, 0, 1) : 0; t = (b * s + f) / e; if (t < 0) { t = 0; s = clampN(-c / a, 0, 1); } else if (t > 1) { t = 1; s = clampN((b - c) / a, 0, 1); } } }
   _c1.copy(p1).addScaledVector(_d1, s); _c2.copy(p2).addScaledVector(_d2, t); if (out1) out1.copy(_c1); if (out2) out2.copy(_c2); segDist.s = s; segDist.t = t; return _c1.distanceTo(_c2); }
 
+
+// ---------- mixed reality: your own room through the headset's cameras, the hall hidden, only the fighters, signs and a shadow on your floor ----------
+const ROOM = scene.children.filter(o => o !== rig && !o.isLight), HALL_BG = scene.background;
+const shadowFloor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12).rotateX(-Math.PI / 2), new THREE.ShadowMaterial({ opacity: 0.35 })); shadowFloor.position.y = FLOOR_Y + 0.002; shadowFloor.receiveShadow = true; shadowFloor.visible = false; scene.add(shadowFloor);
+let mixed = false;
+function setMixed(on) { mixed = on; ROOM.forEach(o => o.visible = !on); scene.background = on ? null : HALL_BG; shadowFloor.visible = on; }
+renderer.xr.addEventListener("sessionend", () => setMixed(false));
 
 // ---------- your weapons ----------
 // In VR they ride on your controllers' grip poses (the stick along the line of your fist); on a desktop, on the mouse.
@@ -53340,7 +53348,7 @@ function contact(dt) { clackCD -= dt; const sides = { main: mainSide(), off: off
           let msg = (k === "knife" ? "Cut: " : k === "hand" ? "Strike: " : "Hit: ") + v.n + (v.n === "weapon hand" && k !== "hand" ? " (defanging the snake)" : "");
           if (combat) { F.hp -= DMG_BY_YOU(k, v.n); if (v.n === "weapon hand" && F.weapon !== "hand" && Math.random() < 0.4) { F.weapon = "hand"; msg += ", disarmed"; } if (F.hp <= 0) { F.down = 0.001; F.st = "down"; SC.downs++; msg = "Down"; thud(1); } }
           showTag(msg, "#ffe08a"); break; } } } } }
-function hurtYou(F, part, dmg) { SC.them += modeI === 3 ? 1 : 0; SC.hitsOnYou++; thud(0.8); flashT = 0.35; buzz("right", 1, 120); buzz("left", 1, 120); if (modeI === 4) { ME.hp -= dmg; if (ME.hp <= 0) { running = false; showTag("You are down", "#ff5040"); bell(); showMenu(true); } } }
+function hurtYou(F, part, dmg) { SC.them += modeI === 3 ? 1 : 0; SC.hitsOnYou++; thud(0.8); flashT = 0.35; buzz("right", 1, 120); buzz("left", 1, 120); if (modeI === 4 && running) { ME.hp -= dmg; if (ME.hp <= 0) endRound(false, "You are down"); } }
 
 // ---------- signs: a tag over the fighters, a scoreboard on a stand ----------
 const tagC = document.createElement("canvas"); tagC.width = 1024; tagC.height = 160; const tagT = new THREE.CanvasTexture(tagC); tagT.colorSpace = THREE.SRGBColorSpace;
@@ -53350,14 +53358,14 @@ const boardC = document.createElement("canvas"); boardC.width = 1280; boardC.hei
 const BOARD = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ map: boardT, toneMapped: false })); BOARD.position.set(-2.1, 1.65, -0.6); BOARD.lookAt(0, 1.6, 2); scene.add(BOARD);
 { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.2, 8), new THREE.MeshStandardMaterial({ color: 0x333333 })); st.position.set(-2.1, 0.6, -0.6); scene.add(st); const bk = new THREE.Mesh(new THREE.BoxGeometry(1.66, 0.96, 0.03), new THREE.MeshStandardMaterial({ color: 0x3a2a1a })); bk.position.copy(BOARD.position); bk.quaternion.copy(BOARD.quaternion); bk.translateZ(-0.02); scene.add(bk); }
 let boardKey = "";
-function drawBoard() { const k = [modeI, speedI, yourI, lefty, running, SC.you, SC.them, SC.blocks, SC.fed, SC.downs, ME.hp, nAtt, attW, Math.ceil(roundT), seated].join(); if (k === boardKey) return; boardKey = k; const g = boardC.getContext("2d");
+function drawBoard() { const k = [SER.n, toughI, modeI, speedI, yourI, lefty, running, SC.you, SC.them, SC.blocks, SC.fed, SC.downs, ME.hp, nAtt, attW, Math.ceil(roundT), seated].join(); if (k === boardKey) return; boardKey = k; const g = boardC.getContext("2d");
   g.fillStyle = "#14110e"; g.fillRect(0, 0, 1280, 720); g.strokeStyle = "#c8a050"; g.lineWidth = 6; g.strokeRect(6, 6, 1268, 708); g.fillStyle = "#f4e2b0"; g.font = "bold 60px Georgia, serif"; g.fillText(MODES[modeI] + (running ? "" : "  (paused)"), 40, 84);
   g.font = "38px -apple-system, Helvetica, sans-serif"; g.fillStyle = "#e8dcc0";
   const lines = [`Speed: ${SPEEDS[speedI][1]}   ·   you: ${YOUR[yourI].n}${lefty ? " (left-handed)" : ""}${seated ? "   ·   seated" : ""}`];
   if (modeI < 2) lines.push(`Blocked ${SC.blocks} of ${SC.fed} fed   ·   hits on you: ${SC.hitsOnYou}`, "Block with the stick, or pass the weapon arm with your live hand.", "Duck or step back: an attack that misses counts as evaded.");
   else if (modeI === 2) lines.push(`Your clean hits: ${SC.you}`, "Strike the partner; it blocks some, at this speed's reaction time.", "A blocked strike does not count. Hit the weapon hand to defang the snake.");
   else if (modeI === 3) lines.push(`You ${SC.you}  ·  partner ${SC.them}${running ? `   ·   ${Math.max(0, Math.ceil(roundT))} s left` : ""}`, "Two-minute round. Clean hits score; blocked ones do not.", "The partner attacks in combinations, blocks, and counters.");
-  else lines.push(`Your health: ${"█".repeat(clampN(ME.hp, 0, 10))}${"░".repeat(10 - clampN(ME.hp, 0, 10))}   ·   down: ${SC.downs} of ${nAtt}`, `${nAtt} attacker${nAtt > 1 ? "s" : ""} with ${ATTW[attW]}, full intensity: they spread round you.`, "Keep moving; put one between you and the others. A knife cuts deep.");
+  else lines.push(`Your health: ${TOUGH[toughI][1] === Infinity ? "practice" : "█".repeat(clampN(Math.ceil(ME.hp / TOUGH[toughI][1] * 10), 0, 10)) + "░".repeat(10 - clampN(Math.ceil(ME.hp / TOUGH[toughI][1] * 10), 0, 10))}   ·   down: ${SC.downs} of ${nAtt}${SER.n ? `   ·   rounds won ${SER.won} of ${SER.n} played` : ""}`, `${nAtt} attacker${nAtt > 1 ? "s" : ""} with ${ATTW[attW]}, full intensity: they spread round you.`, "Keep moving; put one between you and the others. A knife cuts deep.");
   lines.push("", "A (or space): pause and the menu   ·   point your stick and pull the trigger to choose");
   lines.forEach((l, i) => g.fillText(l, 40, 170 + i * 72, 1200)); boardT.needsUpdate = true; }
 
@@ -53370,6 +53378,8 @@ const ROWS = () => [
   { n: "Mode", v: MODES[modeI], f: () => setMode(modeI + 1) },
   { n: "Your weapons", v: YOUR[yourI].n, f: () => { yourI = (yourI + 1) % YOUR.length; equip(); arm(); } },
   ...(modeI === 4 ? [{ n: "Attackers", v: String(nAtt), f: () => { nAtt = nAtt % 4 + 1; arm(); } }, { n: "Attackers armed with", v: ATTW[attW], f: () => { attW = (attW + 1) % ATTW.length; arm(); } }] : []),
+  ...(modeI >= 3 ? [{ n: "Rounds in a row", v: ROUNDS[roundsI] === Infinity ? "endless" : String(ROUNDS[roundsI]), f: () => { roundsI = (roundsI + 1) % ROUNDS.length; SER.n = SER.won = 0; } }] : []),
+  ...(modeI === 4 ? [{ n: "Your toughness", v: TOUGH[toughI][0], f: () => { toughI = (toughI + 1) % TOUGH.length; arm(); } }] : []),
   { n: "Speed", v: SPEEDS[speedI][1], f: () => speedI = (speedI + 1) % SPEEDS.length },
   { n: "Stick hand", v: lefty ? "left" : "right", f: () => { lefty = !lefty; equip(); } },
   { n: "Seated", v: seated ? "yes: no leg attacks" : "no", f: () => seated = !seated },
@@ -53390,10 +53400,16 @@ let started = false, roundStarted = false, roundT = 120;
 function arm() { const n = modeI === 4 ? nAtt : 1; FIGHTERS.forEach((F, i) => { F.active = i < n; F.G.visible = F.active; F.down = 0; F.hp = 6; F.st = "guard"; F.plan = null; F.queue = []; F.next = 1; F.lastWasAngle = false; F.blockIn = -1;
     if (modeI === 4) { F.weapon = attW === 3 ? ["stick", "knife", "hand", "stick"][i] : ["stick", "knife", "hand"][attW]; F.off = "hand"; } else { F.weapon = "stick"; F.off = YOUR[yourI].o === "stick" ? "stick" : YOUR[yourI].o === "knife" ? "knife" : "hand"; }
     F.slot = n === 1 ? 0 : [0, 1.3, -1.3, Math.PI][i]; const dS = PB.f.clone().applyAxisAngle(UP, F.slot), dist = modeI === 4 ? 2.2 : 1.15; F.p.set(PB.head.x + dS.x * dist, FLOOR_Y, PB.head.z + dS.z * dist); F.f.set(PB.head.x - F.p.x, 0, PB.head.z - F.p.z).normalize(); F.r.crossVectors(F.f, UP); poseF(F); const G = guardPose(F); F.hand.copy(G.h); F.dir.copy(G.d); F.handL.copy(G.hl); F.dirL.copy(G.dl); });
-  SC.you = SC.them = SC.blocks = SC.fed = SC.hitsOnYou = SC.downs = 0; ME.hp = 10; roundT = 120; roundStarted = false; boardKey = ""; }
-function setMode(i) { modeI = (i + MODES.length) % MODES.length; running = false; arm(); }
+  SC.you = SC.them = SC.blocks = SC.fed = SC.hitsOnYou = SC.downs = 0; ME.hp = TOUGH[toughI][1]; roundT = 120; roundStarted = false; boardKey = ""; }
+function setMode(i) { modeI = (i + MODES.length) % MODES.length; running = false; SER.n = SER.won = 0; arm(); }
 function go() { if (!roundStarted) { arm(); roundStarted = true; if (modeI >= 3) bell(); } running = true; FIGHTERS.forEach(F => F.wait = 1.0 + F.idx * 0.4); showTag(modeI === 2 ? "Attack when ready" : modeI === 4 ? "Defend yourself" : "Ready", "#f4e2b0"); }
-function pause() { running = false; showMenu(true); showTag("Paused"); }
+function pause() { running = false; nextT = 0; showMenu(true); showTag("Paused"); }
+// rounds in a row: a short break and the running score between them; the menu only at the end of the series
+const ROUNDS = [1, 5, 10, 20, Infinity], TOUGH = [["normal", 10], ["three times tougher", 30], ["practice: never down", Infinity]];
+let roundsI = 2, toughI = 0, nextT = 0; const SER = { n: 0, won: 0 };
+function endRound(won, msg) { running = false; roundStarted = false; SER.n++; if (won) SER.won++; bell(); const total = ROUNDS[roundsI];
+  if (SER.n < total) { showTag(`${msg}. Round ${SER.n + 1}${total < Infinity ? " of " + total : ""} in 3…`, won ? "#7ce07c" : "#ffb070"); nextT = 3; }
+  else { showTag(`${msg}. Won ${SER.won} of ${SER.n}`, "#f4e2b0"); SER.n = SER.won = 0; setTimeout(() => { if (!running) showMenu(true); }, 2500); } }
 addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (e.code === "Space") { if (running) pause(); else { showMenu(false); go(); } } if (e.code === "KeyM") seated = !seated; if (e.code === "KeyV") voiceOn = !voiceOn; });
 const keys = {}, prevB = {};
 addEventListener("keyup", e => keys[e.code] = false);
@@ -53402,7 +53418,10 @@ renderer.domElement.addEventListener("pointerdown", e => { if (!started) { start
 function start() { if (started) return; started = true; ac().resume?.(); document.getElementById("intro")?.classList.add("gone"); updateBody(); arm(); showMenu(true); }
 document.getElementById("intro")?.addEventListener("click", start);
 const VRB = document.getElementById("vr");
-if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); await renderer.xr.setSession(s); start(); setTimeout(() => { updateBody(); showMenu(true); }, 600); }; });
+async function enterXR(mode) { const s = await navigator.xr.requestSession(mode, { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); setMixed(mode === "immersive-ar"); await renderer.xr.setSession(s); start(); setTimeout(() => { updateBody(); arm(); showMenu(true); }, 600); }
+const MRB = VRB ? VRB.cloneNode() : null; if (MRB) { MRB.id = "mr"; MRB.textContent = "Mixed reality"; MRB.style.right = "auto"; MRB.style.left = "18px"; document.body.appendChild(MRB); }
+if (navigator.xr) { navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = () => enterXR("immersive-vr"); });
+  navigator.xr.isSessionSupported("immersive-ar").then(ok => { if (!ok || !MRB) return; MRB.style.display = "block"; MRB.onclick = () => enterXR("immersive-ar"); }); }
 
 // ---------- the loop ----------
 const clock = new THREE.Clock(); let frameN = 0; equip(); updateBody(); arm();
@@ -53425,8 +53444,9 @@ renderer.setAnimationLoop(() => { const dt = clampN(clock.getDelta(), 0, 0.05), 
   for (const F of act) { if (F.down <= 0) { const dd = Math.hypot(F.p.x - PB.head.x, F.p.z - PB.head.z); if (dd < 0.55) F.p.addScaledVector(F.f, -0.02); } }
   if (started && !menuOn) { for (const F of act) { aiUpdate(F, dt, act); poseF(F); drawF(F); } contact(dt); } else for (const F of act) { if (F.down <= 0) { F.f.set(PB.head.x - F.p.x, 0, PB.head.z - F.p.z).normalize(); F.r.crossVectors(F.f, UP); } poseF(F); drawF(F); }
   for (const F of act) if (F.down > 0) { F.down += dt; if (F.down > 4) { F.G.visible = false; } }
-  if (running && modeI === 4 && act.every(F => F.down > 0)) { running = false; roundStarted = false; bell(); showTag(`All ${nAtt} down`, "#7ce07c"); setTimeout(() => showMenu(true), 1500); }
-  if (running && modeI === 3) { roundT -= dt; if (roundT <= 0) { running = false; roundStarted = false; bell(); showTag(SC.you > SC.them ? `You win, ${SC.you} to ${SC.them}` : SC.you < SC.them ? `Partner wins, ${SC.them} to ${SC.you}` : `A draw, ${SC.you} all`, "#f4e2b0"); showMenu(true); } }
+  if (running && modeI === 4 && act.every(F => F.down > 0)) endRound(true, `All ${nAtt} down`);
+  if (nextT > 0) { nextT -= dt; if (nextT <= 0) go(); }
+  if (running && modeI === 3) { roundT -= dt; if (roundT <= 0) endRound(SC.you > SC.them, SC.you > SC.them ? `You win, ${SC.you} to ${SC.them}` : SC.you < SC.them ? `Partner wins, ${SC.them} to ${SC.you}` : `A draw, ${SC.you} all`); }
   if (menuOn) { drawMenu(); if (vr) { const o = WS.main.a.clone(), d = V3().subVectors(WS.main.b, WS.main.a).normalize(); menuHover = menuPick(o, d); laser.visible = true; laser.position.copy(o); laser.quaternion.setFromUnitVectors(NZ, d); laser.scale.setScalar(2); if (trig) menuSelect(); }
     else { ray.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera); menuHover = menuPick(ray.ray.origin, ray.ray.direction); } }
   const lead = act.find(F => F.down <= 0) || act[0]; tagAge += dt; if (lead) TAG.position.copy(lead.head).addScaledVector(UP, 0.42); TAG.material.opacity = tagAge < 2.5 ? 1 : Math.max(0, 1 - (tagAge - 2.5) * 2);
