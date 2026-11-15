@@ -102,19 +102,25 @@ function fillCobbles() { const m4 = new THREE.Matrix4(), q = new THREE.Quaternio
 // refractive index is about 1.27, so it reflects only 1.4% straight down and nearly everything at a glancing angle, and it is clear: in
 // the shallows you see the dark sludge of the bottom. Capillary ripples only, millimetres high (Cassini found it flat to a few mm).
 const RES = IS_HEADSET ? 768 : 1536, reflRT = new THREE.WebGLRenderTarget(RES, RES, { type: THREE.HalfFloatType }), reflCam = new THREE.PerspectiveCamera(100, 1, 0.1, 400000), texMat = new THREE.Matrix4(); reflCam.layers.set(1);
-const seaU = { tRefl: { value: reflRT.texture }, texMat: { value: texMat }, t: { value: 0 }, fogC: { value: FOGC }, fogD: { value: 1 / 26000 }, under: { value: 0 } };
+const seaU = { tRefl: { value: reflRT.texture }, texMat: { value: texMat }, t: { value: 0 }, fogC: { value: FOGC }, fogD: { value: 1 / 26000 }, under: { value: 0 }, org: { value: new THREE.Vector2() }, wA: { value: 0 }, wL: { value: 4 } };
 const seaGeo = (() => { const rings = [0]; let r = 0, d = 1.5; while (r < 200000) { r += d; d *= 1.07; rings.push(r); } const seg = 160, pos = [], idx = [];
   for (let i = 0; i < rings.length; i++) for (let k = 0; k < seg; k++) { const a = k / seg * Math.PI * 2; pos.push(Math.cos(a) * rings[i], 0, Math.sin(a) * rings[i]); }
   for (let i = 0; i < rings.length - 1; i++) for (let k = 0; k < seg; k++) { const a = i * seg + k, b = i * seg + (k + 1) % seg; idx.push(a, a + seg, b, b, a + seg, b + seg); }
   const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("depth", new THREE.BufferAttribute(new Float32Array(pos.length / 3), 1)); g.setIndex(idx); return g; })();
 const sea = new THREE.Mesh(seaGeo, new THREE.ShaderMaterial({ uniforms: seaU, transparent: true, side: THREE.DoubleSide,
-  vertexShader: `attribute float depth; uniform mat4 texMat; varying vec3 vW; varying float vDep; varying vec4 vUV;
+  vertexShader: `attribute float depth; uniform mat4 texMat; uniform float t, wA, wL; uniform vec2 org; varying vec3 vW; varying float vDep; varying vec4 vUV; varying vec3 vN; varying float vFoam;
     #include <common>
     #include <logdepthbuf_pars_vertex>
-    void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; vDep = depth; vUV = texMat * w; gl_Position = projectionMatrix * viewMatrix * w;
+    void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vec2 p = w.xz + org; vec3 nrm = vec3(0.0, 1.0, 0.0); float foam = 0.0;
+      if (wA > 0.0) { float far = 1.0 - smoothstep(25.0 * wL, 45.0 * wL, length(cameraPosition.xz - w.xz)), Hmax = 0.39 * max(depth, 0.0), sh = clamp(Hmax / max(wA, 1e-4), 0.0, 1.0);
+        vec3 dsp = vec3(0.0); vec4 L4 = vec4(1.0, 0.71, 0.53, 1.37) * wL, A4 = vec4(0.5, 0.25, 0.14, 0.2) * wA, D4 = vec4(0.0, 0.35, -0.42, 0.15);
+        for (int i = 0; i < 4; i++) { float k = 6.2831853 / L4[i], om = sqrt(1.352 * k * tanh(k * max(depth, 0.05))), a = A4[i] * sh * far; vec2 d = vec2(sin(D4[i]), cos(D4[i]));
+          float ph = k * dot(d, p) - om * t + float(i) * 1.7, Q = 0.35 + 0.5 * (1.0 - sh); dsp.xz += Q * a * d * cos(ph); dsp.y += a * sin(ph); nrm.xz -= d * k * a * cos(ph); if (sh < 0.98) foam = max(foam, smoothstep(0.55, 1.0, sin(ph)) * (1.0 - sh)); }
+        w.xyz += dsp; nrm = normalize(nrm); foam *= step(0.02, depth) * far; }
+      vN = nrm; vFoam = foam; vW = w.xyz; vDep = depth; vUV = texMat * w; gl_Position = projectionMatrix * viewMatrix * w;
     #include <logdepthbuf_vertex>
     }`,
-  fragmentShader: `uniform sampler2D tRefl; uniform float t, fogD, under; uniform vec3 fogC; varying vec3 vW; varying float vDep; varying vec4 vUV;
+  fragmentShader: `uniform sampler2D tRefl; uniform float t, fogD, under, wA; uniform vec3 fogC; varying vec3 vW; varying float vDep; varying vec4 vUV; varying vec3 vN; varying float vFoam;
     #include <common>
     #include <logdepthbuf_pars_fragment>
     float n2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); float a = fract(sin(dot(i, vec2(127.1, 311.7))) * 43758.5); float b = fract(sin(dot(i + vec2(1, 0), vec2(127.1, 311.7))) * 43758.5);
@@ -124,21 +130,21 @@ const sea = new THREE.Mesh(seaGeo, new THREE.ShaderMaterial({ uniforms: seaU, tr
       vec3 V = normalize(cameraPosition - vW); float dist = length(cameraPosition - vW);
       vec2 p = vW.xz; float e = 0.05, amp = 0.012 / (1.0 + dist * 0.02);
       float h0 = n2(p * 1.7 + vec2(t * 0.4, t * 0.25)) + 0.5 * n2(p * 4.1 - vec2(t * 0.7, -t * 0.3)), hx = n2((p + vec2(e, 0)) * 1.7 + vec2(t * 0.4, t * 0.25)) + 0.5 * n2((p + vec2(e, 0)) * 4.1 - vec2(t * 0.7, -t * 0.3)), hz = n2((p + vec2(0, e)) * 1.7 + vec2(t * 0.4, t * 0.25)) + 0.5 * n2((p + vec2(0, e)) * 4.1 - vec2(t * 0.7, -t * 0.3));
-      vec3 N = normalize(vec3(-(hx - h0) / e * amp, 1.0, -(hz - h0) / e * amp)); if (under > 0.5) N = -N;
+      vec3 N = normalize(vec3(-(hx - h0) / e * amp, 1.0, -(hz - h0) / e * amp) + vec3(vN.x, 0.0, vN.z)); if (under > 0.5) N = -N;
       float c = clamp(abs(dot(N, V)), 0.0, 1.0), R = 0.0141 + 0.9859 * pow(1.0 - c, 5.0);
       vec4 uv = vUV; uv.xy += N.xz * 0.6 * uv.w / max(dist, 1.0); vec3 refl = texture2DProj(tRefl, uv).rgb;
       float cosR = sqrt(max(0.0, 1.0 - (1.0 - c * c) / 1.6129)), path = vDep / max(cosR, 0.05); vec3 T = exp(-path * vec3(1.0 / 16.0, 1.0 / 19.0, 1.0 / 22.0));
       vec3 body = vec3(0.07, 0.045, 0.025); float tav = (T.r + T.g + T.b) / 3.0;
       vec3 col; float a;
       if (under > 0.5) { float tir = smoothstep(0.5, 0.75, 1.0 - c); col = mix(vec3(0.35, 0.22, 0.1) * 0.6, body, tir); a = 0.85; }
-      else { a = R + (1.0 - R) * (1.0 - tav); col = (refl * R + body * (1.0 - R) * (1.0 - tav)) / max(a, 0.001); }
+      else { a = R + (1.0 - R) * (1.0 - tav); col = (refl * R + body * (1.0 - R) * (1.0 - tav)) / max(a, 0.001); float fm = vFoam * smoothstep(0.35, 0.8, n2(vW.xz * 1.3 + vec2(t * 0.2, 0.0)) * 0.6 + n2(vW.xz * 5.0) * 0.4) * 0.55; col = mix(col, vec3(0.55, 0.45, 0.33), fm); a = mix(a, 1.0, fm * 0.8); }
       float f = 1.0 - exp(-pow(dist * fogD, 2.0)); col = mix(col, fogC, f); a = mix(a, 1.0, f);
       gl_FragColor = vec4(col, a);
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
     }` }));
 sea.frustumCulled = false; scene.add(sea); let seaC = [1e12, 1e12];
-function fillSea() { const p = seaGeo.attributes.position, d = seaGeo.attributes.depth; seaC = [ME.x, ME.z]; sea.position.set(ME.x - ME.x0, 0, ME.z - ME.z0);
+function fillSea() { const p = seaGeo.attributes.position, d = seaGeo.attributes.depth; seaC = [ME.x, ME.z]; sea.position.set(ME.x - ME.x0, 0, ME.z - ME.z0); seaU.org.value.set(ME.x0, ME.z0);
   for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i), r2 = x * x + z * z; p.setY(i, -r2 / (2 * R_T)); const rr = Math.sqrt(r2); d.setX(i, rr < 30000 ? Math.max(0, -land(ME.x + x, ME.z + z)) : 160); }
   p.needsUpdate = d.needsUpdate = true; }
 const CLIP = [new THREE.Plane(V3(0, 1, 0), 0.02)], _hp = V3(0, 0, 0), _hq = new THREE.Quaternion(), _hs = V3(1, 1, 1);
@@ -171,7 +177,7 @@ vrPanel.position.set(0, -0.42, -0.62); vrPanel.rotation.x = -0.75; vrPanel.rende
 function say(html, secs = 30) { MSG.innerHTML = html; MSG.style.display = "block"; msgT = secs; msgAge = 0; const g = panT.userData.c.getContext("2d"); g.clearRect(0, 0, 1024, 512); g.fillStyle = "rgba(30,18,8,0.9)"; g.fillRect(0, 0, 1024, 512); g.fillStyle = "#f6e6cc"; g.font = "28px sans-serif";
   const words = html.replace(/<[^>]+>/g, "").split(" "); let line = "", y = 48; for (const w of words) { if (g.measureText(line + w).width > 960) { g.fillText(line, 32, y); line = ""; y += 35; if (y > 495) break; } line += w + " "; } if (y <= 495) g.fillText(line, 32, y); panT.needsUpdate = true; vrPanel.visible = renderer.xr.isPresenting; }
 const nextFact = () => { if (typeof ITEMS !== "undefined") { let best = null, bd = 1e9; for (const I of ITEMS) { const d = Math.hypot(ME.x - I.x, ME.z - I.z) - I.r; if (d < 0 && d < bd) { bd = d; best = I; } } if (best) { say(`<b>${best.title}</b><br>${best.text}`, 45); return; } } factI = (factI + 1) % FACTS.length; say(FACTS[factI] + ` <span style="opacity:.6">(${factI + 1}/${FACTS.length}: E for the next)</span>`, 45); };
-addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (e.code === "KeyE") act(); if (e.code === "KeyH") hud = !hud; if (e.code === "KeyR") { ME.x = ME.x0s; ME.z = ME.z0s; ME.y = land(ME.x, ME.z); ME.vx = ME.vz = ME.vy = 0; } });
+addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (e.code === "KeyE") act(); if (e.code === "KeyH") hud = !hud; if (e.code === "KeyL") { tagsOn = !tagsOn; say(tagsOn ? "Labels on (L)." : "Labels off (L)."); } if (e.code === "KeyG") setWind(windI + 1); if (e.code === "KeyR") { ME.x = ME.x0s; ME.z = ME.z0s; ME.y = land(ME.x, ME.z); ME.vx = ME.vz = ME.vy = 0; } });
 addEventListener("keyup", e => keys[e.code] = false);
 let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY }; start(); });
 addEventListener("pointermove", e => { if (!drag) return; yaw -= (e.clientX - drag.x) * 0.004; pitch = clampN(pitch - (e.clientY - drag.y) * 0.004, -1.45, 1.45); drag.x = e.clientX; drag.y = e.clientY; }); addEventListener("pointerup", () => drag = null);
@@ -475,10 +481,40 @@ function updateRover(dt, mx, my) { const c = Math.cos(RV.head), s = Math.sin(RV.
   if (RV.y === null) { RV.y = yT; RV.pitch = pT; RV.roll = rT; } else { RV.y += (yT - RV.y) * k; RV.pitch += (pT - RV.pitch) * k; RV.roll += (rT - RV.roll) * k; }
   rover.position.set(RV.x - ME.x0, RV.y, RV.z - ME.z0); rover.rotation.set(-RV.pitch, RV.head, -RV.roll, "YXZ"); for (const wl of RV.wheels) wl.rotation.x -= RV.v * dt / 0.85; }
 
+
+// ---------- wind and waves ----------
+// Cassini found Ligeia Mare flat to a few millimetres: the winds have been very light. But waves rise easily here: in low gravity and dense air
+// a wind of well under 1 m/s raises them, and they are slow: a wave of a given length travels 2.7 times slower than on Earth. For a sea
+// fully worked up by a steady wind U, the waves' height is about 0.21 U^2/g and the peak wavelength about 6 U^2 metres (the Pierson-Moskowitz
+// spectrum, with Titan's gravity). In the shallows they steepen and break when they reach about 0.8 of the depth; whether methane surf foams
+// (nitrogen bubbling out?) is not known.
+const WINDS = [["calm, as Cassini saw it", 0], ["a light breeze, 0.8 m/s", 0.8], ["a fresh wind, 1.5 m/s", 1.5], ["a storm wind, 2.5 m/s", 2.5]]; let windI = 0;
+function setWind(i) { windI = (i + WINDS.length) % WINDS.length; const U = WINDS[windI][1], Hs = 0.21 * U * U / G_T, L = 6.04 * U * U, T = Math.sqrt(2 * Math.PI * Math.max(L, 0.1) / G_T);
+  seaU.wA.value = Hs / 2; seaU.wL.value = Math.max(L, 1); say(windI ? `<b>Wind: ${WINDS[windI][0]}.</b> Waves about ${Hs < 1 ? Math.round(Hs * 100) + " cm" : Hs.toFixed(1) + " m"} high, ${Math.round(L)} m apart, one every ${T.toFixed(0)} seconds: slow, in Titan's low gravity. They steepen and break on the shore. (G or Y to change.)` : "<b>Calm</b>: the sea flat as glass, as Cassini found it (G or Y for wind).", 14); }
+FACTS.push("<b>Surf?</b> Usually not: Cassini found the seas flat to millimetres. But a wind of under 1 m/s would raise waves here, and a storm a swell a metre high and nearly 40 m long, rolling in every 13 seconds and breaking in slow motion. Press G (Y in VR) to change the wind.");
+
+// ---------- labels: names over the things and people around you; look at one and press E (A) for its info box ----------
+const TAGS = []; let tagsOn = true;
+function tagTex(title, sub) { const c = document.createElement("canvas"); c.width = 512; c.height = 128; const g = c.getContext("2d"); g.fillStyle = "rgba(20,12,4,0.72)"; g.beginPath(); g.roundRect(4, 4, 504, 120, 18); g.fill(); g.strokeStyle = "rgba(255,200,120,0.6)"; g.lineWidth = 3; g.stroke();
+  g.fillStyle = "#ffe0b0"; g.font = "bold 40px -apple-system, Helvetica, sans-serif"; g.fillText(title, 22, 54, 470); g.fillStyle = "#e8d8c0"; g.font = "28px -apple-system, Helvetica, sans-serif"; g.fillText(sub, 22, 100, 470); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
+function tag(get, title, sub, info, maxD = 3000) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tagTex(title, sub), depthTest: true, depthWrite: false, transparent: true, toneMapped: false, fog: false })); sp.center.set(0.5, 0); sp.renderOrder = 30; scene.add(sp);
+  const T = { sp, get, title, sub, info, maxD, last: "" }; TAGS.push(T); return T; }
+const HT = { "The habitat": 10, "The crew lander": 12.5, "The reactor": 6, "The fuel plant": 7, "The weather mast": 11, "The seismometer": 1.6, "The drill rig": 5.5, "The drone": 2.6, "The antenna": 4.6, "The sea buoy": 3.2 };
+for (const I of ITEMS) tag(() => V3(I.x - ME.x0, (I.title === "The sea buoy" ? 0 : land(I.x, I.z)) + (HT[I.title] || 4), I.z - ME.z0), I.title.replace(/^The /, "").replace(/^./, c => c.toUpperCase()), "", `<b>${I.title}</b><br>${I.text}`);
+for (const p of CREW) { const T = tag(() => p.at ? V3(p.at[0], p.at[1] + 2.15, p.at[2]) : V3(0, -1e4, 0), p.name, p.role, `<b>${p.name}</b>, ${p.role}<br>${p.info}`, 1500); T.indoor = !!p.local; }
+tag(() => V3(RV.x - ME.x0, (RV.y ?? land(RV.x, RV.z)) + 4.8, RV.z - ME.z0), "Pressurised rover", "", "<b>The pressurised rover</b><br>For trips up the canyon and along the coast: a heated cabin on six fat, soft wheels for the loose organic sand, running on methane and oxygen from the plant. Get in at its orange door: E, or A or the trigger in VR. Top speed about 15 km/h: in a seventh of Earth's gravity the wheels grip weakly.");
+{ const lm = { x: S0.x, z: S0.z - 2600 }; tag(() => V3(lm.x - ME.x0, 25, lm.z - ME.z0), "Ligeia Mare", "a sea of liquid methane, 420 by 350 km", FACTS[0], 60000); }
+{ const cx = CANYON.x0 + CANYON.dx * 1800, cz = CANYON.z0 + CANYON.dz * 1800; tag(() => V3(cx - ME.x0, land(cx, cz) + 60, cz - ME.z0), "Vid Flumina", "a river 400 km long, in a canyon 1 km wide", FACTS[1], 60000); }
+const _cd = V3(0, 0, 0), _cp = V3(0, 0, 0);
+function updateTags() { camera.getWorldPosition(_cp); for (const T of TAGS) { const p = T.get(), d = p.distanceTo(_cp); T.sp.visible = tagsOn && d < T.maxD && d > 1.2 && (T.indoor === undefined || T.indoor === insideHab()); if (!T.sp.visible) continue; T.sp.position.copy(p); const w = clampN(d * 0.12, 0.7, 900); T.sp.scale.set(w, w / 4, 1);
+    const ds = d < 1000 ? Math.round(d / (d < 100 ? 1 : 10)) * (d < 100 ? 1 : 10) + " m" : (d / 1000).toFixed(1) + " km", sub = (T.sub ? T.sub + " · " : "") + ds; if (sub !== T.last) { T.last = sub; T.sp.material.map.dispose(); T.sp.material.map = tagTex(T.title, sub); } } }
+function lookedAt() { camera.getWorldDirection(_cd); camera.getWorldPosition(_cp); let best = null, ba = 0.07; for (const T of TAGS) { if (!T.sp.visible) continue; const v = T.sp.position.clone().sub(_cp), d = v.length(), a = v.normalize().angleTo(_cd); if (a < ba + 0.5 / d) { ba = a; best = T; } } return best; }
+
 const groundAt = (x, z, yRef) => { const hf = habFloor(x, z, yRef); return hf === null ? land(x, z) : Math.max(land(x, z), hf); };
 function act() { const door = V3(1.6, 0, -1.4).applyAxisAngle(V3(0, 1, 0), RV.head);
   if (RV.in) { if (Math.abs(RV.v) > 0.3) { say("Stop the rover first (S to brake)."); return; } RV.in = false; const o = door.clone().multiplyScalar(1.9); ME.x = RV.x + o.x; ME.z = RV.z + o.z; ME.y = land(ME.x, ME.z); ME.vx = ME.vz = ME.vy = 0; yaw = RV.head + Math.PI / 2; say("Out of the rover. E beside its orange door to get back in."); return; }
   if (!insideHab() && Math.hypot(ME.x - (RV.x + door.x), ME.z - (RV.z + door.z)) < 3.5) { RV.in = true; yaw = Math.PI; pitch = -0.08; say("In the rover's cab. <b>W</b>/<b>S</b> drive and brake, <b>A</b>/<b>D</b> steer (left stick in VR); top speed about 15 km/h: in a seventh of Earth's gravity the wheels grip weakly. <b>E</b> to get out."); return; }
+  if (tagsOn) { const T = lookedAt(); if (T) { say(T.info, 50); return; } }
   let bp = null, bd = 3.2; for (const p of CREW) { if (!p.at) continue; const d = Math.hypot(p.at[0] + ME.x0 - ME.x, p.at[2] + ME.z0 - ME.z) + Math.abs(p.at[1] - ME.y) * 0.5; if (d < bd) { bd = d; bp = p; } }
   if (bp) { say(`<b>${bp.name}</b>, ${bp.role}<br>${bp.info}`, 50); return; } nextFact(); }
 // ---------- the loop ----------
@@ -487,8 +523,8 @@ updateGround(true); fillCobbles(); fillSea(); placeBase(); BASE.traverse(o => o.
 renderer.setAnimationLoop(() => { const dt = clampN(clock.getDelta(), 0, 0.05), vr = renderer.xr.isPresenting; T += dt; frameN++;
   let mx = 0, my = 0, run = false, jump = false;
   if (vr) { const s = renderer.xr.getSession(); for (const src of s ? s.inputSources : []) { const gp = src.gamepad; if (!gp) continue; const a = gp.axes, ax = a.length >= 4 ? 2 : 0;
-      if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; run = !!gp.buttons[0]?.pressed; const bX = gp.buttons[4]?.pressed; if (bX && !prevB.x) hud = !hud; prevB.x = bX; }
-      else { const tx = a[ax] || 0; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const bA = gp.buttons[4]?.pressed, bB = gp.buttons[5]?.pressed; if (bA && !prevB.a) act(); prevB.a = bA; if (bB && !prevB.b) jump = true; prevB.b = bB; } } }
+      if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; run = !!gp.buttons[0]?.pressed; const bX = gp.buttons[4]?.pressed; if (bX && !prevB.x) { tagsOn = !tagsOn; } prevB.x = bX; const bY = gp.buttons[5]?.pressed; if (bY && !prevB.y) setWind(windI + 1); prevB.y = bY; }
+      else { const tx = a[ax] || 0; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const bA = gp.buttons[4]?.pressed, bB = gp.buttons[5]?.pressed; if (bA && !prevB.a) act(); prevB.a = bA; const tr = gp.buttons[0]?.pressed; if (tr && !prevB.tr) act(); prevB.tr = tr; if (bB && !prevB.b) jump = true; prevB.b = bB; } } }
   else { if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD || keys.ArrowRight) mx += 1; if (keys.KeyA || keys.ArrowLeft) mx -= 1; run = keys.ShiftLeft || keys.ShiftRight; if (keys.Space) jump = true; }
   // physics: on the ground you push off and steer; in the air only gravity and drag act; in the liquid, buoyancy and heavy drag
   if (RV.in) { updateRover(dt, mx, my); ME.x = RV.x; ME.z = RV.z; ME.y = RV.y; ME.vx = ME.vz = ME.vy = 0; } else { updateRover(dt, 0, 0);
@@ -517,6 +553,8 @@ renderer.setAnimationLoop(() => { const dt = clampN(clock.getDelta(), 0, 0.05), 
     if (p.name === "Dr. Amara Okafor") { coreTray.position.set(x + Math.sin(h) * 0.7, y + 0.06, z + Math.cos(h) * 0.7); coreTray.rotation.y = h + Math.PI / 2; coreRod.position.copy(coreTray.position).y += 0.1; coreRod.rotation.y = h + Math.PI / 2; }
     if (p.name === "Sofia Lindqvist") { poleM.position.set(x + Math.sin(h) * 1.3, y + 0.9, z + Math.cos(h) * 1.3); poleM.rotation.set(0, h, 0); poleM.rotateX(1.05); } }
   crowd.done();
+  updateTags();
+  { const door = V3(1.6, 0, -1.4).applyAxisAngle(V3(0, 1, 0), RV.head), nearDoor = !RV.in && !insideHab() && Math.hypot(ME.x - (RV.x + door.x), ME.z - (RV.z + door.z)) < 3.5; if (nearDoor && !prevB.door) say(vr ? "<b>A</b> (or the right trigger): get into the rover." : "<b>E</b>: get into the rover.", 6); prevB.door = nearDoor; }
   seaU.t.value = T; if (!under && (!IS_HEADSET || frameN % 2 === 0)) { sea.visible = false; COB.visible = false; updateReflection(); sea.visible = true; COB.visible = true; }
   if (hud && frameN % 10 === 0) HUD.innerHTML = RV.in ? `In the rover · ${(Math.abs(RV.v) * 3.6).toFixed(1)} km/h<br>W/S drive, A/D steer, E to get out` : insideHab() ? `Inside the habitat · 21 °C, 1 bar of air<br>outside: 94 K (−179 °C), 1.47 bar of nitrogen` : `Ligeia Mare, Titan · 73° N<br>${ME.y >= 0 ? (ME.y < 1000 ? ME.y.toFixed(1) + " m" : (ME.y / 1000).toFixed(2) + " km") + " above the sea" : (-ME.y).toFixed(1) + " m under the surface"} · walked ${walked < 1000 ? Math.round(walked) + " m" : (walked / 1000).toFixed(2) + " km"}<br>gravity 0.14 g · 94 K (−179 °C) · 1.47 bar${ME.y - groundAt(ME.x, ME.z, ME.y) < 0.05 ? "" : " · in the air " + (ME.y - groundAt(ME.x, ME.z, ME.y)).toFixed(1) + " m"}`;
   HUD.style.display = hud && started ? "block" : "none";

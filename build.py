@@ -703,8 +703,8 @@ TI = TI[:i0] + """<div id="intro"><div class="card">
   Rounded cobbles of water ice lie on the dark shore, as the Huygens probe saw them.</p>
   <p>Walk the shore, climb the hills, jump, bound along, look out over the still, mirror-flat sea. Walk into it and you sink: it is half as
   dense as you.</p>
-  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>shift</kbd> bound &nbsp;&middot;&nbsp; <kbd>space</kbd> jump &nbsp;&middot;&nbsp; <kbd>E</kbd> what you are seeing &nbsp;&middot;&nbsp; <kbd>H</kbd> readout &nbsp;&middot;&nbsp; <kbd>R</kbd> back to the start<br>
-  In VR: left stick walk (trigger bounds), right stick turn, <b>B</b> jump, <b>A</b> what you are seeing, <b>X</b> readout</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>shift</kbd> bound &nbsp;&middot;&nbsp; <kbd>space</kbd> jump &nbsp;&middot;&nbsp; <kbd>E</kbd> info on what you look at, or get in/out of the rover &nbsp;&middot;&nbsp; <kbd>L</kbd> labels &nbsp;&middot;&nbsp; <kbd>G</kbd> wind and waves &nbsp;&middot;&nbsp; <kbd>H</kbd> readout &nbsp;&middot;&nbsp; <kbd>R</kbd> back to the start<br>
+  In VR: left stick walk (left trigger bounds), right stick turn, <b>B</b> jump, <b>A</b> or right trigger: info, or get in/out of the rover, <b>X</b> labels, <b>Y</b> wind and waves</p>
   <p class="dim">The sea, its depth and the canyon's size are Cassini's measurements; the shore is the Huygens landing site's; the ground between
   is generated to match Cassini's radar maps, which show nothing smaller than about 300 m. Click to begin.</p>
 </div></div>
