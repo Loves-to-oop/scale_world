@@ -762,9 +762,12 @@ GX = GX[:i0] + """<div id="intro"><div class="card">
   centre of the Milky Way 26.7 km straight ahead. Each shines as bright as it would from where you stand: at the desk the sky is our
   night sky; walk away and the constellations come apart. The ground is the plane of the Milky Way; the Oort cloud is a haze 1.6 m round
   the desk.</p>
-  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;·&nbsp; drag to look &nbsp;·&nbsp; <kbd>shift</kbd> faster &nbsp;·&nbsp; <kbd>F</kbd> fly (<kbd>space</kbd> / <kbd>C</kbd> up and down, <kbd>=</kbd><kbd>−</kbd> speed) &nbsp;·&nbsp; <kbd>E</kbd> info on what you look at
-  &nbsp;·&nbsp; <kbd>G</kbd> glass ground &nbsp;·&nbsp; <kbd>C</kbd> constellation lines &nbsp;·&nbsp; <kbd>L</kbd> labels &nbsp;·&nbsp; <kbd>H</kbd> readout &nbsp;·&nbsp; <kbd>R</kbd> back to the desk<br>
-  In VR: left stick walk (left trigger faster), right stick turn, <b>B</b> fly / land (right stick up/down to climb), <b>A</b> or right trigger info, <b>X</b> labels, <b>Y</b> constellation lines, click the right stick: glass ground, click the left stick: seated</p>
+  <p>There is no ground: platforms float by the stars. Walkways join the nearest stars; a bike on the hub takes trails to stars up to a
+  kilometre away (Betelgeuse is a 500 m ride); a car in the car park takes roads to places kilometres off, as far as the Large Magellanic
+  Cloud, 163 km. Beacon towers mark where the trails and roads end.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;·&nbsp; drag to look &nbsp;·&nbsp; <kbd>shift</kbd> faster &nbsp;·&nbsp; <kbd>E</kbd> beside the bike or car to ride (then <kbd>A</kbd><kbd>D</kbd> choose where, <kbd>W</kbd> go, <kbd>S</kbd> back, <kbd>E</kbd> off), or info on what you look at
+  &nbsp;·&nbsp; <kbd>F</kbd> fly (<kbd>space</kbd> / <kbd>C</kbd> up and down, <kbd>=</kbd><kbd>−</kbd> speed) &nbsp;·&nbsp; <kbd>C</kbd> constellation lines &nbsp;·&nbsp; <kbd>L</kbd> labels &nbsp;·&nbsp; <kbd>H</kbd> readout &nbsp;·&nbsp; <kbd>R</kbd> back to the desk<br>
+  In VR: left stick walk or ride (left trigger faster; sideways at the start chooses where), right stick turn, <b>A</b> or right trigger: ride / get off / info, <b>B</b> fly (right stick up/down to climb), <b>X</b> labels, <b>Y</b> constellation lines, click the left stick: seated</p>
   <p class="dim">Star positions from the HYG database v4.1 (CC BY-SA 4.0). Distances beyond about 1,000 light-years are uncertain by tens of percent. Click to begin.</p>
 </div></div>
 """ + GX[i1:]
