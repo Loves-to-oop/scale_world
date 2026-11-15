@@ -740,9 +740,11 @@ ES = ES[:i0] + """<div id="intro"><div class="card">
   counters, and spars two-minute rounds. Eskabo Daan (Grandmaster Robert Castro, San Francisco) grew out of Angel Cabales' Serrada
   Eskrima, close-range fighting with a short stick; the angles are Serrada's.</p>
   <p><b>Clear a space at least 2 m across and put on your wrist straps</b>: you will be swinging your arms hard.</p>
-  <p>In VR: <b>A</b> start / pause &nbsp;·&nbsp; <b>B</b> speed &nbsp;·&nbsp; <b>X</b> mode (angles 1-12, random angles, your strikes, sparring) &nbsp;·&nbsp; <b>Y</b> live hand / dagger / second stick &nbsp;·&nbsp;
-  right stick up/down: stick angle in your hand &nbsp;·&nbsp; click the right stick: stick in the other hand &nbsp;·&nbsp; click the left stick: seated &nbsp;·&nbsp; left stick: step &nbsp;·&nbsp; right stick left/right: turn</p>
-  <p>On a computer (for trying it out): the mouse moves the stick &nbsp;·&nbsp; <kbd>space</kbd> start / pause &nbsp;·&nbsp; <kbd>1</kbd>-<kbd>4</kbd> mode &nbsp;·&nbsp; <kbd>=</kbd><kbd>−</kbd> speed &nbsp;·&nbsp; <kbd>H</kbd> other hand &nbsp;·&nbsp; <kbd>L</kbd> swap hands &nbsp;·&nbsp; <kbd>V</kbd> voice &nbsp;·&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> step</p>
+  <p>A menu sets everything: the mode (angles 1-12, random angles, your strikes, sparring, combat), your weapons (stick and live hand,
+  stick and dagger, two sticks, knife, empty hands), the number of attackers and what they carry, speed, stick hand, seated.
+  In VR point your stick at a line and pull the trigger; <b>A</b> or <b>X</b> pauses and brings the menu back. Right stick up/down: the
+  stick's angle in your hand; left stick: step; right stick left/right: turn; click the left stick: seated.</p>
+  <p>On a computer (for trying it out): click the menu &nbsp;·&nbsp; the mouse moves the stick &nbsp;·&nbsp; <kbd>space</kbd> pause / menu &nbsp;·&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> step &nbsp;·&nbsp; arrows turn</p>
   <p class="dim">Not a substitute for a teacher or a live partner: the partner's attacks follow the angles but not any school's exact form.
   Click to begin.</p>
 </div></div>

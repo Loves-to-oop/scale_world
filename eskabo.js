@@ -7,7 +7,8 @@
 // eye, 12 the crown), with three blocks for each (pass blocks, cross blocks, then shoulder blocks and gating), the live hand checking
 // the attacker's weapon hand, and drills where a dagger thrust follows each angle. Eskabo Daan's own numbering may differ; these are
 // Serrada's. Your 18-inch rattan stick is in your right hand (a fist's width of butt, the punyo, below your hand); in your left, an
-// empty live hand, a training dagger, or a second stick. The partner is a computer: it feeds angles, defends, counters and spars.
+// empty live hand, a training dagger, or a second stick; or a knife, or empty hands. A computer partner feeds angles, defends, counters
+// and spars; in combat, one to four attackers with sticks, knives or fists come at you at full intensity and spread round you.
 const IS_HEADSET = /OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
@@ -60,74 +61,56 @@ function segDist(p1, q1, p2, q2, out1, out2) { _d1.subVectors(q1, p1); _d2.subVe
   if (a < 1e-9 && e < 1e-9) { s = t = 0; } else if (a < 1e-9) { s = 0; t = clampN(f / e, 0, 1); } else { const c = _d1.dot(_r); if (e < 1e-9) { t = 0; s = clampN(-c / a, 0, 1); } else { const b = _d1.dot(_d2), den = a * e - b * b; s = den > 1e-9 ? clampN((b * f - c * e) / den, 0, 1) : 0; t = (b * s + f) / e; if (t < 0) { t = 0; s = clampN(-c / a, 0, 1); } else if (t > 1) { t = 1; s = clampN((b - c) / a, 0, 1); } } }
   _c1.copy(p1).addScaledVector(_d1, s); _c2.copy(p2).addScaledVector(_d2, t); if (out1) out1.copy(_c1); if (out2) out2.copy(_c2); segDist.s = s; segDist.t = t; return _c1.distanceTo(_c2); }
 
+
 // ---------- your weapons ----------
 // In VR they ride on your controllers' grip poses (the stick along the line of your fist); on a desktop, on the mouse.
 const gloveM = new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.7 }), bladeM = new THREE.MeshStandardMaterial({ color: 0x6a4a2a, roughness: 0.5 });
-function makeGlove() { const g = new THREE.Group(), m = new THREE.Mesh(new THREE.SphereGeometry(0.045, 14, 10), gloveM); m.scale.set(1, 1.1, 1.35); m.castShadow = true; g.add(m); return g; }
-function makeDagger() { const g = new THREE.Group(), h = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.11, 10).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2a1a10 })), gd = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.015, 0.02), bladeM), b = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.008, 0.18), bladeM);
-  h.position.z = 0.0; gd.position.z = -0.06; b.position.z = -0.15; b.geometry.translate(0, 0, 0); [h, gd, b].forEach(m => { m.castShadow = true; g.add(m); }); return g; }
-const OFF = ["live hand", "dagger", "second stick"];
-let offI = 0, lefty = false, gripTilt = 0;
-const HANDS = { right: new THREE.Group(), left: new THREE.Group() };
-const MOUNT = { right: new THREE.Group(), left: new THREE.Group() };
+function makeGlove(m = gloveM) { const g = new THREE.Group(), me = new THREE.Mesh(new THREE.SphereGeometry(0.045, 14, 10), m); me.scale.set(1, 1.1, 1.35); me.castShadow = true; g.add(me); return g; }
+function makeKnife() { const g = new THREE.Group(), h = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.11, 10).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2a1a10 })), gd = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.015, 0.02), bladeM), b = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.008, 0.18), bladeM);
+  gd.position.z = -0.06; b.position.z = -0.15; [h, gd, b].forEach(m => { m.castShadow = true; g.add(m); }); return g; }
+// what each kind of weapon reaches with (along the line of the fist), how fast it must move to count, how thick it is
+const KIND = { stick: { near: -PUNYO, far: STICK - PUNYO, hit0: 0.25, need: 2.2, r: STICK_R }, knife: { near: 0.05, far: 0.24, hit0: 0.3, need: 1.2, r: 0.012 }, hand: { near: -0.03, far: 0.05, hit0: 1, need: 2.6, r: 0.05 } };
+const YOUR = [{ n: "stick and live hand", m: "stick", o: "hand" }, { n: "stick and dagger", m: "stick", o: "knife" }, { n: "two sticks", m: "stick", o: "stick" }, { n: "knife and live hand", m: "knife", o: "hand" }, { n: "empty hands", m: "hand", o: "hand" }];
+let yourI = 0, lefty = false, gripTilt = 0;
+const HANDS = { right: new THREE.Group(), left: new THREE.Group() }, MOUNT = { right: new THREE.Group(), left: new THREE.Group() };
 for (const s of ["right", "left"]) HANDS[s].add(MOUNT[s]);
-const W = { right: { stick: makeStick(), glove: makeGlove(), dagger: makeDagger(), stick2: makeStick() }, left: { stick: makeStick(), glove: makeGlove(), dagger: makeDagger(), stick2: makeStick() } };
+const W = { right: { stick: makeStick(), glove: makeGlove(), knife: makeKnife() }, left: { stick: makeStick(), glove: makeGlove(), knife: makeKnife() } };
 for (const s of ["right", "left"]) for (const k in W[s]) MOUNT[s].add(W[s][k]);
-const mainSide = () => lefty ? "left" : "right", offSide = () => lefty ? "right" : "left";
-function equip() { const m = mainSide(), o = offSide(); for (const s of ["right", "left"]) { W[s].stick.visible = s === m; W[s].glove.visible = true; W[s].dagger.visible = s === o && offI === 1; W[s].stick2.visible = s === o && offI === 2; MOUNT[s].rotation.x = gripTilt; } }
+const mainSide = () => lefty ? "left" : "right", offSide = () => lefty ? "right" : "left", kindOf = which => which === "main" ? YOUR[yourI].m : YOUR[yourI].o;
+function equip() { for (const s of ["right", "left"]) { const k = s === mainSide() ? YOUR[yourI].m : YOUR[yourI].o; W[s].stick.visible = k === "stick"; W[s].knife.visible = k === "knife"; MOUNT[s].rotation.x = gripTilt; } }
 const SRC = { right: null, left: null }, GRIP = {};
 for (const i of [0, 1]) { const grip = renderer.xr.getControllerGrip(i); rig.add(grip); grip.addEventListener("connected", e => { const h = e.data.handedness; if (h !== "left" && h !== "right") return; GRIP[h] = grip; grip.add(HANDS[h]); }); grip.addEventListener("disconnected", () => { for (const h in GRIP) if (GRIP[h] === grip) delete GRIP[h]; }); }
-// desktop: both hands hang off the camera; the stick hand follows the mouse
+// desktop: both hands hang off the camera; the main hand follows the mouse
 const DESK = { right: new THREE.Group(), left: new THREE.Group() }; camera.add(DESK.right, DESK.left); DESK.right.add(HANDS.right); DESK.left.add(HANDS.left);
 let mouseX = 0.3, mouseY = 0.1;
 function placeDesktop() { const m = mainSide(), o = offSide(), sx = m === "right" ? 1 : -1; DESK[m].position.set(mouseX * 0.45, -0.3 + mouseY * 0.4, -0.5); DESK[m].rotation.set(0.9 + mouseY * 0.3, -mouseX * 0.6, -mouseX * 0.4 * sx);
   DESK[o].position.set(-0.18 * sx, -0.32, -0.38); DESK[o].rotation.set(0.3, 0, 0); }
 // segments of what you hold, in world space, and how fast their tips move
-const WS = { main: { a: V3(), b: V3(), pb: V3(), v: 0, cd: 0, blockedT: 0 }, off: { a: V3(), b: V3(), pb: V3(), v: 0, cd: 0, blockedT: 0 } }, _q = V3();
-function updateSegs(dt) { const m = mainSide(), o = offSide();
-  const put = (S, side, near, far) => { const M = MOUNT[side]; M.updateWorldMatrix(true, false); S.pb.copy(S.b); S.a.set(0, 0, -near).applyMatrix4(M.matrixWorld); S.b.set(0, 0, -far).applyMatrix4(M.matrixWorld); S.v = dt > 0 ? S.b.distanceTo(S.pb) / dt : 0; if (S.v > 40) S.v = 0; };
-  put(WS.main, m, -PUNYO, STICK - PUNYO); if (offI === 0) put(WS.off, o, -0.03, 0.05); else if (offI === 1) put(WS.off, o, 0.05, 0.24); else put(WS.off, o, -PUNYO, STICK - PUNYO);
-  WS.main.cd -= dt; WS.off.cd -= dt; WS.main.blockedT -= dt; WS.off.blockedT -= dt; }
+const WS = { main: { a: V3(), b: V3(), pb: V3(), v: 0, cd: 0, blockedT: 0 }, off: { a: V3(), b: V3(), pb: V3(), v: 0, cd: 0, blockedT: 0 } };
+function updateSegs(dt) { for (const which of ["main", "off"]) { const S = WS[which], K = KIND[kindOf(which)], M = MOUNT[which === "main" ? mainSide() : offSide()]; M.updateWorldMatrix(true, false); S.pb.copy(S.b);
+    S.a.set(0, 0, -K.near).applyMatrix4(M.matrixWorld); S.b.set(0, 0, -K.far).applyMatrix4(M.matrixWorld); S.v = dt > 0 ? S.b.distanceTo(S.pb) / dt : 0; if (S.v > 40) S.v = 0; S.cd -= dt; S.blockedT -= dt; } }
 const handPos = side => { const v = V3(); MOUNT[side].getWorldPosition(v); return v; };
 
-// ---------- your body, for the partner to aim at: estimated from your head ----------
-const ME = { x: 0, z: 2.0, yaw: 0 }, PB = { head: V3(), f: V3(), r: V3(), s: 1, hips: V3(), neck: V3(), floorH: V3() };
+// ---------- your body, for attackers to aim at: estimated from your head ----------
+const ME = { x: 0, z: 2.0, yaw: 0, hp: 10 }, PB = { head: V3(), f: V3(), r: V3(), s: 1, hips: V3(), neck: V3(), floorH: V3() };
 let seated = false;
 function updateBody() { camera.getWorldPosition(PB.head); const q = camera.getWorldQuaternion(new THREE.Quaternion()); PB.f.copy(NZ).applyQuaternion(q); PB.f.y = 0; if (PB.f.lengthSq() < 1e-4) PB.f.set(0, 0, -1); PB.f.normalize(); PB.r.crossVectors(PB.f, UP);
   PB.s = clampN((PB.head.y - FLOOR_Y) / 1.62, 0.55, 1.25); PB.neck.copy(PB.head).addScaledVector(UP, -0.2 * PB.s).addScaledVector(PB.f, -0.06); PB.hips.copy(PB.head).addScaledVector(UP, -0.72 * PB.s).addScaledVector(PB.f, -0.06); PB.floorH.set(PB.head.x, FLOOR_Y, PB.head.z).addScaledVector(PB.f, -0.04); }
-function playerTarget(i) { const h = PB.head, s = PB.s, L = PB.r.clone().negate(), R = PB.r, F = PB.f, t = h.clone();
+// targets on you, by angle; seen from the attacker, so "front" is toward it
+function playerTarget(i, F) { const h = PB.head, s = PB.s, R = PB.r, L = R.clone().negate(), tw = F ? V3(F.p.x - h.x, 0, F.p.z - h.z).normalize() : PB.f, t = h.clone();
   switch (i) { case 1: t.addScaledVector(L, 0.08); break; case 2: t.addScaledVector(R, 0.08); break; case 3: t.addScaledVector(UP, -0.42 * s).addScaledVector(L, 0.24); break; case 4: t.addScaledVector(UP, -0.42 * s).addScaledVector(R, 0.24); break;
-    case 5: case 13: t.addScaledVector(UP, -0.62 * s).addScaledVector(F, 0.1); break; case 6: t.addScaledVector(UP, -0.36 * s).addScaledVector(L, 0.1).addScaledVector(F, 0.1); break; case 7: t.addScaledVector(UP, -0.36 * s).addScaledVector(R, 0.1).addScaledVector(F, 0.1); break;
-    case 8: t.set(h.x, FLOOR_Y + 0.5 * s, h.z).addScaledVector(R, 0.12).addScaledVector(F, 0.04); break; case 9: t.set(h.x, FLOOR_Y + 0.5 * s, h.z).addScaledVector(L, 0.12).addScaledVector(F, 0.04); break;
-    case 10: t.addScaledVector(L, 0.035).addScaledVector(F, 0.07); break; case 11: t.addScaledVector(R, 0.035).addScaledVector(F, 0.07); break; case 12: t.addScaledVector(UP, 0.1); break; }
+    case 5: case 13: t.addScaledVector(UP, -0.62 * s).addScaledVector(tw, 0.1); break; case 6: t.addScaledVector(UP, -0.36 * s).addScaledVector(L, 0.1).addScaledVector(tw, 0.1); break; case 7: t.addScaledVector(UP, -0.36 * s).addScaledVector(R, 0.1).addScaledVector(tw, 0.1); break;
+    case 8: t.set(h.x, FLOOR_Y + 0.5 * s, h.z).addScaledVector(R, 0.12).addScaledVector(tw, 0.04); break; case 9: t.set(h.x, FLOOR_Y + 0.5 * s, h.z).addScaledVector(L, 0.12).addScaledVector(tw, 0.04); break;
+    case 10: t.addScaledVector(L, 0.035).addScaledVector(tw, 0.07); break; case 11: t.addScaledVector(R, 0.035).addScaledVector(tw, 0.07); break; case 12: t.addScaledVector(UP, 0.1); break; case 14: t.addScaledVector(tw, 0.08).addScaledVector(UP, -0.04); break; case 15: t.addScaledVector(UP, -0.55 * s).addScaledVector(tw, 0.12); break; }
   return t; }
 // your volumes: head, torso, legs, and both hands (a struck hand is the commonest hit in stick fighting)
 function playerVolumes() { const v = [{ a: PB.head.clone().addScaledVector(PB.f, -0.04), b: null, r: 0.11, n: "head" }, { a: PB.neck, b: PB.hips, r: 0.16, n: "body" }];
   if (!seated) for (const sd of [1, -1]) { const hip = PB.hips.clone().addScaledVector(PB.r, 0.1 * sd), foot = PB.floorH.clone().addScaledVector(PB.r, 0.13 * sd).setY(FLOOR_Y + 0.08); v.push({ a: hip, b: foot, r: 0.08, n: sd > 0 ? "right leg" : "left leg" }); }
-  v.push({ a: handPos(mainSide()), b: null, r: 0.05, n: "stick hand" }, { a: handPos(offSide()), b: null, r: 0.05, n: offI === 0 ? "live hand" : "left hand" }); return v; }
+  v.push({ a: handPos(mainSide()), b: null, r: 0.05, n: "hand" }, { a: handPos(offSide()), b: null, r: 0.05, n: "hand" }); return v; }
 
-// ---------- the partner ----------
-const OPP = { p: V3(0, FLOOR_Y, 0.85), yaw: 0, f: V3(0, 0, 1), r: V3(-1, 0, 0), lunge: 0, flinch: 0, hand: V3(), dir: V3(0, 1, 0), handL: V3(), dirL: V3(0, 1, 0), elbow: V3(), elbowL: V3(), sh: V3(), shL: V3(), head: V3(), chest: V3(), hips: V3(), aR: V3(), aL: V3() };
-const shirtM = new THREE.MeshStandardMaterial({ color: 0x18181c, roughness: 0.85 }), pantsM = new THREE.MeshStandardMaterial({ color: 0x2a2c34, roughness: 0.9 }), skinM = new THREE.MeshStandardMaterial({ color: 0xa87452, roughness: 0.6 }), padM = new THREE.MeshStandardMaterial({ color: 0x8a1818, roughness: 0.5 }), helmM = new THREE.MeshStandardMaterial({ color: 0x1e2226, roughness: 0.45 });
-const limb = (r0, r1, m) => { const me = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, 1, 14), m); me.castShadow = true; scene.add(me); return me; }, ball = (r, m) => { const me = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), m); me.castShadow = true; scene.add(me); return me; };
-const OB = { torso: limb(0.15, 0.18, shirtM), pelvis: ball(0.155, pantsM), chestB: ball(0.175, shirtM), neck: limb(0.05, 0.05, skinM), uaR: limb(0.05, 0.055, shirtM), faR: limb(0.04, 0.045, skinM), uaL: limb(0.05, 0.055, shirtM), faL: limb(0.04, 0.045, skinM), shR: ball(0.058, shirtM), shL: ball(0.058, shirtM), elR: ball(0.048, skinM), elL: ball(0.048, skinM), hR: ball(0.055, padM), hL: ball(0.055, padM),
-  thR: limb(0.06, 0.075, pantsM), shinR: limb(0.05, 0.06, pantsM), thL: limb(0.06, 0.075, pantsM), shinL: limb(0.05, 0.06, pantsM), knR: ball(0.06, pantsM), knL: ball(0.06, pantsM), ftR: ball(0.05, helmM), ftL: ball(0.05, helmM) };
-OB.ftR.scale.set(1, 0.6, 2.2); OB.ftL.scale.set(1, 0.6, 2.2);
-// head in a padded helmet with a steel face grille, as stick sparring is done
-const HEAD = new THREE.Group(); scene.add(HEAD);
-{ const sk = new THREE.Mesh(new THREE.SphereGeometry(0.1, 18, 14), skinM); HEAD.add(sk); const hm = new THREE.Mesh(new THREE.SphereGeometry(0.125, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.62), helmM); hm.rotation.x = -0.45; hm.castShadow = true; HEAD.add(hm);
-  const grT = canvasTex(256, 256, (g, w, h) => { g.clearRect(0, 0, w, h); g.strokeStyle = "#c8ccd0"; g.lineWidth = 7; for (let x = 8; x < w; x += 34) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); } for (let y = 8; y < h; y += 34) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); } });
-  const gr = new THREE.Mesh(new THREE.SphereGeometry(0.13, 20, 14, Math.PI * 0.1, Math.PI * 0.8, Math.PI * 0.22, Math.PI * 0.5), new THREE.MeshStandardMaterial({ map: grT, alphaTest: 0.5, metalness: 0.7, roughness: 0.3, side: THREE.DoubleSide })); HEAD.add(gr); }
-const OSTICK = makeStick(), ODAG = makeDagger(), OSTICK2 = makeStick(); scene.add(OSTICK, ODAG, OSTICK2);
-function placeLimb(me, a, b) { const d = _q.subVectors(b, a), L = d.length(); me.position.copy(a).addScaledVector(d, 0.5); me.quaternion.setFromUnitVectors(YAX, d.divideScalar(L || 1)); me.scale.set(1, L, 1); }
-function ik2(S, H, a, b, hint, outE, outH) { const d = V3().subVectors(H, S); let L = d.length(); const dir = d.divideScalar(L || 1); L = Math.min(L, a + b - 0.002); outH.copy(S).addScaledVector(dir, L); const x = (a * a - b * b + L * L) / (2 * L), y = Math.sqrt(Math.max(0, a * a - x * x)); const perp = hint.clone().addScaledVector(dir, -hint.dot(dir)); if (perp.lengthSq() < 1e-6) perp.set(0, -1, 0); perp.normalize(); outE.copy(S).addScaledVector(dir, x).addScaledVector(perp, y); }
-const L2W = (o, x, y, z) => V3().addScaledVector(OPP.r, x).addScaledVector(UP, y).addScaledVector(OPP.f, z).add(o);
-const dirW = (x, y, z) => V3().addScaledVector(OPP.r, x).addScaledVector(UP, y).addScaledVector(OPP.f, z).normalize();
-function weaponAt(obj, hand, dir) { obj.position.copy(hand); obj.quaternion.setFromUnitVectors(NZ, dir); }
-function slerpDir(a, b, t) { const q = new THREE.Quaternion().setFromUnitVectors(a, b); return a.clone().applyQuaternion(new THREE.Quaternion().slerp(q, t)).normalize(); }
-const ease = t => t * t * (3 - 2 * t);
-// the 12 angles (Cabales Serrada), plus the dagger thrust: where the partner's hand chambers (beside its right shoulder: right, up, forward)
-// and which way the stick points there
+// ---------- the attacks ----------
+// The 12 angles (Cabales Serrada), plus the dagger thrust: where the hand chambers (beside its shoulder: right, up, forward) and which
+// way the weapon points there. Knife attacks follow the same angles, as in the Filipino arts; empty-hand attackers box.
 const ANG = [null,
   { n: "left temple", k: "s", ch: [0.15, 0.28, -0.05], cd: [0.35, 0.8, -0.45] }, { n: "right temple", k: "s", ch: [-0.38, 0.22, 0.02], cd: [-0.55, 0.7, -0.4] },
   { n: "left arm", k: "s", ch: [0.22, 0.02, -0.1], cd: [0.7, 0.35, -0.6] }, { n: "right arm", k: "s", ch: [-0.42, -0.02, 0.05], cd: [-0.75, 0.35, -0.5] },
@@ -135,98 +118,150 @@ const ANG = [null,
   { n: "right leg", k: "s", ch: [-0.38, -0.15, 0.02], cd: [-0.55, 0.6, -0.45] }, { n: "left leg", k: "s", ch: [0.2, 0.08, -0.05], cd: [0.5, 0.7, -0.45] },
   { n: "thrust to the left eye", k: "t", ch: [0.06, -0.12, -0.14] }, { n: "thrust to the right eye", k: "t", ch: [-0.1, -0.12, -0.12] },
   { n: "the crown of the head", k: "s", ch: [0.05, 0.38, -0.08], cd: [0.1, 0.6, -0.8] },
-  { n: "dagger thrust", k: "d", ch: [0.05, -0.45, -0.05] }];
+  { n: "dagger thrust", k: "t", left: true, ch: [0.05, -0.45, -0.05] }];
+const PUNCH = { jab: { n: "jab", k: "p", left: true, tgt: 14, ch: [0.05, -0.02, 0.12] }, cross: { n: "cross", k: "p", tgt: 14, ch: [-0.05, -0.02, 0.05] }, hook: { n: "hook", k: "s", tgt: 1, hookP: true, ch: [0.25, -0.05, 0.1], cd: [0.4, 0.3, 0.2] }, body: { n: "body shot", k: "p", tgt: 15, ch: [0.0, -0.25, 0.05] }, lbody: { n: "body shot", k: "p", left: true, tgt: 15, ch: [0.0, -0.25, 0.08] } };
 const NUMW = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "dagger"];
 const SPEEDS = [[0.35, "very slow"], [0.55, "slow"], [0.75, "medium"], [1.0, "fast"], [1.2, "full speed"]], BLOCKP = [0.3, 0.45, 0.6, 0.75, 0.85], REACT = [0.3, 0.22, 0.15, 0.09, 0.05];
-const MODES = ["Angles 1 to 12", "Random angles", "Your strikes", "Sparring"];
-let modeI = 0, speedI = 1, running = false;
-const AI = { noBlock: 0, st: "guard", t: 0, dur: 0, plan: null, next: 1, wait: 1.5, queue: [], blockIn: -1, blockT: 0, fromH: V3(), fromD: V3(), fromHL: V3(), fromDL: V3(), dist: 1.0, roundT: 0, checked: 0 };
-const SC = { you: 0, them: 0, blocks: 0, fed: 0, hitsOnYou: 0 };
-function guardPose() { const sh = OPP.sh, shL = OPP.shL; return { h: L2W(sh, -0.04, -0.2, 0.3), d: dirW(-0.12, 0.8, 0.45), hl: offI === 0 ? L2W(shL, 0.12, -0.18, 0.26) : L2W(shL, 0.05, -0.28, 0.25), dl: offI === 0 ? dirW(0, 1, 0) : dirW(0.1, 0.55, 0.6) }; }
-function startAttack(i, quick = false) { AI.plan = { i, A: ANG[i], left: ANG[i].k === "d", done: false, res: null, quick }; AI.st = "chamber"; AI.t = 0; AI.dur = (quick ? 0.2 : 0.34) / SPEEDS[speedI][0];
-  AI.fromH.copy(OPP.hand); AI.fromD.copy(OPP.dir); AI.fromHL.copy(OPP.handL); AI.fromDL.copy(OPP.dirL); if (modeI < 2) { showTag(i === 13 ? "Dagger thrust" : `Angle ${i}: ${ANG[i].n}`); speak(NUMW[i]); } }
-function planGeometry() { const P = AI.plan, A = P.A, sh = P.left ? OPP.shL : OPP.sh, T = playerTarget(P.i); P.T = T; P.Hch = L2W(sh, A.ch[0], A.ch[1], A.ch[2]);
-  if (A.k === "s") { P.chD = dirW(A.cd[0], A.cd[1], A.cd[2]); P.Hc = T.clone().add(V3().subVectors(sh, T).normalize().multiplyScalar(0.3)); P.cD = V3().subVectors(T, P.Hc).normalize(); P.fD = P.cD.clone().multiplyScalar(2).sub(P.chD).normalize(); P.Hf = P.Hc.clone().add(V3().subVectors(P.Hc, P.Hch).normalize().multiplyScalar(0.25)); }
-  else { const reach = A.k === "d" ? 0.22 : STICK - PUNYO - 0.03; P.chD = V3().subVectors(T, P.Hch).normalize(); P.cD = P.chD.clone(); P.Hc = T.clone().addScaledVector(P.cD, -reach); P.fD = P.cD.clone(); P.Hf = P.Hc.clone(); } }
-function endAttack(res) { const P = AI.plan; if (!P || P.done) return; P.done = true; P.res = res; if (modeI < 2) { SC.fed++; if (res === "blocked" || res === "checked") SC.blocks++; } }
-function deflect(normal) { AI.st = "deflect"; AI.t = 0; AI.dur = 0.3; AI.fromH.copy(OPP.hand); AI.fromD.copy(OPP.dir); AI.defH = OPP.hand.clone().addScaledVector(normal, 0.14).addScaledVector(OPP.f, -0.08); AI.defD = slerpDir(OPP.dir, UP, 0.5); }
-function setTag(t) { AI.tag = t; }
-function aiUpdate(dt) { const spd = SPEEDS[speedI][0], G = guardPose();
-  // footwork: keep serrada's close range, step in on the strike, back off between exchanges when sparring
-  const want = modeI === 3 && AI.st === "guard" && AI.wait > 0.6 ? 1.3 : 1.0, toMe = V3(PB.head.x - OPP.p.x, 0, PB.head.z - OPP.p.z), d = toMe.length();
-  OPP.f.copy(toMe).normalize(); OPP.r.crossVectors(OPP.f, UP); const mv = (d > want ? clampN((d - want) * 3, 0, 1.1) : d < 0.78 ? clampN((d - 0.78) * 3, -1.1, 0) : 0) * dt; OPP.p.addScaledVector(OPP.f, mv); OPP.p.x = clampN(OPP.p.x, -5.3, 5.3); OPP.p.z = clampN(OPP.p.z, -5.3, 5.3);
-  let lungeT = 0; AI.t += dt;
-  if (AI.st === "guard") { OPP.hand.lerp(G.h, 1 - Math.exp(-dt * 10)); OPP.dir.copy(slerpDir(OPP.dir, G.d, 1 - Math.exp(-dt * 10))); OPP.handL.lerp(G.hl, 1 - Math.exp(-dt * 10)); OPP.dirL.copy(slerpDir(OPP.dirL, G.dl, 1 - Math.exp(-dt * 10)));
-    if (running) { AI.wait -= dt; if (AI.wait <= 0) { if (modeI === 0) { let i = AI.next; if (offI === 1 && AI.lastWasAngle) { i = 13; AI.lastWasAngle = false; } else { AI.next = AI.next % 12 + 1; if (seated && (i === 8 || i === 9)) { i = AI.next; AI.next = AI.next % 12 + 1; } AI.lastWasAngle = true; } startAttack(i); AI.wait = 1.7 / Math.sqrt(spd); }
-        else if (modeI === 1) { let i; do { i = 1 + Math.floor(Math.random() * 12); } while (seated && (i === 8 || i === 9)); if (offI === 1 && Math.random() < 0.25) i = 13; startAttack(i); AI.wait = (0.9 + Math.random() * 0.9) / Math.sqrt(spd); }
-        else if (modeI === 3) { if (!AI.queue.length) { const combos = [[1], [2], [1, 2], [1, 5], [12], [3, 4], [1, 2, 12], [8], [9, 2], [5], [10], [4, 1], [1, 9]]; AI.queue = combos[Math.floor(Math.random() * combos.length)].filter(i => !(seated && (i === 8 || i === 9))); if (offI === 1 && Math.random() < 0.4) AI.queue.push(13); }
-          startAttack(AI.queue.shift(), false); AI.wait = AI.queue.length ? 0.05 : (0.8 + Math.random() * 1.6) / spd; } } } }
-  else if (AI.st === "chamber") { const P = AI.plan; planGeometry(); const u = ease(Math.min(1, AI.t / AI.dur));
-    if (P.left) { OPP.handL.lerpVectors(AI.fromHL, P.Hch, u); OPP.dirL.copy(slerpDir(AI.fromDL, P.chD, u)); } else { OPP.hand.lerpVectors(AI.fromH, P.Hch, u); OPP.dir.copy(slerpDir(AI.fromD, P.chD, u)); }
-    if (AI.t >= AI.dur) { AI.st = "strike"; AI.t = 0; AI.dur = 0.2 / spd; } }
-  else if (AI.st === "strike") { const P = AI.plan, u = Math.min(1, AI.t / AI.dur), c = 0.55; let h, dd; lungeT = Math.sin(Math.PI * Math.min(1, u * 1.3)) * 0.22;
+const MODES = ["Angles 1 to 12", "Random angles", "Your strikes", "Sparring", "Combat"];
+const ATTW = ["sticks", "knives", "empty hands", "mixed"];
+let modeI = 0, speedI = 1, running = false, nAtt = 2, attW = 0;
+const SC = { you: 0, them: 0, blocks: 0, fed: 0, hitsOnYou: 0, downs: 0 };
+
+// ---------- the fighters: a sparring partner, or up to four attackers ----------
+const shirtCols = [0x18181c, 0x6a1c1c, 0x1c3a6a, 0x2c4a2a], skinCols = [0xa87452, 0x7a5236, 0xc89a78, 0x5a3a26];
+const pantsM = new THREE.MeshStandardMaterial({ color: 0x2a2c34, roughness: 0.9 }), padM = new THREE.MeshStandardMaterial({ color: 0x8a1818, roughness: 0.5 }), helmM = new THREE.MeshStandardMaterial({ color: 0x1e2226, roughness: 0.45 }), hairM = new THREE.MeshStandardMaterial({ color: 0x1a1410, roughness: 0.9 });
+const grT = canvasTex(256, 256, (g, w, h) => { g.clearRect(0, 0, w, h); g.strokeStyle = "#c8ccd0"; g.lineWidth = 7; for (let x = 8; x < w; x += 34) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); } for (let y = 8; y < h; y += 34) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); } });
+function makeFighter(idx) { const shirtM = new THREE.MeshStandardMaterial({ color: shirtCols[idx], roughness: 0.85 }), skinM = new THREE.MeshStandardMaterial({ color: skinCols[idx], roughness: 0.6 }), G = new THREE.Group(); scene.add(G);
+  const limb = (r0, r1, m) => { const me = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, 1, 14), m); me.castShadow = true; G.add(me); return me; }, ball = (r, m) => { const me = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), m); me.castShadow = true; G.add(me); return me; };
+  const OB = { torso: limb(0.15, 0.18, shirtM), pelvis: ball(0.155, pantsM), chestB: ball(0.175, shirtM), neck: limb(0.05, 0.05, skinM), uaR: limb(0.05, 0.055, shirtM), faR: limb(0.04, 0.045, skinM), uaL: limb(0.05, 0.055, shirtM), faL: limb(0.04, 0.045, skinM), shR: ball(0.058, shirtM), shL: ball(0.058, shirtM), elR: ball(0.048, skinM), elL: ball(0.048, skinM), hR: ball(0.055, padM), hL: ball(0.055, padM),
+    thR: limb(0.06, 0.075, pantsM), shinR: limb(0.05, 0.06, pantsM), thL: limb(0.06, 0.075, pantsM), shinL: limb(0.05, 0.06, pantsM), knR: ball(0.06, pantsM), knL: ball(0.06, pantsM), ftR: ball(0.05, helmM), ftL: ball(0.05, helmM) };
+  OB.ftR.scale.set(1, 0.6, 2.2); OB.ftL.scale.set(1, 0.6, 2.2);
+  const HEAD = new THREE.Group(); G.add(HEAD); HEAD.add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 18, 14), skinM));
+  const helm = new THREE.Group(); HEAD.add(helm); { const hm = new THREE.Mesh(new THREE.SphereGeometry(0.125, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.62), helmM); hm.rotation.x = -0.45; hm.castShadow = true; helm.add(hm);
+    helm.add(new THREE.Mesh(new THREE.SphereGeometry(0.13, 20, 14, Math.PI * 0.1, Math.PI * 0.8, Math.PI * 0.22, Math.PI * 0.5), new THREE.MeshStandardMaterial({ map: grT, alphaTest: 0.5, metalness: 0.7, roughness: 0.3, side: THREE.DoubleSide }))); }
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.105, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), hairM); hair.rotation.x = -0.35; HEAD.add(hair);
+  const wR = { stick: makeStick(), knife: makeKnife() }, wL = { stick: makeStick(), knife: makeKnife() }; G.add(wR.stick, wR.knife, wL.stick, wL.knife);
+  const F = { idx, G, OB, HEAD, helm, hair, wR, wL, p: V3(0, FLOOR_Y, 0.85), f: V3(0, 0, 1), r: V3(-1, 0, 0), lunge: 0, flinch: 0, hand: V3(), dir: V3(0, 1, 0), handL: V3(), dirL: V3(0, 1, 0), elbow: V3(), elbowL: V3(), sh: V3(), shL: V3(), head: V3(), chest: V3(), hips: V3(), aR: V3(), aL: V3(), kR: V3(), kL: V3(),
+    st: "guard", t: 0, dur: 0, plan: null, wait: 1.5, queue: [], blockIn: -1, blockT: 0, noBlock: 0, threat: "head", threatV: null, fromH: V3(), fromD: V3(), fromHL: V3(), fromDL: V3(), weapon: "stick", off: "hand", hp: 6, down: 0, active: idx === 0, slot: 0, next: 1, lastWasAngle: false };
+  return F; }
+const FIGHTERS = [0, 1, 2, 3].map(makeFighter);
+const L2W = (F, o, x, y, z) => V3().addScaledVector(F.r, x).addScaledVector(UP, y).addScaledVector(F.f, z).add(o);
+const dirW = (F, x, y, z) => V3().addScaledVector(F.r, x).addScaledVector(UP, y).addScaledVector(F.f, z).normalize();
+function placeLimb(me, a, b) { const d = V3().subVectors(b, a), L = d.length(); me.position.copy(a).addScaledVector(d, 0.5); me.quaternion.setFromUnitVectors(YAX, d.divideScalar(L || 1)); me.scale.set(1, L, 1); }
+function ik2(S, H, a, b, hint, outE, outH) { const d = V3().subVectors(H, S); let L = d.length(); const dir = d.divideScalar(L || 1); L = Math.min(L, a + b - 0.002); outH.copy(S).addScaledVector(dir, L); const x = (a * a - b * b + L * L) / (2 * L), y = Math.sqrt(Math.max(0, a * a - x * x)); const perp = hint.clone().addScaledVector(dir, -hint.dot(dir)); if (perp.lengthSq() < 1e-6) perp.set(0, -1, 0); perp.normalize(); outE.copy(S).addScaledVector(dir, x).addScaledVector(perp, y); }
+function weaponAt(obj, hand, dir) { obj.position.copy(hand); obj.quaternion.setFromUnitVectors(NZ, dir); }
+function slerpDir(a, b, t) { const q = new THREE.Quaternion().setFromUnitVectors(a, b); return a.clone().applyQuaternion(new THREE.Quaternion().slerp(q, t)).normalize(); }
+const ease = t => t * t * (3 - 2 * t);
+const wantDist = F => F.weapon === "stick" ? 1.0 : 0.72;
+function guardPose(F) { const sh = F.sh, shL = F.shL; let h, d, hl, dl;
+  if (F.weapon === "stick") { h = L2W(F, sh, -0.04, -0.2, 0.3); d = dirW(F, -0.12, 0.8, 0.45); } else if (F.weapon === "knife") { h = L2W(F, sh, -0.05, -0.25, 0.3); d = dirW(F, -0.1, 0.45, 0.9); } else { h = L2W(F, sh, -0.12, 0.02, 0.16); d = dirW(F, 0, 1, 0.3); }
+  if (F.weapon === "hand") { hl = L2W(F, shL, 0.1, 0.04, 0.26); dl = dirW(F, 0, 1, 0.3); } else if (F.off === "hand") { hl = L2W(F, shL, 0.12, -0.18, 0.26); dl = dirW(F, 0, 1, 0); } else { hl = L2W(F, shL, 0.05, -0.28, 0.25); dl = dirW(F, 0.1, 0.55, 0.6); }
+  return { h, d, hl, dl }; }
+const kindOfF = (F, left) => left ? F.off : F.weapon;
+function startAttack(F, A, label, quick = false) { F.plan = { A, i: A.tgt || A.idx, left: !!A.left, done: false, res: null }; F.st = "chamber"; F.t = 0; const fast = A.k === "p" ? 0.45 : 1; F.dur = (quick ? 0.2 : 0.34) * fast / SPEEDS[speedI][0];
+  F.fromH.copy(F.hand); F.fromD.copy(F.dir); F.fromHL.copy(F.handL); F.fromDL.copy(F.dirL); if (label) { showTag(label); if (A.idx) speak(NUMW[A.idx]); } }
+function planGeometry(F) { const P = F.plan, A = P.A, sh = P.left ? F.shL : F.sh, T = playerTarget(P.i, F), wk = kindOfF(F, P.left); P.T = T; P.Hch = L2W(F, sh, A.ch[0], A.ch[1], A.ch[2]);
+  if (A.k === "s") { const sweet = wk === "stick" ? 0.3 : wk === "knife" ? 0.17 : 0.0; P.chD = dirW(F, A.cd[0], A.cd[1], A.cd[2]); P.Hc = T.clone().add(V3().subVectors(sh, T).normalize().multiplyScalar(sweet)); if (wk === "hand") P.Hc = T.clone(); P.cD = V3().subVectors(T, P.Hc); if (P.cD.lengthSq() < 1e-6) P.cD.copy(V3().subVectors(T, sh)); P.cD.normalize(); P.fD = P.cD.clone().multiplyScalar(2).sub(P.chD).normalize(); P.Hf = P.Hc.clone().add(V3().subVectors(P.Hc, P.Hch).normalize().multiplyScalar(wk === "hand" ? 0.08 : 0.25)); }
+  else { const reach = wk === "stick" ? STICK - PUNYO - 0.03 : wk === "knife" ? 0.22 : 0.0; P.chD = V3().subVectors(T, P.Hch).normalize(); P.cD = P.chD.clone(); P.Hc = T.clone().addScaledVector(P.cD, -reach); P.fD = P.cD.clone(); P.Hf = P.Hc.clone(); } }
+function endAttack(F, res) { const P = F.plan; if (!P || P.done) return; P.done = true; P.res = res; if (modeI < 2) { SC.fed++; if (res === "blocked" || res === "checked") SC.blocks++; } }
+function toRecover(F, d) { F.st = "recover"; F.t = 0; F.dur = d; F.fromH.copy(F.hand); F.fromD.copy(F.dir); F.fromHL.copy(F.handL); F.fromDL.copy(F.dirL); }
+function deflect(F, normal) { F.st = "deflect"; F.t = 0; F.dur = 0.3; F.fromH.copy(F.hand); F.fromD.copy(F.dir); F.fromHL.copy(F.handL); F.fromDL.copy(F.dirL); const left = F.plan && F.plan.left; F.defLeft = left;
+  F.defH = (left ? F.handL : F.hand).clone().addScaledVector(normal, 0.14).addScaledVector(F.f, -0.08); F.defD = slerpDir(left ? F.dirL : F.dir, UP, 0.5); }
+// what an attacker throws next
+function chooseAttack(F) { const w = F.weapon;
+  if (w === "hand") { const c = [["jab", "cross"], ["jab", "jab", "cross"], ["cross", "hook"], ["jab", "body"], ["lbody", "hook"], ["jab", "cross", "hook"]][Math.floor(Math.random() * 6)]; return c.map(k => PUNCH[k]); }
+  const combos = w === "knife" ? [[5], [1, 5], [2], [6], [7, 1], [10], [3, 4], [5, 5]] : [[1], [2], [1, 2], [1, 5], [12], [3, 4], [1, 2, 12], [8], [9, 2], [5], [10], [4, 1], [1, 9]];
+  let c = combos[Math.floor(Math.random() * combos.length)].filter(i => !(seated && (i === 8 || i === 9))); if (!c.length) c = [1]; const out = c.map(i => ({ ...ANG[i], idx: i })); if (F.off === "knife" && Math.random() < 0.35) out.push({ ...ANG[13], idx: 13 }); return out; }
+function aiUpdate(F, dt, others) { const spd = SPEEDS[speedI][0], G = guardPose(F);
+  if (F.down > 0) return;
+  // footwork: keep range, step in on the strike; sparring partners back off between exchanges; attackers spread round you
+  const combat = modeI === 4, want = (modeI === 3 && F.st === "guard" && F.wait > 0.6 ? 1.3 : wantDist(F)), toMe = V3(PB.head.x - F.p.x, 0, PB.head.z - F.p.z), d = toMe.length();
+  F.f.copy(toMe).normalize(); F.r.crossVectors(F.f, UP); const mv = (d > want ? clampN((d - want) * 3, 0, 1.4) : d < want - 0.22 ? clampN((d - want + 0.22) * 3, -1.1, 0) : 0) * dt; F.p.addScaledVector(F.f, mv);
+  if (combat && others.length > 1) { const myA = Math.atan2(F.p.x - PB.head.x, F.p.z - PB.head.z), wantA = Math.atan2(PB.f.x, PB.f.z) + F.slot, da = Math.atan2(Math.sin(wantA - myA), Math.cos(wantA - myA)); F.p.addScaledVector(F.r, clampN(da, -1, 1) * 0.9 * dt * d);
+    for (const o of others) if (o !== F && o.down <= 0) { const dx = F.p.x - o.p.x, dz = F.p.z - o.p.z, dd = Math.hypot(dx, dz); if (dd < 0.65 && dd > 1e-3) { F.p.x += dx / dd * (0.65 - dd) * 0.5; F.p.z += dz / dd * (0.65 - dd) * 0.5; } } }
+  F.p.x = clampN(F.p.x, -5.3, 5.3); F.p.z = clampN(F.p.z, -5.3, 5.3);
+  let lungeT = 0; F.t += dt; const lerpK = 1 - Math.exp(-dt * 10);
+  if (F.st === "guard") { F.hand.lerp(G.h, lerpK); F.dir.copy(slerpDir(F.dir, G.d, lerpK)); F.handL.lerp(G.hl, lerpK); F.dirL.copy(slerpDir(F.dirL, G.dl, lerpK));
+    if (running) { F.wait -= dt; if (F.wait <= 0) {
+        if (modeI === 0) { let i = F.next; if (F.off === "knife" && F.lastWasAngle) { i = 13; F.lastWasAngle = false; } else { F.next = F.next % 12 + 1; if (seated && (i === 8 || i === 9)) { i = F.next; F.next = F.next % 12 + 1; } F.lastWasAngle = true; } startAttack(F, { ...ANG[i], idx: i }, i === 13 ? "Dagger thrust" : `Angle ${i}: ${ANG[i].n}`); F.wait = 1.7 / Math.sqrt(spd); }
+        else if (modeI === 1) { let i; do { i = 1 + Math.floor(Math.random() * 12); } while (seated && (i === 8 || i === 9)); if (F.off === "knife" && Math.random() < 0.25) i = 13; startAttack(F, { ...ANG[i], idx: i }, i === 13 ? "Dagger thrust" : `Angle ${i}: ${ANG[i].n}`); F.wait = (0.9 + Math.random() * 0.9) / Math.sqrt(spd); }
+        else if (modeI === 3 || combat) { const striking = others.filter(o => o !== F && (o.st === "chamber" || o.st === "strike")).length; if (combat && striking >= 2) F.wait = 0.15; else { if (!F.queue.length) F.queue = chooseAttack(F); startAttack(F, F.queue.shift()); F.wait = F.queue.length ? 0.04 : combat ? (0.35 + Math.random() * 0.9) / spd : (0.8 + Math.random() * 1.6) / spd; } } } } }
+  else if (F.st === "chamber") { const P = F.plan; planGeometry(F); const u = ease(Math.min(1, F.t / F.dur));
+    if (P.left) { F.handL.lerpVectors(F.fromHL, P.Hch, u); F.dirL.copy(slerpDir(F.fromDL, P.chD, u)); } else { F.hand.lerpVectors(F.fromH, P.Hch, u); F.dir.copy(slerpDir(F.fromD, P.chD, u)); }
+    if (F.t >= F.dur) { F.st = "strike"; F.t = 0; F.dur = (P.A.k === "p" ? 0.14 : 0.2) / spd; } }
+  else if (F.st === "strike") { const P = F.plan, u = Math.min(1, F.t / F.dur), c = 0.55; let h, dd; lungeT = Math.sin(Math.PI * Math.min(1, u * 1.3)) * (F.weapon === "stick" ? 0.22 : 0.15);
     if (u < c) { const w = ease(u / c); h = V3().lerpVectors(P.Hch, P.Hc, w); dd = slerpDir(P.chD, P.cD, w); } else { const w = (u - c) / (1 - c); h = V3().lerpVectors(P.Hc, P.Hf, w); dd = slerpDir(P.cD, P.fD, w); }
-    if (P.left) { OPP.handL.copy(h); OPP.dirL.copy(dd); } else { OPP.hand.copy(h); OPP.dir.copy(dd); }
-    if (AI.t >= AI.dur) { if (!P.done) endAttack("evaded"); AI.st = "recover"; AI.t = 0; AI.dur = 0.32 / spd; AI.fromH.copy(OPP.hand); AI.fromD.copy(OPP.dir); AI.fromHL.copy(OPP.handL); AI.fromDL.copy(OPP.dirL); } }
-  else if (AI.st === "deflect") { const u = ease(Math.min(1, AI.t / AI.dur)); OPP.hand.lerpVectors(AI.fromH, AI.defH, u); OPP.dir.copy(slerpDir(AI.fromD, AI.defD, u)); OPP.handL.lerp(G.hl, 1 - Math.exp(-dt * 8));
-    if (AI.t >= AI.dur) { AI.st = "recover"; AI.t = 0; AI.dur = 0.28 / spd; AI.fromH.copy(OPP.hand); AI.fromD.copy(OPP.dir); AI.fromHL.copy(OPP.handL); AI.fromDL.copy(OPP.dirL); } }
-  else if (AI.st === "recover") { const u = ease(Math.min(1, AI.t / AI.dur)); OPP.hand.lerpVectors(AI.fromH, G.h, u); OPP.dir.copy(slerpDir(AI.fromD, G.d, u)); OPP.handL.lerpVectors(AI.fromHL, G.hl, u); OPP.dirL.copy(slerpDir(AI.fromDL, G.dl, u)); if (AI.t >= AI.dur) { AI.st = "guard"; AI.t = 0; } }
-  else if (AI.st === "block") { const Tp = OPP[AI.threat || "head"], mid = V3().lerpVectors(WS.main.a, WS.main.b, 0.7), side = V3().subVectors(mid, Tp); side.addScaledVector(OPP.f, -0.5 * side.dot(OPP.f)); if (side.lengthSq() < 1e-6) side.copy(OPP.f); side.normalize();
-    let bd = V3().crossVectors(AI.threatV || UP, OPP.f); if (bd.lengthSq() < 1e-8) bd.copy(dirW(0.3, 1, 0.2)); bd.normalize(); if (bd.dot(UP) < -0.2) bd.negate();
-    const center = Tp.clone().addScaledVector(side, 0.2).addScaledVector(OPP.f, 0.1), h = center.addScaledVector(bd, -0.2); OPP.hand.lerp(h, 1 - Math.exp(-dt * 30)); OPP.dir.copy(slerpDir(OPP.dir, bd, 1 - Math.exp(-dt * 30))); AI.blockT -= dt;
-    if (offI === 0) OPP.handL.lerp(handPos(mainSide()).lerp(OPP.shL, 0.3), 1 - Math.exp(-dt * 12));
-    if (AI.blockT <= 0) { AI.st = "recover"; AI.t = 0; AI.dur = 0.22 / spd; AI.fromH.copy(OPP.hand); AI.fromD.copy(OPP.dir); AI.fromHL.copy(OPP.handL); AI.fromDL.copy(OPP.dirL); if (modeI === 3 && Math.random() < 0.55) { AI.st = "guard"; AI.queue = [[1, 2, 12, 5, 3, 4][Math.floor(Math.random() * 6)]]; AI.wait = 0.05; } } }
-  // defending: when your stick comes in fast, block (or not), after a human reaction time
-  if (AI.noBlock > 0) AI.noBlock -= dt;
-  if ((modeI === 2 || modeI === 3) && running && (AI.st === "guard" || AI.st === "recover") && AI.blockIn < 0 && !(AI.noBlock > 0)) { const v = V3().subVectors(WS.main.b, WS.main.pb).divideScalar(Math.max(dt, 1e-3)), to = V3().subVectors(OPP.chest, WS.main.b), dist = to.length();
-    const pred = WS.main.b.clone().addScaledVector(v, 0.2), near = Math.min(pred.distanceTo(OPP.head), segDist(pred, pred, OPP.hips, OPP.chest), pred.distanceTo(OPP.aR));
-    if (dist < 1.3 && WS.main.v > 2.2 && (v.dot(to.normalize()) > 1.5 || near < 0.4)) { if (Math.random() < BLOCKP[speedI]) { AI.blockIn = REACT[speedI]; AI.threatV = v.clone(); AI.threat = ["head", "chest", "aR"].reduce((m, k) => pred.distanceTo(OPP[k]) < pred.distanceTo(OPP[m]) ? k : m, "head"); } else AI.noBlock = 0.5; } }
-  if (AI.blockIn >= 0) { AI.blockIn -= dt; if (AI.blockIn < 0) { if (AI.st === "guard" || AI.st === "recover") { AI.st = "block"; AI.blockT = 0.32; } AI.blockIn = -1; } }
-  OPP.lunge += (lungeT - OPP.lunge) * (1 - Math.exp(-dt * 20)); OPP.flinch = Math.max(0, OPP.flinch - dt); }
-function poseOpp() { const p = V3().copy(OPP.p).addScaledVector(OPP.f, OPP.lunge), fl = OPP.flinch > 0 ? Math.sin(OPP.flinch / 0.3 * Math.PI) * 0.07 : 0;
-  OPP.hips.copy(p).addScaledVector(UP, 0.95); OPP.chest.copy(p).addScaledVector(UP, 1.32).addScaledVector(OPP.f, 0.03 - fl).addScaledVector(OPP.r, 0.02); OPP.head.copy(p).addScaledVector(UP, 1.6).addScaledVector(OPP.f, 0.02 - fl * 1.5);
-  OPP.sh.copy(OPP.chest).addScaledVector(OPP.r, 0.19).addScaledVector(UP, 0.1); OPP.shL.copy(OPP.chest).addScaledVector(OPP.r, -0.19).addScaledVector(UP, 0.1); }
-function drawOpp() { const hint = V3().addScaledVector(UP, -1).addScaledVector(OPP.r, 0.6), hintL = V3().addScaledVector(UP, -1).addScaledVector(OPP.r, -0.6);
-  ik2(OPP.sh, OPP.hand, 0.3, 0.28, hint, OPP.elbow, OPP.aR); ik2(OPP.shL, OPP.handL, 0.3, 0.28, hintL, OPP.elbowL, OPP.aL);
-  placeLimb(OB.torso, OPP.hips, OPP.chest); OB.pelvis.position.copy(OPP.hips); OB.chestB.position.copy(OPP.chest); placeLimb(OB.neck, OPP.chest, OPP.head);
-  placeLimb(OB.uaR, OPP.sh, OPP.elbow); placeLimb(OB.faR, OPP.elbow, OPP.aR); placeLimb(OB.uaL, OPP.shL, OPP.elbowL); placeLimb(OB.faL, OPP.elbowL, OPP.aL);
-  OB.shR.position.copy(OPP.sh); OB.shL.position.copy(OPP.shL); OB.elR.position.copy(OPP.elbow); OB.elL.position.copy(OPP.elbowL); OB.hR.position.copy(OPP.aR); OB.hL.position.copy(OPP.aL);
-  const base = V3().copy(OPP.p).addScaledVector(OPP.f, OPP.lunge * 0.6), fR = L2W(base, 0.14, 0.05, 0.22 + OPP.lunge * 0.5), fL = L2W(base, -0.14, 0.05, -0.2), hipR = OPP.hips.clone().addScaledVector(OPP.r, 0.1), hipL = OPP.hips.clone().addScaledVector(OPP.r, -0.1), kR = V3(), kL = V3(), aR = V3(), aL = V3();
-  ik2(hipR, fR, 0.46, 0.45, OPP.f, kR, aR); ik2(hipL, fL, 0.46, 0.45, OPP.f, kL, aL); placeLimb(OB.thR, hipR, kR); placeLimb(OB.shinR, kR, aR); placeLimb(OB.thL, hipL, kL); placeLimb(OB.shinL, kL, aL); OB.knR.position.copy(kR); OB.knL.position.copy(kL);
-  OB.ftR.position.copy(aR).setY(FLOOR_Y + 0.03).addScaledVector(OPP.f, 0.06); OB.ftL.position.copy(aL).setY(FLOOR_Y + 0.03).addScaledVector(OPP.f, 0.06); OB.ftR.rotation.y = OB.ftL.rotation.y = Math.atan2(OPP.f.x, OPP.f.z);
-  HEAD.position.copy(OPP.head); HEAD.lookAt(PB.head);
-  weaponAt(OSTICK, OPP.aR, OPP.dir); ODAG.visible = offI === 1; OSTICK2.visible = offI === 2; weaponAt(ODAG, OPP.aL, OPP.dirL); weaponAt(OSTICK2, OPP.aL, OPP.dirL); }
-// partner's volumes, for your hits
-function oppVolumes() { return [{ a: OPP.head, b: null, r: 0.14, n: "head" }, { a: OPP.hips, b: OPP.chest, r: 0.18, n: "body" }, { a: OPP.sh, b: OPP.elbow, r: 0.055, n: "arm" }, { a: OPP.elbow, b: OPP.aR, r: 0.05, n: "weapon arm" }, { a: OPP.aR, b: null, r: 0.06, n: "weapon hand" },
-  { a: OPP.shL, b: OPP.elbowL, r: 0.055, n: "arm" }, { a: OPP.elbowL, b: OPP.aL, r: 0.05, n: "arm" }, { a: OPP.aL, b: null, r: 0.06, n: "hand" }, { a: OB.thR.position, b: OB.knR.position, r: 0.08, n: "leg" }, { a: OB.thL.position, b: OB.knL.position, r: 0.08, n: "leg" }]; }
-const oppSeg = (left) => { const h = left ? OPP.aL : OPP.aR, d = left ? OPP.dirL : OPP.dir; if (left && offI !== 2) return [h.clone().addScaledVector(d, 0.05), h.clone().addScaledVector(d, 0.24)]; return [h.clone().addScaledVector(d, -PUNYO), h.clone().addScaledVector(d, STICK - PUNYO)]; };
+    if (P.left) { F.handL.copy(h); F.dirL.copy(dd); } else { F.hand.copy(h); F.dir.copy(dd); }
+    if (F.t >= F.dur) { if (!P.done) endAttack(F, "evaded"); toRecover(F, (P.A.k === "p" ? 0.18 : 0.32) / spd); } }
+  else if (F.st === "deflect") { const u = ease(Math.min(1, F.t / F.dur)); if (F.defLeft) { F.handL.lerpVectors(F.fromHL, F.defH, u); F.dirL.copy(slerpDir(F.fromDL, F.defD, u)); F.hand.lerp(G.h, lerpK); } else { F.hand.lerpVectors(F.fromH, F.defH, u); F.dir.copy(slerpDir(F.fromD, F.defD, u)); F.handL.lerp(G.hl, lerpK * 0.8); } if (F.t >= F.dur) toRecover(F, 0.28 / spd); }
+  else if (F.st === "recover") { const u = ease(Math.min(1, F.t / F.dur)); F.hand.lerpVectors(F.fromH, G.h, u); F.dir.copy(slerpDir(F.fromD, G.d, u)); F.handL.lerpVectors(F.fromHL, G.hl, u); F.dirL.copy(slerpDir(F.fromDL, G.dl, u)); if (F.t >= F.dur) { F.st = "guard"; F.t = 0; } }
+  else if (F.st === "block") { const Tp = F[F.threat || "head"], mid = V3().lerpVectors(WS.main.a, WS.main.b, 0.7), side = V3().subVectors(mid, Tp); side.addScaledVector(F.f, -0.5 * side.dot(F.f)); if (side.lengthSq() < 1e-6) side.copy(F.f); side.normalize();
+    let bd = V3().crossVectors(F.threatV || UP, F.f); if (bd.lengthSq() < 1e-8) bd.copy(dirW(F, 0.3, 1, 0.2)); bd.normalize(); if (bd.dot(UP) < -0.2) bd.negate();
+    const center = Tp.clone().addScaledVector(side, 0.2).addScaledVector(F.f, 0.1), h = F.weapon === "stick" ? center.clone().addScaledVector(bd, -0.2) : center.clone().addScaledVector(F.f, -0.02); const k = 1 - Math.exp(-dt * 30); F.hand.lerp(h, k); F.dir.copy(slerpDir(F.dir, bd, k)); F.blockT -= dt;
+    if (F.off === "hand" || F.weapon === "hand") F.handL.lerp(F.weapon === "hand" ? L2W(F, F.shL, 0.12, 0.12, 0.18) : handPos(mainSide()).lerp(F.shL, 0.3), 1 - Math.exp(-dt * 12));
+    if (F.blockT <= 0) { toRecover(F, 0.22 / spd); if ((modeI === 3 && Math.random() < 0.55) || (combat && Math.random() < 0.7)) { F.st = "guard"; F.queue = chooseAttack(F).slice(0, 1); F.wait = 0.05; } } }
+  // defending: when your weapon comes in fast, block (or not), after a human reaction time
+  if (F.noBlock > 0) F.noBlock -= dt;
+  if ((modeI >= 2) && running && (F.st === "guard" || F.st === "recover") && F.blockIn < 0 && !(F.noBlock > 0)) { for (const which of ["main", "off"]) { const S = WS[which]; if (S.v < KIND[kindOf(which)].need) continue; const v = V3().subVectors(S.b, S.pb).divideScalar(Math.max(dt, 1e-3)), to = V3().subVectors(F.chest, S.b), dist = to.length();
+      const pred = S.b.clone().addScaledVector(v, 0.2), near = Math.min(pred.distanceTo(F.head), segDist(pred, pred, F.hips, F.chest), pred.distanceTo(F.aR));
+      if (dist < 1.3 && (v.dot(to.normalize()) > 1.5 || near < 0.4)) { const p = BLOCKP[speedI] * (combat ? 0.7 : 1); if (Math.random() < p) { F.blockIn = REACT[speedI]; F.threatV = v.clone(); F.threat = ["head", "chest", "aR"].reduce((m, k) => pred.distanceTo(F[k]) < pred.distanceTo(F[m]) ? k : m, "head"); } else F.noBlock = 0.5; break; } } }
+  if (F.blockIn >= 0) { F.blockIn -= dt; if (F.blockIn < 0) { if (F.st === "guard" || F.st === "recover") { F.st = "block"; F.blockT = 0.32; } F.blockIn = -1; } }
+  F.lunge += (lungeT - F.lunge) * (1 - Math.exp(-dt * 20)); F.flinch = Math.max(0, F.flinch - dt); }
+function poseF(F) { const p = V3().copy(F.p).addScaledVector(F.f, F.lunge), fl = F.flinch > 0 ? Math.sin(F.flinch / 0.3 * Math.PI) * 0.07 : 0;
+  if (F.down > 0) { const u = Math.min(1, F.down / 0.8); F.hips.copy(p).addScaledVector(UP, lerpN(0.95, 0.14, u)).addScaledVector(F.f, -0.3 * u); F.chest.copy(F.hips).addScaledVector(UP, lerpN(0.37, 0.0, u)).addScaledVector(F.f, -0.37 * u).setY(lerpN(F.hips.y + 0.37, 0.16, u)); F.head.copy(F.chest).addScaledVector(F.f, -0.28 * u).setY(lerpN(F.chest.y + 0.28, 0.13, u)); }
+  else { F.hips.copy(p).addScaledVector(UP, 0.95); F.chest.copy(p).addScaledVector(UP, 1.32).addScaledVector(F.f, 0.03 - fl).addScaledVector(F.r, 0.02); F.head.copy(p).addScaledVector(UP, 1.6).addScaledVector(F.f, 0.02 - fl * 1.5); }
+  F.sh.copy(F.chest).addScaledVector(F.r, 0.19).addScaledVector(UP, 0.1); F.shL.copy(F.chest).addScaledVector(F.r, -0.19).addScaledVector(UP, 0.1);
+  if (F.down > 0) { F.hand.copy(F.sh).addScaledVector(F.r, 0.3).setY(0.08); F.handL.copy(F.shL).addScaledVector(F.r, -0.3).setY(0.08); } }
+const lerpN = THREE.MathUtils.lerp;
+function drawF(F) { const O = F.OB, hint = V3().addScaledVector(UP, -1).addScaledVector(F.r, 0.6), hintL = V3().addScaledVector(UP, -1).addScaledVector(F.r, -0.6);
+  ik2(F.sh, F.hand, 0.3, 0.28, hint, F.elbow, F.aR); ik2(F.shL, F.handL, 0.3, 0.28, hintL, F.elbowL, F.aL);
+  placeLimb(O.torso, F.hips, F.chest); O.pelvis.position.copy(F.hips); O.chestB.position.copy(F.chest); placeLimb(O.neck, F.chest, F.head);
+  placeLimb(O.uaR, F.sh, F.elbow); placeLimb(O.faR, F.elbow, F.aR); placeLimb(O.uaL, F.shL, F.elbowL); placeLimb(O.faL, F.elbowL, F.aL);
+  O.shR.position.copy(F.sh); O.shL.position.copy(F.shL); O.elR.position.copy(F.elbow); O.elL.position.copy(F.elbowL); O.hR.position.copy(F.aR); O.hL.position.copy(F.aL);
+  const base = V3().copy(F.p).addScaledVector(F.f, F.lunge * 0.6), fR = F.down > 0 ? L2W(F, base, 0.14, 0.08, 0.5) : L2W(F, base, 0.14, 0.05, 0.22 + F.lunge * 0.5), fL = F.down > 0 ? L2W(F, base, -0.14, 0.08, 0.45) : L2W(F, base, -0.14, 0.05, -0.2), hipR = F.hips.clone().addScaledVector(F.r, 0.1), hipL = F.hips.clone().addScaledVector(F.r, -0.1), aR = V3(), aL = V3();
+  ik2(hipR, fR, 0.46, 0.45, F.down > 0 ? UP : F.f, F.kR, aR); ik2(hipL, fL, 0.46, 0.45, F.down > 0 ? UP : F.f, F.kL, aL); placeLimb(O.thR, hipR, F.kR); placeLimb(O.shinR, F.kR, aR); placeLimb(O.thL, hipL, F.kL); placeLimb(O.shinL, F.kL, aL); O.knR.position.copy(F.kR); O.knL.position.copy(F.kL);
+  O.ftR.position.copy(aR).setY(Math.max(FLOOR_Y + 0.03, aR.y)).addScaledVector(F.f, 0.06); O.ftL.position.copy(aL).setY(Math.max(FLOOR_Y + 0.03, aL.y)).addScaledVector(F.f, 0.06); O.ftR.rotation.y = O.ftL.rotation.y = Math.atan2(F.f.x, F.f.z);
+  F.HEAD.position.copy(F.head); if (F.down > 0) F.HEAD.lookAt(F.head.clone().add(UP)); else F.HEAD.lookAt(PB.head); F.helm.visible = modeI !== 4; F.hair.visible = modeI === 4;
+  F.wR.stick.visible = F.weapon === "stick"; F.wR.knife.visible = F.weapon === "knife"; F.wL.stick.visible = F.off === "stick"; F.wL.knife.visible = F.off === "knife";
+  weaponAt(F.wR.stick, F.aR, F.dir); weaponAt(F.wR.knife, F.aR, F.dir); weaponAt(F.wL.stick, F.aL, F.dirL); weaponAt(F.wL.knife, F.aL, F.dirL); }
+// a fighter's volumes, for your hits, and its weapons as segments
+function fVolumes(F) { return [{ a: F.head, b: null, r: 0.14, n: "head" }, { a: F.hips, b: F.chest, r: 0.18, n: "body" }, { a: F.sh, b: F.elbow, r: 0.055, n: "arm" }, { a: F.elbow, b: F.aR, r: 0.05, n: "weapon arm" }, { a: F.aR, b: null, r: 0.06, n: "weapon hand" },
+  { a: F.shL, b: F.elbowL, r: 0.055, n: "arm" }, { a: F.elbowL, b: F.aL, r: 0.05, n: "arm" }, { a: F.aL, b: null, r: 0.06, n: "hand" }, { a: F.OB.thR.position, b: F.kR, r: 0.08, n: "leg" }, { a: F.OB.thL.position, b: F.kL, r: 0.08, n: "leg" }]; }
+function fSeg(F, left) { const h = left ? F.aL : F.aR, d = left ? F.dirL : F.dir, k = KIND[kindOfF(F, left)]; if (kindOfF(F, left) === "hand") return [h.clone(), h.clone(), 0.055]; return [h.clone().addScaledVector(d, k.near), h.clone().addScaledVector(d, k.far), k.r]; }
 
 // ---------- contact: blocks, hits, clacks ----------
-let clackCD = 0, flashT = 0, flashCol = 0;
-const SRCH = () => ({ main: mainSide(), off: offSide() });
+let clackCD = 0, flashT = 0;
 function buzz(side, s = 0.8, ms = 45) { const g = SRC[side]?.gamepad; if (!g) return; const h = g.hapticActuators?.[0]; if (h?.pulse) h.pulse(s, ms); else g.vibrationActuator?.playEffect?.("dual-rumble", { duration: ms, strongMagnitude: s, weakMagnitude: s * 0.6 }); }
+const DMG_ON_YOU = (F, part) => { const k = kindOfF(F, F.plan.left); if (k === "hand") return part === "head" ? 2 : 1; if (k === "knife") return part === "body" || part === "head" ? 4 : 2; return part === "head" ? 3 : part === "body" ? 2 : 1; };
+const DMG_BY_YOU = (kind, part) => kind === "hand" ? (part === "head" ? 2 : 1) : kind === "knife" ? (part === "body" || part === "head" ? 3 : 1) : part === "head" ? 3 : part === "body" ? 2 : 1;
 const _p1 = V3(), _p2 = V3();
-function contact(dt) { clackCD -= dt; const sides = SRCH();
-  const segs = [["main", WS.main], ["off", WS.off]];
-  // 1. stick on stick, at any time: the clack, and if the partner was striking, a block
-  for (const left of [false, true]) { if (left && offI === 0) continue; const [oa, ob] = oppSeg(left); const striking = AI.st === "strike" && AI.plan && !AI.plan.done && AI.plan.left === left;
-    for (const [key, S] of segs) { if (key === "off" && offI === 0) continue; const d = segDist(S.a, S.b, oa, ob, _p1, _p2), rad = (key === "off" && offI === 1 ? 0.012 : STICK_R) + STICK_R + 0.02;
-      if (d < rad) { const rel = S.v + (striking ? 6 : 1); if (clackCD <= 0 && rel > 1.2) { clack(clampN(rel / 8, 0.3, 1)); buzz(sides[key], clampN(rel / 6, 0.3, 1), 50); clackCD = 0.12; }
-        if (striking) { endAttack("blocked"); deflect(V3().subVectors(_p2, _p1).normalize()); showTag("Blocked", "#7ce07c"); }
-        else if (AI.st === "block" || AI.st === "guard" || AI.st === "recover") S.blockedT = 0.3; } } }
-  // 2. your live hand on the partner's weapon arm while it strikes: a pass or a check
-  if (offI === 0 && AI.st === "strike" && AI.plan && !AI.plan.done && !AI.plan.left) { const hp = handPos(sides.off), d = segDist(hp, hp, OPP.elbow, OPP.aR); if (d < 0.1) { endAttack("checked"); showTag("Passed and checked", "#7ce07c"); buzz(sides.off, 0.4, 30); AI.st = "recover"; AI.t = 0; AI.dur = 0.35 / SPEEDS[speedI][0]; AI.fromH.copy(OPP.hand); AI.fromD.copy(OPP.dir); AI.fromHL.copy(OPP.handL); AI.fromDL.copy(OPP.dirL); } }
-  // 3. the partner's weapon reaching you
-  if (AI.st === "strike" && AI.plan && !AI.plan.done) { const left = AI.plan.left, h = left ? OPP.aL : OPP.aR, dd = left ? OPP.dirL : OPP.dir, a = h.clone().addScaledVector(dd, left ? 0.08 : 0.12), b = h.clone().addScaledVector(dd, left ? 0.24 : STICK - PUNYO);
-    for (const v of playerVolumes()) { const d = v.b ? segDist(a, b, v.a, v.b) : segDist(a, b, v.a, v.a); if (d < v.r + STICK_R) { endAttack("hit " + v.n); SC.them += modeI === 3 ? 1 : 0; SC.hitsOnYou++; thud(0.8); flashT = 0.35; flashCol = 1; buzz(sides.main, 1, 120); buzz(sides.off, 1, 120); showTag("Hit: your " + v.n, "#ff7a6a"); break; } } }
-  // 4. your weapons reaching the partner
-  for (const [key, S] of segs) { if (S.cd > 0) continue; const isDag = key === "off" && offI === 1, isHand = key === "off" && offI === 0, need = isDag ? 1.2 : isHand ? 2.6 : 2.2; if (S.v < need) continue; if (S.blockedT > 0) continue;
-    const a = isHand ? S.b : S.a.clone().lerp(S.b, isDag ? 0.3 : 0.25);
-    for (const v of oppVolumes()) { const d = v.b ? segDist(a, S.b, v.a, v.b) : segDist(a, S.b, v.a, v.a); if (d < v.r + STICK_R) { S.cd = 0.45; if (modeI === 3 || modeI === 2) SC.you++; thud(0.6); buzz(sides[key], 0.9, 70); OPP.flinch = 0.3;
-        if (AI.st === "chamber") { AI.st = "recover"; AI.t = 0; AI.dur = 0.3; AI.fromH.copy(OPP.hand); AI.fromD.copy(OPP.dir); AI.fromHL.copy(OPP.handL); AI.fromDL.copy(OPP.dirL); if (AI.plan) endAttack("interrupted"); }
-        showTag((isDag ? "Dagger: " : isHand ? "Strike: " : "Hit: ") + v.n + (v.n === "weapon hand" ? " (defanging the snake)" : ""), "#ffe08a"); break; } } } }
+function contact(dt) { clackCD -= dt; const sides = { main: mainSide(), off: offSide() }, combat = modeI === 4;
+  for (const F of FIGHTERS) { if (!F.active || F.down > 0) continue;
+    // 1. weapon on weapon, at any time: the clack, and if it was striking, a block
+    for (const left of [false, true]) { const [oa, ob, orad] = fSeg(F, left), striking = F.st === "strike" && F.plan && !F.plan.done && F.plan.left === left, fk = kindOfF(F, left);
+      if (fk === "hand" && !striking) continue;
+      for (const which of ["main", "off"]) { const S = WS[which], k = kindOf(which), K = KIND[k]; const d = segDist(S.a, S.b, oa, ob, _p1, _p2);
+        if (d < K.r + orad + 0.02) { if (k === "hand" && striking && fk !== "hand" && segDist.t > 0.3) { endAttack(F, "hit hand"); hurtYou(F, "hand", 1); showTag("Hit on your hand", "#ffb070"); continue; }
+          const rel = S.v + (striking ? 6 : 1); if (clackCD <= 0 && rel > 1.2 && k !== "hand" && fk !== "hand") { clack(clampN(rel / 8, 0.3, 1)); buzz(sides[which], clampN(rel / 6, 0.3, 1), 50); clackCD = 0.12; }
+          if (striking) { endAttack(F, "blocked"); deflect(F, V3().subVectors(_p2, _p1).normalize()); showTag(fk === "hand" ? "Parried" : "Blocked", "#7ce07c"); if (fk === "hand") buzz(sides[which], 0.3, 25); }
+          else if (F.st === "block" || F.st === "guard" || F.st === "recover") S.blockedT = 0.3; } } }
+    // 2. your live hand on its weapon arm while it strikes: a pass or a check
+    if (F.st === "strike" && F.plan && !F.plan.done) { const left = F.plan.left, el = left ? F.elbowL : F.elbow, wr = left ? F.aL : F.aR;
+      for (const which of ["main", "off"]) { if (kindOf(which) !== "hand") continue; const hp = handPos(sides[which]); if (segDist(hp, hp, el, wr) < 0.1) { endAttack(F, "checked"); showTag("Passed and checked", "#7ce07c"); buzz(sides[which], 0.4, 30); toRecover(F, 0.35 / SPEEDS[speedI][0]); break; } } }
+    // 3. its weapon reaching you
+    if (F.st === "strike" && F.plan && !F.plan.done) { const [a0, b0, orad] = fSeg(F, F.plan.left), a = kindOfF(F, F.plan.left) === "stick" ? a0.clone().lerp(b0, 0.35) : a0;
+      for (const v of playerVolumes()) { const d = v.b ? segDist(a, b0, v.a, v.b) : segDist(a, b0, v.a, v.a); if (d < v.r + orad) { endAttack(F, "hit " + v.n); hurtYou(F, v.n, DMG_ON_YOU(F, v.n)); showTag("Hit: your " + v.n, "#ff7a6a"); break; } } } }
+  // 4. your weapons reaching them
+  for (const which of ["main", "off"]) { const S = WS[which], k = kindOf(which), K = KIND[k]; if (S.cd > 0 || S.v < K.need || S.blockedT > 0) continue; const a = k === "hand" ? S.b : S.a.clone().lerp(S.b, K.hit0);
+    let done = false; for (const F of FIGHTERS) { if (!F.active || F.down > 0 || done) continue;
+      for (const v of fVolumes(F)) { const d = v.b ? segDist(a, S.b, v.a, v.b) : segDist(a, S.b, v.a, v.a); if (d < v.r + K.r) { S.cd = 0.45; done = true; thud(0.6); buzz(sides[which], 0.9, 70); F.flinch = 0.3;
+          if (modeI === 2 || modeI === 3) SC.you++; if (F.st === "chamber") { toRecover(F, 0.3); if (F.plan) endAttack(F, "interrupted"); }
+          let msg = (k === "knife" ? "Cut: " : k === "hand" ? "Strike: " : "Hit: ") + v.n + (v.n === "weapon hand" && k !== "hand" ? " (defanging the snake)" : "");
+          if (combat) { F.hp -= DMG_BY_YOU(k, v.n); if (v.n === "weapon hand" && F.weapon !== "hand" && Math.random() < 0.4) { F.weapon = "hand"; msg += ", disarmed"; } if (F.hp <= 0) { F.down = 0.001; F.st = "down"; SC.downs++; msg = "Down"; thud(1); } }
+          showTag(msg, "#ffe08a"); break; } } } } }
+function hurtYou(F, part, dmg) { SC.them += modeI === 3 ? 1 : 0; SC.hitsOnYou++; thud(0.8); flashT = 0.35; buzz("right", 1, 120); buzz("left", 1, 120); if (modeI === 4) { ME.hp -= dmg; if (ME.hp <= 0) { running = false; showTag("You are down", "#ff5040"); bell(); showMenu(true); } } }
 
-// ---------- signs: a tag over the partner, a scoreboard on the wall ----------
+// ---------- signs: a tag over the fighters, a scoreboard on a stand ----------
 const tagC = document.createElement("canvas"); tagC.width = 1024; tagC.height = 160; const tagT = new THREE.CanvasTexture(tagC); tagT.colorSpace = THREE.SRGBColorSpace;
 const TAG = new THREE.Sprite(new THREE.SpriteMaterial({ map: tagT, depthTest: false, transparent: true, toneMapped: false })); TAG.scale.set(0.9, 0.14, 1); TAG.renderOrder = 50; scene.add(TAG); let tagAge = 9;
 function showTag(text, col = "#f4e8d0") { const g = tagC.getContext("2d"); g.clearRect(0, 0, 1024, 160); g.fillStyle = "rgba(14,10,6,0.78)"; g.beginPath(); g.roundRect(8, 8, 1008, 144, 30); g.fill(); g.fillStyle = col; g.font = "bold 64px -apple-system, Helvetica, sans-serif"; g.textAlign = "center"; g.fillText(text, 512, 102, 980); tagT.needsUpdate = true; tagAge = 0; }
@@ -234,54 +269,86 @@ const boardC = document.createElement("canvas"); boardC.width = 1280; boardC.hei
 const BOARD = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ map: boardT, toneMapped: false })); BOARD.position.set(-2.1, 1.65, -0.6); BOARD.lookAt(0, 1.6, 2); scene.add(BOARD);
 { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.2, 8), new THREE.MeshStandardMaterial({ color: 0x333333 })); st.position.set(-2.1, 0.6, -0.6); scene.add(st); const bk = new THREE.Mesh(new THREE.BoxGeometry(1.66, 0.96, 0.03), new THREE.MeshStandardMaterial({ color: 0x3a2a1a })); bk.position.copy(BOARD.position); bk.quaternion.copy(BOARD.quaternion); bk.translateZ(-0.02); scene.add(bk); }
 let boardKey = "";
-function drawBoard() { const k = [modeI, speedI, offI, lefty, running, SC.you, SC.them, SC.blocks, SC.fed, Math.ceil(AI.roundT), gripTilt, seated].join(); if (k === boardKey) return; boardKey = k; const g = boardC.getContext("2d");
+function drawBoard() { const k = [modeI, speedI, yourI, lefty, running, SC.you, SC.them, SC.blocks, SC.fed, SC.downs, ME.hp, nAtt, attW, Math.ceil(roundT), seated].join(); if (k === boardKey) return; boardKey = k; const g = boardC.getContext("2d");
   g.fillStyle = "#14110e"; g.fillRect(0, 0, 1280, 720); g.strokeStyle = "#c8a050"; g.lineWidth = 6; g.strokeRect(6, 6, 1268, 708); g.fillStyle = "#f4e2b0"; g.font = "bold 60px Georgia, serif"; g.fillText(MODES[modeI] + (running ? "" : "  (paused)"), 40, 84);
   g.font = "38px -apple-system, Helvetica, sans-serif"; g.fillStyle = "#e8dcc0";
-  const lines = [`Speed: ${SPEEDS[speedI][1]}   ·   other hand: ${OFF[offI]}   ·   stick in ${lefty ? "left" : "right"} hand${seated ? "   ·   seated" : ""}`];
+  const lines = [`Speed: ${SPEEDS[speedI][1]}   ·   you: ${YOUR[yourI].n}${lefty ? " (left-handed)" : ""}${seated ? "   ·   seated" : ""}`];
   if (modeI < 2) lines.push(`Blocked ${SC.blocks} of ${SC.fed} fed   ·   hits on you: ${SC.hitsOnYou}`, "Block with the stick, or pass the weapon arm with your live hand.", "Duck or step back: an attack that misses counts as evaded.");
   else if (modeI === 2) lines.push(`Your clean hits: ${SC.you}`, "Strike the partner; it blocks some, at this speed's reaction time.", "A blocked strike does not count. Hit the weapon hand to defang the snake.");
-  else lines.push(`You ${SC.you}  ·  partner ${SC.them}${running ? `   ·   ${Math.max(0, Math.ceil(AI.roundT))} s left` : ""}`, "Two-minute round. Clean hits score; blocked ones do not.", "The partner attacks in combinations, blocks, and counters.");
-  lines.push("", IS_HEADSET || renderer.xr.isPresenting ? "A start / pause · B speed · X mode · Y other hand · right stick ↕ stick angle" : "Space start / pause · = − speed · 1-4 mode · H other hand · mouse: stick", IS_HEADSET || renderer.xr.isPresenting ? "click left stick: seated · click right stick: swap hands · left stick: step" : "M seated · L swap hands · W A S D step · arrows turn");
+  else if (modeI === 3) lines.push(`You ${SC.you}  ·  partner ${SC.them}${running ? `   ·   ${Math.max(0, Math.ceil(roundT))} s left` : ""}`, "Two-minute round. Clean hits score; blocked ones do not.", "The partner attacks in combinations, blocks, and counters.");
+  else lines.push(`Your health: ${"█".repeat(clampN(ME.hp, 0, 10))}${"░".repeat(10 - clampN(ME.hp, 0, 10))}   ·   down: ${SC.downs} of ${nAtt}`, `${nAtt} attacker${nAtt > 1 ? "s" : ""} with ${ATTW[attW]}, full intensity: they spread round you.`, "Keep moving; put one between you and the others. A knife cuts deep.");
+  lines.push("", "A (or space): pause and the menu   ·   point your stick and pull the trigger to choose");
   lines.forEach((l, i) => g.fillText(l, 40, 170 + i * 72, 1200)); boardT.needsUpdate = true; }
 
-// ---------- input ----------
-const keys = {}, prevB = {}; let yaw = 0, started = false;
-function setMode(i) { modeI = (i + MODES.length) % MODES.length; running = false; resetCounts(); showTag(MODES[modeI]); }
-function resetCounts() { SC.you = SC.them = SC.blocks = SC.fed = SC.hitsOnYou = 0; AI.next = 1; AI.lastWasAngle = false; AI.queue = []; AI.roundT = 120; }
-function toggleRun() { running = !running; if (running) { if (modeI === 3) { if (AI.roundT <= 0) resetCounts(); bell(); } AI.wait = 1.2; showTag(modeI === 2 ? "Attack when ready" : "Ready", "#f4e2b0"); } else showTag("Paused"); }
-function setSpeed(i) { speedI = clampN(i, 0, SPEEDS.length - 1); showTag("Speed: " + SPEEDS[speedI][1]); }
-function setOff(i) { offI = (i + OFF.length) % OFF.length; equip(); showTag("Other hand: " + OFF[offI]); }
-function swapHands() { lefty = !lefty; equip(); showTag("Stick in your " + (lefty ? "left" : "right") + " hand"); }
-function toggleSeated() { seated = !seated; showTag(seated ? "Seated: view raised, no leg attacks" : "Standing"); }
-addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (e.code === "Space") toggleRun(); if (e.code === "Equal") setSpeed(speedI + 1); if (e.code === "Minus") setSpeed(speedI - 1); if (/^Digit[1-4]$/.test(e.code)) setMode(+e.code.slice(5) - 1); if (e.code === "KeyH") setOff(offI + 1); if (e.code === "KeyL") swapHands(); if (e.code === "KeyM") toggleSeated(); if (e.code === "KeyV") { voiceOn = !voiceOn; showTag("Voice " + (voiceOn ? "on" : "off")); } });
+// ---------- the menu: point your stick (or the mouse) at a line and pull the trigger (or click) ----------
+const menuC = document.createElement("canvas"); menuC.width = 1024; menuC.height = 900; const menuT = new THREE.CanvasTexture(menuC); menuT.colorSpace = THREE.SRGBColorSpace;
+const MENU = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.79), new THREE.MeshBasicMaterial({ map: menuT, toneMapped: false, transparent: true })); MENU.renderOrder = 60; scene.add(MENU);
+const laser = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(), V3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xffd080 })); laser.visible = false; scene.add(laser);
+let voiceOn2 = true, menuHover = -1, menuKey = "";
+const ROWS = () => [
+  { n: "Mode", v: MODES[modeI], f: () => setMode(modeI + 1) },
+  { n: "Your weapons", v: YOUR[yourI].n, f: () => { yourI = (yourI + 1) % YOUR.length; equip(); arm(); } },
+  ...(modeI === 4 ? [{ n: "Attackers", v: String(nAtt), f: () => { nAtt = nAtt % 4 + 1; arm(); } }, { n: "Attackers armed with", v: ATTW[attW], f: () => { attW = (attW + 1) % ATTW.length; arm(); } }] : []),
+  { n: "Speed", v: SPEEDS[speedI][1], f: () => speedI = (speedI + 1) % SPEEDS.length },
+  { n: "Stick hand", v: lefty ? "left" : "right", f: () => { lefty = !lefty; equip(); } },
+  { n: "Seated", v: seated ? "yes: no leg attacks" : "no", f: () => seated = !seated },
+  { n: "Voice", v: voiceOn ? "on" : "off", f: () => voiceOn = !voiceOn },
+  { n: started && roundStarted ? "Resume" : "Start", v: "", f: () => { showMenu(false); go(); } }];
+function drawMenu() { const rows = ROWS(), k = rows.map(r => r.v).join() + menuHover + roundStarted; if (k === menuKey) return; menuKey = k; const g = menuC.getContext("2d"); g.clearRect(0, 0, 1024, 900); g.fillStyle = "rgba(16,12,8,0.92)"; g.beginPath(); g.roundRect(0, 0, 1024, 900, 30); g.fill(); g.strokeStyle = "#c8a050"; g.lineWidth = 5; g.stroke();
+  g.fillStyle = "#f4e2b0"; g.font = "bold 54px Georgia, serif"; g.fillText("Stick sparring", 40, 74); g.font = "30px -apple-system, Helvetica, sans-serif"; g.fillStyle = "#c8b890"; g.fillText("Point and pull the trigger (or click) to change", 40, 120);
+  rows.forEach((r, i) => { const y = 150 + i * 82; if (i === menuHover) { g.fillStyle = "rgba(200,160,80,0.3)"; g.fillRect(24, y, 976, 74); } g.fillStyle = r.v ? "#e8dcc0" : "#ffe08a"; g.font = (r.v ? "" : "bold ") + "40px -apple-system, Helvetica, sans-serif"; g.fillText(r.n, 44, y + 50); if (r.v) { g.fillStyle = "#ffe08a"; g.textAlign = "right"; g.fillText(r.v, 980, y + 50); g.textAlign = "left"; } });
+  menuT.needsUpdate = true; }
+let menuOn = true;
+function showMenu(on) { menuOn = on; MENU.visible = on; if (on) { const f = V3(PB.f.x, 0, PB.f.z).normalize(); MENU.position.copy(PB.head).addScaledVector(f, 0.85).addScaledVector(UP, -0.18); MENU.lookAt(PB.head); menuKey = ""; } laser.visible = false; }
+const ray = new THREE.Raycaster();
+function menuPick(origin, dir) { ray.set(origin, dir); const hit = ray.intersectObject(MENU)[0]; if (!hit) return -1; const y = (1 - hit.uv.y) * 900, i = Math.floor((y - 150) / 82), n = ROWS().length; return i >= 0 && i < n ? i : -1; }
+function menuSelect() { if (menuHover >= 0) { ROWS()[menuHover].f(); menuKey = ""; clack(0.4); } }
+
+// ---------- modes and rounds ----------
+let started = false, roundStarted = false, roundT = 120;
+function arm() { const n = modeI === 4 ? nAtt : 1; FIGHTERS.forEach((F, i) => { F.active = i < n; F.G.visible = F.active; F.down = 0; F.hp = 6; F.st = "guard"; F.plan = null; F.queue = []; F.next = 1; F.lastWasAngle = false; F.blockIn = -1;
+    if (modeI === 4) { F.weapon = attW === 3 ? ["stick", "knife", "hand", "stick"][i] : ["stick", "knife", "hand"][attW]; F.off = "hand"; } else { F.weapon = "stick"; F.off = YOUR[yourI].o === "stick" ? "stick" : YOUR[yourI].o === "knife" ? "knife" : "hand"; }
+    F.slot = n === 1 ? 0 : [0, 1.3, -1.3, Math.PI][i]; const dS = PB.f.clone().applyAxisAngle(UP, F.slot), dist = modeI === 4 ? 2.2 : 1.15; F.p.set(PB.head.x + dS.x * dist, FLOOR_Y, PB.head.z + dS.z * dist); F.f.set(PB.head.x - F.p.x, 0, PB.head.z - F.p.z).normalize(); F.r.crossVectors(F.f, UP); poseF(F); const G = guardPose(F); F.hand.copy(G.h); F.dir.copy(G.d); F.handL.copy(G.hl); F.dirL.copy(G.dl); });
+  SC.you = SC.them = SC.blocks = SC.fed = SC.hitsOnYou = SC.downs = 0; ME.hp = 10; roundT = 120; roundStarted = false; boardKey = ""; }
+function setMode(i) { modeI = (i + MODES.length) % MODES.length; running = false; arm(); }
+function go() { if (!roundStarted) { arm(); roundStarted = true; if (modeI >= 3) bell(); } running = true; FIGHTERS.forEach(F => F.wait = 1.0 + F.idx * 0.4); showTag(modeI === 2 ? "Attack when ready" : modeI === 4 ? "Defend yourself" : "Ready", "#f4e2b0"); }
+function pause() { running = false; showMenu(true); showTag("Paused"); }
+addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (e.code === "Space") { if (running) pause(); else { showMenu(false); go(); } } if (e.code === "KeyM") seated = !seated; if (e.code === "KeyV") voiceOn = !voiceOn; });
+const keys = {}, prevB = {};
 addEventListener("keyup", e => keys[e.code] = false);
 addEventListener("pointermove", e => { mouseX = (e.clientX / innerWidth) * 2 - 1; mouseY = -((e.clientY / innerHeight) * 2 - 1); });
-function start() { if (started) return; started = true; ac().resume?.(); document.getElementById("intro")?.classList.add("gone"); showTag("Press start when ready", "#f4e2b0"); }
+renderer.domElement.addEventListener("pointerdown", e => { if (!started) { start(); return; } if (menuOn) { ray.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera); menuHover = menuPick(ray.ray.origin, ray.ray.direction); menuSelect(); } });
+function start() { if (started) return; started = true; ac().resume?.(); document.getElementById("intro")?.classList.add("gone"); updateBody(); arm(); showMenu(true); }
 document.getElementById("intro")?.addEventListener("click", start);
 const VRB = document.getElementById("vr");
-if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); await renderer.xr.setSession(s); start(); boardKey = ""; }; });
+if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); await renderer.xr.setSession(s); start(); setTimeout(() => { updateBody(); showMenu(true); }, 600); }; });
 
 // ---------- the loop ----------
-const clock = new THREE.Clock(); let frameN = 0; equip(); resetCounts(); poseOpp(); { const G = guardPose(); OPP.hand.copy(G.h); OPP.dir.copy(G.d); OPP.handL.copy(G.hl); OPP.dirL.copy(G.dl); }
+const clock = new THREE.Clock(); let frameN = 0; equip(); updateBody(); arm();
 const flash = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ color: 0xff2010, transparent: true, opacity: 0, depthTest: false, toneMapped: false })); flash.position.z = -0.1; flash.scale.setScalar(0.1); flash.renderOrder = 99; camera.add(flash);
 renderer.setAnimationLoop(() => { const dt = clampN(clock.getDelta(), 0, 0.05), vr = renderer.xr.isPresenting; frameN++;
-  let mx = 0, my = 0;
+  let mx = 0, my = 0, trig = false;
   if (vr) { SRC.left = SRC.right = null; const s = renderer.xr.getSession(); for (const src of s ? s.inputSources : []) { const gp = src.gamepad; if (!gp) continue; SRC[src.handedness] = src; const a = gp.axes, ax = a.length >= 4 ? 2 : 0, b = gp.buttons;
       const edge = (k, on) => { const r = on && !prevB[k]; prevB[k] = on; return r; };
-      if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.2 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.2 ? a[ax + 1] : 0; if (edge("x", b[4]?.pressed)) setMode(modeI + 1); if (edge("y", b[5]?.pressed)) setOff(offI + 1); if (edge("ls", b[3]?.pressed)) toggleSeated(); }
+      if (edge("t" + src.handedness, b[0]?.pressed)) trig = true;
+      if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.2 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.2 ? a[ax + 1] : 0; if (edge("ls", b[3]?.pressed)) seated = !seated; if (edge("x", b[4]?.pressed) && started) { if (running) pause(); else { showMenu(false); go(); } } }
       else { const tx = a[ax] || 0, ty = a[ax + 1] || 0; if (Math.abs(tx) > 0.7 && !prevB.turn) { ME.yaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3 && Math.abs(ty) < 0.3) prevB.turn = false;
         if (Math.abs(ty) > 0.7 && !prevB.tilt) { gripTilt = clampN(gripTilt - Math.sign(ty) * 5 * Math.PI / 180, -0.8, 0.8); equip(); showTag(`Stick angle ${Math.round(gripTilt * 180 / Math.PI)}°`); prevB.tilt = true; } else if (Math.abs(ty) < 0.3) prevB.tilt = false;
-        if (edge("a", b[4]?.pressed)) toggleRun(); if (edge("b", b[5]?.pressed)) setSpeed(speedI === SPEEDS.length - 1 ? 0 : speedI + 1); if (edge("rs", b[3]?.pressed)) swapHands(); } }
+        if (edge("a", b[4]?.pressed) && started) { if (running) pause(); else { showMenu(false); go(); } } } }
     for (const sd of ["right", "left"]) if (GRIP[sd] && HANDS[sd].parent !== GRIP[sd]) GRIP[sd].add(HANDS[sd]); }
   else { if (keys.KeyW) my -= 1; if (keys.KeyS) my += 1; if (keys.KeyD) mx += 1; if (keys.KeyA) mx -= 1; if (keys.ArrowLeft) ME.yaw += dt * 1.5; if (keys.ArrowRight) ME.yaw -= dt * 1.5; placeDesktop(); for (const sd of ["right", "left"]) if (HANDS[sd].parent !== DESK[sd]) DESK[sd].add(HANDS[sd]); }
-  // stepping with the stick (most of your footwork is your own, in your room)
-  if (mx || my) { const f = V3(0, 0, -1).applyAxisAngle(UP, ME.yaw + (vr ? 0 : 0)), r = V3().crossVectors(f, UP); if (vr) { camera.getWorldDirection(f); f.y = 0; f.normalize(); r.crossVectors(f, UP); } ME.x = clampN(ME.x + (f.x * -my + r.x * mx) * 1.2 * dt, -5.4, 5.4); ME.z = clampN(ME.z + (f.z * -my + r.z * mx) * 1.2 * dt, -5.4, 5.4); }
+  if (mx || my) { const f = V3(), r = V3(); camera.getWorldDirection(f); f.y = 0; f.normalize(); r.crossVectors(f, UP); ME.x = clampN(ME.x + (f.x * -my + r.x * mx) * 1.4 * dt, -5.4, 5.4); ME.z = clampN(ME.z + (f.z * -my + r.z * mx) * 1.4 * dt, -5.4, 5.4); }
   rig.position.set(ME.x, FLOOR_Y + (vr && seated ? 0.45 : 0), ME.z); rig.rotation.y = ME.yaw; if (!vr) camera.position.set(0, 1.65, 0);
-  updateBody(); if (OPP.p.distanceTo(V3(PB.head.x, FLOOR_Y, PB.head.z)) < 0.55) OPP.p.addScaledVector(OPP.f, -0.02);
-  updateSegs(dt);
-  if (started) { aiUpdate(dt); poseOpp(); drawOpp(); contact(dt); } else { poseOpp(); drawOpp(); }
-  if (running && modeI === 3) { AI.roundT -= dt; if (AI.roundT <= 0) { running = false; bell(); showTag(SC.you > SC.them ? `You win, ${SC.you} to ${SC.them}` : SC.you < SC.them ? `Partner wins, ${SC.them} to ${SC.you}` : `A draw, ${SC.you} all`, "#f4e2b0"); AI.roundT = 0; } }
-  tagAge += dt; TAG.position.copy(OPP.head).addScaledVector(UP, 0.42); TAG.material.opacity = tagAge < 2.5 ? 1 : Math.max(0, 1 - (tagAge - 2.5) * 2);
+  updateBody(); updateSegs(dt);
+  const act = FIGHTERS.filter(F => F.active);
+  for (const F of act) { if (F.down <= 0) { const dd = Math.hypot(F.p.x - PB.head.x, F.p.z - PB.head.z); if (dd < 0.55) F.p.addScaledVector(F.f, -0.02); } }
+  if (started && !menuOn) { for (const F of act) { aiUpdate(F, dt, act); poseF(F); drawF(F); } contact(dt); } else for (const F of act) { if (F.down <= 0) { F.f.set(PB.head.x - F.p.x, 0, PB.head.z - F.p.z).normalize(); F.r.crossVectors(F.f, UP); } poseF(F); drawF(F); }
+  for (const F of act) if (F.down > 0) { F.down += dt; if (F.down > 4) { F.G.visible = false; } }
+  if (running && modeI === 4 && act.every(F => F.down > 0)) { running = false; roundStarted = false; bell(); showTag(`All ${nAtt} down`, "#7ce07c"); setTimeout(() => showMenu(true), 1500); }
+  if (running && modeI === 3) { roundT -= dt; if (roundT <= 0) { running = false; roundStarted = false; bell(); showTag(SC.you > SC.them ? `You win, ${SC.you} to ${SC.them}` : SC.you < SC.them ? `Partner wins, ${SC.them} to ${SC.you}` : `A draw, ${SC.you} all`, "#f4e2b0"); showMenu(true); } }
+  if (menuOn) { drawMenu(); if (vr) { const o = WS.main.a.clone(), d = V3().subVectors(WS.main.b, WS.main.a).normalize(); menuHover = menuPick(o, d); laser.visible = true; laser.position.copy(o); laser.quaternion.setFromUnitVectors(NZ, d); laser.scale.setScalar(2); if (trig) menuSelect(); }
+    else { ray.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera); menuHover = menuPick(ray.ray.origin, ray.ray.direction); } }
+  const lead = act.find(F => F.down <= 0) || act[0]; tagAge += dt; if (lead) TAG.position.copy(lead.head).addScaledVector(UP, 0.42); TAG.material.opacity = tagAge < 2.5 ? 1 : Math.max(0, 1 - (tagAge - 2.5) * 2);
   if (frameN % 6 === 0) drawBoard();
   flashT = Math.max(0, flashT - dt); flash.material.opacity = flashT > 0 ? flashT * 0.9 : 0;
   renderer.render(scene, camera); });
