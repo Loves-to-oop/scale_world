@@ -53105,7 +53105,7 @@ const IS_HEADSET = /OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent);
 const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: !IS_HEADSET });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.xr.enabled = true; renderer.xr.setFoveation(1); document.body.appendChild(renderer.domElement);
-const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a1028);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x000000);
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, IS_HEADSET ? 0.05 : 0.01, IS_HEADSET ? 4e5 : 2e6);
 const rig = new THREE.Group(); rig.add(camera); scene.add(rig); camera.position.y = 1.6;
 addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
