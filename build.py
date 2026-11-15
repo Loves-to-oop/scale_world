@@ -711,3 +711,21 @@ TI = TI[:i0] + """<div id="intro"><div class="card">
 </div></div>
 """ + TI[i1:]
 (HERE / "titan.html").write_text(TI.replace("__THREE__", three).replace("__SCENE__", (HERE / "titan.js").read_text(encoding="utf-8")), encoding="utf-8")
+
+# Io: the eastern shore of Loki Patera
+IO = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>The shore of Loki Patera, Io</title>").replace("background:#c8d4d8", "background:#000000")
+i0, i1 = IO.index('<div id="intro">'), IO.index('<button id="vr">')
+IO = IO[:i0] + """<div id="intro"><div class="card">
+  <h1>The shore of Loki Patera, Io</h1>
+  <p>Jupiter's innermost large moon, the most volcanic world in the solar system: 13 degrees north, on the eastern shore of Loki Patera, a lake
+  of lava 202 km across under a glassy black crust. Above it Jupiter hangs still, 19.5 degrees across, 40 times the width of the Moon from
+  Earth, waxing and waning; Europa, Ganymede and Callisto cross a black sky full of stars. There is almost no air; gravity is 0.18 g.</p>
+  <p>No person could stand here: Jupiter's radiation would give a fatal dose in about three hours. The readout counts it. The lander is a
+  robot, and imagined.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>shift</kbd> run &nbsp;&middot;&nbsp; <kbd>space</kbd> jump &nbsp;&middot;&nbsp; <kbd>E</kbd> info on what you look at &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time &nbsp;&middot;&nbsp; <kbd>L</kbd> labels &nbsp;&middot;&nbsp; <kbd>H</kbd> readout &nbsp;&middot;&nbsp; <kbd>M</kbd> sitting / standing &nbsp;&middot;&nbsp; <kbd>R</kbd> back to the start<br>
+  In VR: left stick walk (left trigger runs), right stick turn, <b>B</b> jump, <b>A</b> or right trigger: info, <b>Y</b> speed up time, <b>X</b> labels, click the left stick: sitting / standing</p>
+  <p class="dim">Loki's size, crust and overturning are from Voyager, Galileo, Juno and telescopes; Jupiter and its moons are placed from their real
+  orbits. The ground is generated in keeping with spacecraft images, which show little smaller than a few hundred metres here. Click to begin.</p>
+</div></div>
+""" + IO[i1:]
+(HERE / "io.html").write_text(IO.replace("__THREE__", three).replace("__SCENE__", (HERE / "io.js").read_text(encoding="utf-8")), encoding="utf-8")
