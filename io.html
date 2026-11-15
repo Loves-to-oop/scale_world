@@ -53087,7 +53087,7 @@ const THREE = {ACESFilmicToneMapping, AddEquation, AddOperation, AdditiveAnimati
 const IS_HEADSET = /OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent);
 const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0; renderer.xr.enabled = true;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25; renderer.xr.enabled = true;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x000000);
@@ -53106,25 +53106,34 @@ function ridged(x, z, n = 4) { let s = 0, a = 0.5, w = 0; for (let k = 0; k < n;
 // ---------- the ground, in metres: x east, z south, from a point just outside the patera's eastern rim ----------
 // The patera's centre lies 101 km to the west, so Jupiter hangs over the lake. Its floor, the lava lake's crust, lies 1 km below the plains behind a cliff: Io's paterae are
 // typically 1-2 km deep with steep walls (Radebaugh et al. 2001); Loki's own depth has not been measured. Small islands (~3 km wide, ~10 km apart)
-// stand out of it. The plains are smooth, as Io's mostly are, with lobes of old lava flows; an isolated mountain block rises 70 km to the
-// southeast (Io's mountains stand alone like this, up to 17 km high; this one is generated, not a mapped peak).
-const PC = { x: -101000, z: 300 }, PR = 101000, FLOOR = -1000, MTN = { x: 45000, z: 54000 };
+// stand out of it, and the crust is hottest along the shore, where it breaks against the lake's edge. The plains are smooth, as Io's mostly
+// are: almost no impact craters, since lava and plume fallout bury the surface about a centimetre a year. Across them lie lobes of dark
+// lava flows with low steep fronts. Io's mountains are not volcanoes but blocks of crust, pushed up and tilted, standing alone with steep
+// scarps, 6 km high on average and up to 17 km; one stands 46 km to the southeast here (generated, not a mapped peak).
+const PC = { x: -101000, z: 300 }, PR = 101000, FLOOR = -1000, MTN = { x: 30000, z: 35000, a: 0.5, L: 26000, W: 11000, H: 6500 };
+const flowM = (x, z) => sstep(fbm(x / 900 + 9, z / 900, 4) + 0.04 * sstep(-pateraD(x, z), -9000, 0), 0.58, 0.595);
+function mtnE(x, z) { const dx = x - MTN.x, dz = z - MTN.z, u = dx * Math.cos(MTN.a) + dz * Math.sin(MTN.a), v = -dx * Math.sin(MTN.a) + dz * Math.cos(MTN.a); return [Math.max(Math.abs(u) / MTN.L, Math.abs(v) / MTN.W) + 0.25 * (fbm(x / 7000, z / 7000, 4) - 0.5), u / MTN.L]; }
 function pateraD(x, z) { const dx = x - PC.x, dz = z - PC.z, a = Math.atan2(dz, dx); return Math.hypot(dx, dz) - (PR + 3500 * (fbm(a * 3 + 5, 1.3, 4) - 0.5) + 900 * (fbm(a * 25, 2.7, 3) - 0.5)); }
 function land(x, z) { const pd = pateraD(x, z);
   let h = 28 * (fbm(x / 6000, z / 6000, 4) - 0.5) + 4 * (fbm(x / 500, z / 500, 3) - 0.5) + 0.35 * (fbm(x / 12, z / 12, 2) - 0.5);
-  const flow = sstep(fbm(x / 2600 + 9, z / 2600, 4), 0.56, 0.6); h += 9 * flow;
-  const md = Math.hypot(x - MTN.x, z - MTN.z); if (md < 40000) h += 5200 * Math.exp(-((md / 15000) ** 2)) * (0.55 + 0.45 * ridged(x / 6000, z / 6000, 5)) * sstep(md, 40000, 25000);
-  if (pd < 400) { const t = sstep(pd, 250, -60); h = lerpN(h, FLOOR + 0.4 * (fbm(x / 40, z / 40, 2) - 0.5), t); }
+  const fl = flowM(x, z); h += fl * (2.2 + 0.35 * ridged(x / 4, z / 4, 3) + 0.6 * vn(x / 25, z / 25));
+  if (Math.abs(x - MTN.x) < 60000 && Math.abs(z - MTN.z) < 60000) { const [e, u] = mtnE(x, z); if (e < 1.3) h += MTN.H * sstep(e, 1.08, 0.9) * (0.45 + 0.55 * (u + 1) / 2) * (0.8 + 0.2 * ridged(x / 3000, z / 3000, 5)) + 300 * sstep(e, 1.3, 1.05) * fbm(x / 1500, z / 1500, 3); }
+  if (pd < 400) { const t = sstep(pd, 250, -60); h = lerpN(h, FLOOR + 0.4 * (fbm(x / 40, z / 40, 2) - 0.5), t) + 25 * (fbm(x / 60, z / 15, 3) - 0.5) * Math.sin(Math.PI * t); }
   if (pd < -2000) { const ii = Math.floor(x / 10000), jj = Math.floor(z / 10000), cx = (ii + 0.3 + 0.4 * hash(ii, jj)) * 10000, cz = (jj + 0.3 + 0.4 * hash(jj, ii)) * 10000, d = Math.hypot(x - cx, z - cz); if (hash(ii * 7, jj * 3) < 0.55 && d < 1700) h = Math.max(h, FLOOR + 40 * sstep(d, 1700, 1300) + 6 * fbm(x / 200, z / 200, 3)); }
   return h; }
-// colours: pale yellow sulfur plains, white sulfur-dioxide frost, orange-red sulfur deposits, greenish-grey near the patera, black glassy lava
-function groundColor(h, slope, x, z, out) { const pd = pateraD(x, z), n = fbm(x / 9, z / 9, 3), m = fbm(x / 1800 + 4, z / 1800, 4), m2 = fbm(x / 400 + 9, z / 400, 3); let r, g, b;
-  r = 0.74 + 0.06 * n; g = 0.66 + 0.05 * n; b = 0.4 + 0.04 * n;
-  const frost = sstep(m2, 0.6, 0.72); r = lerpN(r, 0.86, frost); g = lerpN(g, 0.85, frost); b = lerpN(b, 0.8, frost);
-  const red = sstep(m, 0.58, 0.68); r = lerpN(r, 0.62, red); g = lerpN(g, 0.34, red); b = lerpN(b, 0.2, red);
-  const near = sstep(pd, 6000, 300); r = lerpN(r, 0.44, near * 0.7); g = lerpN(g, 0.45, near * 0.7); b = lerpN(b, 0.32, near * 0.7);
-  if (h > 40 && Math.hypot(x - MTN.x, z - MTN.z) < 40000) { const t = sstep(slope, 0.2, 0.6); r = lerpN(r, 0.5, t); g = lerpN(g, 0.42, t); b = lerpN(b, 0.3, t); }
-  if (pd < 300) { const t = sstep(pd, 300, -100), isl = h > FLOOR + 3; r = lerpN(r, isl ? 0.36 : 0.05, t); g = lerpN(g, isl ? 0.34 : 0.048, t); b = lerpN(b, isl ? 0.27 : 0.045, t); }
+// colours, from Galileo's images: pale yellow and cream sulfur plains, white sulfur-dioxide frost, orange and red sulfur deposits, yellow-green
+// near the patera, dark silicate lava flows, a black glassy lake crust; bare rock in the cliff and the mountain's scarps
+const IOC = Object.fromEntries(Object.entries({ plain: "#e8da98", yellow: "#e4c650", cream: "#efe6c0", frost: "#f4f2ea", orange: "#d8913c", red: "#a8482a", green: "#a8b058", flow: "#3a3530", rock: "#6e6050", rock2: "#9a8a6a", crust: "#141210", island: "#7a7260" }).map(([k, v]) => [k, new THREE.Color(v)]));
+const _gc = new THREE.Color(), _gc2 = new THREE.Color();
+function groundColor(h, slope, x, z, out) { const pd = pateraD(x, z), n = fbm(x / 7, z / 7, 3), m = fbm(x / 1500 + 4, z / 1500, 4), m2 = fbm(x / 260 + 9, z / 260, 4), m3 = fbm(x / 70 + 2, z / 70 + 5, 3), c = _gc.copy(IOC.plain);
+  c.lerp(IOC.orange, 0.7 * sstep(m, 0.56, 0.64)); c.lerp(IOC.red, 0.75 * sstep(m + 0.2 * (m2 - 0.5), 0.63, 0.7));
+  c.lerp(IOC.green, 0.5 * sstep(pd, 4000, 400) * sstep(m2, 0.45, 0.6));
+  c.lerp(IOC.frost, 0.6 * sstep(m2 + 0.15 * (m3 - 0.5), 0.6, 0.68));
+  const m4 = fbm(x / 16 + 3, z / 16, 3); c.lerp(IOC.cream, 0.7 * sstep(m3, 0.45, 0.65)); c.lerp(IOC.frost, 0.7 * sstep(m4, 0.6, 0.72)); c.lerp(IOC.yellow, 0.75 * sstep(m4, 0.47, 0.37)); c.lerp(IOC.orange, 0.6 * sstep(m4 + 0.3 * (m3 - 0.5), 0.32, 0.22));
+  c.lerp(IOC.flow, flowM(x, z) * (0.85 + 0.15 * n));
+  if (h > 60 || pd < 300) c.lerp(_gc2.copy(IOC.rock).lerp(IOC.rock2, 0.5 + 0.5 * Math.sin(h / 9 + 2 * n)), sstep(slope, 0.35, 0.8));
+  if (pd < 300) { const t = sstep(pd, 40, -120); c.lerp(h > FLOOR + 3 ? IOC.island : IOC.crust, t); }
+  const k = 0.93 + 0.14 * n; let r = c.r * k, g = c.g * k, b = c.b * k;
   out[0] = r; out[1] = g; out[2] = b; }
 
 // ---------- the sky: Io's orbit, Jupiter and its moons, the Sun, the stars ----------
@@ -53172,14 +53181,14 @@ function updateSky() { const td = tDays, I = moonPos(MOONS[0], td), S = sunJ(), 
   return { sL, jL }; }
 
 // ---------- the ground: nested grids following you, the surface curving away (Io is small: from eye height the horizon is 2.5 km off) ----------
-const grainT = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d"); g.fillStyle = "#c0c0c0"; g.fillRect(0, 0, 256, 256);
-  for (let k = 0; k < 8000; k++) { const v = 140 + Math.random() * 115; g.fillStyle = `rgba(${v},${v},${v},0.4)`; g.fillRect(Math.random() * 256, Math.random() * 256, 1 + Math.random() * 3, 1 + Math.random() * 2); }
+const grainT = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d"); g.fillStyle = "#f4f4f4"; g.fillRect(0, 0, 256, 256);
+  for (let k = 0; k < 8000; k++) { const v = 185 + Math.random() * 70; g.fillStyle = `rgba(${v},${v},${v},0.4)`; g.fillRect(Math.random() * 256, Math.random() * 256, 1 + Math.random() * 3, 1 + Math.random() * 2); }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; })();
 const groundMat = new THREE.MeshStandardMaterial({ map: grainT, vertexColors: true, roughness: 0.92 });
 const lavaU = { t: { value: 0 }, fa: { value: 0.15 }, org: { value: new THREE.Vector2() } };
 groundMat.onBeforeCompile = sh => { sh.uniforms.t = lavaU.t; sh.uniforms.fa = lavaU.fa; sh.uniforms.org = lavaU.org; sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float lava; varying float vLava; varying vec3 vWP;").replace("#include <fog_vertex>", "#include <fog_vertex>\nvLava = lava; vWP = (modelMatrix * vec4(position, 1.0)).xyz;");
   sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float t, fa; uniform vec2 org; varying float vLava; varying vec3 vWP;\nfloat hh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5); }\nfloat vno(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hh(i), hh(i + vec2(1, 0)), f.x), mix(hh(i + vec2(0, 1)), hh(i + vec2(1, 1)), f.x), f.y); }")
-    .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\nif (vLava > 0.5) { vec2 p = vWP.xz + org, q = p - vec2(" + PC.x.toFixed(1) + ", " + PC.z.toFixed(1) + "); float r = length(q), s = (atan(q.y, q.x) - fa) * r, c1 = abs(vno(p / 9.0) - 0.5), c2 = abs(vno(p / 31.0 + 7.0) - 0.5), near = smoothstep(2500.0, 400.0, length(vWP - cameraPosition)), crack = smoothstep(0.035, 0.0, c1) * 0.5 + smoothstep(0.02, 0.0, c2), fresh = s > 0.0 ? exp(-s / 3000.0) : 0.0, front = smoothstep(70.0, 0.0, abs(s + 50.0 * (vno(p / 300.0) - 0.5)));\n totalEmissiveRadiance += vec3(1.0, 0.3, 0.05) * (mix(0.012 + 0.12 * fresh, crack * (0.06 + 0.7 * fresh), near) + front * 3.0) * (0.9 + 0.1 * sin(t * 0.7 + p.x * 0.05)); roughnessFactor = 0.18; }"); };
+    .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\nif (vLava > 0.5) { vec2 p = vWP.xz + org, q = p - vec2(" + PC.x.toFixed(1) + ", " + PC.z.toFixed(1) + "); float r = length(q), s = (atan(q.y, q.x) - fa) * r, c1 = abs(vno(p / 9.0) - 0.5), c2 = abs(vno(p / 31.0 + 7.0) - 0.5), near = smoothstep(2500.0, 400.0, length(vWP - cameraPosition)), crack = smoothstep(0.035, 0.0, c1) * 0.5 + smoothstep(0.02, 0.0, c2), fresh = s > 0.0 ? exp(-s / 3000.0) : 0.0, front = smoothstep(70.0, 0.0, abs(s + 50.0 * (vno(p / 300.0) - 0.5)));\n totalEmissiveRadiance += vec3(1.0, 0.3, 0.05) * (mix(0.012 + 0.12 * fresh, crack * (0.06 + 0.7 * fresh), near) + front * 3.0 + smoothstep(1.3, 1.02, vLava) * (0.6 + 0.6 * vno(p / 40.0))) * (0.9 + 0.1 * sin(t * 0.7 + p.x * 0.05)); roughnessFactor = 0.18; }"); };
 const ME = { x: 0, z: 0, y: 0, vx: 0, vz: 0, vy: 0, x0: 0, z0: 0 };
 function grid(size, n, drop) { const g = new THREE.PlaneGeometry(size, size, n, n).rotateX(-Math.PI / 2); g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 3), 3)); g.setAttribute("lava", new THREE.BufferAttribute(new Float32Array(g.attributes.position.count), 1));
   const m = new THREE.Mesh(g, groundMat); m.frustumCulled = false; m.receiveShadow = true; m.userData = { size, n, drop, cx: 1e12, cz: 1e12, inner: null }; scene.add(m); return m; }
@@ -53189,16 +53198,16 @@ function fillGrid(m) { const { size, n, drop, inner } = m.userData, p = m.geomet
   const H = new Float32Array(p.count); for (let i = 0; i < p.count; i++) H[i] = land(p.getX(i) + ox, p.getZ(i) + oz);
   for (let i = 0; i < p.count; i++) { const x = p.getX(i) + ox, z = p.getZ(i) + oz, iz = Math.floor(i / (n + 1)), hx = H[Math.min(i + 1, iz * (n + 1) + n)] - H[Math.max(i - 1, iz * (n + 1))], hz = H[Math.min(i + n + 1, p.count - 1)] - H[Math.max(i - n - 1, 0)], slope = Math.hypot(hx, hz) / (2 * step);
     let y = H[i] - ((x - ME.x) ** 2 + (z - ME.z) ** 2) / (2 * R_IO) - drop; if (inner) { const ih = inner.userData.size / 2 - inner.userData.size / inner.userData.n * 2; if (Math.abs(x - inner.userData.ox) < ih && Math.abs(z - inner.userData.oz) < ih) y -= 60; }
-    p.setY(i, y); groundColor(H[i], slope, x, z, c3); col.setXYZ(i, c3[0], c3[1], c3[2]); lv.setX(i, H[i] < FLOOR + 1.5 && pateraD(x, z) < 0 ? 1 : 0); uv.setXY(i, ((x % 4000) + 4000) / 2.5, ((z % 4000) + 4000) / 2.5); }
+    p.setY(i, y); groundColor(H[i], slope, x, z, c3); col.setXYZ(i, c3[0], c3[1], c3[2]); lv.setX(i, H[i] < FLOOR + 1.5 && pateraD(x, z) < 0 ? 1 + Math.min(-pateraD(x, z), 2000) / 1000 : 0); uv.setXY(i, ((x % 4000) + 4000) / 2.5, ((z % 4000) + 4000) / 2.5); }
   m.userData.ox = ox; m.userData.oz = oz; p.needsUpdate = col.needsUpdate = lv.needsUpdate = uv.needsUpdate = true; m.geometry.computeVertexNormals(); }
 function updateGround(force = false) { for (const m of GRIDS) if (force || Math.hypot(ME.x - m.userData.cx, ME.z - m.userData.cz) > m.userData.size * 0.06) fillGrid(m); }
 // stones and lumps: sparse, Io's plains are mostly smooth and fine-grained (frost, sulfur, ash)
 const ROCK = new THREE.InstancedMesh((() => { const g = new THREE.IcosahedronGeometry(1, 1), p = g.attributes.position; for (let i = 0; i < p.count; i++) { const k = 0.75 + 0.45 * vn(p.getX(i) * 2 + 5, p.getY(i) * 2 + p.getZ(i)); p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.6, p.getZ(i) * k); } g.computeVertexNormals(); return g; })(), new THREE.MeshStandardMaterial({ roughness: 0.85 }), 1500);
 ROCK.frustumCulled = false; ROCK.castShadow = true; ROCK.receiveShadow = true; scene.add(ROCK); let rockC = [1e12, 1e12];
 function fillRocks() { const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color(); let k = 0; const S = 1.6, ci = Math.floor(ME.x / S), cj = Math.floor(ME.z / S); rockC = [ME.x, ME.z];
-  for (let i = ci - 30; i <= ci + 30 && k < 1500; i++) for (let j = cj - 30; j <= cj + 30 && k < 1500; j++) { const r = hash(i * 3 + 1, j * 7 + 2), x = (i + hash(i, j)) * S, z = (j + hash(j, i)) * S; if (r > 0.12 || pateraD(x, z) < 100) continue; const h = land(x, z);
+  for (let i = ci - 30; i <= ci + 30 && k < 1500; i++) for (let j = cj - 30; j <= cj + 30 && k < 1500; j++) { const r = hash(i * 3 + 1, j * 7 + 2), x = (i + hash(i, j)) * S, z = (j + hash(j, i)) * S; const fl = flowM(x, z); if (r > 0.015 + 0.25 * fl || pateraD(x, z) < 100) continue; const h = land(x, z);
     const sz = 0.03 + 0.25 * Math.pow(hash(i + 9, j + 3), 3); q.setFromEuler(new THREE.Euler(hash(i, 1) * 3, hash(j, 2) * 6, 0)); m4.compose(V3(x - ME.x0, h - ((x - ME.x) ** 2 + (z - ME.z) ** 2) / (2 * R_IO) + sz * 0.15, z - ME.z0), q, V3(sz, sz, sz)); ROCK.setMatrixAt(k, m4);
-    const v = hash(i + 4, j + 8); col.setRGB(0.42 + 0.2 * v, 0.38 + 0.16 * v, 0.28 + 0.1 * v); ROCK.setColorAt(k, col); k++; }
+    const v = hash(i + 4, j + 8); if (fl > 0.5) col.setRGB(0.05 + 0.04 * v, 0.045 + 0.035 * v, 0.04 + 0.03 * v); else col.setRGB(0.5 + 0.2 * v, 0.45 + 0.16 * v, 0.28 + 0.1 * v); ROCK.setColorAt(k, col); k++; }
   ROCK.count = k; ROCK.instanceMatrix.needsUpdate = true; if (ROCK.instanceColor) ROCK.instanceColor.needsUpdate = true; }
 
 // ---------- the lander: a robot, imagined ----------
@@ -53247,7 +53256,7 @@ tag(() => SUN.position.clone().add(V3(0, SKYR * 0.03, 0)).add(rig.position), "Th
 tag(() => V3(PC.x + PR - 9000 - ME.x0, FLOOR + 300, PC.z - ME.z0), "Loki Patera's lava lake", () => "202 km across · molten rock under the crust", FACTS[0]);
 tag(() => { const r = PR - 6000, a = lavaU.fa.value; return V3(PC.x + r * Math.cos(a) - ME.x0, FLOOR + 200 - ((PC.x + r * Math.cos(a) - ME.x) ** 2 + (PC.z + r * Math.sin(a) - ME.z) ** 2) / (2 * R_IO), PC.z + r * Math.sin(a) - ME.z0); }, "Overturn front", () => "moving about 2 km a day", "<b>The overturn front</b>: the lake's crust, thickening and growing denser than the molten rock beneath, cracks and founders here, and fresh lava wells up glowing at 1,300 K or more. Behind the front (here, to its south) the new crust is still hot and glowing in its cracks; ahead it is old, black and cold. The wave works round the lake counterclockwise at 1-3 km a day; a full overturn takes months, every 400-600 days. Speed up time (T) to watch it come.");
 tag(() => V3(LP.x - ME.x0, land(LP.x, LP.z) + 5, LP.z - ME.z0), "Robotic lander (imagined)", () => "", FACTS[7]);
-tag(() => V3(MTN.x - ME.x0, land(MTN.x, MTN.z) + 300 - ((MTN.x - ME.x) ** 2 + (MTN.z - ME.z) ** 2) / (2 * R_IO), MTN.z - ME.z0), "A mountain", () => "70 km · about 5 km high (generated)", "<b>A mountain</b> (generated, not a mapped peak): Io's mountains stand alone, blocks of crust up to 17 km high (Boösaule Montes) pushed up and tilted as the crust, endlessly buried by new lava, sinks and is squeezed. They are not volcanoes.");
+tag(() => V3(MTN.x - ME.x0, land(MTN.x, MTN.z) + 300 - ((MTN.x - ME.x) ** 2 + (MTN.z - ME.z) ** 2) / (2 * R_IO), MTN.z - ME.z0), "A mountain", () => "46 km · 6.5 km high (generated)", "<b>A mountain</b> (generated, not a mapped peak): Io's mountains stand alone, blocks of crust up to 17 km high (Boösaule Montes) pushed up and tilted as the crust, endlessly buried by new lava, sinks and is squeezed. They are not volcanoes.");
 const _cd = V3(0, 0, 0), _cp = V3(0, 0, 0);
 function updateTags() { camera.getWorldPosition(_cp); for (const T of TAGS) { const p = T.get(), d = p.distanceTo(_cp); T.sp.visible = tagsOn && d > 1.2 && !(T.hid && T.hid()) && (T.sky ? p.y - _cp.y > -SKYR * 0.02 : d < 120000); if (!T.sp.visible) continue; T.sp.position.copy(p); const w = clampN(d * 0.12, 0.7, SKYR * 0.2); T.sp.scale.set(w, w / 4, 1);
     const sub = T.subF() + (T.sky ? "" : " · " + fmtKm(d)); if (sub !== T.last) { T.last = sub; T.sp.material.map.dispose(); T.sp.material.map = tagTex(T.title, sub); } } }
