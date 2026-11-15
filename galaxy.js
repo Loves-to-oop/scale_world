@@ -11,11 +11,12 @@
 // Star data: HYG database v4.1 (astronexus), CC BY-SA 4.0. Deneb's distance is set to 2,615 light-years (Schiller & Przybilla 2008),
 // the catalogue's Hipparcos value (1,400) being too small for so distant a star.
 const IS_HEADSET = /OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent);
-const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
+// on a headset the logarithmic depth buffer (needed for centimetres to 160 km in one view) costs too much on its mobile GPU: an ordinary one, nearer far plane
+const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: !IS_HEADSET });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.xr.enabled = true; document.body.appendChild(renderer.domElement);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.xr.enabled = true; renderer.xr.setFoveation(1); document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x000000);
-const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.01, 2e6);
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, IS_HEADSET ? 0.05 : 0.01, IS_HEADSET ? 4e5 : 2e6);
 const rig = new THREE.Group(); rig.add(camera); scene.add(rig); camera.position.y = 1.6;
 addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z), clampN = THREE.MathUtils.clamp, UP = V3(0, 1, 0), LYPC = 3.26156;
@@ -97,9 +98,10 @@ tag(SUN.clone().add(V3(0, 0.05, 0)), "The Sun", () => "0.15 µm across · the pl
 tag(SUN.clone().add(V3(0.6, 0.55, 0)), "The Oort cloud", () => "2,000-100,000 AU · 3 cm to 1.6 m", () => "<b>The Oort cloud</b>: a vast shell of icy bodies thought to surround the Sun, from about 2,000 to 100,000 AU (here 3 cm to 1.6 m), the source of long-period comets. None has been seen out there: it is inferred from comets' orbits. Its outer edge reaches a third of the way to Proxima Centauri.", "#a8c8e8");
 const _cp = V3(), _cd = V3();
 let tagRR = 0;
-function updateTags() { camera.getWorldPosition(_cp); let budget = 14; const n = TAGS.length;
-  for (let k = 0; k < n; k++) { const T = TAGS[(tagRR + k) % n], d = _cp.distanceTo(T.p); T.sp.visible = tagsOn && d > 0.3 && !(T.near && d > T.near) && (d < 1500 || T.far || d < T.p.distanceTo(SUN) * 1.5); if (!T.sp.visible) continue;
-    T.sp.position.copy(T.p); const w = clampN(d * (renderer.xr.isPresenting ? 0.14 : 0.11), 0.12, 9000); T.sp.scale.set(w, w * 150 / 640, 1);
+function updateTags() { camera.getWorldPosition(_cp); const vr = renderer.xr.isPresenting; let budget = vr ? 3 : 10; const n = TAGS.length;
+  if (frameN % 15 === 0) { const vis = []; for (const T of TAGS) { T.d = _cp.distanceTo(T.p); T.ok = tagsOn && T.d > 0.3 && !(T.near && T.d > T.near) && (T.d < 1500 || T.far || T.d < T.p.distanceTo(SUN) * 1.5); if (T.ok) vis.push(T); } vis.sort((a, b) => a.d - b.d); const cap = vr ? 50 : 140; for (let k = cap; k < vis.length; k++) if (!vis[k].far) vis[k].ok = false; }
+  for (let k = 0; k < n; k++) { const T = TAGS[(tagRR + k) % n]; T.sp.visible = !!T.ok && tagsOn; if (!T.sp.visible) continue; const d = _cp.distanceTo(T.p);
+    T.sp.position.copy(T.p); const w = clampN(d * (vr ? 0.14 : 0.11), 0.12, 9000); T.sp.scale.set(w, w * 150 / 640, 1);
     if (budget > 0) { const away = T.away ? fmtM(d) + " away" : "", sub = T.subF(), key = away + sub; if (key !== T.last) { budget--; T.last = key; T.sp.material.map.dispose(); T.sp.material.map = tagTex(T.title, sub, T.col, away); } } }
   tagRR = (tagRR + 7) % Math.max(1, n); }
 function lookedAt() { camera.getWorldDirection(_cd); camera.getWorldPosition(_cp); let best = null, ba = 0.06; for (const T of TAGS) { if (!T.sp.visible) continue; const a = T.p.clone().sub(_cp).normalize().angleTo(_cd); if (a < ba) { ba = a; best = T; } } return best; }
@@ -122,8 +124,14 @@ function drawWrist(lines) { const g = wristT.userData.c.getContext("2d"); g.clea
 // Every walkable surface is a disc (a platform) or a strip (a walkway, trail or road, sloping straight up or down to where it goes).
 const galDir = (l, b) => { l *= Math.PI / 180; b *= Math.PI / 180; return V3(-Math.cos(b) * Math.sin(l), Math.sin(b), -Math.cos(b) * Math.cos(l)); };
 const SURF = [], platM = M(0x3a4048, { metalness: 0.5, roughness: 0.45 });
-function platform(c, r, col = 0x5a8ad0) { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.94, 0.12, 40), platM); m.position.copy(c).add(V3(0, -0.06, 0)); scene.add(m);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(r, 0.025, 6, 48).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: col })); rim.position.copy(c).add(V3(0, 0.02, 0)); scene.add(rim); SURF.push({ k: "disc", c: c.clone(), r }); return c; }
+// platforms are gathered and drawn in two batches (discs and rims), not hundreds of separate objects
+const PLAT = [];
+function platform(c, r, col = 0x5a8ad0) { PLAT.push([c.clone(), r, col]); SURF.push({ k: "disc", c: c.clone(), r }); return c; }
+function buildPlatforms() { const n = PLAT.length, disc = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 0.94, 0.12, 24), platM, n), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color(), pos = [], cs = [], idx = [];
+  PLAT.forEach(([c, r, cl], k) => { disc.setMatrixAt(k, m4.compose(c.clone().add(V3(0, -0.06, 0)), q, V3(r, 1, r))); col.set(cl); const w = Math.min(0.05, r * 0.03), N = 32, k0 = pos.length / 3;
+    for (let a = 0; a <= N; a++) { const t = a / N * Math.PI * 2, cx = Math.cos(t), sz = Math.sin(t); for (const [rr, hh] of [[r - w, 0.03], [r + w, 0.03], [r + w, -0.05]]) { pos.push(c.x + cx * rr, c.y + hh, c.z + sz * rr); cs.push(col.r, col.g, col.b); } }
+    for (let a = 0; a < N; a++) { const b = k0 + a * 3, nb = b + 3; idx.push(b, nb, b + 1, b + 1, nb, nb + 1, b + 1, nb + 1, b + 2, b + 2, nb + 1, nb + 2); } });
+  disc.instanceMatrix.needsUpdate = true; disc.computeBoundingSphere(); scene.add(disc); const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(cs, 3)); g.setIndex(idx); g.computeBoundingSphere(); scene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }))); }
 const stripTex = draw => { const c = document.createElement("canvas"); c.width = 128; c.height = 256; draw(c.getContext("2d")); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; };
 const STRIP = { walk: [stripTex(g => { g.fillStyle = "#59636e"; g.fillRect(0, 0, 128, 256); g.fillStyle = "#8ab4e8"; g.fillRect(0, 0, 8, 256); g.fillRect(120, 0, 8, 256); g.fillStyle = "#4a535c"; for (let y = 0; y < 256; y += 32) g.fillRect(8, y, 112, 3); }), 1.0, 1.0],
   trail: [stripTex(g => { g.fillStyle = "#7a4a34"; g.fillRect(0, 0, 128, 256); g.fillStyle = "#4ad07a"; g.fillRect(0, 0, 6, 256); g.fillRect(122, 0, 6, 256); g.fillStyle = "#f0e8d8"; g.fillRect(60, 0, 8, 128); }), 1.3, 4],
@@ -132,9 +140,14 @@ const STRIP = { walk: [stripTex(g => { g.fillStyle = "#59636e"; g.fillRect(0, 0,
 function fadeMat(mat) { mat.onBeforeCompile = sh => { sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vWf;").replace("#include <project_vertex>", "#include <project_vertex>\nvWf = (modelMatrix * vec4(transformed, 1.0)).xyz;");
   sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec3 vWf;").replace("#include <opaque_fragment>", "diffuseColor.a *= mix(0.12, 1.0, smoothstep(3.0, 14.0, length(vWf - vec3(0.0, 1.0, 0.0))));\n#include <opaque_fragment>"); }; return mat; }
 const STRIPS = [];
-function strip(a, b, kind, lift = 0) { const [tex, w, rep] = STRIP[kind], d = V3().subVectors(b, a), L = d.length(); d.divideScalar(L); const sd = V3().crossVectors(d, UP).normalize(), n = V3().crossVectors(sd, d);
-  const t = tex.clone(); t.needsUpdate = true; t.repeat.set(1, L / rep); const m = new THREE.Mesh(new THREE.PlaneGeometry(w, L), fadeMat(new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide, transparent: true, depthWrite: false })));
-  m.matrixAutoUpdate = false; m.matrix.makeBasis(sd, d, n).setPosition(V3().addVectors(a, b).multiplyScalar(0.5).addScaledVector(UP, lift)); scene.add(m); STRIPS.push(m); SURF.push({ k: "strip", a: a.clone(), b: b.clone(), w }); return { a, b, L, d, sd, n, m }; }
+// paths are gathered by kind and drawn as a few merged meshes
+const SB = {};
+function strip(a, b, kind, lift = 0, faint = false) { const [, w, rep] = STRIP[kind], d = V3().subVectors(b, a), L = d.length(); d.divideScalar(L); const sd = V3().crossVectors(d, UP).normalize(), n = V3().crossVectors(sd, d), key = kind + (faint ? "_f" : "");
+  const B = SB[key] || (SB[key] = { kind, faint, pos: [], uv: [], idx: [] }), k0 = B.pos.length / 3, up = V3(0, lift, 0);
+  for (const [P, v] of [[a, 0], [b, L / rep]]) for (const sg of [-1, 1]) { const q = P.clone().addScaledVector(sd, sg * w / 2).add(up); B.pos.push(q.x, q.y, q.z); B.uv.push(sg < 0 ? 0 : 1, v); }
+  B.idx.push(k0, k0 + 1, k0 + 2, k0 + 1, k0 + 3, k0 + 2); SURF.push({ k: "strip", a: a.clone(), b: b.clone(), w }); return { a, b, L, d, sd, n }; }
+function buildStrips() { for (const key in SB) { const B = SB[key], g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(B.pos, 3)); g.setAttribute("uv", new THREE.Float32BufferAttribute(B.uv, 2)); g.setIndex(B.idx); g.computeBoundingSphere();
+  const m = new THREE.Mesh(g, fadeMat(new THREE.MeshBasicMaterial({ map: STRIP[B.kind][0], side: THREE.DoubleSide, transparent: true, depthWrite: false, opacity: B.faint ? 0.5 : 1 }))); scene.add(m); STRIPS.push(m); } }
 function groundAt(x, z, yRef) { let best = null; for (const S of SURF) { let h = null;
     if (S.k === "disc") { if ((x - S.c.x) ** 2 + (z - S.c.z) ** 2 <= S.r * S.r) h = S.c.y; }
     else { const ax = S.b.x - S.a.x, az = S.b.z - S.a.z, l2 = ax * ax + az * az; if (l2 < 1e-6) continue; const t = ((x - S.a.x) * ax + (z - S.a.z) * az) / l2; if (t < 0 || t > 1) continue; const px = S.a.x + ax * t - x, pz = S.a.z + az * t - z; if (px * px + pz * pz > (S.w / 2) ** 2) continue; h = S.a.y + (S.b.y - S.a.y) * t; }
@@ -142,7 +155,7 @@ function groundAt(x, z, yRef) { let best = null; for (const S of SURF) { let h =
 // the network: every platform is a node, every walkway, trail and road an edge; the autopilots find their way along it
 const NODES = [], EDGES = [];
 function node(p, name, extra = {}) { NODES.push({ p: p.clone(), name, ...extra }); return NODES.length - 1; }
-function edge(i, j, kind, A, B, lift = 0) { const g = strip(A || NODES[i].p, B || NODES[j].p, kind, lift); EDGES.push({ i, j, kind, A: g.a.clone(), B: g.b.clone(), L: g.a.distanceTo(g.b), m: g.m }); return EDGES.length - 1; }
+function edge(i, j, kind, A, B, lift = 0, faint = false) { const g = strip(A || NODES[i].p, B || NODES[j].p, kind, lift, faint); EDGES.push({ i, j, kind, A: g.a.clone(), B: g.b.clone(), L: g.a.distanceTo(g.b) }); return EDGES.length - 1; }
 // the hub round the desk, and the car park behind it
 const HUB = platform(V3(0, 0, 0), 2.5, 0xffd080), PARK = platform(V3(0, 0, 7), 2.6, 0xffd080), nHUB = node(HUB, "the hub"), nPARK = node(PARK, "the car park"); edge(nHUB, nPARK, "walk", V3(0, 0, 2.3), V3(0, 0, 4.6));
 // near stars: a platform under each (the star glows just above it), joined to the hub and to each other by the shortest network of walkways
@@ -177,7 +190,7 @@ function windowGlow(cols, rows, lit, p = 0.5) { const c = document.createElement
 function hsh(i, j) { let h = (Math.imul(i, 374761393) + Math.imul(j, 668265263) + 982451653) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; }
 function vno(x, z) { const i = Math.floor(x), j = Math.floor(z), fx = x - i, fz = z - j, u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz), a = hsh(i, j), b = hsh(i + 1, j), c = hsh(i, j + 1), d = hsh(i + 1, j + 1); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; }
 function ridgedN(x, z) { let s = 0, a = 0.5, w = 0; for (let k = 0; k < 5; k++) { s += a * (1 - Math.abs(2 * vno(x, z) - 1)); w += a; x = x * 2.1 + 3.7; z = z * 2.1 + 1.9; a *= 0.5; } return s / w; }
-function mountainGeo(R, H, massif) { const N = 150, geo = new THREE.PlaneGeometry(2 * R, 2 * R, N, N).rotateX(-Math.PI / 2), p = geo.attributes.position, cl = new Float32Array(p.count * 3);
+function mountainGeo(R, H, massif) { const N = IS_HEADSET ? 100 : 150, geo = new THREE.PlaneGeometry(2 * R, 2 * R, N, N).rotateX(-Math.PI / 2), p = geo.attributes.position, cl = new Float32Array(p.count * 3);
   const PK = massif ? [[0, 0, 1, 0.42], [0.42, 0.18, 0.72, 0.3], [-0.38, 0.32, 0.64, 0.3], [0.12, -0.46, 0.56, 0.26], [-0.3, -0.3, 0.5, 0.25]] : [[0, 0, 1, 0.75], [0.3, 0.25, 0.45, 0.3]];
   for (let i = 0; i < p.count; i++) { const x = p.getX(i) / R, z = p.getZ(i) / R, d = Math.hypot(x, z); let y = -0.002;
     if (d < 1) { let sh = 0; for (const [px, pz, ph, pr] of PK) { const q = Math.hypot(x - px, z - pz) / pr; sh = Math.max(sh, ph * (massif ? Math.exp(-q * q * 1.6) : Math.max(0, 1 - q) ** 1.25)); } const rg = ridgedN(x * 3.2 + 7, z * 3.2 + 3); y = Math.max(0, sh * (0.72 + 0.4 * rg) - 0.02) * (1 - Math.pow(d, 6)); }
@@ -223,7 +236,7 @@ function destination(kind, D) { let S = null, name, p, R = 0, col = 0xffffff; if
   const c = platform(end, kind === "road" ? 4 : 2, col), nEnd = node(c, name, { star: S, far: true }), eI = edge(kind === "road" ? nPARK : nHUB, nEnd, kind, a, end.clone().addScaledVector(V3(end.x - a.x, 0, end.z - a.z).normalize(), -0.5), 0.006 * (PATHS.length % 4)), path = { a: EDGES[eI].A, b: EDGES[eI].B, d: V3().subVectors(EDGES[eI].B, EDGES[eI].A).normalize() }; path.sd = V3().crossVectors(path.d, UP).normalize(); path.n = V3().crossVectors(path.sd, path.d);
   const LM = landmark(dist, c, path.sd, path.d, name, kind, col), lamp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowT, color: col, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); lamp.position.copy(LM.top).add(V3(0, LM.h * 0.06 + 1, 0)); lamp.scale.setScalar(dist * 0.006 + 1); scene.add(lamp); BEACONS.push(lamp);
   PATHS.push({ kind, name, a: path.a, b: path.b, L: path.a.distanceTo(path.b), d: path.d, sd: path.sd, n: path.n, end: c, dist, S, node: nEnd, p });
-  if (R) { const n = R > 1000 ? 900 : 300, ps = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const u = Math.random() * 2 - 1, f = Math.random() * 6.283, r = R * Math.cbrt(Math.random()) * (R > 5000 ? 1 : 1), q = Math.sqrt(1 - u * u); ps.set([p.x + r * q * Math.cos(f), p.y + r * u * (R > 5000 ? 0.15 : 0.7), p.z + r * q * Math.sin(f)], i * 3); }
+  if (R) { const n = Math.round((R > 1000 ? 900 : 300) * (IS_HEADSET ? 0.4 : 1)), ps = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const u = Math.random() * 2 - 1, f = Math.random() * 6.283, r = R * Math.cbrt(Math.random()) * (R > 5000 ? 1 : 1), q = Math.sqrt(1 - u * u); ps.set([p.x + r * q * Math.cos(f), p.y + r * u * (R > 5000 ? 0.15 : 0.7), p.z + r * q * Math.sin(f)], i * 3); }
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(ps, 3)); const cloud = new THREE.Points(g, new THREE.PointsMaterial({ color: col, size: R * (R > 500 ? 0.12 : 0.3), map: glowT, transparent: true, opacity: R > 500 ? 0.1 : 0.3, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true })); cloud.frustumCulled = false; scene.add(cloud);
     const T = tag(p.clone().add(V3(0, R * 0.8, 0)), name.replace(/^the /, "The "), () => fmtM(dist) + " from the Sun · " + fmtLy(dist) + " ly", () => D.info, "#ffd8a8"); T.far = true; }
   const sign = tag(a.clone().add(V3(0, 1.9, 0)).addScaledVector(hdir, 0.2), (kind === "road" ? "🚗 " : "🚲 ") + name.replace(/^the /, "The "), () => fmtM(dist) + (kind === "road" ? " by road" : " by bike trail"), () => `<b>${kind === "road" ? "Road" : "Bike trail"} to ${name}</b>: ${fmtM(dist)}, ${p.y - SUN.y > 0 ? "climbing" : "descending"} ${fmtM(Math.abs(p.y - SUN.y))} on the way. Take the ${kind === "road" ? "car from the car park" : "bike from the hub"}: E beside it.`, kind === "road" ? "#ffe08a" : "#a8f0b8"); sign.near = 25; }
@@ -312,10 +325,10 @@ const HELI = platform(V3(-9, 0, 3), 4.5, 0xff6040), nHELI = node(HELI, "the heli
 { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d"); g.strokeStyle = "#f0f0f0"; g.lineWidth = 14; g.beginPath(); g.arc(128, 128, 110, 0, 7); g.stroke(); g.fillStyle = "#f0f0f0"; g.font = "bold 150px sans-serif"; g.textAlign = "center"; g.fillText("H", 128, 182); const t = new THREE.CanvasTexture(c);
   const h = new THREE.Mesh(new THREE.CircleGeometry(4.2, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: t, transparent: true })); h.position.copy(HELI).add(V3(0, 0.01, 0)); scene.add(h); }
 STRIP.runway = [stripTex(g => { g.fillStyle = "#2a2c30"; g.fillRect(0, 0, 128, 256); g.fillStyle = "#e8e8e8"; g.fillRect(3, 0, 3, 256); g.fillRect(122, 0, 3, 256); g.fillRect(61, 0, 6, 120); }), 45, 60];
-const AIRPORTS = [];
+const AIRPORTS = [], RWL = { pos: [], col: [] };
 function airport(name, end, dir) { const hd = V3(dir.x, 0, dir.z).normalize(), side = V3(hd.z, 0, -hd.x), start = end.clone().addScaledVector(hd, -2600), term = end.clone().addScaledVector(side, 40), n = node(term, name + " airport", { airport: true });
   strip(start, end, "runway"); platform(term, 14, 0x8ad0ff); const tb = new THREE.Mesh(new THREE.BoxGeometry(22, 8, 10), M(0xa8c8e0, { metalness: 0.3, roughness: 0.3, emissive: 0x405870, emissiveIntensity: 0.4 })); tb.position.copy(term).add(V3(0, 4, -7).applyAxisAngle(UP, Math.atan2(hd.x, hd.z))); scene.add(tb);
-  strip(term, end.clone().addScaledVector(side, 20), "walk"); for (let k = 0; k <= 26; k++) { const lp = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), new THREE.MeshBasicMaterial({ color: k > 23 ? 0xff4040 : 0xfff4c0 })); for (const sgn of [-1, 1]) { const q = lp.clone(); q.position.copy(start).addScaledVector(hd, k * 100).addScaledVector(side, sgn * 23).add(V3(0, 0.3, 0)); scene.add(q); } }
+  strip(term, end.clone().addScaledVector(side, 20), "walk"); for (let k = 0; k <= 26; k++) for (const sgn of [-1, 1]) { const q = start.clone().addScaledVector(hd, k * 100).addScaledVector(side, sgn * 23).add(V3(0, 0.3, 0)); RWL.pos.push(q.x, q.y, q.z); RWL.col.push(...(k > 23 ? [1, 0.25, 0.25] : [1, 0.95, 0.75])); }
   const A = { name, start, end, hd, side, term, node: n }; AIRPORTS.push(A); tag(term.clone().add(V3(0, 12, 0)), "✈ " + name.replace(/^the /, "The ") + " airport", () => fmtM(term.distanceTo(SUN)) + " from the Sun", () => `<b>${name.replace(/^the /, "The ")} airport</b>: a 2.6 km runway. Board the jet beside the runway (E) to fly to another airport.`, "#9fd8ff").near = 3000; return A; }
 const SOLPORT = airport("the Sun", V3(0, -30, 2700), V3(0, 0, -1)); edge(nPARK, SOLPORT.node, "road", V3(0, 0, 9.4), SOLPORT.term.clone().addScaledVector(V3(0, 0, -1), 13));
 const GCP = PATHS.find(P => P.name.includes("centre")), GCC = GCP.p, toGC = V3().subVectors(GCC, SUN).normalize(), GCPORT = airport("the Galactic Centre", GCC.clone().addScaledVector(V3(toGC.x, 0, toGC.z).normalize(), -45).add(V3(0, -15, 0)), toGC);
@@ -326,7 +339,7 @@ const LMCP = PATHS.find(P => P.name.includes("Magellanic")), toL = V3().subVecto
 // at its closest); the nuclear star cluster, about 25 million Suns' worth of stars, packs the middle 30 m; the circumnuclear disc of
 // gas and dust circles 5-10 m out. From inside it the sky would blaze: hundreds of stars brighter than Sirius.
 const SGRV = platform(GCC.clone().addScaledVector(V3(toGC.x, 0, toGC.z).normalize(), -2.4).add(V3(0, -1.2, 0)), 1.6, 0xffb060), nSGR = node(SGRV, "Sagittarius A*"); edge(GCPORT.node, nSGR, "walk");
-{ const n = 24000, ps = new Float32Array(n * 3), cs = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const r = 30 * Math.pow(Math.random(), 2.2) + 0.05, u = Math.random() * 2 - 1, f = Math.random() * 6.283, q = Math.sqrt(1 - u * u); ps.set([GCC.x + r * q * Math.cos(f), GCC.y + r * u * 0.8, GCC.z + r * q * Math.sin(f)], i * 3); const w = Math.random(); cs.set(w < 0.7 ? [1, 0.75, 0.5] : w < 0.95 ? [1, 0.92, 0.8] : [0.7, 0.8, 1], i * 3); }
+{ const n = IS_HEADSET ? 10000 : 24000, ps = new Float32Array(n * 3), cs = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const r = 30 * Math.pow(Math.random(), 2.2) + 0.05, u = Math.random() * 2 - 1, f = Math.random() * 6.283, q = Math.sqrt(1 - u * u); ps.set([GCC.x + r * q * Math.cos(f), GCC.y + r * u * 0.8, GCC.z + r * q * Math.sin(f)], i * 3); const w = Math.random(); cs.set(w < 0.7 ? [1, 0.75, 0.5] : w < 0.95 ? [1, 0.92, 0.8] : [0.7, 0.8, 1], i * 3); }
   const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(ps, 3)); g.setAttribute("color", new THREE.BufferAttribute(cs, 3)); const cl = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.05, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); cl.frustumCulled = false; scene.add(cl);
   const cnd = new THREE.Mesh(new THREE.TorusGeometry(7.5, 1.6, 16, 64), new THREE.MeshBasicMaterial({ color: 0xa04830, transparent: true, opacity: 0.25, depthWrite: false })); cnd.position.copy(GCC); cnd.rotation.set(1.2, 0.3, 0); scene.add(cnd);
   const bh = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowT, color: 0xffa040, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); bh.position.copy(GCC); bh.scale.setScalar(0.08); scene.add(bh);
@@ -337,7 +350,7 @@ scope(SGRV.clone().addScaledVector(V3(toGC.z, 0, -toGC.x).normalize(), 0.9), GCC
 // ---------- join everything into one network: the shortest set of links (walkways under 20 m, roads beyond) so every platform can be reached ----------
 { const par = NODES.map((_, k) => k), find = k => par[k] === k ? k : (par[k] = find(par[k])); for (const e of EDGES) par[find(e.i)] = find(e.j);
   const cand = []; NODES.forEach((a, i) => { const ds = NODES.map((b, j) => [a.p.distanceTo(b.p), j]).filter(q => q[1] !== i).sort((x, y) => x[0] - y[0]).slice(0, 6); for (const [d, j] of ds) if (i < j || !ds.some(q => q[1] === i)) cand.push([d, i, j]); });
-  cand.sort((x, y) => x[0] - y[0]); for (const [d, i, j] of cand) if (find(i) !== find(j) && !(NODES[i].airport && NODES[j].airport)) { par[find(i)] = find(j); const k = edge(i, j, d < 20 ? "walk" : "road"); EDGES[k].m.material.opacity = 0.5; } }
+  cand.sort((x, y) => x[0] - y[0]); for (const [d, i, j] of cand) if (find(i) !== find(j) && !(NODES[i].airport && NODES[j].airport)) { par[find(i)] = find(j); edge(i, j, d < 20 ? "walk" : "road", null, null, 0, true); } }
 // ---------- the constellations' attractions: a Grand Prix round the Big Dipper, a roller coaster along Cassiopeia's W, a monorail round Orion ----------
 function loopCurve(names, drop, extra) { const pts = names.map(n => byName(n)).filter(Boolean).map(S => S.p.clone().add(V3(0, -drop, 0))); if (extra) extra(pts); return new THREE.CatmullRomCurve3(pts, true, "centripetal"); }
 function ribbon(curve, width, tex, rep, segs, walk) { const N = segs, pos = [], uv = [], idx = [], L = curve.getLength(); for (let i = 0; i <= N; i++) { const u = i / N, p = curve.getPointAt(u % 1), t = curve.getTangentAt(u % 1), sd = V3().crossVectors(t, UP).normalize(); for (const k of [-1, 1]) { const q = p.clone().addScaledVector(sd, k * width / 2); pos.push(q.x, q.y, q.z); uv.push(k < 0 ? 0 : 1, u * L / rep); } if (i < N) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
@@ -365,6 +378,8 @@ function updateRides(dt) { for (const R of RIDES) {
   else { const top = R.curve.getPointAt(0).y; if (R.kind === "coaster") { const y = R.curve.getPointAt(R.u).y, ymax = R.ymax || (R.ymax = Math.max(...R.curve.getSpacedPoints(400).map(p => p.y))); R.v = Math.sqrt(64 + 2 * 9.8 * 0.35 * (ymax - y)); }
     R.u = (R.u + R.v * dt / R.L) % 1; R.train.forEach((g, k) => { const u = (R.u - k * (R.kind === "coaster" ? 3 : 13) / R.L + 1) % 1, p = R.curve.getPointAt(u), t = R.curve.getTangentAt(u), sd = V3().crossVectors(t, UP).normalize(); g.position.copy(p); g.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(sd, V3().crossVectors(sd, t), t.clone().negate())); }); } } }
 
+buildPlatforms(); buildStrips();
+{ const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(RWL.pos, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(RWL.col, 3)); scene.add(new THREE.Points(g, new THREE.PointsMaterial({ size: 1.4, map: glowT, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }))); }
 // ---------- vehicles: a bike, a car, a helicopter and a jet, all on autopilot ----------
 function makeHeli() { const g = new THREE.Group(), body = new THREE.Mesh(new THREE.SphereGeometry(1.4, 20, 14), M(0xe8e8e8, { metalness: 0.3, roughness: 0.4 })); body.scale.set(1, 0.9, 1.6); body.position.y = 1.4; g.add(body); const glass = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshPhysicalMaterial({ color: 0x8ac0e0, transparent: true, opacity: 0.35 })); glass.position.set(0, 1.6, -1.0); glass.rotation.x = -1.2; g.add(glass);
   const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.3, 5, 10).rotateX(Math.PI / 2), M(0xe8e8e8)); tail.position.set(0, 1.7, 4); g.add(tail); const fin = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.2, 0.8), M(0xd03030)); fin.position.set(0, 2.2, 6.3); g.add(fin);
@@ -489,7 +504,7 @@ renderer.setAnimationLoop(() => { const dt = clampN(clock.getDelta(), 0, 0.05), 
   const lift = vr && seated ? 0.45 : 0; rig.position.set(ME.x, ME.y + lift, ME.z); rig.rotation.set(0, vr ? vrYaw + heading : heading, 0); if (!vr) { camera.position.set(0, riding ? riding.eye : 1.6, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
   for (const b of BEACONS) b.material.opacity = 0.7 + 0.3 * Math.sin(T * 2.5);
   if (started && !riding) { camera.getWorldPosition(_cp); if (viewing && viewing.eye.distanceTo(_cp) > (viewing.auto ? 0.4 : 2.5)) closeView(); if (vr && !viewing) { const S = nearScope(0.22); if (S && S.kind === "light") { showView(S); S.auto = true; } } }
-  updateTags();
+  updateTags(); if (frameN % 20 === 0) { camera.getWorldPosition(_cp); for (const S of SCOPES) S.g.visible = S.eye.distanceTo(_cp) < 60; }
   if (frameN % 10 === 0) { camera.getWorldPosition(_cp); const dSun = _cp.distanceTo(SUN); let near = null, nd = 1e9; for (const S of STARS) { const d = _cp.distanceToSquared(S.p); if (d < nd) { nd = d; near = S; } } nd = Math.sqrt(nd);
     const v = riding ? Math.abs(riding.v) : flying ? FLY[flySpeedI] : 3, how = riding ? "In the " + riding.name : flying ? "Flying" : "Walking";
     const lines = [`From the Sun: ${fmtLy(dSun)} light-years (${fmtM(dSun)})`, `Nearest star: ${near.name || near.bayer || "an unnamed star"}, ${fmtLy(nd)} ly`, `${how}: ${v < 10 ? v.toFixed(1) : Math.round(v)} m/s = ${v < 10 ? v.toFixed(1) : Math.round(v)} ly/s`, `Height above the galactic plane: ${fmtLy(_cp.y - SUN.y)} ly`];
