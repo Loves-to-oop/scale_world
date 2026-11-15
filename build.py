@@ -751,3 +751,21 @@ ES = ES[:i0] + """<div id="intro"><div class="card">
 </div></div>
 """ + ES[i1:]
 (HERE / "eskabo.html").write_text(ES.replace("__THREE__", three).replace("__SCENE__", (HERE / "eskabo.js").read_text(encoding="utf-8")), encoding="utf-8")
+
+# The stars at one light-year to the metre
+GX = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>The stars at one light-year to the metre</title>").replace("background:#c8d4d8", "background:#05070c")
+i0, i1 = GX.index('<div id="intro">'), GX.index('<button id="vr">')
+GX = GX[:i0] + """<div id="intro"><div class="card">
+  <h1>The stars at one light-year to the metre</h1>
+  <p>The Sun is a glint on a desk. Around it, every star you can see with the naked eye, and every star within 81 light-years, stands in
+  its real direction at its real distance: Proxima Centauri 4.2 m away, Sirius 8.6 m, Vega 25 m, Polaris 433 m, Betelgeuse 500 m, the
+  centre of the Milky Way 26.7 km straight ahead. Each shines as bright as it would from where you stand: at the desk the sky is our
+  night sky; walk away and the constellations come apart. The ground is the plane of the Milky Way; the Oort cloud is a haze 1.6 m round
+  the desk.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;·&nbsp; drag to look &nbsp;·&nbsp; <kbd>shift</kbd> faster &nbsp;·&nbsp; <kbd>F</kbd> fly (<kbd>space</kbd> / <kbd>C</kbd> up and down, <kbd>=</kbd><kbd>−</kbd> speed) &nbsp;·&nbsp; <kbd>E</kbd> info on what you look at
+  &nbsp;·&nbsp; <kbd>G</kbd> glass ground &nbsp;·&nbsp; <kbd>C</kbd> constellation lines &nbsp;·&nbsp; <kbd>L</kbd> labels &nbsp;·&nbsp; <kbd>H</kbd> readout &nbsp;·&nbsp; <kbd>R</kbd> back to the desk<br>
+  In VR: left stick walk (left trigger faster), right stick turn, <b>B</b> fly / land (right stick up/down to climb), <b>A</b> or right trigger info, <b>X</b> labels, <b>Y</b> constellation lines, click the right stick: glass ground, click the left stick: seated</p>
+  <p class="dim">Star positions from the HYG database v4.1 (CC BY-SA 4.0). Distances beyond about 1,000 light-years are uncertain by tens of percent. Click to begin.</p>
+</div></div>
+""" + GX[i1:]
+(HERE / "galaxy.html").write_text(GX.replace("__THREE__", three).replace("__SCENE__", (HERE / "galaxy_data.js").read_text(encoding="utf-8") + (HERE / "galaxy.js").read_text(encoding="utf-8")), encoding="utf-8")
