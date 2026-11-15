@@ -757,7 +757,7 @@ GX = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Starl
 i0, i1 = GX.index('<div id="intro">'), GX.index('<button id="vr">')
 GX = GX[:i0] + """<div id="intro"><div class="card">
   <h1>Starlight Park: the stars at one light-year to the metre</h1>
-  <p>A theme park at night: the park floor lies 100 m below, and every star's platform and ride stands on a tower above it (places deeper than the floor go down lit shafts). The Sun is a glint on a desk. Around it, every star you can see with the naked eye, and every star within 81 light-years, stands in
+  <p>A theme park among the stars. The Sun is a glint on a desk. Around it, every star you can see with the naked eye, and every star within 81 light-years, stands in
   its real direction at its real distance: Proxima Centauri 4.2 m away, Sirius 8.6 m, Vega 25 m, Polaris 433 m, Betelgeuse 500 m, the
   centre of the Milky Way 26.7 km straight ahead. Each shines as bright as it would from where you stand: at the desk the sky is our
   night sky; walk away and the constellations come apart. The ground is the plane of the Milky Way; the Oort cloud is a haze 1.6 m round

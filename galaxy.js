@@ -62,9 +62,7 @@ const figLines = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints
 // ---------- the desk, the Sun on it, the Oort cloud round it ----------
 const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, ...o });
 // ---------- Starlight Park: the whole model as a theme park at night ----------
-// a night sky over the park: dark blue overhead, a faint glow of park lights at the horizon (a background image, so it cannot flicker)
-{ const c = document.createElement("canvas"); c.width = 16; c.height = 512; const g = c.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 512); gr.addColorStop(0, "#03050c"); gr.addColorStop(0.38, "#070b1c"); gr.addColorStop(0.49, "#1c1a2c"); gr.addColorStop(0.5, "#2a2230"); gr.addColorStop(0.53, "#0e0d14"); gr.addColorStop(1, "#08080c"); g.fillStyle = gr; g.fillRect(0, 0, 16, 512);
-  const t = new THREE.CanvasTexture(c); t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace; scene.background = t; }
+scene.background = new THREE.Color(0x000000);
 scene.add(new THREE.HemisphereLight(0x9aa8ff, 0x4a2a3a, 0.9));
 // light from one side, so buildings and mountains show solid faces (in space, starlight: an artist's floodlight, really)
 const keyLight = new THREE.DirectionalLight(0xc8d4ff, 1.3); keyLight.position.set(0.6, 1, 0.35); scene.add(keyLight);
@@ -183,8 +181,7 @@ function buildStrips() { for (const key in SB) { const B = SB[key], g = new THRE
 function groundAt(x, z, yRef) { let best = null; for (const S of SURF) { let h = null;
     if (S.k === "disc") { if ((x - S.c.x) ** 2 + (z - S.c.z) ** 2 <= S.r * S.r) h = S.c.y; }
     else { const ax = S.b.x - S.a.x, az = S.b.z - S.a.z, l2 = ax * ax + az * az; if (l2 < 1e-6) continue; const t = ((x - S.a.x) * ax + (z - S.a.z) * az) / l2; if (t < 0 || t > 1) continue; const px = S.a.x + ax * t - x, pz = S.a.z + az * t - z; if (px * px + pz * pz > (S.w / 2) ** 2) continue; h = S.a.y + (S.b.y - S.a.y) * t; }
-    if (h !== null && h <= yRef + 0.7 && (best === null || Math.abs(h - yRef) < Math.abs(best - yRef))) best = h; }
-  if (typeof GROUND_Y !== "undefined" && GROUND_Y <= yRef + 0.7 && (best === null || Math.abs(GROUND_Y - yRef) < Math.abs(best - yRef))) best = GROUND_Y; return best; }
+    if (h !== null && h <= yRef + 0.7 && (best === null || Math.abs(h - yRef) < Math.abs(best - yRef))) best = h; } return best; }
 // the network: every platform is a node, every walkway, trail and road an edge; the autopilots find their way along it
 const NODES = [], EDGES = [];
 function node(p, name, extra = {}) { NODES.push({ p: p.clone(), name, ...extra }); return NODES.length - 1; }
@@ -486,57 +483,6 @@ function updateLifts(t) { const m4 = new THREE.Matrix4(), q = new THREE.Quaterni
 const RIDECAB = new THREE.Group(); { const fr = M(0xd8dce4, { metalness: 0.4, roughness: 0.4 }); for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.4, 0.08), fr); p.position.set(x * 1.1, 1.2, z * 1.4); RIDECAB.add(p); }
   const fl = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.1, 2.9), fr); RIDECAB.add(fl); const rf = fl.clone(); rf.position.y = 2.4; RIDECAB.add(rf); const gl = new THREE.Mesh(new THREE.BoxGeometry(2.25, 2.3, 2.85), new THREE.MeshPhysicalMaterial({ color: 0xa8d0f0, transparent: true, opacity: 0.18, roughness: 0.05, side: THREE.DoubleSide, depthWrite: false })); gl.position.y = 1.2; RIDECAB.add(gl);
   const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.6, 0.1), fr); arm.position.y = 3.7; arm.name = "arm"; RIDECAB.add(arm); RIDECAB.visible = false; scene.add(RIDECAB); }
-// ---------- the park floor, 100 m below the desk: plazas, lawns, trees, food stands and lamps; everything above stands on pillars ----------
-// Stars and rides deeper than the floor go down lit shafts: the floor has openings wherever a platform, path or ride passes through it.
-const GROUND_Y = -100, PARK_R = 2500, MASK = 2048;
-const maskC = document.createElement("canvas"); maskC.width = maskC.height = MASK; const mg = maskC.getContext("2d"); mg.fillStyle = "#ff0000"; mg.fillRect(0, 0, MASK, MASK);
-const toMask = (x, z) => [(x / PARK_R * 0.5 + 0.5) * MASK, (z / PARK_R * 0.5 + 0.5) * MASK], mPx = MASK / (2 * PARK_R);
-const LAWNS = [], LAMPS = [], KIOSKS = [], TREES = [];
-{ let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  for (let k = 0; k < 260; k++) { const r = 60 + Math.pow(rnd(), 0.7) * 1800, a = rnd() * 6.283, x = Math.cos(a) * r, z = Math.sin(a) * r, w = 18 + rnd() * 45, h = 18 + rnd() * 45; LAWNS.push([x, z, w, h]); }
-  mg.globalCompositeOperation = "lighter"; mg.fillStyle = "#00ff00"; for (const [x, z, w, h] of LAWNS) { const [u, v] = toMask(x - w / 2, z - h / 2); mg.beginPath(); mg.roundRect(u, v, w * mPx, h * mPx, 6 * mPx); mg.fill(); for (let t = 0; t < w * h / 120; t++) TREES.push([x + (rnd() - 0.5) * w * 0.85, z + (rnd() - 0.5) * h * 0.85, 4 + rnd() * 6]); }
-  for (let x = -1500; x <= 1500; x += 36) for (let z = -1500; z <= 1500; z += 36) if (Math.hypot(x, z) < 1500 && rnd() < 0.5) LAMPS.push([x + 4, z + 4]);
-  const pool = mg.createRadialGradient(0, 0, 0, 0, 0, 9 * mPx); pool.addColorStop(0, "rgba(0,0,255,1)"); pool.addColorStop(1, "rgba(0,0,0,0)"); mg.fillStyle = pool; for (const [x, z] of LAMPS) { const [u, v] = toMask(x, z); mg.save(); mg.translate(u, v); mg.fillRect(-9 * mPx, -9 * mPx, 18 * mPx, 18 * mPx); mg.restore(); }
-  for (let k = 0; k < 70; k++) { const r = 20 + Math.pow(rnd(), 0.8) * 700, a = rnd() * 6.283; KIOSKS.push([Math.cos(a) * r, Math.sin(a) * r, rnd() * 6.283, Math.floor(rnd() * 5)]); }
-  // openings: under every platform below the floor, and where paths and rides cross it
-  mg.globalCompositeOperation = "destination-out"; const hole = (x, z, r) => { const [u, v] = toMask(x, z); mg.fillStyle = "#000"; mg.beginPath(); mg.arc(u, v, Math.max(1.5, r * mPx), 0, 7); mg.fill(); };
-  for (const n of NODES) if (n.p.y < GROUND_Y) hole(n.p.x, n.p.z, 7);
-  for (const e of EDGES) if ((e.A.y - GROUND_Y) * (e.B.y - GROUND_Y) < 0) { const t = (GROUND_Y - e.A.y) / (e.B.y - e.A.y), p = e.A.clone().lerp(e.B, t); hole(p.x, p.z, e.kind === "road" ? 6 : 4); }
-  for (const R of [...GEN, ...RIDES]) { const pts = R.curve.getSpacedPoints(400); for (let i = 0; i < 400; i++) if ((pts[i].y - GROUND_Y) * (pts[i + 1].y - GROUND_Y) < 0) hole(pts[i].x, pts[i].z, 5); }
-  for (const A of AIRPORTS) if (A.end.y < GROUND_Y) hole(A.term.x, A.term.z, 20); }
-const maskT = new THREE.CanvasTexture(maskC); maskT.flipY = false;
-const groundMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-groundMat.onBeforeCompile = sh => { sh.uniforms.mask = { value: maskT };
-  sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vWg;").replace("#include <project_vertex>", "#include <project_vertex>\nvWg = (modelMatrix * vec4(transformed, 1.0)).xyz;");
-  sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec3 vWg; uniform sampler2D mask;\nfloat hh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5); }")
-    .replace("vec4 diffuseColor = vec4( diffuse, opacity );", `vec2 p = vWg.xz; vec2 uv = p / ${PARK_R.toFixed(1)} * 0.5 + 0.5; vec4 mk = (uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0) ? texture2D(mask, uv) : vec4(1.0, 0.0, 0.0, 0.0); if (mk.r < 0.5) discard;
-      float d = length(cameraPosition.xz - p), park = 1.0 - smoothstep(${(PARK_R * 0.8).toFixed(1)}, ${(PARK_R * 1.6).toFixed(1)}, length(p));
-      vec2 tile = abs(fract(p / 2.0) - 0.5); float seam = smoothstep(0.47, 0.5, max(tile.x, tile.y)) * smoothstep(60.0, 5.0, d);
-      vec3 pave = vec3(0.045, 0.042, 0.05) + 0.012 * hh(floor(p / 2.0)) - seam * 0.015, lawn = vec3(0.015, 0.05, 0.018) + 0.008 * hh(floor(p / 1.5)), field = vec3(0.01, 0.02, 0.012);
-      vec3 c = mix(mix(field, pave, park), lawn, mk.g * park); c += vec3(1.0, 0.72, 0.38) * mk.b * 0.35 * park; c *= mix(1.0, 0.35, smoothstep(2000.0, 30000.0, d));
-      vec4 diffuseColor = vec4(c, 1.0);`); };
-const GROUND = new THREE.Mesh(new THREE.PlaneGeometry(800000, 800000, 8, 8).rotateX(-Math.PI / 2), groundMat); GROUND.position.y = GROUND_Y; scene.add(GROUND);
-// pillars under platforms, rides and the paths near the park; shafts down to the places below the floor
-{ const P = [], add = (x, yTop, z, r) => { if (yTop > GROUND_Y + 0.3) P.push([x, yTop, z, r]); };
-  for (const [c, r] of PLAT) if (c.y > GROUND_Y && Math.hypot(c.x, c.z) < 60000) add(c.x, c.y - 0.12, c.z, clampN(r * 0.05, 0.07, 0.8));
-  for (const R of [...GEN, ...RIDES]) { const n = Math.max(3, Math.round(R.L / 80)), thin = R.type === "train" ? 0.03 : 0.15; for (let i = 0; i < n; i++) { const q = R.curve.getPointAt(i / n); add(q.x, q.y - 0.6, q.z, thin); } }
-  for (const e of EDGES) { if (e.lift === "cable" || e.kind === "walk") continue; const mid = e.A.clone().lerp(e.B, 0.5); if (mid.length() > 2500) continue; const step = 150, n = Math.floor(e.L / step); for (let i = 1; i <= n; i++) { const q = e.A.clone().lerp(e.B, i / (n + 1)); add(q.x, q.y - 0.1, q.z, e.kind === "road" ? 0.25 : 0.1); } }
-  const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1.15, 1, 8, 1, true), M(0x50545e, { roughness: 0.7, emissive: 0x20242c, emissiveIntensity: 0.4 }), P.length), m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
-  P.forEach(([x, yT, z, r], k) => im.setMatrixAt(k, m4.compose(V3(x, (yT + GROUND_Y) / 2, z), q, V3(r, yT - GROUND_Y, r)))); im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); scene.add(im); STRIPS.push(im);
-  const sh = NODES.filter(n => n.p.y < GROUND_Y - 1), sm = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0x3a2a1a, side: THREE.DoubleSide, transparent: true, opacity: 0.55, depthWrite: false }), Math.max(1, sh.length));
-  sh.forEach((n, k) => sm.setMatrixAt(k, m4.compose(V3(n.p.x, (GROUND_Y + n.p.y) / 2, n.p.z), q, V3(6.5, GROUND_Y - n.p.y, 6.5)))); sm.instanceMatrix.needsUpdate = true; sm.computeBoundingSphere(); scene.add(sm);
-  const rp = [], rc = []; for (const n of sh) for (let k = 0; k < 24; k++) { const a = k / 24 * 6.283; rp.push(n.p.x + Math.cos(a) * 6.8, GROUND_Y + 0.3, n.p.z + Math.sin(a) * 6.8); rc.push(1, 0.8, 0.4); } const rg = new THREE.BufferGeometry(); rg.setAttribute("position", new THREE.Float32BufferAttribute(rp, 3)); rg.setAttribute("color", new THREE.Float32BufferAttribute(rc, 3)); scene.add(new THREE.Points(rg, new THREE.PointsMaterial({ size: 0.8, map: glowT, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }))); }
-// trees, food stands and lamps on the park floor
-{ const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color(), tr = TREES.filter(t => Math.hypot(t[0], t[1]) < 1900).slice(0, IS_HEADSET ? 600 : 900);
-  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.15, 0.22, 1, 4, 1, true), M(0x4a3020), tr.length), crown = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 7), M(0x1e4a26, { emissive: 0x0a2010, emissiveIntensity: 0.6 }), tr.length);
-  tr.forEach(([x, z, h], k) => { trunk.setMatrixAt(k, m4.compose(V3(x, GROUND_Y + h * 0.15, z), q, V3(1, h * 0.3, 1))); crown.setMatrixAt(k, m4.compose(V3(x, GROUND_Y + h * 0.62, z), q, V3(h * 0.28, h * 0.75, h * 0.28))); crown.setColorAt(k, col.setHSL(0.28 + Math.random() * 0.08, 0.5, 0.18 + Math.random() * 0.08)); });
-  for (const m of [trunk, crown]) { m.instanceMatrix.needsUpdate = true; m.computeBoundingSphere(); scene.add(m); }
-  const kb = new THREE.InstancedMesh(new THREE.BoxGeometry(3, 2.4, 3), M(0xf0e8d8, { emissive: 0xffe0b0, emissiveIntensity: 0.35 }), KIOSKS.length), kr = new THREE.InstancedMesh(new THREE.ConeGeometry(2.6, 1.4, 4), M(0xffffff, { emissive: 0xffffff, emissiveIntensity: 0.25 }), KIOSKS.length), RC = [0xe03030, 0x3070e0, 0xf0b020, 0x30a050, 0xd040c0];
-  KIOSKS.forEach(([x, z, a, c], k) => { q.setFromAxisAngle(UP, a); kb.setMatrixAt(k, m4.compose(V3(x, GROUND_Y + 1.2, z), q, V3(1, 1, 1))); q.setFromAxisAngle(UP, a + Math.PI / 4); kr.setMatrixAt(k, m4.compose(V3(x, GROUND_Y + 3.1, z), q, V3(1, 1, 1))); kr.setColorAt(k, col.set(RC[c])); });
-  for (const m of [kb, kr]) { m.instanceMatrix.needsUpdate = true; m.computeBoundingSphere(); scene.add(m); }
-  const lp = [], lc = []; for (const [x, z] of LAMPS) { lp.push(x, GROUND_Y + 4.5, z); lc.push(1, 0.85, 0.55); } const lg = new THREE.BufferGeometry(); lg.setAttribute("position", new THREE.Float32BufferAttribute(lp, 3)); lg.setAttribute("color", new THREE.Float32BufferAttribute(lc, 3)); scene.add(new THREE.Points(lg, new THREE.PointsMaterial({ size: 1.6, map: glowT, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
-  const posts = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.06, 0.08, 4.4, 5), M(0x2a2a30), LAMPS.length); LAMPS.forEach(([x, z], k) => posts.setMatrixAt(k, m4.compose(V3(x, GROUND_Y + 2.2, z), q.identity(), V3(1, 1, 1)))); posts.instanceMatrix.needsUpdate = true; posts.computeBoundingSphere(); scene.add(posts); }
-
 const pathNode = n => PATHS.find(P => P.name === n)?.node;
 PLACES.push(["The Sun (the desk)", () => nHUB], ["Proxima Centauri", () => STARNODE.get("Proxima Centauri")], ["Sirius", () => STARNODE.get("Sirius")], ["Vega gas lamp", () => pathNode("Vega")], ["Aldebaran school bus", () => pathNode("Aldebaran")], ["Polaris log cabin", () => pathNode("Polaris")],
   ["Betelgeuse house", () => pathNode("Betelgeuse")], ["Antares farmhouse", () => pathNode("Antares")], ["Rigel lighthouse", () => pathNode("Rigel")], ["The Pleiades", () => pathNode("the Pleiades")], ["Orion Nebula", () => pathNode("the Orion Nebula")], ["Deneb tower", () => pathNode("Deneb")],
@@ -640,7 +586,7 @@ function setFly(i) { flySpeedI = clampN(i, 0, FLY.length - 1); say(`Flying speed
 function nearVeh() { camera.getWorldPosition(_cp); for (const V of Object.values(VEH)) if (V.mesh.position.distanceTo(_cp) < (V.jet ? 70 : V.air ? 6 : 3)) return V; return null; }
 function use() { if (!riding && scopeUse()) return; if (riding) { openMenu(); return; } const V = !flying && nearVeh(); if (V) { mount(V); return; } act(); }
 function act() { const T = tagsOn ? lookedAt() : null; camera.getWorldPosition(_cp); if (T) { say(T.infoF(_cp), 45); return; } factI = (factI + 1) % FACTS.length; say(FACTS[factI] + ` <span style="opacity:.6">(${factI + 1}/${FACTS.length}: E for the next)</span>`, 40); }
-function start() { if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); HUD.style.display = "block"; say("<b>Starlight Park: the stars at one light-year to the metre, as a theme park at night.</b> The Sun is the glint on the desk, high on its tower; the park floor is 100 m below. Every star is in its real direction and distance and shines as it would from where you stand. Walkways lead to the nearest stars; the bike (on the hub) and the car (in the car park behind you) take trails and roads to far ones: E beside them. Look at a label and press <b>E</b>.", 30); }
+function start() { if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); HUD.style.display = "block"; say("<b>Starlight Park: the stars at one light-year to the metre, as a theme park.</b> The Sun is the glint on the desk. Every star is in its real direction and distance and shines as it would from where you stand. Walkways lead to the nearest stars; the bike (on the hub) and the car (in the car park behind you) take trails and roads to far ones: E beside them. Look at a label and press <b>E</b>.", 30); }
 document.getElementById("intro")?.addEventListener("click", start);
 // sitting or standing (in VR, sitting raises your view to a standing eye height); remembered between visits
 seated = localStorage.getItem("vrPosture") === "sitting";
