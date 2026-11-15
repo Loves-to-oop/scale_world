@@ -53128,14 +53128,14 @@ function groundColor(h, slope, x, z, out) { const n = fbm(x / 6, z / 6, 3), m = 
 // ---------- the sky: orange haze; the Sun a brighter glow low in the south; no Saturn ----------
 let sunAz = Math.PI * 0.92, sunEl = 0.17; const SUN = () => V3(Math.sin(sunAz) * Math.cos(sunEl), Math.sin(sunEl), -Math.cos(sunAz) * Math.cos(sunEl));
 const skyU = { sun: { value: SUN() } };
-const sky = new THREE.Mesh(new THREE.SphereGeometry(300000, 48, 24), new THREE.ShaderMaterial({ uniforms: skyU, side: THREE.BackSide, depthWrite: false, fog: false,
+const sky = new THREE.Mesh(new THREE.SphereGeometry(900, 48, 24), new THREE.ShaderMaterial({ uniforms: skyU, side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
   vertexShader: "varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
   fragmentShader: `uniform vec3 sun; varying vec3 vD; void main(){ float h = vD.y, s = max(dot(vD, sun), 0.0);
     vec3 zen = vec3(0.34, 0.2, 0.08), hor = vec3(0.86, 0.56, 0.26), c = mix(hor, zen, pow(clamp(h, 0.0, 1.0), 0.45));
     c += vec3(1.0, 0.72, 0.38) * (pow(s, 6.0) * 0.55 + pow(s, 40.0) * 0.6); if (h < 0.0) c = hor * 0.92; gl_FragColor = vec4(c * 0.75, 1.0);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
-  }` })); sky.layers.enable(1); scene.add(sky);
+  }` })); sky.layers.enable(1); sky.renderOrder = -10; sky.frustumCulled = false; scene.add(sky); scene.background = new THREE.Color(0.58, 0.37, 0.17);
 const FOGC = new THREE.Color(0.58, 0.37, 0.17); scene.fog = new THREE.FogExp2(FOGC, 1 / 26000);
 const hemiL = new THREE.HemisphereLight(0xffb060, 0x3a2410, 1.55), sunL = new THREE.DirectionalLight(0xffc888, 0.35); sunL.position.copy(SUN()).multiplyScalar(100); hemiL.layers.enable(1); sunL.layers.enable(1); scene.add(hemiL, sunL);
 
@@ -53216,8 +53216,8 @@ function fillSea() { const p = seaGeo.attributes.position, d = seaGeo.attributes
 const CLIP = [new THREE.Plane(V3(0, 1, 0), 0.02)], _hp = V3(0, 0, 0), _hq = new THREE.Quaternion(), _hs = V3(1, 1, 1);
 function updateReflection() { const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera; cam.matrixWorld.decompose(_hp, _hq, _hs);
   const fwd = V3(0, 0, -1).applyQuaternion(_hq), up = V3(0, 1, 0).applyQuaternion(_hq); reflCam.position.set(_hp.x, -_hp.y, _hp.z); reflCam.up.set(up.x, -up.y, up.z); reflCam.lookAt(_hp.x + fwd.x, -(_hp.y + fwd.y), _hp.z + fwd.z);
-  reflCam.updateMatrixWorld(); reflCam.updateProjectionMatrix(); texMat.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1).multiply(reflCam.projectionMatrix).multiply(reflCam.matrixWorldInverse);
-  const xr = renderer.xr.enabled, prev = renderer.getRenderTarget(); renderer.xr.enabled = false; renderer.clippingPlanes = CLIP; renderer.setRenderTarget(reflRT); renderer.clear(); renderer.render(scene, reflCam); renderer.setRenderTarget(prev); renderer.clippingPlanes = []; renderer.xr.enabled = xr; }
+  reflCam.updateMatrixWorld(); reflCam.updateProjectionMatrix(); sky.position.copy(reflCam.position); sky.updateMatrixWorld(); texMat.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1).multiply(reflCam.projectionMatrix).multiply(reflCam.matrixWorldInverse);
+  const xr = renderer.xr.enabled, prev = renderer.getRenderTarget(); renderer.xr.enabled = false; renderer.clippingPlanes = CLIP; renderer.setRenderTarget(reflRT); renderer.clear(); renderer.render(scene, reflCam); renderer.setRenderTarget(prev); renderer.clippingPlanes = []; renderer.xr.enabled = xr; sky.position.copy(rig.position); }
 
 // ---------- you: walking, bounding and jumping in a seventh of Earth's gravity, through air four times as thick ----------
 // A person in a suit (say 110 kg) who jumps as hard as on Earth leaves the ground at about 2.6 m/s and rises more than 2 m, coming down
