@@ -780,15 +780,16 @@ GX = GX[:i0] + """<div id="intro"><div class="card">
 (HERE / "galaxy.html").write_text(GX.replace("__THREE__", three).replace("__SCENE__", (HERE / "galaxy_data.js").read_text(encoding="utf-8") + (HERE / "galaxy.js").read_text(encoding="utf-8")), encoding="utf-8")
 
 # Galaxies at one million light-years to the metre
-UV = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Galaxies at a million light-years to the metre</title>").replace("background:#c8d4d8", "background:#05070c")
+UV = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Galaxies at 100,000 light-years to the metre</title>").replace("background:#c8d4d8", "background:#05070c")
 i0, i1 = UV.index('<div id="intro">'), UV.index('<button id="vr">')
 UV = UV[:i0] + """<div id="intro"><div class="card">
-  <h1>Galaxies at a million light-years to the metre</h1>
-  <p>The Milky Way is a spiral 10 cm across on a glass desk; the Sun, a glint 2.7 cm from its centre; the Magellanic Clouds float 16 and
-  20 cm away. Andromeda is 2.5 m off, 15 cm across: the Local Group fills a room. The Virgo Cluster is 54 m away, Coma 320 m; the 43,000
-  galaxies of the 2MASS Redshift Survey reach 2.4 km and trace the cosmic web. The most distant galaxies known are 32-34 km away, and the
-  cosmic microwave background, the edge of what we can see, surrounds everything 46 km away.</p>
-  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;·&nbsp; drag to look &nbsp;·&nbsp; <kbd>E</kbd> about what you look at &nbsp;·&nbsp; <kbd>T</kbd> teleport &nbsp;·&nbsp; <kbd>F</kbd> fly (<kbd>space</kbd> / <kbd>C</kbd> up and down, <kbd>=</kbd><kbd>−</kbd> speed, up to 20 km/s) &nbsp;·&nbsp; <kbd>L</kbd> labels &nbsp;·&nbsp; <kbd>H</kbd> readout &nbsp;·&nbsp; <kbd>M</kbd> sitting &nbsp;·&nbsp; <kbd>R</kbd> back to the desk<br>
+    <h1>Galaxies at 100,000 light-years to the metre</h1>
+  <p>The Milky Way is a spiral a metre across over a round glass table; the Sun, a glint 27 cm from its centre; the Magellanic Clouds float
+  1.6 and 2 m away. Andromeda is 25 m off, 1.5 m across: the Local Group spreads over about 100 m, joined by walkways. Bike trails go to the
+  galaxies hundreds of metres away (the Virgo Cluster, 535 m), roads and a car to the clusters kilometres off (Coma, 3.2 km), a jet to
+  runways by the most distant galaxies, 320 km away. The 43,000 galaxies of the 2MASS Redshift Survey trace the cosmic web to 24 km; the
+  cosmic microwave background, the edge of what we can see, surrounds everything 457 km away.</p>
+<p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;·&nbsp; drag to look &nbsp;·&nbsp; <kbd>E</kbd> about what you look at &nbsp;·&nbsp; <kbd>T</kbd> teleport &nbsp;·&nbsp; <kbd>E</kbd> beside the bike, car, helicopter or jet to ride &nbsp;·&nbsp; <kbd>F</kbd> fly (<kbd>space</kbd> / <kbd>C</kbd> up and down, <kbd>=</kbd><kbd>−</kbd> speed, up to 100 km/s) &nbsp;·&nbsp; <kbd>P</kbd> paths &nbsp;·&nbsp; <kbd>L</kbd> labels &nbsp;·&nbsp; <kbd>H</kbd> readout &nbsp;·&nbsp; <kbd>M</kbd> sitting &nbsp;·&nbsp; <kbd>R</kbd> back to the desk<br>
   In VR: left stick walk or fly, right stick turn, <b>B</b> fly / land (right stick up/down to climb), <b>Y</b> flying speed, <b>A</b> or right trigger: about what you look at, <b>X</b> labels, click the left stick: sitting; teleport from the panel on your left wrist</p>
   <p class="dim">Galaxy positions: the 2MASS Redshift Survey (Huchra et al. 2012), distances from redshift; named galaxies from NED and the literature. Far distances are where galaxies are now (comoving). Click to begin.</p>
 </div></div>
