@@ -53151,18 +53151,20 @@ function cellTex(n, wall, fill, dot) { const N = 256, c = document.createElement
   g.putImageData(im, 0, 0); if (dot) { g.fillStyle = dot; for (const [x, y] of P) { g.beginPath(); g.arc(x, y, 3, 0, 7); g.fill(); } }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
 // a material that lays a texture on in world metres from whichever side a face looks (size: metres per repeat; sy: stretch upward)
-function cellMat(map, size, sy = 1, o = {}) { const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, ...o }); m.userData.map = map;
+function cellMat(map, size, sy = 1, o = {}, local = false) { const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, ...o }); m.userData.map = map;
+  // local: the pattern is laid on in the thing's own body (in metres), so it moves with an animal instead of sliding over it
   m.onBeforeCompile = sh => { sh.uniforms.cMap = { value: map }; sh.uniforms.cSize = { value: size }; sh.uniforms.cSy = { value: sy }; sh.uniforms.cOrig = CELL_ORIG;
-    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vWP; varying vec3 vWN;").replace("#include <fog_vertex>", `#include <fog_vertex>
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vWP; varying vec3 vWN; varying vec3 vWD;").replace("#include <fog_vertex>", `#include <fog_vertex>
       { mat4 M4 = modelMatrix;
       #ifdef USE_INSTANCING
         M4 = modelMatrix * instanceMatrix;
       #endif
-      vWP = (M4 * vec4(position, 1.0)).xyz; vWN = normalize(mat3(M4) * objectNormal); }`);
-    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform sampler2D cMap; uniform float cSize, cSy; uniform vec2 cOrig; varying vec3 vWP; varying vec3 vWN;").replace("#include <color_fragment>", `#include <color_fragment>
-      { vec3 p = vWP + vec3(cOrig.x, 0.0, cOrig.y); vec3 w = pow(abs(normalize(vWN)), vec3(4.0)); w /= (w.x + w.y + w.z);
+      vWD = (M4 * vec4(position, 1.0)).xyz;
+      ${local ? "vec3 sc = vec3(length(M4[0].xyz), length(M4[1].xyz), length(M4[2].xyz)); vWP = position * sc; vWN = normalize(objectNormal);" : "vWP = vWD; vWN = normalize(mat3(M4) * objectNormal);"} }`);
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform sampler2D cMap; uniform float cSize, cSy; uniform vec2 cOrig; varying vec3 vWP; varying vec3 vWN; varying vec3 vWD;").replace("#include <color_fragment>", `#include <color_fragment>
+      { vec3 p = vWP${local ? "" : " + vec3(cOrig.x, 0.0, cOrig.y)"}; vec3 w = pow(abs(normalize(vWN)), vec3(4.0)); w /= (w.x + w.y + w.z);
         vec3 t = texture2D(cMap, p.zy / vec2(cSize, cSize * cSy)).rgb * w.x + texture2D(cMap, p.xz / cSize).rgb * w.y + texture2D(cMap, p.xy / vec2(cSize, cSize * cSy)).rgb * w.z;
-        vec3 avg = texture2D(cMap, vec2(0.5), 12.0).rgb; float fade = 1.0 - smoothstep(cSize * 30.0, cSize * 120.0, length(vWP - cameraPosition)); diffuseColor.rgb *= mix(avg, t, fade) * 1.25; }`); };
+        vec3 avg = texture2D(cMap, vec2(0.5), 12.0).rgb; float fade = 1.0 - smoothstep(cSize * 30.0, cSize * 120.0, length(vWD - cameraPosition)); diffuseColor.rgb *= mix(avg, t, fade) * 1.25; }`); };
   return m; }
 // the origin's remainder, so patterns stay put when the origin moves (kept small: the pattern repeats anyway)
 const CELL_ORIG = { value: new THREE.Vector2() };
@@ -53222,7 +53224,7 @@ function hexTex() { const W = 256, H = 222, c = document.createElement("canvas")
   for (let r = -1; r <= 8; r++) for (let q = -1; q <= 8; q++) { const cx = q * 32 + (r & 1) * 16, cy = r * 27.7, gr = g.createRadialGradient(cx - 4, cy - 4, 1, cx, cy, 16); gr.addColorStop(0, "#f0e0b0"); gr.addColorStop(0.35, "#8a6a30"); gr.addColorStop(1, "#3a2a10"); g.fillStyle = gr; g.beginPath(); for (let k = 0; k < 6; k++) { const a = Math.PI / 6 + k * Math.PI / 3; g.lineTo(cx + 15 * Math.cos(a), cy + 15 * Math.sin(a)); } g.fill(); }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
 MAT.nem = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.25, transparent: true, opacity: 0.3, depthWrite: false });
-MAT.cuticle = cellMat(cellTex(36, "#9a9a9a", "#ffffff"), 0.8, 1, { roughness: 0.35 }); MAT.eye = cellMat(hexTex(), 1.2, 1, { roughness: 0.15 }); MAT.skin = cellMat(cellTex(30, "#a86a60", "#e8b0a4"), 0.8, 1, { roughness: 0.35 });
+MAT.cuticle = cellMat(cellTex(36, "#9a9a9a", "#ffffff"), 0.8, 1, { roughness: 0.35 }, true); MAT.eye = cellMat(hexTex(), 1.2, 1, { roughness: 0.15 }, true); MAT.skin = cellMat(cellTex(30, "#a86a60", "#e8b0a4"), 0.8, 1, { roughness: 0.35 }, true);
 // hairs (setae), each made by a single cell: n of them standing out from an ellipsoid round (cx, cy, cz)
 function hairs(n, cx, cy, cz, rx, ry, rz, len, th, col, k = 0) { const out = [], up = V3(0, 1, 0); for (let i = 0; i < n; i++) { const a = i * 2.39996 + k, b = Math.acos(1 - 2 * (i + 0.5) / n), d = V3(Math.sin(b) * Math.cos(a), Math.cos(b), Math.sin(b) * Math.sin(a)); if (d.y < -0.3) continue;
     const L = len * (0.7 + 0.6 * hash(i, k, 1400)), q = new THREE.Quaternion().setFromUnitVectors(up, d.clone().add(V3(0, 0.4, 0)).normalize()), p = V3(cx + d.x * rx, cy + d.y * ry, cz + d.z * rz).addScaledVector(d, L / 2); out.push([Cy(th * 0.4, th, L, 3, true), col, new THREE.Matrix4().compose(p, q, V3(1, 1, 1))]); } return out; }
