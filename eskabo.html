@@ -53385,14 +53385,16 @@ const ROWS = () => [
   { n: "Seated", v: seated ? "yes: no leg attacks" : "no", f: () => seated = !seated },
   { n: "Voice", v: voiceOn ? "on" : "off", f: () => voiceOn = !voiceOn },
   { n: started && roundStarted ? "Resume" : "Start", v: "", f: () => { showMenu(false); go(); } }];
+// rows shrink to fit the panel (combat mode has the most: eleven)
+const rowH = n => Math.min(82, Math.floor(735 / n));
 function drawMenu() { const rows = ROWS(), k = rows.map(r => r.v).join() + menuHover + roundStarted; if (k === menuKey) return; menuKey = k; const g = menuC.getContext("2d"); g.clearRect(0, 0, 1024, 900); g.fillStyle = "rgba(16,12,8,0.92)"; g.beginPath(); g.roundRect(0, 0, 1024, 900, 30); g.fill(); g.strokeStyle = "#c8a050"; g.lineWidth = 5; g.stroke();
   g.fillStyle = "#f4e2b0"; g.font = "bold 54px Georgia, serif"; g.fillText("Stick sparring", 40, 74); g.font = "30px -apple-system, Helvetica, sans-serif"; g.fillStyle = "#c8b890"; g.fillText("Point and pull the trigger (or click) to change", 40, 120);
-  rows.forEach((r, i) => { const y = 150 + i * 82; if (i === menuHover) { g.fillStyle = "rgba(200,160,80,0.3)"; g.fillRect(24, y, 976, 74); } g.fillStyle = r.v ? "#e8dcc0" : "#ffe08a"; g.font = (r.v ? "" : "bold ") + "40px -apple-system, Helvetica, sans-serif"; g.fillText(r.n, 44, y + 50); if (r.v) { g.fillStyle = "#ffe08a"; g.textAlign = "right"; g.fillText(r.v, 980, y + 50); g.textAlign = "left"; } });
+  const RH = rowH(rows.length), fs = Math.round(RH * 0.49); rows.forEach((r, i) => { const y = 150 + i * RH; if (i === menuHover) { g.fillStyle = "rgba(200,160,80,0.3)"; g.fillRect(24, y, 976, RH - 8); } g.fillStyle = r.v ? "#e8dcc0" : "#ffe08a"; g.font = (r.v ? "" : "bold ") + fs + "px -apple-system, Helvetica, sans-serif"; g.fillText(r.n, 44, y + RH * 0.61); if (r.v) { g.fillStyle = "#ffe08a"; g.textAlign = "right"; g.fillText(r.v, 980, y + RH * 0.61); g.textAlign = "left"; } });
   menuT.needsUpdate = true; }
 let menuOn = true;
 function showMenu(on) { menuOn = on; MENU.visible = on; if (on) { const f = V3(PB.f.x, 0, PB.f.z).normalize(); MENU.position.copy(PB.head).addScaledVector(f, 0.85).addScaledVector(UP, -0.18); MENU.lookAt(PB.head); menuKey = ""; } laser.visible = false; }
 const ray = new THREE.Raycaster();
-function menuPick(origin, dir) { ray.set(origin, dir); const hit = ray.intersectObject(MENU)[0]; if (!hit) return -1; const y = (1 - hit.uv.y) * 900, i = Math.floor((y - 150) / 82), n = ROWS().length; return i >= 0 && i < n ? i : -1; }
+function menuPick(origin, dir) { ray.set(origin, dir); const hit = ray.intersectObject(MENU)[0]; if (!hit) return -1; const n = ROWS().length, y = (1 - hit.uv.y) * 900, i = Math.floor((y - 150) / rowH(n)); return i >= 0 && i < n ? i : -1; }
 function menuSelect() { if (menuHover >= 0) { ROWS()[menuHover].f(); menuKey = ""; clack(0.4); } }
 
 // ---------- modes and rounds ----------
