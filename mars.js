@@ -32,26 +32,28 @@ function ridged(x, z, n = 4) { let s = 0, a = 0.5, w = 0; for (let k = 0; k < n;
 
 // ---------- the ground: MOLA, in metres, x east and z south of the hotel ----------
 const toLL = (x, z) => { const lat = LAT0 - z / R_M / DEG; return [lat, LON0 + x / (R_M * Math.cos(lat * DEG)) / DEG]; };
-const MOLA = { region: null, local: null };
+const MOLA = { region: null, local: null, local2: null };
 function loadMola(D) { return new Promise(res => { const im = new Image(); im.onload = () => { const c = document.createElement("canvas"); c.width = D.w; c.height = D.h; const g = c.getContext("2d"); g.drawImage(im, 0, 0); const px = g.getImageData(0, 0, D.w, D.h).data, H = new Float32Array(D.w * D.h);
   for (let i = 0; i < H.length; i++) H[i] = px[i * 4] * 256 + px[i * 4 + 1] - 32768; res({ ...D, H }); }; im.src = D.png; }); }
 const cr = (p0, p1, p2, p3, t) => p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0)));
 function sampleD(D, lat, lon) { const fi = (D.lat0 - lat) * D.ppd - 0.5, fj = (lon - D.lon0) * D.ppd - 0.5, i = Math.floor(fi), j = Math.floor(fj), ti = fi - i, tj = fj - j, row = k => { const r = clampN(i + k, 0, D.h - 1) * D.w; return cr(D.H[r + clampN(j - 1, 0, D.w - 1)], D.H[r + clampN(j, 0, D.w - 1)], D.H[r + clampN(j + 1, 0, D.w - 1)], D.H[r + clampN(j + 2, 0, D.w - 1)], tj); };
   return cr(row(-1), row(0), row(1), row(2), ti); }
 // MOLA, 463 m where the local tile covers, 1.85 km beyond, blended over the last 20 pixels of the local tile
-function mola(x, z) { const [lat, lon] = toLL(x, z), L = MOLA.local; let h = sampleD(MOLA.region, lat, lon);
-  if (L) { const m = Math.min((L.lat0 - lat) * L.ppd, (lat - L.lat1) * L.ppd, (lon - L.lon0) * L.ppd, (L.lon1 - lon) * L.ppd); if (m > 2) h = lerpN(h, sampleD(L, lat, lon), sstep(m, 2, 22)); } return h; }
+function mola(x, z) { const [lat, lon] = toLL(x, z); let h = sampleD(MOLA.region, lat, lon);
+  for (const L of [MOLA.local, MOLA.local2]) { if (!L) continue; const m = Math.min((L.lat0 - lat) * L.ppd, (lat - L.lat1) * L.ppd, (lon - L.lon0) * L.ppd, (L.lon1 - lon) * L.ppd); if (m > 2) h = lerpN(h, sampleD(L, lat, lon), sstep(m, 2, 22)); } return h; }
 // the generated detail, below MOLA's resolution: gentle undulation and small craters' worth of roughness on the plateau; on the walls, spurs and gullies
-// running downslope and the outcrops of the layers the walls are cut through
+// running downslope, and ledges where the harder layers the walls are cut through stand out as cliffs above benches of softer rock
 const SITE = { rimZ: 300, H0: 5000, pads: [] };
-function land(x, z) { const e = 3, h0 = mola(x, z), sx = (mola(x + e * 60, z) - mola(x - e * 60, z)) / (e * 120), sz = (mola(x, z + e * 60) - mola(x, z - e * 60)) / (e * 120), sl = Math.hypot(sx, sz), wall = sstep(sl, 0.12, 0.45);
+function land(x, z) { const e = 3, h0 = mola(x, z), sx = (mola(x + e * 60, z) - mola(x - e * 60, z)) / (e * 120), sz = (mola(x, z + e * 60) - mola(x, z - e * 60)) / (e * 120), sl = Math.hypot(sx, sz), wall = sstep(sl, 0.2, 0.5);
   let h = h0 + 18 * (fbm(x / 900, z / 900, 4) - 0.5) + 3 * (fbm(x / 90, z / 90, 3) - 0.5) + 0.25 * (fbm(x / 7, z / 7, 2) - 0.5);
-  if (wall > 0) { const a = Math.atan2(sz, sx), u = x * Math.cos(a) + z * Math.sin(a), v = -x * Math.sin(a) + z * Math.cos(a); h -= wall * (150 * Math.pow(1 - ridged(v / 700, u / 2600, 4), 1.5) + 25 * fbm(x / 160, z / 160, 3) + 14 * (0.5 + 0.5 * Math.sin(h0 / 55 + 3 * fbm(x / 2000, z / 2000, 2)))); }
+  if (wall > 0) { const wz = sz * sz / (sx * sx + sz * sz + 1e-9), rg = ridged(x / 700, z / 2600, 4) * wz + ridged(z / 700 + 31.7, x / 2600, 4) * (1 - wz); h -= wall * (150 * Math.pow(1 - rg, 1.5) + 25 * fbm(x / 160, z / 160, 3) + 14 * (0.5 + 0.5 * Math.sin(h0 / 55 + 3 * fbm(x / 2000, z / 2000, 2)))); }
+  if (sl > 0.4) { const L = 38 + 22 * fbm(x / 5000 + 3, z / 5000, 2), t = h / L, f = t - Math.floor(t), terr = (Math.floor(t) + sstep(f, 0.45, 0.95)) * L; h = lerpN(h, terr, 0.6 * sstep(sl, 0.4, 0.7)); }
   for (const P of SITE.pads) { if (x < P.x0 - P.s || x > P.x1 + P.s || z < P.z0 - P.s || z > P.z1 + P.s) continue; const d = Math.max(P.x0 - x, x - P.x1, P.z0 - z, z - P.z1, 0); h = lerpN(h, P.h, sstep(d, P.s, 2)); }
   const C = SITE.cut; if (C && x > C.x0 && x < C.x1 && z > C.z0 && z < C.z1) h = Math.min(h, C.h - Math.max(0, z - C.z0) * 0.8);
+  const C2 = SITE.cut2; if (C2 && x > C2.x0 && x < C2.x1 && z > C2.z0 && z < C2.z1) h = Math.min(h, C2.h - Math.max(0, C2.x1 - x) * 0.8);
   return h; }
-// colours, from HiRISE and CTX: dusty butterscotch plains, darker basaltic sand, the walls' alternating light and dark layers, dark talus below them
-const MC = Object.fromEntries(Object.entries({ dust: "#b8784a", dust2: "#c48a58", sand: "#5a3a2a", rock: "#8a5a3e", rockL: "#b08460", rockD: "#5e3c2a", talus: "#6a4430", bright: "#d4a47a" }).map(([k, v]) => [k, new THREE.Color(v)]));
+// colours, from Curiosity's and HiRISE's pictures, muted as the real ones are: dusty butterscotch-brown plains, darker basaltic sand, the walls' alternating light and dark layers, dark talus below them
+const MC = Object.fromEntries(Object.entries({ dust: "#9a6a48", dust2: "#a87a56", sand: "#4a3a32", rock: "#7a5a46", rockL: "#a88a6c", rockD: "#4e3a2e", talus: "#5a4436", bright: "#b8987a" }).map(([k, v]) => [k, new THREE.Color(v)]));
 const _gc = new THREE.Color();
 function groundColor(h, slope, x, z, out) { const n = fbm(x / 9, z / 9, 3), m = fbm(x / 2400 + 4, z / 2400, 4), m2 = fbm(x / 300 + 9, z / 300, 4), c = _gc.copy(MC.dust).lerp(MC.dust2, sstep(m, 0.4, 0.65));
   c.lerp(MC.sand, 0.6 * sstep(m2 + 0.25 * (m - 0.5), 0.6, 0.72)); c.lerp(MC.bright, 0.35 * sstep(m2, 0.36, 0.28));
@@ -128,14 +130,39 @@ function updateSky() { const s = sunDir(tSec), day = sstep(s.y, -0.15, 0.15); sk
   scene.fog.color.setRGB(0.78, 0.6, 0.42).multiplyScalar(0.03 + 0.97 * sstep(s.y, -0.15, 0.25)); return s; }
 
 // ---------- the ground: nested grids following you, the surface curving away (Mars is small: from eye height on flat ground the horizon is 3.4 km off) ----------
-const grainT = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d"); g.fillStyle = "#f4f4f4"; g.fillRect(0, 0, 256, 256);
-  for (let k = 0; k < 9000; k++) { const v = 175 + Math.random() * 80; g.fillStyle = `rgba(${v},${v},${v},0.45)`; g.fillRect(Math.random() * 256, Math.random() * 256, 1 + Math.random() * 3, 1 + Math.random() * 2); }
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; })();
-const groundMat = new THREE.MeshStandardMaterial({ map: grainT, vertexColors: true, roughness: 0.95 });
+// a tiling noise texture: four independent noises (smooth, pebbly, ridged, fine grain), sampled at several scales by the ground's shader
+const noiseT = (() => { const N = 256, d = new Uint8Array(N * N * 4), lat = (seed, f) => { const g = new Float32Array(f * f); for (let i = 0; i < f * f; i++) g[i] = hash(i + seed * 7919, seed); return g; };
+  const vnw = (g, f, x, y) => { const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), at = (a, b) => g[((b % f + f) % f) * f + ((a % f + f) % f)]; return lerpN(lerpN(at(i, j), at(i + 1, j), u), lerpN(at(i, j + 1), at(i + 1, j + 1), u), v); };
+  const oct = [4, 8, 16, 32, 64].map((f, k) => [f, lat(k + 1, f)]), oct2 = [16, 32, 64, 128].map((f, k) => [f, lat(k + 11, f)]);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { let a = 0, w = 0, amp = 1; for (const [f, g] of oct) { a += amp * vnw(g, f, x / N * f, y / N * f); w += amp; amp *= 0.55; } a /= w;
+    let r = 0, w2 = 0; amp = 1; for (const [f, g] of oct2) { r += amp * (1 - Math.abs(2 * vnw(g, f, x / N * f, y / N * f) - 1)); w2 += amp; amp *= 0.5; } r /= w2;
+    const peb = vnw(oct2[2][1], 64, x / N * 64, y / N * 64), fine = hash(x, y + 999); const o = (y * N + x) * 4; d[o] = a * 255; d[o + 1] = Math.pow(peb, 3) * 255; d[o + 2] = r * 255; d[o + 3] = fine * 255; }
+  const t = new THREE.DataTexture(d, N, N, THREE.RGBAFormat); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.needsUpdate = true; return t; })();
+// the shader works in coordinates near you; for each scale of noise the far-off part of your position is reduced here, in double precision, to a fraction of a tile
+const NSC = [37, 5.3, 0.83, 290, 23, 4.1, 0.9, 0.31, 3.0], groundU = { nTex: { value: noiseT }, org: { value: new THREE.Vector2() }, nOff: { value: NSC.map(() => new THREE.Vector2()) } };
+function setNoiseOrigin(x, z) { groundU.org.value.set(x, z); NSC.forEach((sc, i) => groundU.nOff.value[i].set(((x / sc) % 1 + 1) % 1, ((z / sc) % 1 + 1) % 1)); }
+const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+groundMat.onBeforeCompile = sh => { sh.uniforms.nTex = groundU.nTex; sh.uniforms.org = groundU.org; sh.uniforms.nOff = groundU.nOff;
+  sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vWP; varying vec3 vWN;").replace("#include <fog_vertex>", "#include <fog_vertex>\nvWP = (modelMatrix * vec4(position, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * normal);");
+  sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
+uniform sampler2D nTex; uniform vec2 org; uniform vec2 nOff[9]; varying vec3 vWP; varying vec3 vWN;
+float gH(vec2 p, float near) { return texture2D(nTex, p / 23.0 + nOff[4]).r * 0.9 + texture2D(nTex, p / 4.1 + nOff[5]).r * 0.35 * near + texture2D(nTex, p / 0.9 + nOff[6]).g * 0.12 * near + texture2D(nTex, p / 0.31 + nOff[7]).a * 0.02 * near; }`)
+  .replace("#include <color_fragment>", `#include <color_fragment>
+  vec2 wp = vWP.xz; float dist = length(vWP - cameraPosition), near = 1.0 - smoothstep(25.0, 260.0, dist), mid = 1.0 - smoothstep(400.0, 4000.0, dist), steep = smoothstep(0.55, 0.85, 1.0 - vWN.y);
+  vec4 n1 = texture2D(nTex, wp / 37.0 + nOff[0]), n2 = texture2D(nTex, wp / 5.3 + nOff[1]), n3 = texture2D(nTex, wp / 0.83 + nOff[2]), n4 = texture2D(nTex, wp / 290.0 + nOff[3]);
+  float tone = mix(1.0, 0.8 + 0.4 * n4.r, mid) * mix(1.0, (0.86 + 0.28 * n1.r) * (0.9 + 0.2 * n2.r), mid);
+  float peb = near * smoothstep(0.4, 0.75, n3.g) * (1.0 - steep); vec3 pebC = diffuseColor.rgb * mix(0.62, 1.08, n3.a);
+  vec3 col = diffuseColor.rgb * tone; col = mix(col, pebC, peb * 0.6);
+  float strata = 0.5 + 0.5 * sin(vWP.y * 0.9 + n1.r * 6.0) * sin(vWP.y * 0.23 + 1.0); col *= mix(1.0, 0.85 + 0.3 * strata, steep * mid);
+  col *= mix(1.0, 0.96 + 0.08 * n3.a, near); diffuseColor.rgb = col;`)
+  .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
+  { float e = 0.08, h0 = gH(wp, near), hx = gH(wp + vec2(e, 0.0), near), hz = gH(wp + vec2(0.0, e), near); vec3 g = vec3(-(hx - h0) / e, 0.0, -(hz - h0) / e) * (0.3 + 0.7 * near) * (1.0 - 0.6 * steep);
+    normal = normalize(normal + (viewMatrix * vec4(g, 0.0)).xyz * 0.45); }`)
+  .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\n  roughnessFactor = 0.88 + 0.1 * texture2D(nTex, vWP.xz / 3.0 + nOff[8]).r;"); };
 const ME = { x: 0, z: 0, y: 0, vx: 0, vz: 0, vy: 0, x0: 0, z0: 0 };
 function grid(size, n, drop) { const g = new THREE.PlaneGeometry(size, size, n, n).rotateX(-Math.PI / 2); g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 3), 3));
   const m = new THREE.Mesh(g, groundMat); m.frustumCulled = false; m.receiveShadow = true; m.userData = { size, n, drop, cx: 1e12, cz: 1e12, inner: null }; scene.add(m); return m; }
-const GRIDS = IS_HEADSET ? [grid(400, 128, 0), grid(4000, 128, 2), grid(24000, 150, 12), grid(120000, 160, 60), grid(600000, 90, 400)] : [grid(500, 200, 0), grid(4000, 180, 2), grid(24000, 200, 12), grid(120000, 200, 60), grid(600000, 120, 400)];
+const GRIDS = IS_HEADSET ? [grid(90, 90, 0), grid(500, 110, 0.3), grid(4000, 128, 2), grid(24000, 150, 12), grid(120000, 160, 60), grid(600000, 90, 400)] : [grid(100, 100, 0), grid(600, 160, 0.3), grid(4000, 180, 2), grid(24000, 200, 12), grid(120000, 200, 60), grid(600000, 120, 400)];
 for (let i = 1; i < GRIDS.length; i++) GRIDS[i].userData.inner = GRIDS[i - 1];
 function fillGrid(m) { const { size, n, drop, inner } = m.userData, p = m.geometry.attributes.position, col = m.geometry.attributes.color, uv = m.geometry.attributes.uv, step = size / n, c3 = [0, 0, 0];
   const ox = Math.round(ME.x / step) * step, oz = Math.round(ME.z / step) * step; m.userData.cx = ME.x; m.userData.cz = ME.z; m.position.set(ox - ME.x0, 0, oz - ME.z0);
@@ -144,16 +171,25 @@ function fillGrid(m) { const { size, n, drop, inner } = m.userData, p = m.geomet
     let y = H[i] - ((x - ME.x) ** 2 + (z - ME.z) ** 2) / (2 * R_M) - drop; if (inner) { const ih = inner.userData.size / 2 - inner.userData.size / inner.userData.n * 2; if (Math.abs(x - inner.userData.ox) < ih && Math.abs(z - inner.userData.oz) < ih) y -= 40 + drop * 4; }
     p.setY(i, y); groundColor(H[i], slope, x, z, c3); col.setXYZ(i, c3[0], c3[1], c3[2]); uv.setXY(i, ((x % 4000) + 4000) / 2.5, ((z % 4000) + 4000) / 2.5); }
   m.userData.ox = ox; m.userData.oz = oz; p.needsUpdate = col.needsUpdate = uv.needsUpdate = true; m.geometry.computeVertexNormals(); }
-function updateGround(force = false) { for (const m of GRIDS) if (force || Math.hypot(ME.x - m.userData.cx, ME.z - m.userData.cz) > m.userData.size * 0.06) fillGrid(m); }
+function updateGround(force = false) { for (const m of GRIDS) if (force || Math.hypot(ME.x - m.userData.cx, ME.z - m.userData.cz) > m.userData.size * 0.06) { fillGrid(m); if (!force) return; } }
 // boulders: sparse on the dusty plateau, many on the talus below the rim
-const ROCK = new THREE.InstancedMesh((() => { const g = new THREE.IcosahedronGeometry(1, 1), p = g.attributes.position; for (let i = 0; i < p.count; i++) { const k = 0.7 + 0.5 * vn(p.getX(i) * 2 + 5, p.getY(i) * 2 + p.getZ(i)); p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.65, p.getZ(i) * k); } g.computeVertexNormals(); return g; })(), new THREE.MeshStandardMaterial({ roughness: 0.9 }), 1800);
-ROCK.frustumCulled = false; ROCK.castShadow = true; ROCK.receiveShadow = true; scene.add(ROCK); let rockC = [1e12, 1e12];
-function fillRocks() { const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color(); let k = 0; const S = 1.8, ci = Math.floor(ME.x / S), cj = Math.floor(ME.z / S); rockC = [ME.x, ME.z];
-  for (let i = ci - 32; i <= ci + 32 && k < 1800; i++) for (let j = cj - 32; j <= cj + 32 && k < 1800; j++) { const x = (i + hash(i, j)) * S, z = (j + hash(j, i)) * S, h = land(x, z), sl = Math.abs(land(x, z + 4) - land(x, z - 4)) / 8 + Math.abs(land(x + 4, z) - land(x - 4, z)) / 8;
-    if (hash(i * 3 + 1, j * 7 + 2) > 0.02 + 0.3 * sstep(sl, 0.2, 0.6) || inBuilt(x, z)) continue; const sz = 0.04 + (0.3 + 0.9 * sstep(sl, 0.2, 0.7)) * Math.pow(hash(i + 9, j + 3), 3);
-    q.setFromEuler(new THREE.Euler(hash(i, 1) * 3, hash(j, 2) * 6, 0)); m4.compose(V3(x - ME.x0, h - ((x - ME.x) ** 2 + (z - ME.z) ** 2) / (2 * R_M) + sz * 0.2, z - ME.z0), q, V3(sz, sz, sz)); ROCK.setMatrixAt(k, m4);
-    const v = hash(i + 4, j + 8); col.setRGB(0.42 + 0.18 * v, 0.27 + 0.1 * v, 0.19 + 0.06 * v); ROCK.setColorAt(k, col); k++; }
-  ROCK.count = k; ROCK.instanceMatrix.needsUpdate = true; if (ROCK.instanceColor) ROCK.instanceColor.needsUpdate = true; }
+// rocks: angular blocks, a few on the dusty plateau, many on the talus below the rim and the walls; pebbles round your feet. Their surfaces get the same drawn-in grain
+const rockGeo = (seed, det) => { const g = new THREE.IcosahedronGeometry(1, det), p = g.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = 0.62 + 0.55 * vn(x * 1.7 + seed, y * 1.7 + z * 1.3 + seed * 2), f = Math.max(Math.abs(x), Math.abs(y), Math.abs(z)) * 0.35 + 0.65; p.setXYZ(i, x * k / f, y * k * 0.62 / f, z * k / f); } g.computeVertexNormals(); return g.index ? g.toNonIndexed() : g; };
+const rockMat = new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true });
+rockMat.onBeforeCompile = sh => { sh.uniforms.nTex = groundU.nTex; sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vRP;").replace("#include <fog_vertex>", "#include <fog_vertex>\nvRP = position * 3.0 + vec3(instanceMatrix[3][0], 0.0, instanceMatrix[3][2]) * 0.37;");
+  sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform sampler2D nTex; varying vec3 vRP;").replace("#include <color_fragment>", "#include <color_fragment>\n  diffuseColor.rgb *= (0.7 + 0.4 * texture2D(nTex, vRP.xz * 0.21 + vRP.y * 0.13).r) * (0.85 + 0.25 * texture2D(nTex, vRP.xy * 0.9).a);"); };
+const ROCKS = [0, 1, 2].map(k => { const m = new THREE.InstancedMesh(rockGeo(k * 13 + 1, k === 2 ? 0 : 1), rockMat, 900); m.frustumCulled = false; m.castShadow = true; m.receiveShadow = true; scene.add(m); return m; });
+const PEB = new THREE.InstancedMesh(rockGeo(77, 0), rockMat, IS_HEADSET ? 1500 : 3000); PEB.frustumCulled = false; PEB.receiveShadow = true; scene.add(PEB);
+let rockC = [1e12, 1e12];
+function fillRocks() { const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color(), cnt = [0, 0, 0]; const S = 1.8, ci = Math.floor(ME.x / S), cj = Math.floor(ME.z / S); rockC = [ME.x, ME.z];
+  const place = (M, k, x, z, sz, i, j) => { const h = land(x, z); q.setFromEuler(new THREE.Euler(hash(i, 1) * 0.6, hash(j, 2) * 6.3, hash(i, j) * 0.6)); m4.compose(V3(x - ME.x0, h - ((x - ME.x) ** 2 + (z - ME.z) ** 2) / (2 * R_M) + sz * 0.18, z - ME.z0), q, V3(sz * (0.8 + 0.5 * hash(i, 7)), sz, sz * (0.8 + 0.5 * hash(j, 9)))); M.setMatrixAt(k, m4);
+    const v = hash(i + 4, j + 8), w = hash(i + 6, j + 1); col.setRGB(0.27 + 0.16 * v, 0.2 + 0.1 * v + 0.03 * w, 0.16 + 0.06 * v + 0.04 * w); M.setColorAt(k, col); };
+  for (let i = ci - 34; i <= ci + 34; i++) for (let j = cj - 34; j <= cj + 34; j++) { const x = (i + hash(i, j)) * S, z = (j + hash(j, i)) * S, sl = Math.abs(land(x, z + 4) - land(x, z - 4)) / 8 + Math.abs(land(x + 4, z) - land(x - 4, z)) / 8;
+    if (hash(i * 3 + 1, j * 7 + 2) > 0.03 + 0.35 * sstep(sl, 0.2, 0.6) || inBuilt(x, z)) continue; const t = Math.floor(hash(i + 2, j + 5) * 3); if (cnt[t] >= 900) continue; const sz = 0.05 + (0.35 + 1.1 * sstep(sl, 0.2, 0.7)) * Math.pow(hash(i + 9, j + 3), 3); place(ROCKS[t], cnt[t]++, x, z, sz, i, j); }
+  ROCKS.forEach((M, t) => { M.count = cnt[t]; M.instanceMatrix.needsUpdate = true; if (M.instanceColor) M.instanceColor.needsUpdate = true; });
+  let k = 0; const P = 0.45, pi = Math.floor(ME.x / P), pj = Math.floor(ME.z / P), N = PEB.instanceMatrix.count;
+  for (let i = pi - 30; i <= pi + 30 && k < N; i++) for (let j = pj - 30; j <= pj + 30 && k < N; j++) { if (hash(i * 5 + 3, j * 11 + 1) > 0.55) continue; const x = (i + hash(i + 1, j)) * P, z = (j + hash(j + 1, i)) * P; if (inBuilt(x, z)) continue; place(PEB, k++, x, z, 0.015 + 0.07 * Math.pow(hash(i + 3, j + 7), 2.5), i + 500, j + 500); }
+  PEB.count = k; PEB.instanceMatrix.needsUpdate = true; if (PEB.instanceColor) PEB.instanceColor.needsUpdate = true; }
 
 // ---------- the colony (imagined): the Coprates Rim Hotel and what is round it ----------
 // Built in hotel coordinates (x east, z south of the hotel's centre point, y up from the graded pad), placed on the ground once MOLA is loaded.
@@ -194,25 +230,26 @@ function buildColony() {
   // inside: benches facing the canyon, planters with real plants (the lounge is warm and at a comfortable pressure), a bar along the north wall
   for (const x of [-12, -6, 6, 12]) { put(new THREE.BoxGeometry(4, 0.45, 0.8), Mt(0x5a3a2a), x, 0.52, L.z1 - 4); put(new THREE.BoxGeometry(4, 0.6, 0.12), Mt(0x5a3a2a), x, 0.95, L.z1 - 4.4); }
   for (const x of [-16, 16]) for (const z of [L.z0 + 2, L.z1 - 2]) { put(new THREE.CylinderGeometry(0.7, 0.6, 0.8, 12), whiteM, x, 0.7, z); const leaf = put(new THREE.IcosahedronGeometry(0.9, 1), greenM, x, 1.7, z); leaf.scale.set(1, 1.3, 1); }
-  put(new THREE.BoxGeometry(12, 1.1, 1.0), Mt(0x3a2a22), 0, 0.85, L.z0 + 1.2); put(new THREE.BoxGeometry(12.2, 0.08, 1.2), whiteM, 0, 1.44, L.z0 + 1.2); WALLS.push([-6, L.z0 + 0.6, 6, L.z0 + 0.6], [-6, L.z0 + 1.8, 6, L.z0 + 1.8]);
+  { const bx = L.x0 + 1.4, bz = (L.z0 + L.z1) / 2; put(new THREE.BoxGeometry(1.0, 1.1, 8), Mt(0x3a2a22), bx, 0.85, bz); put(new THREE.BoxGeometry(1.2, 0.08, 8.2), whiteM, bx, 1.44, bz); WALLS.push([bx - 0.6, bz - 4, bx - 0.6, bz + 4], [bx + 0.6, bz - 4, bx + 0.6, bz + 4]); }
   for (let x = -14; x <= 14; x += 4) { const lp = put(new THREE.SphereGeometry(0.18, 10, 8), warmM, x, 0.3 + H - 0.5, (L.z0 + L.z1) / 2); }
   const lampL = new THREE.PointLight(0xffd0a0, 18, 30, 1.6); lampL.position.set(0, 4.5, (L.z0 + L.z1) / 2); COL.add(lampL);
   // the airlock north of the lounge: a short regolith-covered tunnel leading back to the hotel domes
-  put(new THREE.BoxGeometry(4.4, 3.4, 8), regM, 0, 1.7, L.z0 - 4); for (const zz of [L.z0 - 0.05, L.z0 - 7.95]) { put(new THREE.BoxGeometry(3.4, 0.3, 0.3), frameM, 0, 3.0, zz); for (const xx of [-1.6, 1.6]) put(new THREE.BoxGeometry(0.3, 2.9, 0.3), frameM, xx, 1.55, zz); put(new THREE.BoxGeometry(1.4, 2.6, 0.12), Mt(0x6a7a86, { metalness: 0.6, roughness: 0.3 }), -2.3, 1.6, zz); }
-  put(new THREE.BoxGeometry(3.2, 0.2, 0.25), new THREE.MeshBasicMaterial({ color: 0x60ff90 }), 0, 3.1, L.z0 - 0.1); FLOORS.push({ x0: -1.6, x1: 1.6, z0: L.z0 - 8, z1: L.z0, y: 0.3 }); WALLS.push([-1.6, L.z0, -1.6, L.z0 - 8], [1.6, L.z0, 1.6, L.z0 - 8]);
+  { const tun = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.3, 8, 16, 1, true, -Math.PI / 2, Math.PI).rotateX(-Math.PI / 2), regM); tun.position.set(0, 0.3, L.z0 - 4); tun.castShadow = tun.receiveShadow = true; COL.add(tun);
+    const sc = document.createElement("canvas"); sc.width = 512; sc.height = 128; const g = sc.getContext("2d"); g.fillStyle = "#1a2a1e"; g.fillRect(0, 0, 512, 128); g.fillStyle = "#80ffa8"; g.font = "bold 46px sans-serif"; g.textAlign = "center"; g.fillText("AIRLOCK  ▸  SURFACE", 256, 58); g.font = "28px sans-serif"; g.fillStyle = "#c8f0d0"; g.fillText("suits on beyond this door", 256, 102);
+    const st = new THREE.CanvasTexture(sc); st.colorSpace = THREE.SRGBColorSpace; put(new THREE.PlaneGeometry(3.2, 0.8), new THREE.MeshBasicMaterial({ map: st }), 0, 3.6, L.z0 + 0.05); } for (const zz of [L.z0 - 0.05, L.z0 - 7.95]) { put(new THREE.BoxGeometry(3.4, 0.3, 0.3), frameM, 0, 3.0, zz); for (const xx of [-1.6, 1.6]) put(new THREE.BoxGeometry(0.3, 2.9, 0.3), frameM, xx, 1.55, zz); put(new THREE.BoxGeometry(1.4, 2.6, 0.12), Mt(0x6a7a86, { metalness: 0.6, roughness: 0.3 }), -2.3, 1.6, zz); }
+  FLOORS.push({ x0: -1.6, x1: 1.6, z0: L.z0 - 8, z1: L.z0, y: 0.3 }); WALLS.push([-1.6, L.z0, -1.6, L.z0 - 8], [1.6, L.z0, 1.6, L.z0 - 8]);
   // the hotel itself: rooms carved into the cliff below the rim, each with a window; from outside, rows of lit windows in the rock
   HOTELW.length = 0; for (let lv = 0; lv < 6; lv++) for (let k = -5; k <= 5; k++) { const x = k * 14 + (lv % 2) * 7, z0 = R0 + 30 + lv * 35; let z = z0; while (land(x, z) > PAD_H - 20 - lv * 40 && z < R0 + 600) z += 2; HOTELW.push([x, z, land(x, z)]); }
   // habitat domes behind the rim, under three metres of regolith piled on a pressurised shell; a glass greenhouse; a lift down the wall; the maglev station; the rocket pad
-  for (const [x, z, r] of [[-60, R0 - 90, 22], [10, R0 - 130, 30], [80, R0 - 95, 18], [-110, R0 - 170, 16], [60, R0 - 210, 24]]) { const y0 = site(x, z, r + 4), d = put(new THREE.SphereGeometry(r, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2), regM, x, y0 - 0.5, z); d.scale.y = 0.55; CIRCLES.push({ x, z, r: r + 0.5 });
+  for (const [x, z, r] of [[-60, R0 - 90, 22], [10, R0 - 130, 30], [80, R0 - 95, 18], [-110, R0 - 170, 16], [60, R0 - 210, 24]]) { const y0 = Math.min(...[0, 1, 2, 3, 4, 5, 6, 7].map(k => land(x + Math.cos(k * 0.785) * r * 0.9, z + Math.sin(k * 0.785) * r * 0.9)), land(x, z)) - PAD_H - 1.0, d = put(new THREE.SphereGeometry(r, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2), regM, x, y0 - 0.5, z); d.scale.y = 0.55; CIRCLES.push({ x, z, r: r + 0.5 });
     for (let a = 0; a < 6.28; a += 1.05) put(new THREE.BoxGeometry(1.6, 1.2, 0.3), warmM, x + Math.cos(a) * r * 0.98, y0 + 1.0, z + Math.sin(a) * r * 0.98, -a + Math.PI / 2); }
-  { const x = -150, z = R0 - 60, r = 26, y0 = site(x, z, r + 4); put(new THREE.SphereGeometry(r, 32, 14, 0, Math.PI * 2, 0, Math.PI / 2), glassM, x, y0, z); const ribs = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 7, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xd8d4cc, wireframe: true })); ribs.position.set(x, y0, z); COL.add(ribs); CIRCLES.push({ x, z, r: r + 0.5 });
+  { const x = -150, z = R0 - 60, r = 26, y0 = Math.min(...[0, 1, 2, 3, 4, 5, 6, 7].map(k => land(x + Math.cos(k * 0.785) * r, z + Math.sin(k * 0.785) * r))) - PAD_H - 0.5; put(new THREE.SphereGeometry(r, 32, 14, 0, Math.PI * 2, 0, Math.PI / 2), glassM, x, y0, z); const ribs = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 7, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xd8d4cc, wireframe: true })); ribs.position.set(x, y0, z); COL.add(ribs); CIRCLES.push({ x, z, r: r + 0.5 });
     for (let i = 0; i < 70; i++) { const a = hash(i, 3) * 6.28, rr = Math.sqrt(hash(i, 5)) * r * 0.85, t = put(new THREE.IcosahedronGeometry(1.4 + hash(i, 7) * 1.6, 0), greenM, x + Math.cos(a) * rr, y0 + 1.5 + hash(i, 9) * 3, z + Math.sin(a) * rr); t.scale.y = 1.4; }
     const gl = new THREE.PointLight(0xfff0e0, 30, 60, 1.5); gl.position.set(x, y0 + 12, z); COL.add(gl); SITE.GH = { x, z, y: y0 }; }
   { const x = 150; let rz = R0; for (let z = R0 - 300; z < R0 + 2000; z += 4) if (mola(x, z + 30) - mola(x, z) < -12) { rz = z; break; } const y0 = site(x, rz - 12, 10); SITE.LIFT = { x, z: rz - 12, y: y0 }; put(new THREE.BoxGeometry(14, 22, 14), Mt(0x9a9690, { metalness: 0.3 }), x, y0 + 11, rz - 12); put(new THREE.BoxGeometry(18, 3, 18), Mt(0xb43a2a), x, y0 + 23.5, rz - 12); put(new THREE.BoxGeometry(3, 8, 3), warmM, x - 7.1, y0 + 8, rz - 12);
     CIRCLES.push({ x, z: rz - 12, r: 10 }); LIFTLINE.length = 0; let z = rz - 5; while (z < R0 + 60000) { const h = land(x, z); LIFTLINE.push([x, z, h + 4]); if (h < -4600) break; z += z < R0 + 3000 ? 40 : 300; } }
   { const x = SITE.ST.x, z = SITE.ST.z, y0 = SITE.ST.h; put(new THREE.BoxGeometry(60, 9, 18), Mt(0xd0ccc4, { metalness: 0.3 }), x, y0 + 4.5, z); put(new THREE.BoxGeometry(62, 0.6, 20), frameM, x, y0 + 9.3, z); put(new THREE.BoxGeometry(56, 2, 0.3), warmM, x, y0 + 4, z + 9.05); CIRCLES.push({ x: x - 20, z, r: 12 }, { x, z, r: 12 }, { x: x + 20, z, r: 12 });
-    for (let k = 1; k < 40; k++) { const px = x - 30 - k * 60, pz = z - k * 22, gy = land(px, pz) - PAD_H, top = y0 + 9.6 - 2.2; put(new THREE.CylinderGeometry(0.8, 1.1, top - gy, 8), frameM, px, (top + gy) / 2, pz); }
-    const tube = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 2560, 16, 1, true).rotateZ(Math.PI / 2), Mt(0xc8c4bc, { metalness: 0.5, roughness: 0.3, side: THREE.DoubleSide })); tube.position.set(x - 30 - 1200, y0 + 9.6, z - 440); tube.rotation.y = -Math.atan2(22, 60); COL.add(tube); }
+  }
   { const x = SITE.RP.x, z = SITE.RP.z, y0 = SITE.RP.h; put(new THREE.CylinderGeometry(40, 42, 1, 48), Mt(0x6a6660), x, y0 + 0.4, z); put(new THREE.CylinderGeometry(4.5, 4.5, 40, 24), whiteM, x, y0 + 21, z); put(new THREE.ConeGeometry(4.5, 10, 24), whiteM, x, y0 + 46, z); for (let a = 0; a < 6.28; a += 2.094) put(new THREE.BoxGeometry(0.6, 8, 4), darkM, x + Math.cos(a) * 4.8, y0 + 4, z + Math.sin(a) * 4.8, -a);
     CIRCLES.push({ x, z, r: 6 }); }
   for (let k = 0; k < 8; k++) for (let j = 0; j < 3; j++) { const p = put(new THREE.BoxGeometry(16, 0.2, 6), Mt(0x1a2a44, { metalness: 0.6, roughness: 0.3 }), SITE.SA.x - 63 + k * 18, SITE.SA.h + 1.4, SITE.SA.z + 9 - j * 9); p.rotation.x = -0.5; }
@@ -225,6 +262,7 @@ function buildFar() { const wg = new THREE.BoxGeometry(7, 2.2, 1.2), wm = new TH
 
 // ---------- you: in the lounge at first; through the airlock you are in a suit ----------
 const keys = {}, prevB = {}; let yaw = Math.PI, pitch = -0.12, vrYaw = yaw, started = false, seated = false, hud = true, msgT = 0, msgAge = 0, walked = 0, dose = 0, rateI = 0, factI = -1, tagsOn = true, ready = false;
+let wasInside = null, lastHint = "";
 const RATES = [[1, "real time"], [60, "a minute a second"], [600, "ten minutes a second"], [3600, "an hour a second"]];
 const FACTS = [
   "<b>Coprates Chasma</b>, the eastern trunk of Valles Marineris. Below this rim the ground falls 10 km to the canyon floor, 50 km to the south: from the edge you look down on the tops of the haze. The south wall, 100 km away, rises again to 4,300 m. Valles Marineris runs 4,000 km, from the maze of Noctis Labyrinthus in the west to the chaos terrain in the east: as long as the United States is wide, and four times as deep as the Grand Canyon. It is a crack in Mars' crust that opened as the Tharsis volcanoes, just to the west, bulged it up; landslides and water widened it.",
@@ -234,7 +272,7 @@ const FACTS = [
   "<b>Phobos and Deimos</b>: Phobos, 22 km long, orbits only 6,000 km above the ground, faster than Mars turns, so it rises in the west and sets in the east, crossing the sky in about four hours, twice a sol. It is spiralling inward and will break up in some 40 million years. Deimos, 12 km long, is a bright star that takes two and a half sols to cross the sky.",
   "<b>The colony is imagined</b>, a few centuries from now, with nothing in it physics would not allow. Mars' surface takes about 0.7 mSv of radiation a day (several hundred times Earth's), so people live under rock or regolith: the domes here are pressurised shells under three metres of piled soil; the hotel's rooms are carved into the cliff below you, their windows set back behind two metres of rock. The lounge is the one room with glass all round; visitors come for an hour.",
   "<b>Gravity is 0.38 g</b>: you weigh about a third of what you do on Earth. Jump (space, or B in VR) and you rise three times as high as at home. A sol, Mars' day, is 24 h 40 min.",
-  "<b>Getting about</b> (coming next): a maglev in a vacuum tube along the plateau to the other settlements of Valles Marineris; a lift down the cliff to the canyon floor, 10 km below; rocket hops from the pad to anywhere on Mars in under an hour; pressurised rovers. Mars' air is too thin for ordinary aircraft."];
+  "<b>Getting about</b>: the Canyon Lift down the wall to the floor, 10 km below; the maglev, on an open guideway (the air is too thin to need a tube), 570 km to the Melas Overlook; the rover, parked by the airlock. Rocket hops from the pad, to anywhere on Mars in under an hour, are still to come. Mars' air is too thin for ordinary aircraft."];
 const MSG = document.createElement("div"); MSG.style.cssText = "position:fixed;left:50%;bottom:16px;transform:translateX(-50%);max-width:700px;z-index:2;background:rgba(30,16,8,.86);color:#f6e6d0;font:14.5px/1.5 -apple-system,sans-serif;padding:12px 16px;border-radius:10px;display:none"; document.body.appendChild(MSG);
 const HUD = document.createElement("div"); HUD.style.cssText = "position:fixed;right:14px;top:12px;z-index:2;background:rgba(30,16,8,.72);color:#f6e6d0;font:13px/1.45 -apple-system,sans-serif;padding:7px 11px;border-radius:8px;display:none"; document.body.appendChild(HUD);
 const panT = (() => { const c = document.createElement("canvas"); c.width = 1024; c.height = 512; const t = new THREE.CanvasTexture(c); t.userData.c = c; return t; })(), vrPanel = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.28), new THREE.MeshBasicMaterial({ map: panT, transparent: true, depthTest: false, fog: false }));
@@ -261,8 +299,11 @@ function makeTags() { const R0 = SITE.rimZ;
   tag(() => W3(0, 4300 + 1500, R0 + 100000), "The south wall", () => "100 km · 4,300 m high", FACTS[2]);
   tag(() => W3(0, PAD_H + 8, R0 - 6), "Observation lounge", () => "", FACTS[5]);
   tag(() => W3(0, PAD_H - 40, R0 + 90), "Hotel rooms, in the cliff", () => "behind 2 m of rock", FACTS[5]);
-  tag(() => W3(SITE.LIFT.x, PAD_H + SITE.LIFT.y + 30, SITE.LIFT.z), "The Canyon Lift", () => "down the wall to the floor (coming next)", "<b>The Canyon Lift</b> (imagined): a cable railway down the wall, then a funicular along the talus to the canyon floor, 10 km lower and 48 km south: a two-hour ride. Its lights run away down the cliff. (Riding it is coming next.)");
-  tag(() => W3(SITE.ST.x, PAD_H + SITE.ST.h + 14, SITE.ST.z), "Maglev station", () => "the vacuum tube to the rest of Valles Marineris", "<b>The maglev</b> (imagined): a train floating on magnets in an evacuated tube on pylons. Mars' thin air makes the vacuum easy to keep. Along Valles Marineris it would run at 1,000 km/h or more: Noctis Labyrinthus, 2,000 km west, in two hours. (Riding it is coming next.)");
+  tag(() => W3(SITE.LIFT.x, PAD_H + SITE.LIFT.y + 30, SITE.LIFT.z), "The Canyon Lift", () => "down the wall to the canyon floor", "<b>The Canyon Lift</b> (imagined): a rack railway down the wall, 10 km lower and 48 km south to the canyon floor, a self-levelling glass car at 17 m/s. Walk to the top station and press E.");
+  tag(() => W3(SITE.ST.x, PAD_H + SITE.ST.h + 14, SITE.ST.z), "Maglev station", () => "to the Melas Overlook, 570 km", "<b>The maglev</b> (imagined): a train floating on magnets over an open guideway on pylons. Mars' air is so thin that even at 1,000 km/h it needs no tube. This line runs 570 km northwest along the plateau to the Melas Overlook. Walk to the platform and press E.");
+  tag(() => W3(SITE.FLOOR.x, SITE.FLOOR.y + 20, SITE.FLOOR.z), "Coprates Floor Station", () => "the bottom of the Canyon Lift", "<b>Coprates Floor Station</b> (imagined): the bottom of the Canyon Lift, on the floor of Coprates Chasma, 10 km below the rim.");
+  tag(() => W3(SITE.MELAS.x, SITE.MELAS.y + 22, SITE.MELAS.z), "Melas Overlook", () => "the end of the maglev line", "<b>The Melas Overlook</b> (imagined station, real place: 8.0° S, 71.0° W): the edge of the plateau where the ground falls 8 km to the junction of Melas and Candor Chasmata, the widest part of Valles Marineris, 200 km across.");
+  tag(() => W3(RV.x, land(RV.x, RV.z) + 5, RV.z), "Rover", () => "E beside it to drive", "<b>The rover</b> (imagined): a pressurised cab on six wheels. Walk up to it and press E.");
   tag(() => W3(SITE.RP.x, PAD_H + SITE.RP.h + 55, SITE.RP.z), "Rocket pad", () => "hops anywhere on Mars", "<b>Rocket hops</b> (imagined, but simple physics): with a third of Earth's gravity and almost no air to fight, a rocket can go anywhere on Mars on a ballistic arc in under an hour: Olympus Mons, the poles, Hellas. The only way to fly far: aircraft need air.");
   tag(() => W3(SITE.GH.x, PAD_H + SITE.GH.y + 30, SITE.GH.z), "Greenhouse", () => "under glass and a water shield", "<b>The greenhouse</b> (imagined): plants need light, so this dome is glass, thick and layered, with water between the layers to soak up radiation. Mars gets 43% of Earth's sunlight, enough for crops.");
   tag(() => SUN.position.clone().add(V3(0, SKYR * 0.03, 0)).add(rig.position), "The Sun", () => "1.52 AU · 43% of Earth's sunlight", FACTS[3], true);
@@ -271,7 +312,7 @@ const _cd = V3(0, 0, 0), _cp = V3(0, 0, 0);
 function updateTags() { camera.getWorldPosition(_cp); for (const T of TAGS) { const p = T.get(), d = p.distanceTo(_cp); T.sp.visible = tagsOn && d > 1.2 && !(T.hid && T.hid()) && (T.sky ? p.y - _cp.y > -SKYR * 0.02 : d < 300000); if (!T.sp.visible) continue; T.sp.position.copy(p); const w = clampN(d * 0.1, 0.7, SKYR * 0.2); T.sp.scale.set(w, w / 4, 1);
     const sub = T.subF() + (T.sky ? "" : " · " + fmtKm(d)); if (sub !== T.last) { T.last = sub; T.sp.material.map.dispose(); T.sp.material.map = tagTex(T.title, sub); } } }
 function lookedAt() { camera.getWorldDirection(_cd); camera.getWorldPosition(_cp); let best = null, ba = 0.09; for (const T of TAGS) { if (!T.sp.visible) continue; const v = T.sp.position.clone().sub(_cp), a = v.normalize().angleTo(_cd); if (a < ba) { ba = a; best = T; } } return best; }
-function act() { const T = tagsOn ? lookedAt() : null; if (T) { say(T.info, 50); return; } factI = (factI + 1) % FACTS.length; say(FACTS[factI] + ` <span style="opacity:.6">(${factI + 1}/${FACTS.length}: E for the next)</span>`, 45); }
+function act() { if (boardOrAct()) return; const T = tagsOn ? lookedAt() : null; if (T) { say(T.info, 50); return; } factI = (factI + 1) % FACTS.length; say(FACTS[factI] + ` <span style="opacity:.6">(${factI + 1}/${FACTS.length}: E for the next)</span>`, 45); }
 function setRate(i) { rateI = (i + RATES.length) % RATES.length; say(`Time: ${RATES[rateI][1]}.${rateI ? " Watch the shadows move down the walls and Phobos cross the sky." : ""}`, 8); }
 function toggleSeated() { seated = !seated; say(seated ? "<b>Sitting mode</b>: your view is raised about 45 cm, to standing height. (M, or click the left stick, for standing.)" : "<b>Standing mode</b>: your own height.", 8); }
 addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (e.code === "KeyE") act(); if (e.code === "KeyH") hud = !hud; if (e.code === "KeyL") tagsOn = !tagsOn; if (e.code === "KeyT") setRate(rateI + 1); if (e.code === "KeyM") toggleSeated(); if (e.code === "KeyR") toStart(); });
@@ -293,10 +334,104 @@ function collide(ox, oz) { const r = 0.35; for (const [x0, z0, x1, z1] of WALLS)
   for (const C of CIRCLES) { const d = Math.hypot(ME.x - C.x, ME.z - C.z); if (d < C.r) { ME.x = C.x + (ME.x - C.x) / d * C.r; ME.z = C.z + (ME.z - C.z) / d * C.r; } } }
 const insideNow = () => { const f = floorAt(ME.x, ME.z); return f !== null && Math.abs(ME.y - f) < 2 && !(ME.z < SITE.rimZ - 15 - 8); };
 
+// ---------- getting about (imagined): the Canyon Lift down the wall, a pressurised rover, the maglev to the Melas Overlook ----------
+// The tracks are drawn only within a few kilometres of you, rebuilt as you go, so they follow the curve of the ground.
+const llXZ = (lat, lon) => [(lon - LON0) * DEG * R_M * Math.cos(lat * DEG), (LAT0 - lat) * DEG * R_M];
+const REMOTE = [];
+function remote(x, z) { const g = new THREE.Group(); g.userData = { x, z, y: Math.round(mola(x, z)) }; scene.add(g); REMOTE.push(g); return g; }
+const trackM = { lift: Mt(0x8a8680, { metalness: 0.4, roughness: 0.5 }), mag: Mt(0xd8d4cc, { metalness: 0.5, roughness: 0.35 }) };
+const TRACKS = [];
+function makeTrack(kind, pts, w, h, pylonEvery) { const T = { kind, pts, w, h, pylonEvery, mesh: null, pyl: null, c: [1e12, 1e12], L: 0, cum: [0] }; for (let i = 1; i < pts.length; i++) T.cum.push(T.cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1], pts[i][2] - pts[i - 1][2])); T.L = T.cum[T.cum.length - 1];
+  T.pyl = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.5, 0.8, 1, 8).translate(0, 0.5, 0), trackM[kind], 200); T.pyl.frustumCulled = false; T.pyl.castShadow = true; scene.add(T.pyl); TRACKS.push(T); return T; }
+function trackAt(T, s) { s = clampN(s, 0, T.L); let lo = 0, hi = T.cum.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (T.cum[m] <= s) lo = m; else hi = m; } const a = T.pts[lo], b = T.pts[hi], t = (s - T.cum[lo]) / Math.max(1e-6, T.cum[hi] - T.cum[lo]);
+  return { x: lerpN(a[0], b[0], t), z: lerpN(a[1], b[1], t), y: lerpN(a[2], b[2], t), dx: b[0] - a[0], dz: b[1] - a[1], dy: b[2] - a[2] }; }
+function drawTrack(T) { const R = 3000; T.c = [ME.x, ME.z]; const pos = [], m4 = new THREE.Matrix4(); let np = 0;
+  const box = (a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz) || 1, sx = -dz / L * T.w / 2, sz = dx / L * T.w / 2, ya = a[2] + curveY(a[0], a[1]), yb = b[2] + curveY(b[0], b[1]), P = [];
+    for (const [p, y] of [[a, ya], [b, yb]]) for (const sgn of [-1, 1]) for (const up of [0, -T.h]) P.push([p[0] + sx * sgn - ME.x0, y + up, p[1] + sz * sgn - ME.z0]);
+    const q = (i, j, k, l) => { pos.push(...P[i], ...P[j], ...P[k], ...P[i], ...P[k], ...P[l]); }; q(0, 2, 6, 4); q(1, 5, 7, 3); q(0, 4, 5, 1); q(2, 3, 7, 6); q(0, 1, 3, 2); q(4, 6, 7, 5); };
+  for (let i = 0; i < T.pts.length - 1; i++) { const a = T.pts[i]; if (Math.abs(a[0] - ME.x) > R || Math.abs(a[1] - ME.z) > R) continue; box(a, T.pts[i + 1]);
+    if (i % T.pylonEvery === 0 && np < 200) { const g = land(a[0], a[1]), top = a[2] - T.h; if (top - g > 1) { m4.compose(V3(a[0] - ME.x0, g + curveY(a[0], a[1]) - 1, a[1] - ME.z0), new THREE.Quaternion(), V3(1, top - g + 1, 1)); T.pyl.setMatrixAt(np++, m4); } } }
+  T.pyl.count = np; T.pyl.instanceMatrix.needsUpdate = true; if (T.mesh) { scene.remove(T.mesh); T.mesh.geometry.dispose(); }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); T.mesh = new THREE.Mesh(g, trackM[T.kind]); T.mesh.castShadow = T.mesh.receiveShadow = true; T.mesh.frustumCulled = false; scene.add(T.mesh); T.x0 = ME.x0; T.z0 = ME.z0; }
+function updateTracks() { for (const T of TRACKS) if (Math.hypot(ME.x - T.c[0], ME.z - T.c[1]) > 400 || T.x0 !== ME.x0 || T.z0 !== ME.z0) drawTrack(T); }
+// cabins: the lift's level glass car, the maglev's long car with a band of windows
+function liftCar() { const g = new THREE.Group(), add = (geo, m, x, y, z) => { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); g.add(me); return me; };
+  add(new THREE.BoxGeometry(3.2, 0.3, 6), floorM, 0, 0.15, 0); add(new THREE.BoxGeometry(3.4, 0.25, 6.2), frameM, 0, 2.9, 0);
+  for (const x of [-1.6, 1.6]) for (const z of [-3, -1, 1, 3]) add(new THREE.BoxGeometry(0.12, 2.8, 0.12), frameM, x, 1.5, z);
+  for (const [w, d, x, z] of [[0.02, 6, -1.6, 0], [0.02, 6, 1.6, 0], [3.2, 0.02, 0, -3], [3.2, 0.02, 0, 3]]) add(new THREE.BoxGeometry(w, 2.6, d), glassM, x, 1.45, z);
+  for (const x of [-1.15, 1.15]) add(new THREE.BoxGeometry(0.6, 0.45, 4.4), Mt(0x5a3a2a), x, 0.5, 0); add(new THREE.BoxGeometry(1.2, 1.2, 1.2), Mt(0x6a6660), 0, 3.6, 0);
+  const l = new THREE.PointLight(0xffd8b0, 4, 8, 1.6); l.position.set(0, 2.6, 0); g.add(l); g.visible = false; scene.add(g); return g; }
+function magCar() { const g = new THREE.Group(), body = Mt(0xe8e4dc, { metalness: 0.4, roughness: 0.3, side: THREE.DoubleSide }), add = (geo, m, x, y, z) => { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); g.add(me); return me; };
+  add(new THREE.BoxGeometry(3.4, 0.3, 30), floorM, 0, 0.15, 0); add(new THREE.BoxGeometry(3.6, 0.3, 30), body, 0, 3.0, 0); add(new THREE.BoxGeometry(3.6, 0.6, 30), body, 0, -0.2, 0);
+  for (const x of [-1.75, 1.75]) { add(new THREE.BoxGeometry(0.1, 0.9, 30), body, x, 0.6, 0); add(new THREE.BoxGeometry(0.1, 0.7, 30), body, x, 2.55, 0); add(new THREE.BoxGeometry(0.04, 1.2, 30), glassM, x, 1.65, 0); for (let z = -14; z <= 14; z += 2) add(new THREE.BoxGeometry(0.14, 1.2, 0.18), body, x, 1.65, z); }
+  for (const z of [-15, 15]) add(new THREE.BoxGeometry(3.6, 3.2, 0.1), body, 0, 1.45, z); const nose = add(new THREE.SphereGeometry(1.8, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), body, 0, 1.4, -15); nose.rotation.x = -Math.PI / 2; nose.scale.set(1, 3, 0.9);
+  for (let z = -12; z <= 12; z += 2) for (const x of [-1.05, 1.05]) add(new THREE.BoxGeometry(0.9, 0.5, 0.6), Mt(0x3a4a6a), x, 0.55, z);
+  const l = new THREE.PointLight(0xfff0e0, 6, 14, 1.4); l.position.set(0, 2.6, 0); g.add(l); g.visible = false; scene.add(g); return g; }
+function roverMesh() { const g = new THREE.Group(), white = Mt(0xe8e4dc, { metalness: 0.3, roughness: 0.4, side: THREE.DoubleSide }), add = (geo, m, x, y, z) => { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); me.castShadow = true; g.add(me); return me; };
+  add(new THREE.BoxGeometry(2.8, 0.4, 6.2), Mt(0x3a3a3c), 0, 0.9, 0); add(new THREE.BoxGeometry(2.6, 0.2, 5.2), white, 0, 1.2, 0.3); add(new THREE.BoxGeometry(2.6, 0.2, 5.2), white, 0, 3.2, 0.3);
+  for (const x of [-1.3, 1.3]) { add(new THREE.BoxGeometry(0.1, 0.8, 5.2), white, x, 1.6, 0.3); add(new THREE.BoxGeometry(0.06, 1.2, 5.2), glassM, x, 2.6, 0.3); }
+  add(new THREE.BoxGeometry(2.6, 2.0, 0.1), white, 0, 2.2, 2.9); add(new THREE.BoxGeometry(2.6, 0.5, 0.1), white, 0, 1.45, -2.3); add(new THREE.BoxGeometry(2.6, 1.5, 0.06), glassM, 0, 2.45, -2.3);
+  for (const z of [-2.2, 0, 2.2]) for (const x of [-1.6, 1.6]) { const w = add(new THREE.CylinderGeometry(0.62, 0.62, 0.5, 16).rotateZ(Math.PI / 2), Mt(0x2a2a2a), x, 0.62, z); w.userData.wheel = true; }
+  add(new THREE.BoxGeometry(0.8, 0.5, 0.6), Mt(0x3a4a6a), -0.6, 1.55, -1.4); add(new THREE.BoxGeometry(0.8, 0.5, 0.6), Mt(0x3a4a6a), 0.6, 1.55, -1.4); add(new THREE.BoxGeometry(2.4, 0.3, 0.4), Mt(0x2a2a2e), 0, 1.55, -2.0);
+  add(new THREE.CylinderGeometry(0.04, 0.04, 1.2, 6), frameM, 0.9, 3.9, 2.0); add(new THREE.SphereGeometry(0.3, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), whiteM, 0.9, 4.5, 2.0);
+  scene.add(g); return g; }
+let LIFT_T = null, MAG_T = null, LIFTCAR = null, MAGCAR = null, ROVER = null, ride = null, drive = null;
+const RV = { x: 0, z: 0, yaw: 0, v: 0 };
+const STATIONS = [];
+function buildTravel() { const R0 = SITE.rimZ;
+  // the Canyon Lift: from the top station by the rim, down the wall to the canyon floor, 4 m above the ground on piers, a dense line of points every 25 m
+  { const x0 = SITE.LIFT.x, z0 = SITE.LIFT.z + 10, pts = []; let z = z0; while (z < R0 + 60000) { const g = land(x0, z); pts.push([x0, z, g + clampN((z - z0) / 30, 0.25, 4)]); if (g < -4700 && z > R0 + 30000) break; z += 25; }
+    for (let i = 1; i < pts.length - 1; i++) pts[i][2] = Math.max(pts[i][2], (pts[i - 1][2] + pts[i + 1][2]) / 2); LIFT_T = makeTrack("lift", pts, 3.6, 0.6, 2); }
+  // the floor station at the bottom: a platform, a hall and two domes
+  { const e = LIFT_T.pts[LIFT_T.pts.length - 1], g = remote(e[0], e[1] + 30), gy = g.userData.y; SITE.pads.push({ x0: e[0] - 30, x1: e[0] + 30, z0: e[1] - 10, z1: e[1] + 70, h: gy - 0.4, s: 30 }); g.userData.y = gy;
+    const P = (geo, m, x, y, z) => { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); me.castShadow = me.receiveShadow = true; g.add(me); return me; };
+    P(new THREE.BoxGeometry(12, 0.5, 20), floorM, 0, 0.05, -24); P(new THREE.BoxGeometry(30, 7, 14), Mt(0xd0ccc4, { metalness: 0.3 }), 0, 3.5, 6); P(new THREE.BoxGeometry(26, 1.6, 0.2), warmM, 0, 3.5, -1.05);
+    for (const [x, z, r] of [[-26, 30, 14], [20, 34, 11]]) { const d = P(new THREE.SphereGeometry(r, 28, 10, 0, Math.PI * 2, 0, Math.PI / 2), regM, x, -0.5, z); d.scale.y = 0.55; CIRCLES.push({ x: e[0] + x, z: e[1] + 30 + z, r: r + 0.5 }); }
+    CIRCLES.push({ x: e[0] - 10, z: e[1] + 36, r: 8 }, { x: e[0] + 10, z: e[1] + 36, r: 8 }, { x: e[0], z: e[1] + 36, r: 8 });
+    STATIONS.push({ name: "Coprates Floor Station", x: e[0], z: e[1] - 6, track: LIFT_T, s: LIFT_T.L, dir: -1, info: "the Canyon Lift back up to the rim" }); SITE.FLOOR = { x: e[0], z: e[1] + 30, y: gy }; }
+  STATIONS.push({ name: "Canyon Lift, top station", x: SITE.LIFT.x, z: SITE.LIFT.z + 10, track: LIFT_T, s: 0, dir: 1, info: "the Canyon Lift down to the floor of Coprates Chasma, 10 km below" });
+  // the maglev: an open guideway on pylons (the air is so thin that a train at 1,000 km/h needs no tube), 12 m over the ground, smoothed to gentle grades, northwest along the plateau to the Melas Overlook
+  { const way = [[SITE.ST.x, SITE.ST.z]].concat([[-10.5, 295.5], [-9.0, 293.0], [-8.3, 291.0], [-8.05, 289.4], [-8.0, 288.918]].map(([la, lo]) => llXZ(la, lo))), pts = [];
+    for (let i = 0; i < way.length - 1; i++) { const [ax, az] = way[i], [bx, bz] = way[i + 1], L = Math.hypot(bx - ax, bz - az), n = Math.ceil(L / 60); for (let k = 0; k < n; k++) { const t = k / n; pts.push([ax + (bx - ax) * t, az + (bz - az) * t, 0]); } } pts.push([...way[way.length - 1], 0]);
+    for (let i = 1; i < pts.length - 1; i++) { const a = pts[i - 1], b = pts[i], c = pts[i + 1]; b[0] = (a[0] + b[0] * 2 + c[0]) / 4; b[1] = (a[1] + b[1] * 2 + c[1]) / 4; }
+    const G = pts.map(p => land(p[0], p[1])), W = 25; for (let i = 0; i < pts.length; i++) { let s = 0, n = 0; for (let k = Math.max(0, i - W); k <= Math.min(pts.length - 1, i + W); k++) { s += G[k]; n++; } pts[i][2] = Math.max(s / n + 14, G[i] + 8); }
+    for (let pass = 0; pass < 3; pass++) for (let i = 1; i < pts.length - 1; i++) pts[i][2] = Math.max(G[i] + 8, (pts[i - 1][2] + pts[i][2] * 2 + pts[i + 1][2]) / 4);
+    const st = pts[0]; st[2] = Math.max(st[2], PAD_H + SITE.ST.h + 9.6); MAG_T = makeTrack("mag", pts, 3.0, 1.4, 1); }
+  STATIONS.push({ name: "Coprates Rim maglev station", x: SITE.ST.x, z: SITE.ST.z + 16, track: MAG_T, s: 0, dir: 1, info: "the maglev to the Melas Overlook, 570 km northwest" });
+  // the Melas Overlook: the station at the end of the line, a viewing pavilion at the plateau's edge, where the ground falls 8 km to where Melas and Candor Chasmata meet
+  { const e = MAG_T.pts[MAG_T.pts.length - 1], g = remote(e[0], e[1]), gy = g.userData.y; SITE.pads.push({ x0: e[0] - 50, x1: e[0] + 50, z0: e[1] - 30, z1: e[1] + 30, h: gy - 0.4, s: 40 }); g.userData.y = gy;
+    const P = (geo, m, x, y, z) => { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); me.castShadow = me.receiveShadow = true; g.add(me); return me; };
+    P(new THREE.BoxGeometry(50, 8, 16), Mt(0xd0ccc4, { metalness: 0.3 }), 0, 4, 14); P(new THREE.BoxGeometry(46, 1.6, 0.2), warmM, 0, 4, 5.9); P(new THREE.BoxGeometry(40, 0.5, 6), floorM, 0, e[2] - gy - 2.2, 0);
+    CIRCLES.push({ x: e[0] - 16, z: e[1] + 14, r: 9 }, { x: e[0], z: e[1] + 14, r: 9 }, { x: e[0] + 16, z: e[1] + 14, r: 9 });
+    let rx = e[0]; for (let x = e[0]; x > e[0] - 3000; x -= 4) if (mola(x - 30, e[1]) - mola(x, e[1]) < -12) { rx = x; break; } const px = rx - e[0], ph = Math.round(mola(rx + 20, e[1])) - gy, F = gy - PAD_H + ph + 0.3;
+    SITE.pads.push({ x0: rx - 1, x1: rx + 30, z0: e[1] - 10, z1: e[1] + 10, h: gy + ph - 0.4, s: 12 }); SITE.cut2 = { x0: rx - 30, x1: rx + 1, z0: e[1] - 8, z1: e[1] + 8, h: gy + ph - 2 };
+    P(new THREE.BoxGeometry(26, 0.4, 16), floorM, px + 13, ph + 0.1, 0); P(new THREE.BoxGeometry(14, 0.12, 8), glassM, px - 7, ph + 0.24, 0); FLOORS.push({ x0: rx, x1: rx + 26, z0: e[1] - 8, z1: e[1] + 8, y: F - 0.0 }, { x0: rx - 14, x1: rx, z0: e[1] - 4, z1: e[1] + 4, y: F, glass: true });
+    for (const [x0, z0, x1, z1, hh] of [[px, -8, px, -4, 5], [px, 4, px, 8, 5], [px, -8, px + 26, -8, 5], [px, 8, px + 26, 8, 5], [px - 14, -4, px, -4, 3], [px - 14, 4, px, 4, 3], [px - 14, -4, px - 14, 4, 3]]) { const len = Math.hypot(x1 - x0, z1 - z0), a = Math.atan2(z1 - z0, x1 - x0), m = P(new THREE.PlaneGeometry(len, hh), glassM, (x0 + x1) / 2, ph + 0.3 + hh / 2, (z0 + z1) / 2); m.rotation.y = -a; m.castShadow = false; for (let t = 0; t <= len; t += 4) P(new THREE.BoxGeometry(0.16, hh, 0.16), frameM, x0 + (x1 - x0) * t / len, ph + 0.3 + hh / 2, z0 + (z1 - z0) * t / len); WALLS.push([e[0] + x0, e[1] + z0, e[0] + x1, e[1] + z1]); }
+    { const r1 = P(new THREE.PlaneGeometry(26, 16).rotateX(Math.PI / 2), glassM, px + 13, ph + 5.3, 0); r1.castShadow = false; const r2 = P(new THREE.PlaneGeometry(14, 8).rotateX(Math.PI / 2), glassM, px - 7, ph + 3.3, 0); r2.castShadow = false; for (let x = 0; x <= 26; x += 4) P(new THREE.BoxGeometry(0.18, 0.18, 16), frameM, px + x, ph + 5.3, 0); for (let x = 0; x <= 14; x += 3.5) P(new THREE.BoxGeometry(0.18, 0.18, 8), frameM, px - x, ph + 3.3, 0); }
+    SITE.MELASVIEW = { x: rx + 6, z: e[1] };
+    STATIONS.push({ name: "Melas Overlook station", x: e[0], z: e[1] + 4, track: MAG_T, s: MAG_T.L, dir: -1, info: "the maglev back to the Coprates Rim Hotel" }); SITE.MELAS = { x: e[0], z: e[1], y: gy }; }
+  // the rover, parked by the airlock
+  ROVER = roverMesh(); RV.x = 14; RV.z = R0 - 44; RV.yaw = 0.3; LIFTCAR = liftCar(); MAGCAR = magCar(); }
+function nearStation() { for (const S of STATIONS) if (Math.hypot(ME.x - S.x, ME.z - S.z) < 18) return S; return null; }
+function boardStation(S) { const T = S.track, fast = T.kind === "mag"; ride = { T, s: S.s, dir: S.dir, v: 0, vmax: fast ? 280 : 17, acc: fast ? 2.5 : 1, warp: fast ? 10 : 15, car: fast ? MAGCAR : LIFTCAR, name: fast ? "Maglev" : "Canyon Lift" }; ride.car.visible = true; ME.vx = ME.vz = ME.vy = 0;
+  say(fast ? "<b>The maglev</b> (imagined): an open guideway on pylons, 12 m over the plateau. Mars' air is so thin that at 1,000 km/h it needs no tube: the drag is like an aircraft's 30 km up on Earth. 570 km to the Melas Overlook: 35 minutes, here sped up ten times. Look out of the windows." : "<b>The Canyon Lift</b> (imagined): a self-levelling glass car on a rack railway down the wall, 17 m/s, 10 km down and 48 km south to the canyon floor: about 50 minutes, here sped up fifteen times. Watch the layers of the wall go by.", 25); }
+function nearRover() { return Math.hypot(ME.x - RV.x, ME.z - RV.z) < 6 ? ROVER : null; }
+function boardOrAct() { if (ride) return false; if (drive) { drive = null; const sd = V3(Math.cos(RV.yaw), 0, -Math.sin(RV.yaw)); ME.x = RV.x - sd.x * 2.6; ME.z = RV.z - sd.z * 2.6; ME.y = standY(ME.x, ME.z); say("You step out of the rover. <b>E</b> beside it to drive again.", 6); return true; }
+  const S = nearStation(); if (S) { boardStation(S); return true; } if (nearRover()) { drive = true; RV.v = 0; say("<b>The rover</b> (imagined): a pressurised six-wheeled cab, 40 km/h at most. <b>W</b>/<b>S</b> drive and brake, <b>A</b>/<b>D</b> steer (left stick in VR); <b>E</b> gets out. Steep walls stop it.", 14); return true; } return false; }
+function updateRide(dt) { const R = ride, T = R.T, end = R.dir > 0 ? T.L : 0, left = Math.abs(end - R.s), sdt = dt * R.warp, stopV = Math.sqrt(2 * R.acc * left); R.v = Math.min(R.vmax, R.v + R.acc * sdt, stopV + 0.5); R.s += R.dir * R.v * sdt; tSec += sdt - dt * RATES[rateI][0];
+  const p = trackAt(T, R.s), yaw = Math.atan2(-p.dx * R.dir, -p.dz * R.dir); ME.x = p.x; ME.z = p.z; ME.y = p.y + (T.kind === "mag" ? 0.15 : 0.3); R.car.position.set(p.x - ME.x0, p.y, p.z - ME.z0); R.car.rotation.set(0, yaw, 0);
+  if (R.dir > 0 ? R.s >= T.L - 0.5 : R.s <= 0.5) { R.car.visible = false; const S = STATIONS.find(S2 => S2.track === T && Math.abs(S2.s - R.s) < 1); ride = null; if (S) { ME.x = S.x; ME.z = S.z; ME.y = standY(S.x, S.z); say(`<b>${S.name}.</b> ${S.name.startsWith("Melas") ? "You are on the plateau at 8° S, 71° W. Walk west into the glass pavilion at the edge: the ground falls 8 km to where Melas and Candor Chasmata meet, the widest part of Valles Marineris." : S.name.startsWith("Coprates Floor") ? "You are on the floor of Coprates Chasma, 4,900 m below the areoid, 10 km below the hotel: the walls rise all round you. The air here is twice as thick as on the rim, still far too thin to breathe." : "Back at the hotel."} <b>E</b> by the platform to ride back.`, 20); } } }
+function updateDrive(dt, mx, my) { const acc = -my * 2.5, steer = mx; RV.v = clampN(RV.v + acc * dt - Math.sign(RV.v) * Math.min(Math.abs(RV.v), (my ? 0 : 1.2) * dt), -3, 11); RV.yaw -= steer * dt * 0.6 * clampN(Math.abs(RV.v) / 3, 0, 1) * Math.sign(RV.v || 1);
+  const nx = RV.x - Math.sin(RV.yaw) * RV.v * dt, nz = RV.z - Math.cos(RV.yaw) * RV.v * dt, sl = Math.abs(land(nx, nz) - land(RV.x, RV.z)) / Math.max(0.01, Math.hypot(nx - RV.x, nz - RV.z));
+  if (sl > 0.7 || CIRCLES.some(C => Math.hypot(nx - C.x, nz - C.z) < C.r + 2.5)) RV.v = 0; else { RV.x = nx; RV.z = nz; }
+  ME.x = RV.x - Math.sin(RV.yaw) * 1.2; ME.z = RV.z - Math.cos(RV.yaw) * 1.2; ME.y = land(RV.x, RV.z) + 1.0; }
+function placeRover() { const h = land(RV.x, RV.z), f = V3(-Math.sin(RV.yaw), 0, -Math.cos(RV.yaw)), sd = V3(-f.z, 0, f.x), hf = land(RV.x + f.x * 2.5, RV.z + f.z * 2.5), hb = land(RV.x - f.x * 2.5, RV.z - f.z * 2.5), hl = land(RV.x + sd.x * 1.4, RV.z + sd.z * 1.4), hr = land(RV.x - sd.x * 1.4, RV.z - sd.z * 1.4);
+  ROVER.position.set(RV.x - ME.x0, h + curveY(RV.x, RV.z), RV.z - ME.z0); ROVER.rotation.set(Math.atan2(hf - hb, 5), RV.yaw, -Math.atan2(hl - hr, 2.8), "YXZ"); ROVER.children.forEach(c => { if (c.userData.wheel) c.rotation.x += RV.v * 0.016 / 0.62; }); }
+
 // ---------- the loop ----------
 const clock = new THREE.Clock(); let T = 0, frameN = 0;
 const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
-Promise.all([loadMola(MOLA_REGION), loadMola(MOLA_LOCAL)]).then(([r, l]) => { MOLA.region = r; MOLA.local = l; buildColony(); toStart(); ME.x0 = ME.x; ME.z0 = ME.z; COL.position.set(-ME.x0, PAD_H, -ME.z0); buildFar(); makeTags(); updateGround(true); fillRocks(); ready = true;
+Promise.all([loadMola(MOLA_REGION), loadMola(MOLA_LOCAL), loadMola(MOLA_LOCAL2)]).then(([r, l, l2]) => { MOLA.region = r; MOLA.local = l; MOLA.local2 = l2; buildColony(); buildTravel(); toStart(); ME.x0 = ME.x; ME.z0 = ME.z; COL.position.set(-ME.x0, PAD_H, -ME.z0); buildFar(); makeTags(); updateGround(true); fillRocks(); ready = true;
   const card = document.querySelector("#intro .dim"); if (card) card.textContent = card.textContent.replace("Loading the ground…", "Click to begin."); });
 renderer.setAnimationLoop(() => { const dt = clampN(clock.getDelta(), 0, 0.05), vr = renderer.xr.isPresenting, simDt = dt * RATES[rateI][0]; T += dt; frameN++; if (!ready) { renderer.render(scene, camera); return; }
   if (started) { tSec += simDt; }
@@ -305,21 +440,26 @@ renderer.setAnimationLoop(() => { const dt = clampN(clock.getDelta(), 0, 0.05), 
       if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; run = !!gp.buttons[0]?.pressed; const bX = gp.buttons[4]?.pressed; if (bX && !prevB.x) tagsOn = !tagsOn; prevB.x = bX; const bY = gp.buttons[5]?.pressed; if (bY && !prevB.y) setRate(rateI + 1); prevB.y = bY; const bS = gp.buttons[3]?.pressed; if (bS && !prevB.st) toggleSeated(); prevB.st = bS; }
       else { const tx = a[ax] || 0; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const bA = gp.buttons[4]?.pressed, bB = gp.buttons[5]?.pressed, tr = gp.buttons[0]?.pressed; if (bA && !prevB.a) act(); prevB.a = bA; if (tr && !prevB.tr) act(); prevB.tr = tr; if (bB && !prevB.b) jump = true; prevB.b = bB; } } }
   else { if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD || keys.ArrowRight) mx += 1; if (keys.KeyA || keys.ArrowLeft) mx -= 1; run = keys.ShiftLeft || keys.ShiftRight; if (keys.Space) jump = true; }
+  if (ride && started) updateRide(dt); else if (drive && started) updateDrive(dt, mx, my);
   // walking and jumping in 0.38 g; the thin air does nothing to slow you
-  const gY = standY(ME.x, ME.z), onGround = ME.y <= gY + 0.03;
+  const gY = standY(ME.x, ME.z), onGround = !ride && !drive && ME.y <= gY + 0.03;
   if (started && onGround) { if (mx || my) { const f = V3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())); f.y = 0; f.normalize(); const sd = V3(-f.z, 0, f.x), sp = run ? 5 : 2.2, k = 1 - Math.exp(-dt * 6); ME.vx += ((f.x * -my + sd.x * mx) * sp - ME.vx) * k; ME.vz += ((f.z * -my + sd.z * mx) * sp - ME.vz) * k; }
     else { const k = 1 - Math.exp(-dt * 6); ME.vx -= ME.vx * k; ME.vz -= ME.vz * k; } if (jump) ME.vy = 2.4; }
-  ME.vy -= G_M * dt; const ox = ME.x, oz = ME.z; ME.x += ME.vx * dt; ME.z += ME.vz * dt; ME.y += ME.vy * dt; collide(ox, oz); walked += Math.hypot(ME.x - ox, ME.z - oz);
-  const gN = standY(ME.x, ME.z); if (ME.y < gN) { if (gN - ME.y > 1.2 && onGround) { ME.x = ox; ME.z = oz; ME.y = standY(ox, oz); } else { ME.y = gN; if (ME.vy < 0) ME.vy = 0; } }
-  if (Math.hypot(ME.x - ME.x0, ME.z - ME.z0) > 3000) { ME.x0 = ME.x; ME.z0 = ME.z; updateGround(true); fillRocks(); } else { updateGround(); if (Math.hypot(ME.x - rockC[0], ME.z - rockC[1]) > 10) fillRocks(); }
+  if (!ride && !drive) { ME.vy -= G_M * dt; const ox = ME.x, oz = ME.z; ME.x += ME.vx * dt; ME.z += ME.vz * dt; ME.y += ME.vy * dt; collide(ox, oz); walked += Math.hypot(ME.x - ox, ME.z - oz);
+  const gN = standY(ME.x, ME.z); if (ME.y < gN) { if (gN - ME.y > 1.2 && onGround) { ME.x = ox; ME.z = oz; ME.y = standY(ox, oz); } else { ME.y = gN; if (ME.vy < 0) ME.vy = 0; } } }
+  if (Math.hypot(ME.x - ME.x0, ME.z - ME.z0) > 3000) { ME.x0 = ME.x; ME.z0 = ME.z; updateGround(true); fillRocks(); } else { updateGround(); if (Math.hypot(ME.x - rockC[0], ME.z - rockC[1]) > 6) fillRocks(); }
   const lift = vr && seated ? 0.45 : 0; rig.position.set(ME.x - ME.x0, ME.y + lift, ME.z - ME.z0); rig.rotation.set(0, vr ? vrYaw : 0, 0); if (!vr) { camera.position.set(0, 1.6, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
+  setNoiseOrigin(ME.x0, ME.z0); updateTracks(); for (const g of REMOTE) g.position.set(g.userData.x - ME.x0, g.userData.y + curveY(g.userData.x, g.userData.z), g.userData.z - ME.z0); if (ROVER) placeRover(); if (liftMesh) liftMesh.visible = Math.hypot(ME.x, ME.z - SITE.rimZ) < 4000 && !ride;
+  if (started && !ride && !drive && frameN % 40 === 0) { const S = nearStation(), Rv = nearRover(), key = S ? S.name : Rv ? "rover" : ""; if (key && key !== lastHint) say(S ? `<b>${S.name}.</b> <b>E</b> (A in VR) to ride ${S.info}.` : "<b>The rover.</b> <b>E</b> (A in VR) to get in and drive.", 8); lastHint = key; }
   COL.position.set(-ME.x0, PAD_H + curveY(0, SITE.rimZ), -ME.z0); if (winMesh) { winMesh.position.set(-ME.x0, 0, -ME.z0); liftMesh.position.set(-ME.x0, 0, -ME.z0); }
   const s = updateSky(); SKY.position.copy(rig.position); sunL.position.copy(rig.position).addScaledVector(s, 200); sunL.target.position.copy(rig.position);
   updateTags();
   if (frameN % 10 === 0) { const [lat, lon] = toLL(ME.x, ME.z), h = ME.y, lst = (LST0 + tSec / SOL * 24) % 24, inside = insideNow(), pa = 610 * Math.exp(-h / 11100), el = Math.asin(s.y) / DEG, az = ((Math.atan2(s.x, -s.z) / DEG) + 360) % 360;
-    const lines = [`<b>Coprates Chasma, Valles Marineris</b>`, `${Math.abs(lat).toFixed(3)}° S, ${(360 - lon).toFixed(3)}° W · ${Math.round(h).toLocaleString()} m above the areoid`, inside ? "inside: 21 °C, 70 kPa air · no suit" : `outside, in a suit · air ${Math.round(pa)} Pa (${(pa / 1013).toFixed(2)}% of Earth's), CO₂`,
+    const place = Math.hypot(ME.x - (SITE.MELAS ? SITE.MELAS.x : 1e9), ME.z - (SITE.MELAS ? SITE.MELAS.z : 1e9)) < 60000 ? "Melas Overlook, above Melas and Candor Chasmata" : "Coprates Chasma, Valles Marineris";
+    const lines = [`<b>${place}</b>`, ...(ride ? [`<b>${ride.name}</b> · ${Math.round(ride.v * 3.6)} km/h · ${fmtKm(Math.abs((ride.dir > 0 ? ride.T.L : 0) - ride.s))} to go · time ×${ride.warp}`] : drive ? [`<b>Rover</b> · ${Math.round(Math.abs(RV.v) * 3.6)} km/h`] : []), `${Math.abs(lat).toFixed(3)}° S, ${(360 - lon).toFixed(3)}° W · ${Math.round(h).toLocaleString()} m above the areoid`, inside || ride || drive ? "inside: 21 °C, 70 kPa air · no suit" : `outside, in a suit · air ${Math.round(pa)} Pa (${(pa / 1013).toFixed(2)}% of Earth's), CO₂`,
       `sol ${1 + Math.floor((LST0 / 24) + tSec / SOL)}, ${String(Math.floor(lst)).padStart(2, "0")}:${String(Math.floor((lst % 1) * 60)).padStart(2, "0")} local time · Sun ${el < 0 ? "below the horizon" : COMPASS[Math.round(az / 22.5) % 16] + " " + Math.round(el) + "° up"} · time ${RATES[rateI][1]}`,
       ...MOONS.map(m => `${m.n}: ${m.v.y < 0 ? "below the horizon" : COMPASS[Math.round((((Math.atan2(m.v.x, -m.v.z) / DEG) + 360) % 360) / 22.5) % 16] + " " + Math.round(Math.asin(m.v.y) / DEG) + "° up"}`)];
+    if (inside !== wasInside && started) { if (!inside && wasInside !== null) say("<b>Through the airlock.</b> You are in a pressure suit now: outside, the air is 0.6% of Earth's, carbon dioxide, about −50 °C. The suit's pack keeps you at 30 kPa of oxygen. Walk anywhere; <b>R</b> takes you back to the lounge.", 14); wasInside = inside; }
     if (hud) HUD.innerHTML = lines.join("<br>"); if (vr && frameN % 30 === 0) drawWrist(lines.join("<br>")); }
   wrist.visible = vr && hud && started; HUD.style.display = hud && started ? "block" : "none";
   msgT -= dt; msgAge += dt; if (vr && vrPanel.visible && msgAge > 4 && (mx || my)) msgT = 0; if (msgT <= 0) { MSG.style.display = "none"; vrPanel.visible = false; }

@@ -806,10 +806,12 @@ MA = MA[:i0] + """<div id="intro"><div class="card">
   the drop. Gravity is 0.38 g; outside, the air is 0.6% of Earth's, so through the airlock you wear a suit. The sky is butterscotch, blue round the
   setting Sun; Phobos crosses it west to east twice a sol.</p>
   <p>The ground is real: Mars as NASA's laser altimeter measured it, 463 m between points here and 1.85 km across the rest of Valles Marineris;
-  smaller detail is generated. The colony is imagined, built the way physics says it would have to be: people live under rock and regolith.
-  Ways to travel (a maglev, a lift down the wall, rocket hops) are coming next.</p>
-  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>shift</kbd> run &nbsp;&middot;&nbsp; <kbd>space</kbd> jump &nbsp;&middot;&nbsp; <kbd>E</kbd> info on what you look at &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time &nbsp;&middot;&nbsp; <kbd>L</kbd> labels &nbsp;&middot;&nbsp; <kbd>H</kbd> readout &nbsp;&middot;&nbsp; <kbd>M</kbd> sitting / standing &nbsp;&middot;&nbsp; <kbd>R</kbd> back to the lounge<br>
-  In VR: left stick walk (left trigger runs), right stick turn, <b>B</b> jump, <b>A</b> or right trigger: info, <b>Y</b> speed up time, <b>X</b> labels, click the left stick: sitting / standing; the readout is on your left wrist</p>
+  smaller detail is generated. The colony is imagined, built the way physics says it would have to be: people live under rock and regolith.</p>
+  <p>Getting about: the airlock at the back of the lounge leads outside. The <b>Canyon Lift</b> (its top station 150 m east along the rim) rides down the wall
+  to the canyon floor, 10 km below; the <b>maglev</b> (its station 550 m northwest) runs 570 km on an open guideway to the Melas Overlook, at the edge of
+  the widest part of Valles Marineris; the <b>rover</b> is parked by the airlock. Walk up to any of them and press <kbd>E</kbd> (A in VR). Rides are sped up.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>shift</kbd> run &nbsp;&middot;&nbsp; <kbd>space</kbd> jump &nbsp;&middot;&nbsp; <kbd>E</kbd> ride, drive, get out, or info on what you look at &nbsp;&middot;&nbsp; in the rover <kbd>W</kbd><kbd>S</kbd> drive, <kbd>A</kbd><kbd>D</kbd> steer &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time &nbsp;&middot;&nbsp; <kbd>L</kbd> labels &nbsp;&middot;&nbsp; <kbd>H</kbd> readout &nbsp;&middot;&nbsp; <kbd>M</kbd> sitting / standing &nbsp;&middot;&nbsp; <kbd>R</kbd> back to the lounge<br>
+  In VR: left stick walk or drive (left trigger runs), right stick turn, <b>B</b> jump, <b>A</b> or right trigger: ride, drive, get out, or info, <b>Y</b> speed up time, <b>X</b> labels, click the left stick: sitting / standing; the readout is on your left wrist</p>
   <p class="dim">Elevations: Mars Orbiter Laser Altimeter (MOLA), Mars Global Surveyor, NASA PDS. Loading the ground…</p>
 </div></div>
 """ + MA[i1:]
