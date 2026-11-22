@@ -889,8 +889,8 @@ BY = BY[:i0] + """<div id="intro"><div class="card">
   <p>The yard is laid out from a seed (add <kbd>?seed=2</kbd> for another): a lawn, a flower bed with dandelions, a maple and its leaf litter, a
   concrete patio (a 1 km cliff), a puddle from last night's rain. What is near you is generated as you go, at real sizes; the animals move at
   their real speeds, so an ant runs at 300 m/s here (<kbd>T</kbd> slows time).</p>
-  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>shift</kbd> run &nbsp;&middot;&nbsp; <kbd>space</kbd> jump (up, when flying) &nbsp;&middot;&nbsp; <kbd>C</kbd> down &nbsp;&middot;&nbsp; <kbd>G</kbd> fly on / off &nbsp;&middot;&nbsp; <kbd>E</kbd> what is that? &nbsp;&middot;&nbsp; <kbd>M</kbd> places in the yard (<kbd>1</kbd>-<kbd>0</kbd>, <kbd>N</kbd>) &nbsp;&middot;&nbsp; <kbd>T</kbd> slow time<br>
-  In VR: left stick walk or fly (left trigger fast), right stick turn, and up / down when flying; <b>A</b> or right trigger: what is that?; <b>B</b> fly on / off; <b>X</b> slow time; <b>Y</b> next place</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>shift</kbd> run &nbsp;&middot;&nbsp; <kbd>space</kbd> jump (up, when flying) &nbsp;&middot;&nbsp; <kbd>C</kbd> down &nbsp;&middot;&nbsp; <kbd>G</kbd> fly on / off &nbsp;&middot;&nbsp; <kbd>E</kbd> what is that? &nbsp;&middot;&nbsp; <kbd>L</kbd> labels on / off &nbsp;&middot;&nbsp; <kbd>M</kbd> places in the yard (<kbd>1</kbd>-<kbd>0</kbd>, <kbd>N</kbd>) &nbsp;&middot;&nbsp; <kbd>T</kbd> slow time<br>
+  In VR: left stick walk or fly (left trigger fast), right stick turn, and up / down when flying; <b>A</b> or right trigger: what is that?; <b>B</b> fly on / off; <b>X</b> slow time; <b>Y</b> next place; click the left stick: labels on / off</p>
   <p class="dim">Click to begin.</p>
 </div></div>
 """ + BY[i1:]
