@@ -836,3 +836,24 @@ GC3 = GC3[:i0] + """<div id="intro"><div class="card">
 </div></div>
 """ + GC3[i1:]
 (HERE / "glencarbon.html").write_text(GC3.replace("__THREE__", three).replace("__SCENE__", (HERE / "glencarbon_data.js").read_text(encoding="utf-8") + (HERE / "glencarbon.js").read_text(encoding="utf-8")), encoding="utf-8")
+
+# Edwardsville, 1962: the town as it stood, and the Madison County jail inside and out
+ED = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Edwardsville, Illinois, 1962: the town and the Madison County jail</title>").replace("background:#c8d4d8", "background:#1c1c22")
+i0, i1 = ED.index('<div id="intro">'), ED.index('<button id="vr">')
+ED = ED[:i0] + """<div id="intro"><div class="card">
+  <h1>Edwardsville, 1962</h1>
+  <p>Saturday afternoon, 21 July 1962, in the seat of Madison County, Illinois. You start on North Main Street in front of the county jail:
+  the sheriff's house of 1869, Second Empire with a mansard roof, and behind it the jail, the iron cage of 1869 and the steel cells of 1904.
+  Walk in through the front door and through the back of the hall into the jail; or go anywhere in town, downtown, the courthouse, the Wildey,
+  Leclaire and the fields beyond.</p>
+  <p>Built from the records: the USGS elevations; the USGS map of 1954 (aerial photographs of 1952), which decides which of today's buildings
+  and streets stood then, and puts back houses that are gone; the Sanborn fire insurance maps of 1930-47 for downtown and the jail's outline;
+  and E. W. Bowles's history of the jail (1960) for its cells and fittings. No plans of the jail survive, so its rooms are reconstructed as such
+  jails were built. The blue <b>i</b> points say what is known and what is guessed.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>shift</kbd> run &nbsp;&middot;&nbsp; <kbd>M</kbd> list of places &nbsp;&middot;&nbsp; <kbd>1</kbd>-<kbd>0</kbd> jump to a place, <kbd>N</kbd> / <kbd>P</kbd> next / previous &nbsp;&middot;&nbsp; <kbd>E</kbd> read the nearest <b>i</b> or ask about a person &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time<br>
+  In VR: left stick walk (left trigger runs), right stick turn, <b>A</b> read, <b>B</b> next place, <b>Y</b> previous place, <b>X</b> speed up time</p>
+  <p class="dim">Elevations: USGS 3DEP via the AWS Terrain Tiles. Maps: USGS Edwardsville quadrangle 1954 and 1968; Sanborn Map Company, Edwardsville 1930 (Library of Congress); © OpenStreetMap contributors (ODbL). Loading…</p>
+</div></div>
+""" + ED[i1:]
+(HERE / "edwardsville.html").write_text(ED.replace("__THREE__", three).replace("__SCENE__", (HERE / "edwardsville_data.js").read_text(encoding="utf-8") + (HERE / "edwardsville.js").read_text(encoding="utf-8")), encoding="utf-8")
+print("  wrote edwardsville.html")
