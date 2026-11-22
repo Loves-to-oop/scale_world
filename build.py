@@ -817,3 +817,22 @@ MA = MA[:i0] + """<div id="intro"><div class="card">
 </div></div>
 """ + MA[i1:]
 (HERE / "mars.html").write_text(MA.replace("__THREE__", three).replace("__SCENE__", (HERE / "mars_data.js").read_text(encoding="utf-8") + (HERE / "mars.js").read_text(encoding="utf-8")), encoding="utf-8")
+
+# Glen Carbon, 3026: one best guess at a thousand years of today's trends
+GC3 = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Route 157, Glen Carbon, Illinois, in 3026</title>").replace("background:#c8d4d8", "background:#1a2218")
+i0, i1 = GC3.index('<div id="intro">'), GC3.index('<button id="vr">')
+GC3 = GC3[:i0] + """<div id="intro"><div class="card">
+  <h1>Route 157, Glen Carbon, Illinois, in 3026</h1>
+  <p>You stand on Route 157 at Chain of Rocks Road, at the foot of the bluff above the Mississippi's floodplain, on a hot July afternoon a thousand years from now.
+  This is one best guess, not a prediction: what today's trends (population, climate, how long buildings and roads last, energy, farming) would most likely make of this
+  place. Signs explain each guess: its reasons, and how unsure anyone could be. Look at one and press <kbd>E</kbd>.</p>
+  <p>The ground is real (USGS elevations). Today's roads, from OpenStreetMap, are drawn as faint lines where they used to run; <kbd>G</kbd> hides them. Most of today's
+  subdivisions are old forest, with the foundations of the houses under the leaves; Route 157 is a narrow, shaded road for small automated pods; the university town and
+  Glen Carbon's old village centre are towns of thick-walled, shaded buildings; the interstate's embankment carries an electric railway. Pod stops at the crossroads go to the
+  university town and to Glen Carbon village.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>shift</kbd> run &nbsp;&middot;&nbsp; <kbd>space</kbd> jump &nbsp;&middot;&nbsp; <kbd>E</kbd> read a sign / ride a pod &nbsp;&middot;&nbsp; <kbd>G</kbd> today's roads &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time &nbsp;&middot;&nbsp; <kbd>L</kbd> labels &nbsp;&middot;&nbsp; <kbd>H</kbd> readout &nbsp;&middot;&nbsp; <kbd>M</kbd> sitting / standing &nbsp;&middot;&nbsp; <kbd>R</kbd> back to the start<br>
+  In VR: left stick walk (left trigger runs), right stick turn, <b>A</b> or right trigger: read / ride, <b>B</b> jump, click the right stick: today's roads, <b>Y</b> time, <b>X</b> labels, click the left stick: sitting / standing; the readout is on your left wrist</p>
+  <p class="dim">Elevations: USGS 3DEP via the AWS Terrain Tiles. Today's map: © OpenStreetMap contributors (ODbL). Loading the ground…</p>
+</div></div>
+""" + GC3[i1:]
+(HERE / "glencarbon.html").write_text(GC3.replace("__THREE__", three).replace("__SCENE__", (HERE / "glencarbon_data.js").read_text(encoding="utf-8") + (HERE / "glencarbon.js").read_text(encoding="utf-8")), encoding="utf-8")
