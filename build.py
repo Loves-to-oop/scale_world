@@ -877,3 +877,22 @@ EL = EL[:i0] + """<div id="intro"><div class="card">
 """ + EL[i1:]
 (HERE / "endless.html").write_text(EL.replace("__THREE__", three).replace("__SCENE__", (HERE / "endless.js").read_text(encoding="utf-8")), encoding="utf-8")
 print("  wrote endless.html")
+
+# A backyard at ×10,000: a procedurally laid-out yard; a micrometre is a centimetre
+BY = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>A backyard at ×10,000</title>").replace("background:#c8d4d8", "background:#1a2414")
+i0, i1 = BY.index('<div id="intro">'), BY.index('<button id="vr">')
+BY = BY[:i0] + """<div id="intro"><div class="card">
+  <h1>A backyard, at ×10,000</h1>
+  <p>You are 10,000 times smaller: 170 µm tall. A micrometre is a centimetre here, a millimetre is 10 m, a metre is 10 km, so the yard is
+  200 by 300 km. Viruses are specks of a millimetre or two, bacteria pebbles of 1-2 cm, skin cells 30-40 cm plates, a mite a 5 m beetle,
+  an ant 50 m long, a grass blade a green wall 30 m wide and 700 m tall, a dew drop a 10 m globe of water, a fallen leaf a kilometre-wide plain.</p>
+  <p>The yard is laid out from a seed (add <kbd>?seed=2</kbd> for another): a lawn, a flower bed with dandelions, a maple and its leaf litter, a
+  concrete patio (a 1 km cliff), a puddle from last night's rain. What is near you is generated as you go, at real sizes; the animals move at
+  their real speeds, so an ant runs at 300 m/s here (<kbd>T</kbd> slows time).</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>shift</kbd> run &nbsp;&middot;&nbsp; <kbd>space</kbd> jump (up, when flying) &nbsp;&middot;&nbsp; <kbd>C</kbd> down &nbsp;&middot;&nbsp; <kbd>G</kbd> fly on / off &nbsp;&middot;&nbsp; <kbd>E</kbd> what is that? &nbsp;&middot;&nbsp; <kbd>M</kbd> places in the yard (<kbd>1</kbd>-<kbd>0</kbd>, <kbd>N</kbd>) &nbsp;&middot;&nbsp; <kbd>T</kbd> slow time<br>
+  In VR: left stick walk or fly (left trigger fast), right stick turn, and up / down when flying; <b>A</b> or right trigger: what is that?; <b>B</b> fly on / off; <b>X</b> slow time; <b>Y</b> next place</p>
+  <p class="dim">Click to begin.</p>
+</div></div>
+""" + BY[i1:]
+(HERE / "backyard.html").write_text(BY.replace("__THREE__", three).replace("__SCENE__", (HERE / "backyard.js").read_text(encoding="utf-8")), encoding="utf-8")
+print("  wrote backyard.html")
