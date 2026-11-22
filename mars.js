@@ -17,6 +17,8 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWid
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1; renderer.xr.enabled = true;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
+// haze: light from a distance d reaches you dimmed by exp(-d / L) (three's FogExp2 uses exp(-(d/L)^2), which hides the far wall too soon)
+THREE.ShaderChunk.fog_fragment = THREE.ShaderChunk.fog_fragment.replace("float fogFactor = 1.0 - exp( - fogDensity * fogDensity * vFogDepth * vFogDepth );", "float fogFactor = 1.0 - exp( - fogDensity * vFogDepth );");
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a0604);
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 1200000);
 const rig = new THREE.Group(); rig.add(camera); scene.add(rig); camera.position.y = 1.6;
@@ -53,12 +55,15 @@ function land(x, z) { const e = 3, h0 = mola(x, z), sx = (mola(x + e * 60, z) - 
   const C2 = SITE.cut2; if (C2 && x > C2.x0 && x < C2.x1 && z > C2.z0 && z < C2.z1) h = Math.min(h, C2.h - Math.max(0, C2.x1 - x) * 0.8);
   return h; }
 // colours, from Curiosity's and HiRISE's pictures, muted as the real ones are: dusty butterscotch-brown plains, darker basaltic sand, the walls' alternating light and dark layers, dark talus below them
-const MC = Object.fromEntries(Object.entries({ dust: "#9a6a48", dust2: "#a87a56", sand: "#4a3a32", rock: "#7a5a46", rockL: "#a88a6c", rockD: "#4e3a2e", talus: "#5a4436", bright: "#b8987a" }).map(([k, v]) => [k, new THREE.Color(v)]));
+const MC = Object.fromEntries(Object.entries({ dust: "#9a6a48", dust2: "#ad7c56", sand: "#3e322c", rock: "#7a5a46", rockL: "#b4947a", rockD: "#4a362a", talus: "#4e3c30", bright: "#c4a688" }).map(([k, v]) => [k, new THREE.Color(v)]));
 const _gc = new THREE.Color();
-function groundColor(h, slope, x, z, out) { const n = fbm(x / 9, z / 9, 3), m = fbm(x / 2400 + 4, z / 2400, 4), m2 = fbm(x / 300 + 9, z / 300, 4), c = _gc.copy(MC.dust).lerp(MC.dust2, sstep(m, 0.4, 0.65));
-  c.lerp(MC.sand, 0.6 * sstep(m2 + 0.25 * (m - 0.5), 0.6, 0.72)); c.lerp(MC.bright, 0.35 * sstep(m2, 0.36, 0.28));
-  const layer = 0.5 + 0.5 * Math.sin(h / 38 + 4 * fbm(x / 3000, z / 3000, 2)) * Math.sin(h / 140 + 1.3), rk = _gc.clone().copy(MC.rockD).lerp(MC.rockL, layer).lerp(MC.rock, 0.3);
-  c.lerp(rk, sstep(slope, 0.35, 0.9)); c.lerp(MC.talus, 0.45 * sstep(slope, 0.25, 0.4) * (1 - sstep(slope, 0.5, 0.8)));
+function groundColor(h, slope, x, z, out) { const n = fbm(x / 9, z / 9, 3), m = fbm(x / 2400 + 4, z / 2400, 4), m2 = fbm(x / 300 + 9, z / 300, 4), m3 = fbm(x / 9000 + 2, z / 9000 + 7, 4), low = sstep(-h, -1000, 3000), c = _gc.copy(MC.dust).lerp(MC.dust2, sstep(m, 0.4, 0.65));
+  // dark basaltic sand: sheets and dune fields, most of all on the canyon floors; pale layered deposits in patches on the floors; bright dust on the high plateau
+  c.lerp(MC.sand, 0.75 * sstep(m3 + 0.2 * (m - 0.5) + 0.22 * low, 0.5, 0.66)); c.lerp(MC.sand, 0.5 * sstep(m2 + 0.25 * (m - 0.5), 0.62, 0.72));
+  c.lerp(MC.bright, 0.55 * low * sstep(m3, 0.38, 0.3)); c.lerp(MC.bright, 0.25 * sstep(h, 4000, 6000) * sstep(m, 0.45, 0.6));
+  // the walls: alternating light and dark layers tens to hundreds of metres thick, then dark talus aprons at their feet
+  const layer = 0.5 + 0.5 * Math.sin(h / 85 + 3 * fbm(x / 6000, z / 6000, 2)) * (0.55 + 0.45 * Math.sin(h / 310 + 1.3)), rk = new THREE.Color().copy(MC.rockD).lerp(MC.rockL, layer);
+  c.lerp(rk, sstep(slope, 0.3, 0.75)); c.lerp(MC.talus, 0.5 * sstep(slope, 0.2, 0.35) * (1 - sstep(slope, 0.45, 0.7)));
   const k = 0.9 + 0.2 * n; out[0] = c.r * k; out[1] = c.g * k; out[2] = c.b * k; }
 
 // ---------- the sky: the Sun through the sol, Phobos and Deimos, the dusty sky, the stars ----------
@@ -118,15 +123,15 @@ const moonMat = () => new THREE.ShaderMaterial({ uniforms: { sun: { value: V3(0,
     }` });
 const MOONM = MOONS.map(m => { const g = new THREE.SphereGeometry(1, 24, 16), p = g.attributes.position; for (let i = 0; i < p.count; i++) { const k = m.n === "Phobos" ? [1.0, 0.8, 0.7] : [1.0, 0.85, 0.75]; p.setXYZ(i, p.getX(i) * k[0], p.getY(i) * k[1], p.getZ(i) * k[2]); } g.computeVertexNormals(); const me = new THREE.Mesh(g, moonMat()); SKY.add(me); return me; });
 const sunL = new THREE.DirectionalLight(0xfff0dc, 2.6); sunL.castShadow = true; sunL.shadow.mapSize.set(IS_HEADSET ? 1024 : 2048, IS_HEADSET ? 1024 : 2048); Object.assign(sunL.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 400 }); sunL.shadow.bias = -0.0004; scene.add(sunL, sunL.target);
-const ambL = new THREE.HemisphereLight(0xd8a070, 0x6a3e26, 0.55); scene.add(ambL);
+const ambL = new THREE.HemisphereLight(0xd8a070, 0x5a3420, 0.45); scene.add(ambL);
 // the dust: horizontal visibility of tens of kilometres; the far wall, 100 km off, is a pale shape in the haze
-scene.fog = new THREE.FogExp2(0xc89a6c, 1 / 48000);
+scene.fog = new THREE.FogExp2(0xc89a6c, 1 / 60000);
 const _sv = V3(0, 0, 0);
 function updateSky() { const s = sunDir(tSec), day = sstep(s.y, -0.15, 0.15); skyU.sun.value.copy(s); skyU.day.value = day;
   SUN.position.copy(s).multiplyScalar(SKYR * 0.9); SUN.scale.setScalar(SKYR * 0.9 * Math.tan(0.175 * DEG)); SUNG.position.copy(SUN.position); SUNG.scale.setScalar(SKYR * 0.9 * 0.05); SUN.visible = SUNG.visible = s.y > -0.03;
   STARS.material.opacity = 1 - sstep(s.y, -0.2, -0.02);
   MOONS.forEach((m, k) => { const { v, dist } = moonVec(m, tSec), me = MOONM[k]; me.position.copy(v).multiplyScalar(SKYR * 0.8); me.scale.setScalar(SKYR * 0.8 * m.r / dist); me.visible = v.y > -0.02; me.material.uniforms.sun.value.copy(s); me.material.uniforms.day.value = day; m.v = v; m.dist = dist; });
-  const lit = sstep(s.y, -0.05, 0.25); sunL.intensity = 2.6 * lit; sunL.color.setRGB(1, 0.86 + 0.08 * lit, 0.72 + 0.14 * lit); ambL.intensity = 0.05 + 0.5 * sstep(s.y, -0.15, 0.3);
+  const lit = sstep(s.y, -0.05, 0.25); sunL.intensity = 2.6 * lit; sunL.color.setRGB(1, 0.86 + 0.08 * lit, 0.72 + 0.14 * lit); ambL.intensity = 0.05 + 0.42 * sstep(s.y, -0.15, 0.3);
   scene.fog.color.setRGB(0.78, 0.6, 0.42).multiplyScalar(0.03 + 0.97 * sstep(s.y, -0.15, 0.25)); return s; }
 
 // ---------- the ground: nested grids following you, the surface curving away (Mars is small: from eye height on flat ground the horizon is 3.4 km off) ----------
@@ -139,24 +144,25 @@ const noiseT = (() => { const N = 256, d = new Uint8Array(N * N * 4), lat = (see
     const peb = vnw(oct2[2][1], 64, x / N * 64, y / N * 64), fine = hash(x, y + 999); const o = (y * N + x) * 4; d[o] = a * 255; d[o + 1] = Math.pow(peb, 3) * 255; d[o + 2] = r * 255; d[o + 3] = fine * 255; }
   const t = new THREE.DataTexture(d, N, N, THREE.RGBAFormat); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.needsUpdate = true; return t; })();
 // the shader works in coordinates near you; for each scale of noise the far-off part of your position is reduced here, in double precision, to a fraction of a tile
-const NSC = [37, 5.3, 0.83, 290, 23, 4.1, 0.9, 0.31, 3.0], groundU = { nTex: { value: noiseT }, org: { value: new THREE.Vector2() }, nOff: { value: NSC.map(() => new THREE.Vector2()) } };
+const NSC = [37, 5.3, 0.83, 290, 23, 4.1, 0.9, 0.31, 3.0, 2600, 11000], groundU = { nTex: { value: noiseT }, org: { value: new THREE.Vector2() }, nOff: { value: NSC.map(() => new THREE.Vector2()) } };
 function setNoiseOrigin(x, z) { groundU.org.value.set(x, z); NSC.forEach((sc, i) => groundU.nOff.value[i].set(((x / sc) % 1 + 1) % 1, ((z / sc) % 1 + 1) % 1)); }
 const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
 groundMat.onBeforeCompile = sh => { sh.uniforms.nTex = groundU.nTex; sh.uniforms.org = groundU.org; sh.uniforms.nOff = groundU.nOff;
   sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vWP; varying vec3 vWN;").replace("#include <fog_vertex>", "#include <fog_vertex>\nvWP = (modelMatrix * vec4(position, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * normal);");
   sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
-uniform sampler2D nTex; uniform vec2 org; uniform vec2 nOff[9]; varying vec3 vWP; varying vec3 vWN;
-float gH(vec2 p, float near) { return texture2D(nTex, p / 23.0 + nOff[4]).r * 0.9 + texture2D(nTex, p / 4.1 + nOff[5]).r * 0.35 * near + texture2D(nTex, p / 0.9 + nOff[6]).g * 0.12 * near + texture2D(nTex, p / 0.31 + nOff[7]).a * 0.02 * near; }`)
+uniform sampler2D nTex; uniform vec2 org; uniform vec2 nOff[11]; varying vec3 vWP; varying vec3 vWN;
+float gH(vec2 p, float near, float fine) { return texture2D(nTex, p / 23.0 + nOff[4]).r * 0.9 + texture2D(nTex, p / 4.1 + nOff[5]).r * 0.35 * near + texture2D(nTex, p / 0.9 + nOff[6]).g * 0.1 * fine + texture2D(nTex, p / 0.31 + nOff[7]).a * 0.012 * fine; }`)
   .replace("#include <color_fragment>", `#include <color_fragment>
-  vec2 wp = vWP.xz; float dist = length(vWP - cameraPosition), near = 1.0 - smoothstep(25.0, 260.0, dist), mid = 1.0 - smoothstep(400.0, 4000.0, dist), steep = smoothstep(0.55, 0.85, 1.0 - vWN.y);
+  vec2 wp = vWP.xz; float dist = length(vWP - cameraPosition), near = 1.0 - smoothstep(25.0, 260.0, dist), fine = 1.0 - smoothstep(3.0, 22.0, dist), mid = 1.0 - smoothstep(400.0, 4000.0, dist), steep = smoothstep(0.55, 0.85, 1.0 - vWN.y);
   vec4 n1 = texture2D(nTex, wp / 37.0 + nOff[0]), n2 = texture2D(nTex, wp / 5.3 + nOff[1]), n3 = texture2D(nTex, wp / 0.83 + nOff[2]), n4 = texture2D(nTex, wp / 290.0 + nOff[3]);
   float tone = mix(1.0, 0.8 + 0.4 * n4.r, mid) * mix(1.0, (0.86 + 0.28 * n1.r) * (0.9 + 0.2 * n2.r), mid);
-  float peb = near * smoothstep(0.4, 0.75, n3.g) * (1.0 - steep); vec3 pebC = diffuseColor.rgb * mix(0.62, 1.08, n3.a);
+  float peb = fine * smoothstep(0.4, 0.75, n3.g) * (1.0 - steep); vec3 pebC = diffuseColor.rgb * mix(0.62, 1.08, n3.a);
   vec3 col = diffuseColor.rgb * tone; col = mix(col, pebC, peb * 0.6);
   float strata = 0.5 + 0.5 * sin(vWP.y * 0.9 + n1.r * 6.0) * sin(vWP.y * 0.23 + 1.0); col *= mix(1.0, 0.85 + 0.3 * strata, steep * mid);
-  col *= mix(1.0, 0.96 + 0.08 * n3.a, near); diffuseColor.rgb = col;`)
+  col *= mix(1.0, 0.96 + 0.08 * n3.a, fine);
+  vec4 n5 = texture2D(nTex, wp / 2600.0 + nOff[9]), n6 = texture2D(nTex, wp / 11000.0 + nOff[10]); col *= (0.84 + 0.32 * n5.r) * (0.86 + 0.28 * n6.r); diffuseColor.rgb = col;`)
   .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
-  { float e = 0.08, h0 = gH(wp, near), hx = gH(wp + vec2(e, 0.0), near), hz = gH(wp + vec2(0.0, e), near); vec3 g = vec3(-(hx - h0) / e, 0.0, -(hz - h0) / e) * (0.3 + 0.7 * near) * (1.0 - 0.6 * steep);
+  { float e = 0.08, h0 = gH(wp, near, fine), hx = gH(wp + vec2(e, 0.0), near, fine), hz = gH(wp + vec2(0.0, e), near, fine); vec3 g = vec3(-(hx - h0) / e, 0.0, -(hz - h0) / e) * (0.3 + 0.7 * near) * (1.0 - 0.6 * steep);
     normal = normalize(normal + (viewMatrix * vec4(g, 0.0)).xyz * 0.45); }`)
   .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\n  roughnessFactor = 0.88 + 0.1 * texture2D(nTex, vWP.xz / 3.0 + nOff[8]).r;"); };
 const ME = { x: 0, z: 0, y: 0, vx: 0, vz: 0, vy: 0, x0: 0, z0: 0 };
@@ -171,6 +177,10 @@ function fillGrid(m) { const { size, n, drop, inner } = m.userData, p = m.geomet
     let y = H[i] - ((x - ME.x) ** 2 + (z - ME.z) ** 2) / (2 * R_M) - drop; if (inner) { const ih = inner.userData.size / 2 - inner.userData.size / inner.userData.n * 2; if (Math.abs(x - inner.userData.ox) < ih && Math.abs(z - inner.userData.oz) < ih) y -= 40 + drop * 4; }
     p.setY(i, y); groundColor(H[i], slope, x, z, c3); col.setXYZ(i, c3[0], c3[1], c3[2]); uv.setXY(i, ((x % 4000) + 4000) / 2.5, ((z % 4000) + 4000) / 2.5); }
   m.userData.ox = ox; m.userData.oz = oz; p.needsUpdate = col.needsUpdate = uv.needsUpdate = true; m.geometry.computeVertexNormals(); }
+// the height of the ground as drawn (the finest grid covering the point, interpolated across its triangle): rocks sit on what you see
+function meshY(x, z) { for (const m of GRIDS) { const { size, n, ox, oz } = m.userData; if (ox === undefined) continue; const step = size / n, fx = (x - ox + size / 2) / step, fz = (z - oz + size / 2) / step; if (fx < 2 || fz < 2 || fx > n - 2 || fz > n - 2) continue;
+    const ix = Math.floor(fx), iz = Math.floor(fz), u = fx - ix, v = fz - iz, P = m.geometry.attributes.position, Y = (i, k) => P.getY(k * (n + 1) + i), ya = Y(ix, iz), yb = Y(ix, iz + 1), yc = Y(ix + 1, iz + 1), yd = Y(ix + 1, iz);
+    return u + v < 1 ? ya + u * (yd - ya) + v * (yb - ya) : yc + (1 - u) * (yb - yc) + (1 - v) * (yd - yc); } return land(x, z) - ((x - ME.x) ** 2 + (z - ME.z) ** 2) / (2 * R_M); }
 function updateGround(force = false) { for (const m of GRIDS) if (force || Math.hypot(ME.x - m.userData.cx, ME.z - m.userData.cz) > m.userData.size * 0.06) { fillGrid(m); if (!force) return; } }
 // boulders: sparse on the dusty plateau, many on the talus below the rim
 // rocks: angular blocks, a few on the dusty plateau, many on the talus below the rim and the walls; pebbles round your feet. Their surfaces get the same drawn-in grain
@@ -182,7 +192,7 @@ const ROCKS = [0, 1, 2].map(k => { const m = new THREE.InstancedMesh(rockGeo(k *
 const PEB = new THREE.InstancedMesh(rockGeo(77, 0), rockMat, IS_HEADSET ? 1500 : 3000); PEB.frustumCulled = false; PEB.receiveShadow = true; scene.add(PEB);
 let rockC = [1e12, 1e12];
 function fillRocks() { const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color(), cnt = [0, 0, 0]; const S = 1.8, ci = Math.floor(ME.x / S), cj = Math.floor(ME.z / S); rockC = [ME.x, ME.z];
-  const place = (M, k, x, z, sz, i, j) => { const h = land(x, z); q.setFromEuler(new THREE.Euler(hash(i, 1) * 0.6, hash(j, 2) * 6.3, hash(i, j) * 0.6)); m4.compose(V3(x - ME.x0, h - ((x - ME.x) ** 2 + (z - ME.z) ** 2) / (2 * R_M) + sz * 0.18, z - ME.z0), q, V3(sz * (0.8 + 0.5 * hash(i, 7)), sz, sz * (0.8 + 0.5 * hash(j, 9)))); M.setMatrixAt(k, m4);
+  const place = (M, k, x, z, sz, i, j) => { q.setFromEuler(new THREE.Euler(hash(i, 1) * 0.6, hash(j, 2) * 6.3, hash(i, j) * 0.6)); m4.compose(V3(x - ME.x0, meshY(x, z) + sz * 0.12, z - ME.z0), q, V3(sz * (0.8 + 0.5 * hash(i, 7)), sz, sz * (0.8 + 0.5 * hash(j, 9)))); M.setMatrixAt(k, m4);
     const v = hash(i + 4, j + 8), w = hash(i + 6, j + 1); col.setRGB(0.27 + 0.16 * v, 0.2 + 0.1 * v + 0.03 * w, 0.16 + 0.06 * v + 0.04 * w); M.setColorAt(k, col); };
   for (let i = ci - 34; i <= ci + 34; i++) for (let j = cj - 34; j <= cj + 34; j++) { const x = (i + hash(i, j)) * S, z = (j + hash(j, i)) * S, sl = Math.abs(land(x, z + 4) - land(x, z - 4)) / 8 + Math.abs(land(x + 4, z) - land(x - 4, z)) / 8;
     if (hash(i * 3 + 1, j * 7 + 2) > 0.03 + 0.35 * sstep(sl, 0.2, 0.6) || inBuilt(x, z)) continue; const t = Math.floor(hash(i + 2, j + 5) * 3); if (cnt[t] >= 900) continue; const sz = 0.05 + (0.35 + 1.1 * sstep(sl, 0.2, 0.7)) * Math.pow(hash(i + 9, j + 3), 3); place(ROCKS[t], cnt[t]++, x, z, sz, i, j); }
@@ -232,6 +242,8 @@ function buildColony() {
   for (const x of [-16, 16]) for (const z of [L.z0 + 2, L.z1 - 2]) { put(new THREE.CylinderGeometry(0.7, 0.6, 0.8, 12), whiteM, x, 0.7, z); const leaf = put(new THREE.IcosahedronGeometry(0.9, 1), greenM, x, 1.7, z); leaf.scale.set(1, 1.3, 1); }
   { const bx = L.x0 + 1.4, bz = (L.z0 + L.z1) / 2; put(new THREE.BoxGeometry(1.0, 1.1, 8), Mt(0x3a2a22), bx, 0.85, bz); put(new THREE.BoxGeometry(1.2, 0.08, 8.2), whiteM, bx, 1.44, bz); WALLS.push([bx - 0.6, bz - 4, bx - 0.6, bz + 4], [bx + 0.6, bz - 4, bx + 0.6, bz + 4]); }
   for (let x = -14; x <= 14; x += 4) { const lp = put(new THREE.SphereGeometry(0.18, 10, 8), warmM, x, 0.3 + H - 0.5, (L.z0 + L.z1) / 2); }
+  { const ac = document.createElement("canvas"); ac.width = ac.height = 128; const g = ac.getContext("2d"); g.fillStyle = "#60ff90"; g.beginPath(); g.moveTo(64, 10); g.lineTo(118, 70); g.lineTo(84, 70); g.lineTo(84, 118); g.lineTo(44, 118); g.lineTo(44, 70); g.lineTo(10, 70); g.closePath(); g.fill();
+    const am = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(ac), transparent: true, depthWrite: false }); for (let z = L.z1 - 5; z > L.z0 - 7; z -= 2.5) { const a = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9).rotateX(-Math.PI / 2), am); a.position.set(0, 0.33, z); a.renderOrder = 5; COL.add(a); } }
   const lampL = new THREE.PointLight(0xffd0a0, 18, 30, 1.6); lampL.position.set(0, 4.5, (L.z0 + L.z1) / 2); COL.add(lampL);
   // the airlock north of the lounge: a short regolith-covered tunnel leading back to the hotel domes
   { const tun = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.3, 8, 16, 1, true, -Math.PI / 2, Math.PI).rotateX(-Math.PI / 2), regM); tun.position.set(0, 0.3, L.z0 - 4); tun.castShadow = tun.receiveShadow = true; COL.add(tun);
@@ -256,7 +268,8 @@ function buildColony() {
   COL.position.set(-ME.x0, PAD_H, -ME.z0); }
 const HOTELW = [], LIFTLINE = [];
 let winMesh = null, liftMesh = null;
-function buildFar() { const wg = new THREE.BoxGeometry(7, 2.2, 1.2), wm = new THREE.InstancedMesh(wg, new THREE.MeshStandardMaterial({ color: 0x1a1612, roughness: 0.15, metalness: 0.4, emissive: 0xffb060, emissiveIntensity: 0.35 }), HOTELW.length), m4 = new THREE.Matrix4(); HOTELW.forEach(([x, z, h], i) => wm.setMatrixAt(i, m4.makeTranslation(x, h + 1.4, z))); winMesh = wm; scene.add(wm);
+function buildFar() { const wg = new THREE.BoxGeometry(6, 0.12, 2.2), wm = new THREE.InstancedMesh(wg, new THREE.MeshStandardMaterial({ color: 0x0c0a0a, roughness: 0.08, metalness: 0.2, emissive: 0xffb060, emissiveIntensity: 0.12 }), HOTELW.length), m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+  HOTELW.forEach(([x, z, h], i) => { const nrm = V3(land(x - 2, z) - land(x + 2, z), 4, land(x, z - 2) - land(x, z + 2)).normalize(); q.setFromUnitVectors(V3(0, 1, 0), nrm); wm.setMatrixAt(i, m4.compose(V3(x, h + 0.04, z), q, V3(1, 1, 1))); }); winMesh = wm; scene.add(wm);
   const pts = LIFTLINE.map(([x, z, h]) => V3(x, h - (x * x + (z - SITE.rimZ) ** 2) / (2 * R_M), z)), g = new THREE.BufferGeometry().setFromPoints(pts); liftMesh = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xe8e0d0 })); scene.add(liftMesh);
   const lights = new THREE.Points(new THREE.BufferGeometry().setFromPoints(pts.filter((_, i) => i % 2 === 0)), new THREE.PointsMaterial({ color: 0xffc060, size: 3, sizeAttenuation: false, fog: false })); liftMesh.add(lights); }
 
@@ -321,7 +334,7 @@ let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag
 addEventListener("pointermove", e => { if (!drag) return; yaw -= (e.clientX - drag.x) * 0.004; pitch = clampN(pitch - (e.clientY - drag.y) * 0.004, -1.45, 1.45); drag.x = e.clientX; drag.y = e.clientY; }); addEventListener("pointerup", () => drag = null);
 function toStart() { ME.x = 0; ME.z = SITE.rimZ - 3; ME.y = PAD_H + 0.3; ME.vx = ME.vz = ME.vy = 0; }
 function start() { if (started || !ready) return; started = true; document.getElementById("intro")?.classList.add("gone"); HUD.style.display = "block";
-  say("<b>The Coprates Rim Hotel, Mars, some centuries from now.</b> You are in its observation lounge, at the very edge of Valles Marineris: in front of you the ground falls away 10 km to the floor of Coprates Chasma. Walk out on the glass-floored deck. <b>E</b> tells you about whatever you look at (A in VR); <b>T</b> speeds up time; the airlock behind you leads outside, where you wear a suit.", 35); }
+  say("<b>The Coprates Rim Hotel, Mars, some centuries from now.</b> You are in its observation lounge, at the very edge of Valles Marineris: in front of you the ground falls away 10 km to the floor of Coprates Chasma. Walk out on the glass-floored deck. To go outside, turn round and follow the green arrows on the floor to the airlock. <b>E</b> tells you about whatever you look at (A in VR); <b>T</b> speeds up time.", 35); }
 document.getElementById("intro")?.addEventListener("click", start);
 const VRB = document.getElementById("vr");
 if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = async () => { if (!ready) return; const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); await renderer.xr.setSession(s); start(); vrYaw = yaw; }; });
@@ -367,7 +380,7 @@ function magCar() { const g = new THREE.Group(), body = Mt(0xe8e4dc, { metalness
   for (const z of [-15, 15]) add(new THREE.BoxGeometry(3.6, 3.2, 0.1), body, 0, 1.45, z); const nose = add(new THREE.SphereGeometry(1.8, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), body, 0, 1.4, -15); nose.rotation.x = -Math.PI / 2; nose.scale.set(1, 3, 0.9);
   for (let z = -12; z <= 12; z += 2) for (const x of [-1.05, 1.05]) add(new THREE.BoxGeometry(0.9, 0.5, 0.6), Mt(0x3a4a6a), x, 0.55, z);
   const l = new THREE.PointLight(0xfff0e0, 6, 14, 1.4); l.position.set(0, 2.6, 0); g.add(l); g.visible = false; scene.add(g); return g; }
-function roverMesh() { const g = new THREE.Group(), white = Mt(0xe8e4dc, { metalness: 0.3, roughness: 0.4, side: THREE.DoubleSide }), add = (geo, m, x, y, z) => { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); me.castShadow = true; g.add(me); return me; };
+function roverMesh() { const g = new THREE.Group(), white = Mt(0xe8e4dc, { metalness: 0.3, roughness: 0.4 }), add = (geo, m, x, y, z) => { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); me.castShadow = true; g.add(me); return me; };
   add(new THREE.BoxGeometry(2.8, 0.4, 6.2), Mt(0x3a3a3c), 0, 0.9, 0); add(new THREE.BoxGeometry(2.6, 0.2, 5.2), white, 0, 1.2, 0.3); add(new THREE.BoxGeometry(2.6, 0.2, 5.2), white, 0, 3.2, 0.3);
   for (const x of [-1.3, 1.3]) { add(new THREE.BoxGeometry(0.1, 0.8, 5.2), white, x, 1.6, 0.3); add(new THREE.BoxGeometry(0.06, 1.2, 5.2), glassM, x, 2.6, 0.3); }
   add(new THREE.BoxGeometry(2.6, 2.0, 0.1), white, 0, 2.2, 2.9); add(new THREE.BoxGeometry(2.6, 0.5, 0.1), white, 0, 1.45, -2.3); add(new THREE.BoxGeometry(2.6, 1.5, 0.06), glassM, 0, 2.45, -2.3);
@@ -445,10 +458,11 @@ renderer.setAnimationLoop(() => { const dt = clampN(clock.getDelta(), 0, 0.05), 
   const gY = standY(ME.x, ME.z), onGround = !ride && !drive && ME.y <= gY + 0.03;
   if (started && onGround) { if (mx || my) { const f = V3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())); f.y = 0; f.normalize(); const sd = V3(-f.z, 0, f.x), sp = run ? 5 : 2.2, k = 1 - Math.exp(-dt * 6); ME.vx += ((f.x * -my + sd.x * mx) * sp - ME.vx) * k; ME.vz += ((f.z * -my + sd.z * mx) * sp - ME.vz) * k; }
     else { const k = 1 - Math.exp(-dt * 6); ME.vx -= ME.vx * k; ME.vz -= ME.vz * k; } if (jump) ME.vy = 2.4; }
-  if (!ride && !drive) { ME.vy -= G_M * dt; const ox = ME.x, oz = ME.z; ME.x += ME.vx * dt; ME.z += ME.vz * dt; ME.y += ME.vy * dt; collide(ox, oz); walked += Math.hypot(ME.x - ox, ME.z - oz);
-  const gN = standY(ME.x, ME.z); if (ME.y < gN) { if (gN - ME.y > 1.2 && onGround) { ME.x = ox; ME.z = oz; ME.y = standY(ox, oz); } else { ME.y = gN; if (ME.vy < 0) ME.vy = 0; } } }
+  const hd = vr ? (() => { const c = camera.position, cy = Math.cos(vrYaw), sy = Math.sin(vrYaw); return [c.x * cy + c.z * sy, -c.x * sy + c.z * cy]; })() : [0, 0];
+  if (!ride && !drive) { ME.vy -= G_M * dt; const ox = ME.x, oz = ME.z; ME.x += ME.vx * dt; ME.z += ME.vz * dt; ME.y += ME.vy * dt; ME.x += hd[0]; ME.z += hd[1]; collide(ox, oz); ME.x -= hd[0]; ME.z -= hd[1]; walked += Math.hypot(ME.x - ox, ME.z - oz);
+  const gN = standY(ME.x + hd[0], ME.z + hd[1]); if (ME.y < gN) { if (gN - ME.y > 1.2 && onGround) { ME.x = ox; ME.z = oz; ME.y = standY(ox + hd[0], oz + hd[1]); } else { ME.y = gN; if (ME.vy < 0) ME.vy = 0; } } }
   if (Math.hypot(ME.x - ME.x0, ME.z - ME.z0) > 3000) { ME.x0 = ME.x; ME.z0 = ME.z; updateGround(true); fillRocks(); } else { updateGround(); if (Math.hypot(ME.x - rockC[0], ME.z - rockC[1]) > 6) fillRocks(); }
-  const lift = vr && seated ? 0.45 : 0; rig.position.set(ME.x - ME.x0, ME.y + lift, ME.z - ME.z0); rig.rotation.set(0, vr ? vrYaw : 0, 0); if (!vr) { camera.position.set(0, 1.6, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
+  const lift = drive && vr ? land(RV.x, RV.z) + 1.3 + 1.2 - camera.position.y - ME.y : vr && seated ? 0.45 : 0; rig.position.set(ME.x - ME.x0, ME.y + lift, ME.z - ME.z0); rig.rotation.set(0, vr ? vrYaw : 0, 0); if (!vr) { camera.position.set(0, 1.6, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
   setNoiseOrigin(ME.x0, ME.z0); updateTracks(); for (const g of REMOTE) g.position.set(g.userData.x - ME.x0, g.userData.y + curveY(g.userData.x, g.userData.z), g.userData.z - ME.z0); if (ROVER) placeRover(); if (liftMesh) liftMesh.visible = Math.hypot(ME.x, ME.z - SITE.rimZ) < 4000 && !ride;
   if (started && !ride && !drive && frameN % 40 === 0) { const S = nearStation(), Rv = nearRover(), key = S ? S.name : Rv ? "rover" : ""; if (key && key !== lastHint) say(S ? `<b>${S.name}.</b> <b>E</b> (A in VR) to ride ${S.info}.` : "<b>The rover.</b> <b>E</b> (A in VR) to get in and drive.", 8); lastHint = key; }
   COL.position.set(-ME.x0, PAD_H + curveY(0, SITE.rimZ), -ME.z0); if (winMesh) { winMesh.position.set(-ME.x0, 0, -ME.z0); liftMesh.position.set(-ME.x0, 0, -ME.z0); }
