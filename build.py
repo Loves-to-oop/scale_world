@@ -857,3 +857,23 @@ ED = ED[:i0] + """<div id="intro"><div class="card">
 """ + ED[i1:]
 (HERE / "edwardsville.html").write_text(ED.replace("__THREE__", three).replace("__SCENE__", (HERE / "edwardsville_data.js").read_text(encoding="utf-8") + (HERE / "edwardsville.js").read_text(encoding="utf-8")), encoding="utf-8")
 print("  wrote edwardsville.html")
+
+# The Endless Land: one procedurally generated world on land, every region a different kind of place; walk, glide, or take the endless railway
+EL = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>The Endless Land</title>").replace("background:#c8d4d8", "background:#18202a")
+i0, i1 = EL.index('<div id="intro">'), EL.index('<button id="vr">')
+EL = EL[:i0] + """<div id="intro"><div class="card">
+  <h1>The Endless Land</h1>
+  <p>A world on land that goes on in every direction and is made as you go. Every region, a kilometre or two across, is a different kind of
+  place, with its own name, ground, sky and things standing in it: mushroom meadows, crystal dunes, islands floating over a lake, forests of
+  stone pillars, glass woods, a drowned city, coral highlands, ember fields, frost peaks, plains of giant bones, toy geometry, a great lake,
+  arch canyons, a clockwork grove, grass taller than trees. The same place is always the same (add <kbd>?seed=2</kbd> to the address for
+  another world).</p>
+  <p>Get about on foot, by <b>glider</b> (fly anywhere), or on the <b>endless railway</b>: two tracks running east and west for ever, a station
+  every 3 km, trains waiting 20 seconds at each. You can land on the floating islands, the pillar tops and the lily pads.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk &nbsp;&middot;&nbsp; drag to look &nbsp;&middot;&nbsp; <kbd>shift</kbd> run &nbsp;&middot;&nbsp; <kbd>space</kbd> jump (up, in the glider) &nbsp;&middot;&nbsp; <kbd>C</kbd> down &nbsp;&middot;&nbsp; <kbd>G</kbd> glider on / off &nbsp;&middot;&nbsp; <kbd>E</kbd> board or leave a train &nbsp;&middot;&nbsp; <kbd>T</kbd> speed up time &nbsp;&middot;&nbsp; <kbd>R</kbd> back to the first station<br>
+  In VR: left stick walk or fly (left trigger fast), right stick turn, and up / down in the glider; <b>A</b> or right trigger board / leave a train; <b>B</b> glider on / off; <b>X</b> time; <b>Y</b> back to the first station</p>
+  <p class="dim">Click to begin.</p>
+</div></div>
+""" + EL[i1:]
+(HERE / "endless.html").write_text(EL.replace("__THREE__", three).replace("__SCENE__", (HERE / "endless.js").read_text(encoding="utf-8")), encoding="utf-8")
+print("  wrote endless.html")
