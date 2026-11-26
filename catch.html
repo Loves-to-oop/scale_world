@@ -53078,7 +53078,7 @@ const THREE = {ACESFilmicToneMapping, AddEquation, AddOperation, AdditiveAnimati
 // tracked: you catch with your hands and throw by swinging your arm and letting go. A menu on your left wrist sets it all. Built into
 // catch.html by build.py.
 const IS_HEADSET = /OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); renderer.setClearColor(0x000000, 0);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight); renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.xr.enabled = true; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.02, 200000), rig = new THREE.Group(); rig.add(camera); scene.add(rig); camera.position.set(0, 1.6, 0);
@@ -53119,7 +53119,9 @@ const sunL = new THREE.DirectionalLight(0xfff4e0, 2.8); sunL.position.set(20, 30
 const lampL = new THREE.PointLight(0xffffff, 0, 30, 1.2); lampL.position.set(0, 2.2, -3); scene.add(lampL);
 
 // ---------- the places ----------
-const ENV = {};
+const ENV = {}; let MR = false;
+// in mixed reality a shadow on your real floor, so the partner and the ball sit in your room
+const SHADOWFLOOR = new THREE.Mesh(new THREE.PlaneGeometry(30, 30).rotateX(-Math.PI / 2), new THREE.ShadowMaterial({ opacity: 0.35 })); SHADOWFLOOR.receiveShadow = true; SHADOWFLOOR.visible = false; scene.add(SHADOWFLOOR);
 const ground = (col, draw, rep, r = 2000) => { const m = new THREE.Mesh(new THREE.CircleGeometry(r, 64).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: tex(512, 512, draw, rep), color: col, roughness: 0.95 })); m.receiveShadow = true; return m; };
 const speckle = (base, a, b, n) => (g, w, h) => { g.fillStyle = base; g.fillRect(0, 0, w, h); for (let k = 0; k < n; k++) { g.fillStyle = rnd() < 0.5 ? a : b; g.globalAlpha = 0.25 + 0.5 * rnd(); g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 3, 1 + rnd() * 3); } g.globalAlpha = 1; };
 function rocks(G, n, col, rmax, R0, R1) { const im = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), M(col, { flatShading: true }), n), m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
@@ -53157,7 +53159,9 @@ function setWorld(i) { const w = WORLDS[i]; S.w = w; S.dist = w.dist; for (const
   skyU.top.value.set(w.top); skyU.hor.value.set(w.hor); skyU.sunOn.value = w.key === "sun" || w.station ? 0 : 1; skyU.stars.value = w.key === "moon" ? 1 : 0; sky.visible = !w.station;
   scene.fog = w.fog ? new THREE.Fog(...w.fog) : null; sunL.intensity = w.sun; hemi.color.set(w.hemi[0]); hemi.groundColor.set(w.hemi[1]); hemi.intensity = w.hemi[2]; lampL.intensity = w.station ? 25 : 0;
   if (w.key === "sun") { sunL.intensity = 2.5; sunL.position.set(5, -20, -8); sunL.color.set(0xffd080); } else { sunL.position.set(20, 30, -25); sunL.color.set(0xfff4e0); }
+  if (MR) applyMR();
   NPC.setOutfit(w.key === "earth" || w.station ? "casual" : "suit"); NPC.home.set(0, 0, -S.dist); NPC.base.copy(NPC.home); resetBall("npc"); S.streak = 0; drawMenu(); say(`<b>${w.name}</b>: gravity ${w.g ? (w.g / 9.81).toFixed(w.g < 9 ? 2 : 1) + " × Earth's" : "none"}${note(w)}`, 8); }
+function applyMR() { for (const k in ENV) ENV[k].visible = false; sky.visible = false; scene.fog = null; SHADOWFLOOR.visible = true; lampL.intensity = 0; if (S.w.key === "sun") { sunL.position.set(20, 30, -25); } S.dist = Math.min(S.dist, S.w.key === "sun" ? 2.2 : 3.5); NPC.home.set(0, 0, -S.dist); NPC.base.copy(NPC.home); }
 const note = w => ({ moon: ". No air: the ball flies on a perfect curve.", mars: ". The air is about 1% as thick as Earth's.", jupiter: ". A deck floating at the cloud tops, where the pressure is 1 bar; 2.5 times your weight.", sun: ". A heat-proof platform in the photosphere, 5,800 °C: no one could stand 28 times their weight, so this is a fantasy; the throws are short and fast.", zero: ". Inside a space station: the ball goes straight until it hits something.", earth: "." })[w.key];
 
 // ---------- the partner ----------
@@ -53191,13 +53195,13 @@ const ballMesh = { baseball: (() => { const m = new THREE.Mesh(new THREE.SphereG
 scene.add(ballMesh.baseball, ballMesh.football);
 function resetBall(to) { BALL.vel.set(0, 0, 0); BALL.rest = false; BALL.lost = 0; if (to === "npc") { BALL.owner = "npc"; NPC.state = "hold"; NPC.timer = 1.2; } else { BALL.owner = "player"; BALL.hand = to; HOLD.armed = false; } }
 // the world's floor under a point (null where there is none: off the edge of a deck)
-function floorAt(x, z) { const w = S.w; if (w.deck && Math.hypot(x, z) > w.deck) return null; return 0; }
+function floorAt(x, z) { const w = S.w; if (MR) return 0; if (w.deck && Math.hypot(x, z) > w.deck) return null; return 0; }
 // one step of flight: gravity and the world's air (quadratic drag: ½ ρ Cd A v², the football flying nose-first)
 const _dv = V3();
 function stepBall(dt) { const w = S.w, B = BALLS[S.ballKey], m = ballMass(), v = BALL.vel, sp = v.length(), k = 0.5 * w.rho * B.cd * B.area / m;
   if (!BALL.rest) { v.y -= w.g * dt; if (sp > 0) v.addScaledVector(v, -k * sp * dt); BALL.pos.addScaledVector(v, dt); }
   const r = B.r, p = BALL.pos;
-  if (w.station) { const dy = p.y - 1.3, dr = Math.hypot(p.x, dy), R = 2.3 - r; if (dr > R) { const nx = p.x / dr, ny = dy / dr, vn = v.x * nx + v.y * ny; if (vn > 0) { v.x -= (1 + w.bounce) * vn * nx; v.y -= (1 + w.bounce) * vn * ny; bump(Math.abs(vn)); } p.x = nx * R; p.y = 1.3 + ny * R; }
+  if (w.station && !MR) { const dy = p.y - 1.3, dr = Math.hypot(p.x, dy), R = 2.3 - r; if (dr > R) { const nx = p.x / dr, ny = dy / dr, vn = v.x * nx + v.y * ny; if (vn > 0) { v.x -= (1 + w.bounce) * vn * nx; v.y -= (1 + w.bounce) * vn * ny; bump(Math.abs(vn)); } p.x = nx * R; p.y = 1.3 + ny * R; }
     if (p.y < r) { p.y = r; if (v.y < 0) { v.y = -v.y * w.bounce; bump(Math.abs(v.y)); } } if (p.z > 6 - r) { p.z = 6 - r; v.z = -Math.abs(v.z) * w.bounce; bump(Math.abs(v.z)); } if (p.z < -24 + r) { p.z = -24 + r; v.z = Math.abs(v.z) * w.bounce; bump(Math.abs(v.z)); } return; }
   const f = floorAt(p.x, p.z); if (f !== null && p.y < f + r) { p.y = f + r; if (v.y < 0) { if (-v.y > 0.6) { bump(-v.y); v.y = -v.y * w.bounce; v.x *= 0.75; v.z *= 0.75; } else { v.y = 0; const hs = Math.hypot(v.x, v.z), dec = (S.ballKey === "football" ? 3 : 1.5) * Math.max(w.g, 0.5) * 0.4 * dt; if (hs < dec) { v.x = v.z = 0; BALL.rest = true; } else { v.x *= 1 - dec / hs; v.z *= 1 - dec / hs; } } } if (BALL.thrower) groundTouch(); } }
 function groundTouch() { if (S.streak > 0) say(`Dropped. ${S.streak} catch${S.streak === 1 ? "" : "es"} in a row.`, 4); S.streak = 0; BALL.thrower = null; drawMenu(); }
@@ -53236,14 +53240,22 @@ function updateNPC(dt) { const N = NPC, w = S.w, toPlayer = Math.atan2(PLAYER.ch
 // ---------- you: your hands are the controllers; catch what comes near them, hold the trigger or grip and let go to throw ----------
 const PLAYER = { chest: V3(0, 1.3, 0) };
 const HOLD = { armed: false };
-const HANDS = [0, 1].map(i => { const grip = renderer.xr.getControllerGrip(i), ray = renderer.xr.getController(i); rig.add(grip, ray); const H = { i, grip, ray, src: null, hist: [], down: false, side: i === 0 ? "left" : "right", pos: V3(), vel: V3() };
+const HANDS = [0, 1].map(i => { const grip = renderer.xr.getControllerGrip(i), ray = renderer.xr.getController(i); rig.add(grip, ray); const H = { i, grip, ray, src: null, hist: [], vh: [], down: false, side: i === 0 ? "left" : "right", pos: V3(), vel: V3() };
   const mitt = new THREE.Mesh(new THREE.SphereGeometry(0.06, 14, 10), M(0xc8a070, { roughness: 0.7 })); mitt.scale.set(1, 0.7, 1.2); mitt.position.z = 0.02; grip.add(mitt); H.mitt = mitt;
   grip.addEventListener("connected", e => { H.src = e.data; H.side = e.data.handedness; if (H.side === "left") attachMenu(grip); }); grip.addEventListener("disconnected", () => { H.src = null; }); return H; });
 const LASER = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(0, 0, 0), V3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0x80e0ff })); LASER.visible = false;
+// the ball leaves at the fastest moment of the last tenth of a second (you let go a little after the peak, as everyone does); its speed
+// is the hand's speed plus the wrist's flick: angular velocity × the 8 cm from the wrist to the ball. The headset measures both directly.
+function throwVel(H) { const h = H.vh.filter(s => TIME - s.t < 0.1); if (h.length) return h.reduce((a, b) => b.v.lengthSq() > a.v.lengthSq() ? b : a).v.clone(); return handVel(H); }
 function handVel(H) { const h = H.hist; if (h.length < 3) return V3(); const now = h[h.length - 1]; let j = h.length - 1; while (j > 0 && now.t - h[j].t < 0.06) j--; const a = h[j]; return now.p.clone().sub(a.p).multiplyScalar(1 / Math.max(0.008, now.t - a.t)); }
 function pulse(H, s, ms) { try { H.src?.gamepad?.hapticActuators?.[0]?.pulse(clampN(s, 0.05, 1), ms); } catch (e) { } }
-function updateHands(dt) { for (const H of HANDS) { if (!H.src) continue; H.grip.getWorldPosition(H.pos); H.hist.push({ t: TIME, p: H.pos.clone() }); while (H.hist.length > 30) H.hist.shift(); const gp = H.src.gamepad, down = !!(gp && (gp.buttons[0]?.pressed || gp.buttons[1]?.pressed));
-    if (BALL.owner === "player" && BALL.hand === H) { BALL.pos.copy(H.pos).add(V3(0, 0, -0.04).applyQuaternion(H.grip.getWorldQuaternion(new THREE.Quaternion()))); if (down && !menuPointing) HOLD.armed = true; if (!down && H.down && HOLD.armed) { const v = handVel(H).multiplyScalar(1.08); lastThrowT = TIME; BALL.owner = null; BALL.thrower = "player"; BALL.vel.copy(v); BALL.rest = false; BALL.spin = S.ballKey === "football" ? 40 : 20; NPC.target = null; NPC.state = "ready"; } }
+const _w = V3(), _r = V3(), _bq = new THREE.Quaternion();
+function updateHands(dt, frame) { for (const H of HANDS) { if (!H.src) continue; H.grip.getWorldPosition(H.pos); H.hist.push({ t: TIME, p: H.pos.clone() }); while (H.hist.length > 30) H.hist.shift();
+    const pose = frame && H.src.gripSpace ? frame.getPose(H.src.gripSpace, renderer.xr.getReferenceSpace()) : null; let v = null;
+    if (pose && pose.linearVelocity) { v = V3(pose.linearVelocity.x, pose.linearVelocity.y, pose.linearVelocity.z); if (pose.angularVelocity) { _w.set(pose.angularVelocity.x, pose.angularVelocity.y, pose.angularVelocity.z); _r.set(0, 0, -0.08).applyQuaternion(H.grip.getWorldQuaternion(_bq)); v.add(_w.clone().cross(_r)); } }
+    else if (H.hist.length > 2) { const a = H.hist[H.hist.length - 3], b = H.hist[H.hist.length - 1]; v = b.p.clone().sub(a.p).multiplyScalar(1 / Math.max(0.005, b.t - a.t)); }
+    if (v) { H.vh.push({ t: TIME, v }); while (H.vh.length > 20) H.vh.shift(); } const gp = H.src.gamepad, down = !!(gp && (gp.buttons[0]?.pressed || gp.buttons[1]?.pressed));
+    if (BALL.owner === "player" && BALL.hand === H) { BALL.pos.copy(H.pos).add(V3(0, 0, -0.08).applyQuaternion(H.grip.getWorldQuaternion(new THREE.Quaternion()))); if (down && !menuPointing) HOLD.armed = true; if (!down && H.down && HOLD.armed) { const v = throwVel(H); lastThrowT = TIME; BALL.owner = null; BALL.thrower = "player"; BALL.vel.copy(v); BALL.rest = false; BALL.spin = S.ballKey === "football" ? 40 : 20; NPC.target = null; NPC.state = "ready"; } }
     else if (BALL.owner === null && ballNear(H.pos) < BALLS[S.ballKey].catchR && (BALL.thrower !== "player" || BALL.rest || BALL.vel.length() < 4)) { const p = BALL.vel.length() * ballMass(), fromNPC = BALL.thrower === "npc"; resetBall(H); if (fromNPC) { S.streak++; S.best = Math.max(S.best, S.streak); } BALL.thrower = null; pulse(H, p / 3 + 0.1, 60); pop(p); drawMenu(); }
     H.down = down; } }
 let lastThrowT = -10;
@@ -53288,11 +53300,15 @@ addEventListener("keyup", e => keys[e.code] = false);
 function start() { if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); PANEL.style.display = renderer.xr.isPresenting ? "none" : "block"; audio(); setWorld(0); }
 document.getElementById("intro")?.addEventListener("click", start);
 const VRB = document.getElementById("vr"); if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); await renderer.xr.setSession(s); start(); PANEL.style.display = "none"; say("Your partner will throw to you. Catch with either hand; hold the trigger and let go to throw. The menu is on your left wrist: point at it with your right hand and pull the trigger.", 10); }; });
+const MRB = document.createElement("button"); MRB.textContent = "Enter mixed reality"; MRB.style.cssText = VRB.style.cssText; Object.assign(MRB.style, { display: "none", position: "fixed", right: "180px", bottom: "18px", zIndex: 3, padding: "12px 20px", font: "600 15px -apple-system,sans-serif", border: "0", borderRadius: "10px", background: "#2e6a7a", color: "#fff", cursor: "pointer" }); document.body.appendChild(MRB);
+if (navigator.xr) navigator.xr.isSessionSupported("immersive-ar").then(ok => { if (!ok) return; MRB.style.display = "block"; MRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-ar", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); await renderer.xr.setSession(s); MR = true; start(); applyMR(); PANEL.style.display = "none"; drawMenu();
+  say("Mixed reality: your partner is in your room, 3.5 m away (shorten it with the wrist menu if your room is smaller). The ball bounces on your floor; the world you choose still sets the gravity and the air.", 10);
+  s.addEventListener("end", () => { MR = false; SHADOWFLOOR.visible = false; setWorld(WORLDS.indexOf(S.w)); }); }; });
 
 // ---------- the loop ----------
 const clock = new THREE.Clock(); let TIME = 0; const _cq = new THREE.Quaternion();
 setWorld(0); drawMenu();
-renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.05), vr = renderer.xr.isPresenting; TIME += dt;
+renderer.setAnimationLoop((tms, frame) => { const dt = Math.min(clock.getDelta(), 0.05), vr = renderer.xr.isPresenting; TIME += dt;
   if (!vr) { camera.position.set(0, 1.6, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
   camera.getWorldPosition(PLAYER.chest); PLAYER.chest.y -= 0.35;
   updateMenuRay();
@@ -53300,9 +53316,9 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.05), v
   if (!vr) { if (BALL.owner === "player") { BALL.pos.copy(V3(0.25, -0.25, -0.5).applyQuaternion(camera.getWorldQuaternion(_cq)).add(camera.getWorldPosition(V3()))); } else if (BALL.owner === null && BALL.thrower !== "player" && ballNear(PLAYER.chest.clone().add(V3(0, 0.2, 0))) < 0.6) { const p = BALL.vel.length() * ballMass(); BALL.owner = "player"; BALL.thrower = null; S.streak++; S.best = Math.max(S.best, S.streak); pop(p); drawMenu(); } }
   if (BALL.owner === "desk") BALL.owner = "player";
   BALL.prev = BALL.pos.clone();
-  if (BALL.owner === null) { const n = 8; for (let k = 0; k < n; k++) stepBall(dt / n); if (BALL.pos.y < -30 || Math.hypot(BALL.pos.x, BALL.pos.z) > 400 || (BALL.rest && (S.w.run === 0 || floorAt(BALL.pos.x, BALL.pos.z) === null) && Math.hypot(BALL.pos.x - PLAYER.chest.x, BALL.pos.z - PLAYER.chest.z) > 1.2)) { BALL.lost += dt; if (BALL.lost > 1.5) { say(BALL.pos.y < -30 ? (S.w.key === "sun" ? "Gone into the Sun." : "Lost into the clouds.") + " Your partner has another." : "Your partner has another ball.", 4); groundTouch(); resetBall("npc"); } } else BALL.lost = 0;
-    if (BALL.vel.length() < 0.3 && Math.hypot(BALL.pos.x - PLAYER.chest.x, BALL.pos.z - PLAYER.chest.z) > 1.2) { BALL.idle = (BALL.idle || 0) + dt; if (BALL.idle > 4 && (S.w.station || S.w.run === 0)) { BALL.idle = 0; say("Your partner has another ball.", 3); groundTouch(); resetBall("npc"); } } else BALL.idle = 0; }
-  updateHands(dt); updateNPC(dt);
+  if (BALL.owner === null) { const n = 8; for (let k = 0; k < n; k++) stepBall(dt / n); if (BALL.pos.y < -30 || Math.hypot(BALL.pos.x, BALL.pos.z) > (MR ? 14 : 400) || (BALL.rest && (S.w.run === 0 || floorAt(BALL.pos.x, BALL.pos.z) === null) && Math.hypot(BALL.pos.x - PLAYER.chest.x, BALL.pos.z - PLAYER.chest.z) > 1.2)) { BALL.lost += dt; if (BALL.lost > 1.5) { say(BALL.pos.y < -30 ? (S.w.key === "sun" ? "Gone into the Sun." : "Lost into the clouds.") + " Your partner has another." : "Your partner has another ball.", 4); groundTouch(); resetBall("npc"); } } else BALL.lost = 0;
+    if (BALL.vel.length() < 0.3 && Math.hypot(BALL.pos.x - PLAYER.chest.x, BALL.pos.z - PLAYER.chest.z) > 1.2) { BALL.idle = (BALL.idle || 0) + dt; if (BALL.idle > 4 && (S.w.station || S.w.run === 0 || MR)) { BALL.idle = 0; say("Your partner has another ball.", 3); groundTouch(); resetBall("npc"); } } else BALL.idle = 0; }
+  updateHands(dt, frame); updateNPC(dt);
   const bm = ballMesh[S.ballKey]; ballMesh.baseball.visible = S.ballKey === "baseball"; ballMesh.football.visible = S.ballKey === "football"; bm.position.copy(BALL.pos);
   if (BALL.owner === null && !BALL.rest) { BALL.spin += 0; if (S.ballKey === "football" && BALL.vel.lengthSq() > 1) { bm.quaternion.setFromUnitVectors(V3(0, 0, 1), BALL.vel.clone().normalize()); bm.rotateZ(TIME * 60); } else bm.rotateOnAxis(V3(1, 0, 0), dt * 25); }
   msgT -= dt; if (msgT <= 0) MSG.style.display = "none";
