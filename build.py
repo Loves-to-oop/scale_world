@@ -896,3 +896,22 @@ BY = BY[:i0] + """<div id="intro"><div class="card">
 """ + BY[i1:]
 (HERE / "backyard.html").write_text(BY.replace("__THREE__", three).replace("__SCENE__", (HERE / "backyard.js").read_text(encoding="utf-8")), encoding="utf-8")
 print("  wrote backyard.html")
+
+# Catch on other worlds: play catch in VR under the gravity of Earth, the Moon, Mars, Jupiter, the Sun or zero g
+CT = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Catch on other worlds</title>").replace("background:#c8d4d8", "background:#141822")
+i0, i1 = CT.index('<div id="intro">'), CT.index('<button id="vr">')
+CT = CT[:i0] + """<div id="intro"><div class="card">
+  <h1>Catch on other worlds</h1>
+  <p>Play catch with a partner under the gravity of Earth, the Moon, Mars, Jupiter (on a deck floating at the cloud tops), the Sun (a fantasy
+  platform in the photosphere, at 28 times Earth's gravity) or zero g (inside a space station). The ball flies with that world's gravity and
+  through that world's air. Throw a baseball or an American football, standard or made to weigh on that world what it weighs on Earth.</p>
+  <p><b>In VR</b> your controllers are your hands: catch the ball when it reaches either hand, then hold the trigger (or grip), swing, and let go to
+  throw. The menu is on your left wrist: point at it with your right hand and pull the trigger. Your controllers buzz on a catch, harder for a
+  heavier, faster ball.</p>
+  <p><b>Without a headset:</b> drag to look; hold the mouse button to wind up and let go to throw where you look; the ball is caught when it
+  reaches you. The menu is at the top left; <kbd>1</kbd>-<kbd>6</kbd> worlds, <kbd>B</kbd> ball, <kbd>H</kbd> weight, <kbd>R</kbd> ball to you.</p>
+  <p class="dim">Click to begin.</p>
+</div></div>
+""" + CT[i1:]
+(HERE / "catch.html").write_text(CT.replace("__THREE__", three).replace("__SCENE__", (HERE / "catch.js").read_text(encoding="utf-8")), encoding="utf-8")
+print("  wrote catch.html")
