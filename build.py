@@ -924,12 +924,12 @@ HS = HS[:i0] + """<div id="intro"><div class="card">
   <p>A two-storey house, 28 by 40 ft on a full basement, built step by step from the staked lot to the finished house: excavation, footings,
   foundation walls, sills and beam, the first floor platform, walls framed flat and tilted up, the second platform, its walls, roof trusses,
   sheathing, stairs, windows, roofing, the rough-in of pipes, wires and ducts, insulation, drywall, siding, and the finish. Every piece is at
-  its true size and spacing. Walk anywhere: floors and stairs carry you as soon as they are built.</p>
+  its true size and spacing, and the crews who really do each job are there with their equipment (excavator, mixer and pump trucks, telehandler, crane, roofing conveyor, insulation blower...), doing it: walk up and watch. Walk anywhere: floors and stairs carry you as soon as they are built.</p>
   <p>Platform framing builds each storey as a platform (joists and subfloor) on top of the walls below, then frames the next walls on it.
   About nine in ten new American houses are wood-framed, and nearly all of those are platform-framed; most of the rest are concrete block or
   insulated concrete (common in Florida and the Southwest), with a few steel-framed, panelised or timber-framed.</p>
-  <p><kbd>N</kbd>/<kbd>→</kbd> next step &nbsp;&middot;&nbsp; <kbd>P</kbd>/<kbd>←</kbd> back &nbsp;&middot;&nbsp; <kbd>space</kbd> replay &nbsp;&middot;&nbsp; <kbd>X</kbd> x-ray (hide the coverings to see the frame) &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk, drag to look, <kbd>shift</kbd> run &nbsp;&middot;&nbsp; <kbd>G</kbd> fly (<kbd>Q</kbd>/<kbd>E</kbd> down/up) &nbsp;&middot;&nbsp; <kbd>1</kbd>-<kbd>6</kbd> places<br>
-  In VR: left stick walk, right stick turn (and up/down when flying), <b>A</b> next step, <b>B</b> back, right trigger replay, <b>X</b> x-ray, <b>Y</b> places, click the left stick to fly; the step's explanation is on your left wrist</p>
+  <p><kbd>N</kbd>/<kbd>→</kbd> next step &nbsp;&middot;&nbsp; <kbd>P</kbd>/<kbd>←</kbd> back &nbsp;&middot;&nbsp; <kbd>space</kbd> replay &nbsp;&middot;&nbsp; <kbd>X</kbd> x-ray (hide the coverings to see the frame) &nbsp;&middot;&nbsp; <kbd>L</kbd> name tags &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk, drag to look, <kbd>shift</kbd> run &nbsp;&middot;&nbsp; <kbd>G</kbd> fly (<kbd>Q</kbd>/<kbd>E</kbd> down/up) &nbsp;&middot;&nbsp; <kbd>1</kbd>-<kbd>6</kbd> places<br>
+  In VR: left stick walk, right stick turn (and up/down when flying), <b>A</b> next step, <b>B</b> back, right trigger replay, <b>X</b> x-ray, <b>Y</b> places, click the left stick to fly, click the right stick for name tags; the step's explanation and who is working are on your left wrist</p>
   <p class="dim">Click to begin.</p>
 </div></div>
 """ + HS[i1:]
