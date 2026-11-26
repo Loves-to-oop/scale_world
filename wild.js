@@ -1,0 +1,284 @@
+// wild.js -- Lost in the Shawnee Hills: a survival game in VR. You are in the woods of southern Illinois with only the clothes you are wearing,
+// and searchers will find you at the end of the third day (one day passes in one hour). The forest is made as you walk: oak-hickory ridges,
+// creek valleys every few hundred metres with sandstone bluffs, old fields grown up in cedar, and the traces of people (fence lines, a
+// logging road, an old homestead chimney, a deer stand, litter). A field guide on your wrist teaches what to do, in order, to stay alive and
+// then to be comfortable. Built into wild.html by build.py.
+const IS_HEADSET = /OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent);
+const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, IS_HEADSET ? 1 : 2)); renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25; renderer.xr.enabled = true; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 3000), rig = new THREE.Group(); rig.add(camera); scene.add(rig); camera.position.set(0, 1.6, 0);
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z), clampN = THREE.MathUtils.clamp, lerpN = THREE.MathUtils.lerp, sstep = THREE.MathUtils.smoothstep, UP = V3(0, 1, 0);
+const tex = (w, h, draw, rep = [1, 1]) => { const c = document.createElement("canvas"); c.width = w; c.height = h; draw(c.getContext("2d"), w, h); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...rep); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; };
+
+// ---------- randomness that is the same every time for the same place ----------
+const hash2 = (i, j) => { const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return s - Math.floor(s); };
+function vnoise(x, z) { const i = Math.floor(x), j = Math.floor(z), fx = x - i, fz = z - j, u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
+  return lerpN(lerpN(hash2(i, j), hash2(i + 1, j), u), lerpN(hash2(i, j + 1), hash2(i + 1, j + 1), u), v); }
+const fbm = (x, z, o = 4) => { let a = 0, f = 1, s = 0.5, t = 0; for (let k = 0; k < o; k++) { a += vnoise(x * f, z * f) * s; t += s; f *= 2.03; s *= 0.5; } return a / t; };
+const mulberry = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+
+// ---------- the land: rolling ridges cut by creek valleys that run north to south, one every 550 m or so ----------
+// Each creek wanders, with a channel 3-5 m wide and a valley 80-100 m across; its bed falls gently southward (toward +z).
+const CREEK_SP = 550;
+const creekX = (k, z) => k * CREEK_SP + 70 * Math.sin(z / 190 + k * 1.7) + 28 * Math.sin(z / 67 + k * 3.1) + 9 * Math.sin(z / 23 + k);
+const bedY = z => -z * 0.004 + 4 * Math.sin(z / 520);
+function nearCreek(x, z) { const k0 = Math.round(x / CREEK_SP); let best = 1e9, bk = k0; for (let k = k0 - 1; k <= k0 + 1; k++) { const d = x - creekX(k, z); if (Math.abs(d) < Math.abs(best)) { best = d; bk = k; } } return { d: best, k: bk, w: 1.8 + 1.2 * vnoise(bk * 7.3, z / 60) }; }
+function ground(x, z) { const c = nearCreek(x, z), ad = Math.abs(c.d), b = bedY(z), ridge = 8 + 16 * fbm(x / 260 + 11, z / 260 - 4) + 5 * fbm(x / 60, z / 60, 3), side = Math.min(1, ad / 140);
+  const bl = 7 * sstep(vnoise(c.k * 5.1 + 3, z / 110), 0.45, 0.75); let h = b + 1.2 + ridge * sstep(side, 0.08, 1) + ad * 0.03 + bl * sstep(ad, c.w + 5, c.w + 11); if (ad < c.w) h = b - 0.55 * (1 - (ad / c.w) ** 2); else if (ad < c.w + 2) h = lerpN(b + 0.05, h, (ad - c.w) / 2); return h; }
+const waterAt = (x, z) => { const c = nearCreek(x, z); return Math.abs(c.d) < c.w + 0.2; };
+// where the forest opens into an old field (abandoned farmland grown up in grass, goldenrod and red cedar)
+const openness = (x, z) => sstep(fbm(x / 340 - 30, z / 340 + 70, 3), 0.6, 0.72);
+
+// ---------- the season you chose on the start card ----------
+const SEASONS = {
+  fall: { name: "late October", lit: "#8a5a2a", hi: 17, lo: 6, sunrise: 7.2, sunset: 18.2, fogFar: 170, wear: ["jeans", "a cotton T-shirt", "a cotton hooded sweatshirt", "canvas sneakers", "socks"], clo: 0.9 },
+  summer: { name: "July", lit: "#4a5a2a", hi: 31, lo: 19, sunrise: 5.6, sunset: 20.3, fogFar: 120, wear: ["cotton shorts", "a cotton T-shirt", "running shoes", "socks"], clo: 0.35 },
+  winter: { name: "January", lit: "#e8eef2", hi: 4, lo: -6, sunrise: 7.1, sunset: 17.0, fogFar: 200, wear: ["jeans", "a cotton T-shirt", "a fleece pullover", "a winter parka", "a knit hat", "gloves", "leather boots", "socks"], clo: 1.6 } };
+let SEASON = "fall", SZ = SEASONS.fall;
+// tree species: bark colour, crown shape, leaf colour in summer and in fall; whether the leaves stay on in winter
+const SPECIES = {
+  whiteOak: { name: "White oak", bark: 0x8a8a80, barkT: "scaly", crown: [1.15, 0.9], sum: 0x3a5a28, fall: 0x8a3a22, keep: false, h: [18, 26], info: "Pale, scaly bark; leaves with rounded lobes. Its acorns are the least bitter of the oaks: shelled, leached in changes of water and roasted, they are real food. Illinois' state tree." },
+  redOak: { name: "Northern red oak", bark: 0x5a5a56, barkT: "ridged", crown: [1.1, 0.95], sum: 0x2e5426, fall: 0x9a2a1a, keep: false, h: [20, 28], info: "Dark bark with long flat-topped ridges ('ski tracks'); pointed lobes. Its acorns are bitter with tannin and need long leaching." },
+  hickory: { name: "Shagbark hickory", bark: 0x7a7670, barkT: "shag", crown: [0.9, 1.0], sum: 0x40602a, fall: 0xc89a2a, keep: false, h: [18, 25], info: "Bark in long loose plates that curl away from the trunk. Hickory nuts are rich and sweet (crack them on a rock). The shaggy strips of dead bark light easily: good tinder." },
+  maple: { name: "Sugar maple", bark: 0x6a6a64, barkT: "furrow", crown: [1.0, 1.1], sum: 0x3a6a2a, fall: 0xe0702a, keep: false, h: [16, 24], info: "Grey furrowed bark, five-lobed leaves. Its sap is sweet in late winter. The leaves turn orange and scarlet in fall." },
+  beech: { name: "American beech", bark: 0xa8aaa8, barkT: "smooth", crown: [1.2, 0.85], sum: 0x4a6a2a, fall: 0xc0903a, keep: false, h: [16, 22], info: "Smooth grey bark like elephant skin, often carved. Grows in moist ravines. Its papery tan leaves hang on all winter. Beechnuts are small but edible raw." },
+  sycamore: { name: "American sycamore", bark: 0xd8d4c8, barkT: "patch", crown: [1.3, 0.9], sum: 0x5a7a3a, fall: 0x9a7a4a, keep: false, h: [22, 32], info: "White upper bark peeling in patches; the biggest trees along the creek. Where you see sycamores from a ridge, there is water." },
+  cedar: { name: "Eastern red cedar", bark: 0x7a4a38, barkT: "fibre", crown: [0.55, 1.6], sum: 0x2a4a32, fall: 0x2e4a30, win: 0x4a4a2a, keep: true, h: [6, 12], evergreen: true, info: "A small evergreen with shreddy reddish bark, first to grow up in an abandoned field. The inner bark shreds into fine fibre for tinder and cord; the dense boughs shed rain." },
+  snag: { name: "Dead tree (snag)", bark: 0x6a5e50, barkT: "dead", crown: [0, 0], sum: 0, fall: 0, keep: false, h: [8, 18], dead: true, info: "A standing dead tree. Its dead branches are the best dry firewood (wood lying on the ground is damp). Never camp under one: dead limbs fall without warning, the 'widowmakers'." } };
+const SP_KEYS = Object.keys(SPECIES);
+function barkTex(kind, col) { const c = new THREE.Color(col); return tex(128, 256, (g, w, h) => { g.fillStyle = "#" + c.getHexString(); g.fillRect(0, 0, w, h); const r = mulberry(kind.length * 99);
+    for (let i = 0; i < 260; i++) { const x = r() * w, y = r() * h, d = (r() - 0.5) * 0.35; g.fillStyle = `rgba(${d > 0 ? 255 : 0},${d > 0 ? 255 : 0},${d > 0 ? 255 : 0},${Math.abs(d)})`;
+      if (kind === "smooth") g.fillRect(x, y, 6, 2); else if (kind === "patch") { g.fillStyle = r() < 0.5 ? "rgba(120,130,100,0.5)" : "rgba(240,240,230,0.5)"; g.beginPath(); g.ellipse(x, y, 8 + r() * 10, 6 + r() * 12, 0, 0, 7); g.fill(); }
+      else if (kind === "shag") g.fillRect(x, y, 3 + r() * 4, 30 + r() * 50); else if (kind === "ridged") g.fillRect(x, y, 2, 40 + r() * 60); else g.fillRect(x, y, 2 + r() * 3, 12 + r() * 30); } }, [2, 3]); }
+const LEAFT = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d"), r = mulberry(5); for (let i = 0; i < 900; i++) { const v = 120 + r() * 135 | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.beginPath(); g.ellipse(r() * 256, r() * 256, 5 + r() * 6, 2.5 + r() * 3, r() * 3, 0, 7); g.fill(); } const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; })();
+function litterTex() { return tex(256, 256, (g, w, h) => { const r = mulberry(17), S = SEASON; g.fillStyle = S === "winter" ? "#e8ecef" : S === "summer" ? "#4a4630" : "#7a5230"; g.fillRect(0, 0, w, h);
+    const cols = S === "winter" ? ["#ffffff", "#dde4ea", "#cfd8e0", "#6a5a48"] : S === "summer" ? ["#5a5a34", "#3a4a26", "#6a5a3a", "#4a6a2a", "#2e3a1e"] : ["#a0522d", "#c8782a", "#8a3a22", "#d8a040", "#6a4a2a", "#b0602a", "#5a3a20"];
+    for (let i = 0; i < (S === "winter" ? 400 : 1600); i++) { g.fillStyle = cols[r() * cols.length | 0]; g.beginPath(); g.ellipse(r() * w, r() * h, 2 + r() * 6, 1 + r() * 3, r() * 3, 0, 7); g.fill(); } }, [1, 1]); }
+// putting several shapes into one, so a whole crown is drawn at once
+function mergeGeos(list) { const pos = [], nor = []; for (const g0 of list) { const g = g0.index ? g0.toNonIndexed() : g0; g.computeVertexNormals(); pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); } const m = new THREE.BufferGeometry(); m.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); m.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+  const uv = []; for (let i = 0; i < pos.length; i += 3) uv.push(pos[i] * 0.7 + pos[i + 2] * 0.3, pos[i + 1] * 0.7); m.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); return m; }
+function crownGeo(w, h, seed) { const r = mulberry(seed), parts = []; if (h > w * 2) { for (let k = 0; k < 4; k++) parts.push(new THREE.ConeGeometry(w * (1 - k * 0.2), h * 0.45, 9).translate((r() - 0.5) * 0.1, k * h * 0.22 + h * 0.2, (r() - 0.5) * 0.1)); return mergeGeos(parts); }
+  for (let k = 0; k < 7; k++) { const a = r() * 6.28, d = k ? 0.45 + r() * 0.35 : 0, s = 0.55 + r() * 0.3; parts.push(new THREE.IcosahedronGeometry(s, 1).scale(w, h * 0.8, w).translate(Math.cos(a) * d * w, h * (0.45 + r() * 0.35), Math.sin(a) * d * w)); } return mergeGeos(parts); }
+function branchGeo(seed) { const r = mulberry(seed), parts = []; for (let k = 0; k < 9; k++) { const a = r() * 6.28, y0 = 0.45 + r() * 0.4, L = 0.35 + r() * 0.3, tilt = 0.5 + r() * 0.6, g = new THREE.CylinderGeometry(0.004, 0.012, L, 4).translate(0, L / 2, 0).rotateZ(tilt).rotateY(a).translate(0, y0, 0); parts.push(g);
+    for (let j = 0; j < 2; j++) parts.push(new THREE.CylinderGeometry(0.002, 0.005, L * 0.5, 3).translate(0, L * 0.25, 0).rotateZ(tilt - 0.6 + r() * 1.2).rotateY(a + r() - 0.5).translate(-Math.sin(tilt) * L * 0.6 * Math.cos(a), y0 + Math.cos(tilt) * L * 0.6, Math.sin(tilt) * L * 0.6 * Math.sin(a))); }
+  parts.push(new THREE.CylinderGeometry(0.004, 0.012, 0.5, 5).translate(0, 0.98, 0)); return mergeGeos(parts); }
+
+// ---------- the forest is made in squares of 48 m around you as you walk ----------
+const CH = 48, SEG = 48, RAD = 2, CHUNKS = new Map(); let MAT = null, IMS = null;
+const ROADS = n => n * 1300 + 300, roadZ = (n, x) => ROADS(n) + 25 * Math.sin(x / 110 + n * 2.1) + 10 * Math.sin(x / 37 + n);
+function initMaterials() { MAT = { ground: new THREE.MeshStandardMaterial({ map: litterTex(), vertexColors: true, roughness: 0.95 }), water: new THREE.MeshStandardMaterial({ color: SEASON === "summer" ? 0x7a8a6a : 0x7a9298, roughness: 0.15, transparent: true, opacity: 0.8, emissive: 0x1a2628 }),
+    rock: new THREE.MeshStandardMaterial({ color: 0xb89870, roughness: 0.95, flatShading: true }), log: new THREE.MeshStandardMaterial({ map: barkTex("dead", 0x5a4a3a), roughness: 0.95 }), stick: new THREE.MeshStandardMaterial({ color: 0x5a4636, roughness: 0.95 }),
+    leaf: new THREE.MeshStandardMaterial({ map: LEAFT, roughness: 0.9, alphaTest: 0.45, side: THREE.DoubleSide, emissive: 0x111108 }), shrub: new THREE.MeshStandardMaterial({ map: LEAFT, roughness: 0.9, alphaTest: 0.45, side: THREE.DoubleSide }), tuft: new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }),
+    road: new THREE.MeshStandardMaterial({ color: SEASON === "winter" ? 0xd8d8d0 : 0x7a6a50, roughness: 1 }), stone: new THREE.MeshStandardMaterial({ color: 0x9a8a72, roughness: 0.95, flatShading: true }), post: new THREE.MeshStandardMaterial({ color: 0x6a5a48, roughness: 0.95 }), wire: new THREE.MeshStandardMaterial({ color: 0x5a4a40, roughness: 0.6, metalness: 0.5 }),
+    metal: new THREE.MeshStandardMaterial({ color: 0x4a5a4a, roughness: 0.6, metalness: 0.5 }), plastic: new THREE.MeshStandardMaterial({ color: 0xd8eef8, roughness: 0.2, transparent: true, opacity: 0.6 }), can: new THREE.MeshStandardMaterial({ color: 0xb8b0a0, roughness: 0.4, metalness: 0.8 }) };
+  const im = (geo, mat, n, shadow = true) => { const m = new THREE.InstancedMesh(geo, mat, n); m.count = 0; m.castShadow = shadow; m.receiveShadow = true; m.frustumCulled = false; scene.add(m); return m; };
+  IMS = { trunk: {}, crown: {}, branch: {} };
+  for (const k of SP_KEYS) { const S = SPECIES[k]; IMS.trunk[k] = im(new THREE.CylinderGeometry(0.55, 1, 1, 9).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ map: barkTex(S.barkT, S.bark), roughness: 0.95 }), 2500);
+    if (!S.dead) { IMS.crown[k] = im(crownGeo(S.crown[0], S.crown[1], k.length * 31), MAT.leaf.clone(), 2500); IMS.crown[k].material.color.set(SEASON === "summer" ? S.sum : SEASON === "fall" ? S.fall : S.win || (S.keep ? 0xb89060 : S.fall)); }
+    IMS.branch[k] = im(branchGeo(k.length * 7), new THREE.MeshStandardMaterial({ color: S.bark, roughness: 0.95 }), 2500, false); }
+  IMS.rock = im(new THREE.DodecahedronGeometry(1, 0), MAT.rock, 3000); IMS.log = im(new THREE.CylinderGeometry(1, 1, 1, 8).rotateZ(Math.PI / 2), MAT.log, 800); IMS.stick = im(new THREE.CylinderGeometry(1, 0.7, 1, 4).rotateZ(Math.PI / 2), MAT.stick, 2500, false);
+  IMS.shrub = im(new THREE.IcosahedronGeometry(1, 1), MAT.shrub, 2500); IMS.twig = im(branchGeo(3), MAT.stick, 2500, false); IMS.tuft = im(new THREE.ConeGeometry(0.25, 1, 5).translate(0, 0.5, 0), MAT.tuft, 9000, false); }
+const leafsOn = (S, r) => S.evergreen || (SEASON === "summer") || (SEASON === "fall" && r > 0.18) || (SEASON === "winter" && S.keep);
+function pickSpecies(r, d, op) { const ad = Math.abs(d); let W; if (op > 0.5) W = { cedar: 0.75, snag: 0.05, hickory: 0.1, whiteOak: 0.1 }; else if (ad < 35) W = { sycamore: 0.28, beech: 0.2, maple: 0.25, redOak: 0.1, hickory: 0.05, snag: 0.12 }; else W = { whiteOak: 0.3, redOak: 0.25, hickory: 0.2, maple: 0.1, beech: 0.04, snag: 0.08, cedar: 0.03 };
+  let t = 0; for (const k in W) t += W[k]; let x = r * t; for (const k in W) { x -= W[k]; if (x <= 0) return k; } return "whiteOak"; }
+function makeChunk(cx, cz) { const x0 = cx * CH, z0 = cz * CH, R = mulberry((cx * 73856093) ^ (cz * 19349663)), C = { cx, cz, trees: [], rocks: [], logs: [], sticks: [], shrubs: [], tufts: [], targets: [], group: new THREE.Group() };
+  // the ground
+  const n = SEG + 1, pos = new Float32Array(n * n * 3), col = new Float32Array(n * n * 3), uv = new Float32Array(n * n * 2), idx = [];
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const x = x0 + i * CH / SEG, z = z0 + j * CH / SEG, y = ground(x, z), k = j * n + i; pos.set([x, y, z], k * 3); uv.set([x / 6, z / 6], k * 2); }
+  for (let j = 0; j < SEG; j++) for (let i = 0; i < SEG; i++) { const a = j * n + i; idx.push(a, a + n, a + 1, a + 1, a + n, a + n + 1); }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("uv", new THREE.BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+  const nr = g.attributes.normal; for (let k = 0; k < n * n; k++) { const x = pos[k * 3], z = pos[k * 3 + 2], c = nearCreek(x, z), ad = Math.abs(c.d), steep = 1 - nr.getY(k), op = openness(x, z); let r = 1, gg = 1, b = 1;
+    if (ad < c.w + 2.5) { const t = 1 - sstep(ad, c.w, c.w + 2.5); r = lerpN(1, 0.85, t); gg = lerpN(1, 0.8, t); b = lerpN(1, 0.72, t); if (SEASON === "winter") { r = gg = b = lerpN(1, 0.55, t); } }
+    else if (steep > 0.3 && SEASON !== "winter") { const t = sstep(steep, 0.3, 0.55); r = lerpN(1, 1.5, t); gg = lerpN(1, 1.25, t); b = lerpN(1, 1.0, t); }
+    if (op > 0.3 && SEASON !== "winter") { const t = sstep(op, 0.3, 0.8); r *= SEASON === "summer" ? lerpN(1, 0.9, t) : lerpN(1, 1.25, t); gg *= SEASON === "summer" ? lerpN(1, 1.35, t) : lerpN(1, 1.2, t); b *= lerpN(1, 0.8, t); }
+    col.set([r, gg, b], k * 3); }
+  g.setAttribute("color", new THREE.BufferAttribute(col, 3)); const gm = new THREE.Mesh(g, MAT.ground); gm.receiveShadow = true; C.group.add(gm); C.groundMesh = gm;
+  // the creek's water
+  for (let k = Math.floor((x0 - 120) / CREEK_SP); k <= Math.ceil((x0 + CH + 120) / CREEK_SP); k++) { const wp = [], wi = []; for (let z = z0; z <= z0 + CH + 0.01; z += 1) { const cxz = creekX(k, z); if (cxz < x0 - 6 || cxz > x0 + CH + 6) continue; const w = nearCreek(cxz, z).w + 0.25, y = bedY(z) - 0.02; wp.push(cxz - w, y, z, cxz + w, y, z); }
+    if (wp.length < 12) continue; for (let i = 0; i < wp.length / 6 - 1; i++) { const a = i * 2; wi.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); } const wg = new THREE.BufferGeometry(); wg.setAttribute("position", new THREE.Float32BufferAttribute(wp, 3)); wg.setIndex(wi); wg.computeVertexNormals(); const wm = new THREE.Mesh(wg, MAT.water); wm.receiveShadow = true; C.group.add(wm); }
+  // trees on a jittered grid, thinner in old fields, none in the creek
+  for (let gx = 0; gx < CH; gx += 5) for (let gz = 0; gz < CH; gz += 5) { const x = x0 + gx + R() * 5, z = z0 + gz + R() * 5, c = nearCreek(x, z), op = openness(x, z); if (Math.abs(c.d) < c.w + 1.2) continue; if (R() > lerpN(0.62, 0.1, op)) continue;
+    const sp = pickSpecies(R(), c.d, op), S = SPECIES[sp], H = lerpN(S.h[0], S.h[1], R()) * (op > 0.5 && sp !== "cedar" ? 0.7 : 1), r = H / (sp === "cedar" ? 45 : 62) * (0.75 + R() * 0.5), lr = R(); C.trees.push({ sp, x, z, y: ground(x, z), H, r, rot: R() * 6.28, lean: (R() - 0.5) * 0.06, leaves: leafsOn(S, lr) });
+    C.targets.push({ kind: "tree", sp, p: V3(x, ground(x, z) + 1.5, z), r: Math.max(r, 0.3) }); }
+  // shrubs under the trees, grass tufts in the open
+  for (let i = 0; i < 34; i++) { const x = x0 + R() * CH, z = z0 + R() * CH, c = nearCreek(x, z); if (Math.abs(c.d) < c.w + 0.6 || openness(x, z) > 0.6) continue; const s = 0.4 + R() * 0.9; C.shrubs.push({ x, z, y: ground(x, z) + s * 0.5, s, kind: Math.abs(c.d) < 30 && R() < 0.4 ? "pawpaw" : R() < 0.5 ? "honeysuckle" : "spicebush" }); }
+  for (let i = 0; i < 260; i++) { const x = x0 + R() * CH, z = z0 + R() * CH, op = openness(x, z); if (R() > op * 1.2 + 0.02 || waterAt(x, z)) continue; C.tufts.push({ x, z, y: ground(x, z), h: (SEASON === "summer" ? 0.7 : 0.55) + R() * 0.7, rot: R() * 6.28 }); }
+  // rocks: sandstone where the slopes are steep, cobbles along the creek
+  for (let i = 0; i < 70; i++) { const x = x0 + R() * CH, z = z0 + R() * CH, c = nearCreek(x, z), ad = Math.abs(c.d), y = ground(x, z), sl = Math.abs(ground(x + 1, z) - y) + Math.abs(ground(x, z + 1) - y);
+    if ((sl > 0.9 && R() < 0.7) || R() < 0.03) { const s = 0.6 + R() * 2.2; C.rocks.push({ x, z, y: y - s * 0.1, s, sy: 0.5 + R() * 0.4, rot: R() * 6.28 }); if (s > 1.4) C.targets.push({ kind: "bluff", p: V3(x, y + s * 0.5, z), r: s }); }
+    else if (ad < c.w + 1.5 && R() < 0.5) C.rocks.push({ x, z, y: y + 0.02, s: 0.08 + R() * 0.25, sy: 0.6, rot: R() * 6.28 }); }
+  // fallen logs and sticks
+  for (let i = 0; i < 5; i++) { const x = x0 + R() * CH, z = z0 + R() * CH; if (waterAt(x, z) || openness(x, z) > 0.6) continue; const L = 3 + R() * 7, rr = 0.12 + R() * 0.25, a = R() * 6.28; C.logs.push({ x, z, y: ground(x, z) + rr * 0.8, L, r: rr, a }); C.targets.push({ kind: "log", p: V3(x, ground(x, z) + rr, z), r: L / 2 }); }
+  for (let i = 0; i < 30; i++) { const x = x0 + R() * CH, z = z0 + R() * CH; if (waterAt(x, z)) continue; const L = 0.4 + R() * 1.8; C.sticks.push({ x, z, y: ground(x, z) + 0.03, L, r: 0.008 + L * 0.012, a: R() * 6.28, tilt: (R() - 0.5) * 0.2 }); }
+  // the traces of people
+  const fx = hash2(cx * 1.3 + 0.7, cz * 2.9 - 0.3), mesh = (geo, mat, x, y, z, ry = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = ry; m.castShadow = m.receiveShadow = true; C.group.add(m); return m; };
+  for (let rn = Math.floor((z0 - 80) / 1300); rn <= Math.ceil((z0 + CH + 80) / 1300); rn++) { const rp = [], ri = []; for (let x = x0; x <= x0 + CH + 0.01; x += 2) { const z = roadZ(rn, x); if (z < z0 - 4 || z > z0 + CH + 4) { if (rp.length) break; continue; } for (const o of [-1.8, 1.8]) rp.push(x, Math.max(ground(x, z + o), bedY(z) + 0.05) + 0.04, z + o); }
+    if (rp.length >= 12) { for (let i = 0; i < rp.length / 6 - 1; i++) { const a = i * 2; ri.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } const rg = new THREE.BufferGeometry(); rg.setAttribute("position", new THREE.Float32BufferAttribute(rp, 3)); rg.setIndex(ri); rg.computeVertexNormals(); const rm = new THREE.Mesh(rg, MAT.road); rm.receiveShadow = true; C.group.add(rm); const mx = x0 + CH / 2; C.targets.push({ kind: "road", p: V3(mx, ground(mx, roadZ(rn, mx)) + 0.3, roadZ(rn, mx)), r: CH / 2, line: true, rn }); } }
+  if (fx < 0.07) { const x = x0 + 10 + R() * 28, za = z0 + 4; let prev = null; for (let z = za; z < za + 40; z += 3.5) { const y = ground(x, z); if (waterAt(x, z)) { prev = null; continue; } const p = mesh(new THREE.CylinderGeometry(0.06, 0.07, 1.3, 6), MAT.post, x, y + 0.6, z); p.rotation.z = (R() - 0.5) * 0.3;
+      if (prev) for (const h of [0.45, 0.8, 1.1]) { const A = V3(x, prev + h, z - 3.5), B = V3(x, y + h - 0.05, z), cv = new THREE.QuadraticBezierCurve3(A, A.clone().lerp(B, 0.5).add(V3(0, -0.12, 0)), B); C.group.add(new THREE.Mesh(new THREE.TubeGeometry(cv, 6, 0.004, 3), MAT.wire)); } prev = y; }
+    C.targets.push({ kind: "fence", p: V3(x, ground(x, za + 20) + 0.8, za + 20), r: 20, line: true }); }
+  else if (fx < 0.1) { const x = x0 + 12 + R() * 24, z = z0 + 12 + R() * 24; if (Math.abs(nearCreek(x, z).d) > 40) { const y = ground(x, z); for (let k = 0; k < 14; k++) for (let j = 0; j < 4; j++) mesh(new THREE.BoxGeometry(0.42 + R() * 0.1, 0.24, 0.3), MAT.stone, x + (j % 2 ? 0.5 : -0.5) * (k > 9 ? 0.6 : 1) + (R() - 0.5) * 0.04, y + 0.12 + k * 0.26, z + (j > 1 ? 0.3 : -0.3) * (k > 9 ? 0.6 : 1));
+      for (let k = 0; k < 18; k++) { const a = k / 18 * 6.28; mesh(new THREE.BoxGeometry(0.5, 0.25, 0.35), MAT.stone, x + 3 + Math.cos(a) * 3.5, ground(x + 3 + Math.cos(a) * 3.5, z + Math.sin(a) * 4) + 0.08, z + Math.sin(a) * 4, a); }
+      C.targets.push({ kind: "homestead", p: V3(x, y + 1.5, z), r: 4 }); } }
+  else if (fx < 0.14) { const t = C.trees.find(t => t.sp.includes("Oak") || t.sp === "hickory"); if (t) { const a = t.rot, dx = Math.sin(a), dz = Math.cos(a), bx = t.x + dx * (t.r + 0.25), bz = t.z + dz * (t.r + 0.25);
+      for (const s of [-0.22, 0.22]) mesh(new THREE.BoxGeometry(0.04, 4.6, 0.04), MAT.metal, bx + dz * s + dx * 0.6, t.y + 2.2, bz - dx * s + dz * 0.6).rotation.set(dz * 0.13, 0, -dx * 0.13);
+      for (let k = 0; k < 12; k++) mesh(new THREE.BoxGeometry(0.48, 0.03, 0.03), MAT.metal, bx + dx * (0.6 - k * 0.048), t.y + 0.3 + k * 0.37, bz + dz * (0.6 - k * 0.048), a);
+      mesh(new THREE.BoxGeometry(0.6, 0.05, 0.6), MAT.metal, bx, t.y + 4.6, bz, a); C.targets.push({ kind: "stand", p: V3(bx, t.y + 3, bz), r: 1.2 }); } }
+  if (hash2(cx * 3.1 - 1.7, cz * 0.7 + 4.2) < 0.2) { const x = x0 + R() * CH, z = z0 + R() * CH; if (!waterAt(x, z)) { const can = R() < 0.4, m = mesh(can ? new THREE.CylinderGeometry(0.042, 0.042, 0.12, 12) : new THREE.CylinderGeometry(0.033, 0.033, 0.21, 10), can ? MAT.can : MAT.plastic, x, ground(x, z) + (can ? 0.042 : 0.033), z, R() * 6); m.rotation.z = Math.PI / 2; C.targets.push({ kind: can ? "can" : "bottle", p: V3(x, ground(x, z) + 0.05, z), r: 0.3 }); } }
+  scene.add(C.group); return C; }
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s = new THREE.Vector3(), _p = new THREE.Vector3(), _c = new THREE.Color();
+function rebuildInstances() { const cnt = {}, set = (im, key, p, e, s, color) => { const i = cnt[key] = (cnt[key] || 0); if (i >= im.instanceMatrix.count) return; _q.setFromEuler(e); _m4.compose(p, _q, s); im.setMatrixAt(i, _m4); if (color) im.setColorAt(i, color); cnt[key]++; };
+  for (const C of CHUNKS.values()) { for (const t of C.trees) { const S = SPECIES[t.sp]; _e.set(t.lean, t.rot, t.lean * 0.7); _p.set(t.x, t.y - 0.2, t.z); set(IMS.trunk[t.sp], "t" + t.sp, _p, _e, _s.set(t.r, S.dead ? t.H : t.H * (S.evergreen ? 0.6 : 0.72), t.r));
+      const w = t.H * (S.evergreen ? 0.22 : 0.3); if (!S.dead && t.leaves) { _p.set(t.x, t.y + t.H * (S.evergreen ? 0.08 : 0.5), t.z); _c.set(1, 1, 1).multiplyScalar(0.8 + hash2(t.x, t.z) * 0.4); set(IMS.crown[t.sp], "c" + t.sp, _p, _e, _s.set(w, t.H * (S.evergreen ? 0.62 : 0.52), w), _c); }
+      if (!S.evergreen) { _p.set(t.x, t.y - 0.2, t.z); set(IMS.branch[t.sp], "b" + t.sp, _p, _e, _s.set(t.H * 0.75 * (S.dead ? 0.6 : 1), t.H, t.H * 0.75 * (S.dead ? 0.6 : 1))); } }
+    for (const r of C.rocks) { _e.set(0, r.rot, 0); _p.set(r.x, r.y, r.z); set(IMS.rock, "r", _p, _e, _s.set(r.s, r.s * r.sy, r.s * 0.85)); }
+    for (const l of C.logs) { _e.set(0, l.a, 0); _p.set(l.x, l.y, l.z); set(IMS.log, "l", _p, _e, _s.set(l.L, l.r, l.r)); }
+    for (const s of C.sticks) { _e.set(0, s.a, s.tilt); _p.set(s.x, s.y, s.z); set(IMS.stick, "s", _p, _e, _s.set(s.L, s.r, s.r)); }
+    for (const s of C.shrubs) { _e.set(0, s.x, 0); if (SEASON === "winter") { _p.set(s.x, s.y - s.s * 0.5, s.z); set(IMS.twig, "tw", _p, _e, _s.set(s.s * 1.6, s.s * 1.8, s.s * 1.6)); continue; } _p.set(s.x, s.y, s.z); const col = s.kind === "honeysuckle" ? (SEASON === "winter" ? 0x6a5a40 : 0x4a7a32) : s.kind === "pawpaw" ? (SEASON === "summer" ? 0x4a7a2a : SEASON === "fall" ? 0xd8b830 : 0x5a4a38) : (SEASON === "summer" ? 0x5a8a3a : SEASON === "fall" ? 0xd8c040 : 0x5a4a3a); _c.set(col); set(IMS.shrub, "sh", _p, _e, _s.set(s.s, s.s * 0.8, s.s), _c); }
+    for (const t of C.tufts) { _e.set(0, t.rot, 0); _p.set(t.x, t.y, t.z); _c.set(SEASON === "summer" ? 0x6a8a3a : SEASON === "fall" ? 0xb8985a : 0xa89068).multiplyScalar(0.85 + hash2(t.x, t.z) * 0.3); set(IMS.tuft, "tu", _p, _e, _s.set(1, t.h, 1), _c); } }
+  const fin = (im, key) => { im.count = cnt[key] || 0; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; };
+  for (const k of SP_KEYS) { fin(IMS.trunk[k], "t" + k); if (IMS.crown[k]) fin(IMS.crown[k], "c" + k); fin(IMS.branch[k], "b" + k); } fin(IMS.rock, "r"); fin(IMS.log, "l"); fin(IMS.stick, "s"); fin(IMS.shrub, "sh"); fin(IMS.twig, "tw"); fin(IMS.tuft, "tu"); }
+let lastCX = null, lastCZ = null;
+function updateChunks(px, pz, force) { const cx = Math.floor(px / CH), cz = Math.floor(pz / CH); if (!force && cx === lastCX && cz === lastCZ) return; lastCX = cx; lastCZ = cz; let changed = false;
+  for (const [k, C] of CHUNKS) if (Math.abs(C.cx - cx) > RAD + 1 || Math.abs(C.cz - cz) > RAD + 1) { scene.remove(C.group); C.group.traverse(o => { if (o.geometry) o.geometry.dispose(); }); CHUNKS.delete(k); changed = true; }
+  for (let i = -RAD; i <= RAD; i++) for (let j = -RAD; j <= RAD; j++) { const k = (cx + i) + "," + (cz + j); if (!CHUNKS.has(k)) { CHUNKS.set(k, makeChunk(cx + i, cz + j)); changed = true; } }
+  if (changed) rebuildInstances(); }
+
+// ---------- time: one day passes in one hour; the searchers find you on the afternoon of the third day ----------
+const GAME_RATE = 24, RESCUE_T = 2 * 24 + 16; let T = 14, paused = false;
+const hourOf = t => ((t % 24) + 24) % 24, dayOf = t => Math.floor(t / 24) + 1;
+const clockStr = t => { const h = hourOf(t), hh = Math.floor(h), mm = Math.floor((h - hh) * 60); return `Day ${dayOf(t)}, ${((hh + 11) % 12) + 1}:${String(mm).padStart(2, "0")} ${hh < 12 ? "am" : "pm"}`; };
+// air temperature: coldest just before sunrise, warmest about 3 pm, plus a slow drift from day to day; wind gusts, less under the trees
+function airTemp(t) { const h = hourOf(t), S = SZ, x = h < S.sunrise ? (h + 24 - 15) / (S.sunrise + 24 - 15) : h < 15 ? 1 - (h - S.sunrise) / (15 - S.sunrise) : (h - 15) / (S.sunrise + 24 - 15); const shape = 0.5 + 0.5 * Math.cos(Math.PI * (1 - clampN(x, 0, 1)));
+  return lerpN(S.lo, S.hi, 1 - shape) + 3 * Math.sin(t / 31 + 1.3); }
+const windAt = t => Math.max(0, 2.5 + 2 * Math.sin(t / 5.3) + 1.2 * Math.sin(t / 1.7 + 2));
+const daylight = t => { const h = hourOf(t); return sstep(h, SZ.sunrise - 0.6, SZ.sunrise + 0.8) * (1 - sstep(h, SZ.sunset - 0.8, SZ.sunset + 0.6)); };
+
+// ---------- the sky, the sun and the moon ----------
+const SKY = new THREE.Mesh(new THREE.SphereGeometry(2500, 32, 16), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { sun: { value: V3(0, 1, 0) }, day: { value: 1 } },
+  vertexShader: "varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+  fragmentShader: "uniform vec3 sun; uniform float day; varying vec3 vD; void main(){ float h = max(vD.y, 0.0); vec3 dayC = mix(vec3(0.75,0.83,0.9), vec3(0.3,0.5,0.85), pow(h, 0.6)); vec3 nightC = mix(vec3(0.03,0.04,0.07), vec3(0.01,0.015,0.035), h);\n float dusk = exp(-pow(sun.y * 4.0, 2.0)) * smoothstep(-0.3, 0.6, dot(normalize(vD.xz + 1e-4), normalize(sun.xz + 1e-4))) * (1.0 - h);\n vec3 c = mix(nightC, dayC, day) + vec3(1.0, 0.45, 0.15) * dusk * 0.8; float sd = max(dot(vD, sun), 0.0); c += vec3(1.0, 0.9, 0.7) * pow(sd, 400.0) * 3.0 * step(0.0, sun.y);\n float st = fract(sin(dot(floor(vD * 300.0), vec3(12.9, 78.2, 37.7))) * 43758.5); c += vec3(0.8) * step(0.998, st) * (1.0 - day) * h;\n gl_FragColor = vec4(c, 1.0);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}" }));
+scene.add(SKY);
+const sunL = new THREE.DirectionalLight(0xfff0d8, 2.4); sunL.castShadow = true; sunL.shadow.mapSize.set(IS_HEADSET ? 1024 : 2048, IS_HEADSET ? 1024 : 2048); Object.assign(sunL.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 300 }); sunL.shadow.bias = -0.0005; scene.add(sunL, sunL.target);
+const hemi = new THREE.HemisphereLight(0xdfe8f0, 0x5a4a38, 0.9), moonL = new THREE.DirectionalLight(0x8aa0d0, 0.0); scene.add(hemi, moonL, moonL.target);
+scene.fog = new THREE.Fog(0xb8c4cc, 15, 170);
+function updateSky(t) { const h = hourOf(t), S = SZ, f = (h - S.sunrise) / (S.sunset - S.sunrise), el = Math.sin(Math.PI * f) * (SEASON === "summer" ? 1.2 : SEASON === "winter" ? 0.55 : 0.75), az = Math.PI * (0.5 + f);
+  const sd = V3(Math.cos(az) * Math.cos(el), Math.sin(el), -Math.sin(az) * Math.cos(el) * 0.6 - 0.4).normalize(); if (f < 0 || f > 1) sd.y = Math.min(sd.y, -0.1 - 0.3 * Math.min(Math.abs(f), Math.abs(f - 1)));
+  const d = daylight(t); SKY.material.uniforms.sun.value.copy(sd); SKY.material.uniforms.day.value = d; SKY.position.copy(rig.position);
+  sunL.position.copy(rig.position).addScaledVector(sd, 120); sunL.target.position.copy(rig.position); sunL.intensity = 2.6 * d * sstep(sd.y, -0.02, 0.15); sunL.color.setHSL(0.09, 0.6, lerpN(0.6, 0.92, sstep(sd.y, 0, 0.4)));
+  moonL.position.copy(rig.position).add(V3(-60, 90, 40)); moonL.target.position.copy(rig.position); moonL.intensity = 0.35 * (1 - d); hemi.intensity = lerpN(0.15, 1.3, d); hemi.color.setHSL(0.6, 0.3, lerpN(0.35, 0.85, d));
+  const fc = new THREE.Color().setRGB(lerpN(0.03, 0.72, d), lerpN(0.035, 0.77, d), lerpN(0.06, 0.82, d)); scene.fog.color.copy(fc); scene.fog.far = lerpN(45, SZ.fogFar, d); scene.fog.near = lerpN(2, 15, d); }
+
+// ---------- your body ----------
+// Heat: your body makes about 100 W at rest, 250 W walking, 500 W hurrying, plus up to 300 W more when you shiver. It loses heat through
+// your clothes in proportion to the difference between your skin (about 33 °C) and the air, faster in wind and much faster when the clothes
+// are wet (wet cotton keeps almost none of its insulation: "cotton kills"). Your core temperature changes with the balance; your body
+// holds about 245 kJ per degree. Water: you lose about 2 litres a day resting in the shade, much more sweating; a loss of 4 litres
+// (about 6% of your weight) is serious, 8 litres is fatal. Food: your quick energy store (glycogen) is about 2,000 kcal; after that
+// the body burns fat, which keeps you alive for weeks but leaves you weak and colder.
+const BODY = { core: 37.0, water: 0, kcal: 2000, wet: 0, activity: 0, shiver: 0, awake: 6, ill: 0 };
+function clothingClo() { return SZ.clo * (1 - 0.7 * BODY.wet); }
+function updateBody(dtH, moving, running) { const Ta = airTemp(T), wind = windAt(T) * 0.4, act = running ? 500 : moving ? 250 : 100; BODY.shiver = clampN((36.9 - BODY.core) * 260, 0, 300);
+  const R = 0.155 * clothingClo() + 0.1 / (1 + 0.35 * wind), skin = clampN(33 - (36.9 - BODY.core) * 2, 26, 34.5), loss = 1.8 * (skin - Ta) / R, net = act + BODY.shiver - loss;
+  const sweat = BODY.core > 36.9 && net > 0 ? clampN(net / 675, 0, 1.5) : 0, evapW = sweat * 675; BODY.core += (net - evapW) * dtH * 3600 / 245000; BODY.core = clampN(BODY.core, 20, 41);
+  BODY.water += dtH * (2.0 / 24 + sweat); BODY.kcal -= dtH * (act + BODY.shiver) * 0.86; BODY.wet = Math.max(0, BODY.wet - dtH * (Ta > 10 ? 0.25 : 0.08) * (1 + windAt(T) * 0.1)); BODY.awake += dtH; BODY.loss = loss; BODY.net = net; }
+const heatWord = () => { const c = BODY.core; return c >= 38.5 ? ["Overheating: heat exhaustion", "#ff8a4a"] : c >= 37.4 ? ["Hot", "#e8c070"] : c >= 36.5 ? ["Comfortable", "#9ad88a"] : c >= 36 ? ["Cold: shivering", "#a8c8e8"] : c >= 35 ? ["Very cold: hard shivering, clumsy hands", "#6aa8ff"] : c >= 32 ? ["Hypothermia: confused, stumbling", "#4a7aff"] : ["Severe hypothermia", "#ff4a4a"]; };
+const waterWord = () => { const w = BODY.water; return w < 1 ? ["Fine", "#9ad88a"] : w < 2 ? ["Thirsty", "#e8d070"] : w < 4 ? ["Dehydrated: headache, dark urine", "#ffb04a"] : w < 6 ? ["Badly dehydrated: dizzy, weak", "#ff7a4a"] : ["Dying of thirst", "#ff4a4a"]; };
+const foodWord = () => { const k = BODY.kcal; return k > 1200 ? ["Fine", "#9ad88a"] : k > 400 ? ["Hungry", "#e8d070"] : k > 0 ? ["Very hungry: tiring easily", "#ffb04a"] : ["Running on fat: weak, cold", "#ff9a4a"]; };
+
+// ---------- what things are, and what they are good for ----------
+const KINDS = {
+  creek: ["Creek", "Running water, and the most important thing you have found. In Illinois even a clear creek carries Giardia, Cryptosporidium and bacteria from deer, cattle and farm runoff. Boil it if you can (a can will do). But if you can't, drink anyway: dehydration can kill you in 3 days, while Giardia takes 1-3 weeks to make you sick and can be treated after you are rescued. Creeks also lead downstream to bigger creeks, roads and bridges."],
+  bluff: ["Sandstone bluff", "The Shawnee Hills are carved from sandstone. Overhangs in bluffs like this were people's shelters for 10,000 years. Check the ceiling for loose slabs, and build a fire against the back wall to reflect heat onto you."],
+  log: ["Fallen log", "A ready-made windbreak and wall: a debris shelter or a lean-to can be built against it. The underside and the punky, rotten wood stay damp; for fire you want dead wood that is off the ground."],
+  road: ["Old logging road", "A forest road. Roads lead to people, and searchers drive them. If nobody knows where you are, following a road is reasonable; if someone will report you missing, stay put near the road, where you are easy to find."],
+  fence: ["Old barbed-wire fence", "A fence line from when this was farmland: most of the Shawnee was farmed until the 1930s, when the government bought the worn-out farms for the National Forest. Fences mark property lines, and they lead somewhere."],
+  homestead: ["Homestead ruin", "The stone chimney and foundation of a farmhouse, abandoned in the 1930s. Daffodils, lilacs or a yucca often still mark old home sites. An open, flat spot near people's old paths: a good place to be seen."],
+  stand: ["Deer stand", "A hunter's ladder stand, chained to a tree. Hunters come back to their stands (firearm deer season is in November and December), so people do come here. Climbing it gives you a view, but a fall from a stand is a common hunting injury."],
+  can: ["Steel food can", "Litter, and maybe the most useful thing in these woods for you: a metal container can boil water to make it safe, and cook. Pick it up."],
+  bottle: ["Plastic water bottle", "Litter, and useful: it carries water. Plastic melts in a fire, but a clear plastic bottle of water laid in full sun for 6 hours is disinfected by the sun's ultraviolet light (it's called SODIS)."],
+  field: ["Old field", "Abandoned farmland growing back to forest: grasses (broomsedge, little bluestem), goldenrod and red cedars. Open ground is where a search plane or helicopter can see you; dry grass is tinder and stuffing for insulation."],
+  pawpaw: ["Pawpaw", "A small tree with big, drooping, tropical-looking leaves, in creek bottoms. Its fruit, ripe in September, tastes like banana custard: the largest native fruit in North America."],
+  honeysuckle: ["Amur honeysuckle", "An invasive shrub from Asia, the one that stays green long after everything else. Its red berries are not food for you."],
+  spicebush: ["Spicebush", "Scratch a twig and it smells spicy and lemony. The twigs and leaves make a pleasant tea in boiled water; its red berries (fall) are a spice."] };
+const kindInfo = tg => tg.kind === "tree" ? [SPECIES[tg.sp].name, SPECIES[tg.sp].info] : KINDS[tg.kind];
+
+// ---------- the coach: what matters most right now, in the order survival instructors teach it ----------
+const SEEN = new Set(); let FOUND = { creek: false, open: false, road: false, can: false };
+function priorities() { const night = daylight(T) < 0.3, h = hourOf(T), Ta = airTemp(T), list = [], toDark = (SZ.sunset - h + 24) % 24;
+  if (T < 14.4 && dayOf(T) === 1) list.push(["Stop", "S.T.O.P.: Stop, Think, Observe, Plan. Panic makes lost people walk fast, in circles, deeper into the woods. You are not in danger yet. Sit down for a minute. Nobody will find you faster if you run."]);
+  if (T < 15 && dayOf(T) === 1) list.push(["Stay near where you are", "Most people lost in the woods are found within 72 hours, usually within a couple of miles of where they were last seen, and searchers start from there. Don't wander off: explore in loops, and come back to one spot. Somebody knows you went for a walk; you will be found on the third day here."]);
+  if (SEASON !== "summer" && (toDark < 4 || night)) list.push(["Shelter before dark", `It will be about ${Math.round(SZ.lo)} °C tonight${SEASON === "fall" ? ", and cotton holds no warmth once it's damp with dew or sweat" : ", far below freezing"}. Exposure kills more lost people than anything else. Find a spot out of the wind: against a log, a bluff, in thick cedars. Use the last daylight to build; it gets dark fast under the trees.`]);
+  if (!FOUND.creek) list.push(["Find water", "You can live about 3 days without water, less in heat. Water runs downhill: walk down into the valleys and listen. Big white-barked sycamores grow along creeks; you can see them from a ridge, especially in fall and winter."]);
+  else if (BODY.water > 1) list.push(["Drink", "You know where the creek is. Drink before you are badly thirsty; thirst lags behind need, and dehydration makes you clumsy and cold."]);
+  if (SEASON === "summer") list.push(["Stay cool and keep bugs off", "In July the danger is heat and dehydration: rest in shade through the afternoon, move in the morning and evening. Check for ticks (lone star and deer ticks are everywhere here) and stay out of poison ivy (three leaflets, hairy vines on trees)."]);
+  list.push(["Be easy to find", "Make yourself visible: an open spot, something unnatural (a big X of logs, broken branches in lines), a smoky fire in daytime, noise (three of anything is the signal for help: shouts, whistles, knocks)."]);
+  if (!FOUND.can) list.push(["Look for useful litter", "Even deep woods have trash: a can or a bottle is a pot and a canteen. Check along roads, fences and old homesites."]);
+  list.push(["Food can wait", "You can go three weeks without food; in three days hunger is unpleasant but not dangerous. Don't eat what you can't identify for certain. Nuts are the safe, rich food of these woods: hickory nuts, beechnuts, leached acorns."]);
+  return list; }
+
+// ---------- the field guide: on your left wrist in VR, at the top left on a screen ----------
+const PANEL = (() => { const c = document.createElement("canvas"); c.width = 640; c.height = 900; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const me = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.28125), new THREE.MeshBasicMaterial({ map: t, transparent: true, side: THREE.DoubleSide })); me.renderOrder = 10; return { c, t, me }; })();
+const HUD = document.createElement("div"); HUD.style.cssText = "position:fixed;left:12px;top:12px;width:400px;max-height:94vh;overflow:auto;z-index:2;background:rgba(18,20,16,.84);color:#f2eee4;font:14px/1.45 Georgia,serif;padding:12px 14px;border-radius:10px;display:none"; document.body.appendChild(HUD);
+const MSG = document.createElement("div"); MSG.style.cssText = "position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:2;background:rgba(18,20,16,.88);color:#f2eee4;font:15px sans-serif;padding:10px 14px;border-radius:10px;display:none;max-width:70vw"; document.body.appendChild(MSG); let msgT = 0;
+const say = (t, s = 4) => { MSG.textContent = t; MSG.style.display = "block"; msgT = s; };
+function wrap(g, text, x, y, w, lh, maxY = 880) { const words = text.split(" "); let line = ""; for (const wd of words) { if (g.measureText(line + wd).width > w) { if (y > maxY) return y; g.fillText(line, x, y); line = ""; y += lh; } line += wd + " "; } if (y <= maxY) g.fillText(line, x, y); return y + lh; }
+let LOOK = null, guideKey = "";
+function drawPanel() { const g = PANEL.c.getContext("2d"), P = priorities()[0], hw = heatWord(), ww = waterWord(), fw = foodWord(), Ta = airTemp(T); g.clearRect(0, 0, 640, 900); g.fillStyle = "rgba(24,26,20,0.92)"; g.beginPath(); g.roundRect(0, 0, 640, 900, 24); g.fill();
+  g.fillStyle = "#e8c070"; g.font = "bold 28px sans-serif"; g.fillText(clockStr(T), 24, 44); g.fillStyle = "#c8c4b8"; g.font = "22px sans-serif"; g.fillText(`${Math.round(Ta)} °C (${Math.round(Ta * 1.8 + 32)} °F) · wind ${Math.round(windAt(T) * 2.24)} mph · rescue on day 3`, 24, 76);
+  let y = 118; for (const [k, w] of [["Warmth", hw], ["Water", ww], ["Food", fw]]) { g.fillStyle = "#a8a498"; g.font = "bold 22px sans-serif"; g.fillText(k, 24, y); g.fillStyle = w[1]; g.font = "22px sans-serif"; g.fillText(w[0], 130, y); y += 32; }
+  g.fillStyle = "#a8a498"; g.font = "18px sans-serif"; y = wrap(g, `Wearing ${SZ.wear.join(", ")}${BODY.wet > 0.2 ? " (damp)" : ""}.`, 24, y, 592, 22) + 10;
+  g.fillStyle = "#e8c070"; g.font = "bold 24px sans-serif"; g.fillText("Field guide: " + P[0], 24, y); y += 32; g.fillStyle = "#f0ece0"; g.font = "21px Georgia"; y = wrap(g, P[1], 24, y, 592, 26) + 10;
+  if (LOOK) { const [n, t] = kindInfo(LOOK); g.fillStyle = "#9ad88a"; g.font = "bold 24px sans-serif"; g.fillText("Looking at: " + n, 24, y); y += 30; g.fillStyle = "#e0dcd0"; g.font = "20px Georgia"; wrap(g, t, 24, y, 592, 24, 850); }
+  g.fillStyle = "#a8b0b8"; g.font = "17px sans-serif"; g.fillText("Look at something to learn what it is · stick: walk · right stick: turn", 24, 888); PANEL.t.needsUpdate = true;
+  HUD.innerHTML = `<b style="color:#e8c070">${clockStr(T)}</b> · ${Math.round(Ta)} °C (${Math.round(Ta * 1.8 + 32)} °F) · wind ${Math.round(windAt(T) * 2.24)} mph<br>Warmth: <span style="color:${hw[1]}">${hw[0]}</span> · Water: <span style="color:${ww[1]}">${ww[0]}</span> · Food: <span style="color:${fw[1]}">${fw[0]}</span>
+    <div style="color:#a8a498;font-size:12px">Wearing ${SZ.wear.join(", ")}${BODY.wet > 0.2 ? " (damp)" : ""}. Searchers will find you on day 3.</div><div style="margin-top:6px"><b style="color:#e8c070">Field guide: ${P[0]}</b><br>${P[1]}</div>${LOOK ? `<div style="margin-top:6px"><b style="color:#9ad88a">Looking at: ${kindInfo(LOOK)[0]}</b><br>${kindInfo(LOOK)[1]}</div>` : ""}
+    <div style="margin-top:6px;color:#a8b0b8;font-size:12px">W A S D walk · drag to look · shift hurry · look at things to identify them · V comfort vignette · P pause</div>`; }
+// what you are looking at: the nearest thing close to the middle of your view
+const LABEL = (() => { const c = document.createElement("canvas"); c.width = 512; c.height = 64; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true })); sp.renderOrder = 20; sp.scale.set(0.9, 0.1125, 1); sp.visible = false; scene.add(sp); return { c, t, sp, text: "" }; })();
+function setLabel(text, p) { if (!text) { LABEL.sp.visible = false; return; } if (text !== LABEL.text) { const g = LABEL.c.getContext("2d"); g.clearRect(0, 0, 512, 64); g.font = "bold 34px sans-serif"; const w = Math.min(500, g.measureText(text).width + 30); g.fillStyle = "rgba(20,22,18,0.8)"; g.beginPath(); g.roundRect((512 - w) / 2, 4, w, 56, 14); g.fill(); g.fillStyle = "#f4ecc8"; g.textAlign = "center"; g.fillText(text, 256, 44); LABEL.t.needsUpdate = true; LABEL.text = text; }
+  LABEL.sp.visible = true; LABEL.sp.position.copy(p); const d = p.distanceTo(_eye); LABEL.sp.scale.set(0.36 * d, 0.045 * d, 1); }
+const _eye = V3(0, 0, 0), _dir = V3(0, 0, 0);
+function updateLook() { camera.getWorldPosition(_eye); camera.getWorldDirection(_dir); let best = null, bs = 1e9;
+  for (const C of CHUNKS.values()) for (const tg of C.targets) { const v = tg.p.clone().sub(_eye); let d = v.length(); if (tg.line) { const along = v.dot(_dir); if (along < 0 || along > 25) continue; const q = _eye.clone().addScaledVector(_dir, along); if (tg.kind === "road" ? Math.abs(q.z - roadZ(tg.rn, q.x)) < 3 && Math.abs(q.y - ground(q.x, q.z)) < 1.5 : Math.abs(q.x - tg.p.x) < 1 && Math.abs(q.z - tg.p.z) < tg.r) { d = along; const s = d; if (s < bs) { bs = s; best = { ...tg, p: q }; } } continue; }
+    if (d > 14 || d < 0.3) continue; const ang = Math.acos(clampN(v.dot(_dir) / d, -1, 1)), tol = Math.atan(tg.r / d) + 0.05; if (ang > tol) continue; const s = d * (0.5 + ang / tol); if (s < bs) { bs = s; best = tg; } }
+  for (let s = 1; s < 20; s += 0.5) { const q = _eye.clone().addScaledVector(_dir, s); if (q.y < ground(q.x, q.z) + 0.05) { if (waterAt(q.x, q.z) && s < bs) best = { kind: "creek", p: q.clone().add(V3(0, 0.3, 0)), r: 1 }; else if (!best && openness(q.x, q.z) > 0.6) best = { kind: "field", p: q.clone().add(V3(0, 0.6, 0)), r: 1 }; break; } }
+  const key = best ? best.kind + (best.sp || "") : ""; if (best) { const [n] = kindInfo(best); setLabel(n, best.kind === "tree" ? V3(best.p.x, _eye.y + 0.2, best.p.z) : best.p.clone().add(V3(0, 0.35, 0)));
+    if (!SEEN.has(key)) { SEEN.add(key); if (best.kind === "creek") FOUND.creek = true; if (best.kind === "field") FOUND.open = true; if (best.kind === "road") FOUND.road = true; } } else setLabel(null);
+  const ch = (LOOK ? LOOK.kind + (LOOK.sp || "") : "") !== key; LOOK = best; return ch; }
+
+// ---------- moving about: walking only (no flying), smooth with a comfort vignette, or snap turns ----------
+const ME = { x: 0, y: 0, z: 0, vy: 0 }; let yaw = 0, pitch = -0.05, vrYaw = 0, started = false, comfortVig = true; const keys = {}, prevB = {};
+const VIG = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture((() => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d"), gr = g.createRadialGradient(128, 128, 50, 128, 128, 128); gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(0.6, "rgba(0,0,0,0.25)"); gr.addColorStop(1, "rgba(0,0,0,1)"); g.fillStyle = gr; g.fillRect(0, 0, 256, 256); return c; })()), transparent: true, opacity: 0, depthTest: false, depthWrite: false, fog: false }));
+VIG.position.z = -0.35; VIG.renderOrder = 998; camera.add(VIG);
+function blockedBy(x, z) { for (const C of CHUNKS.values()) { if (Math.abs(C.cx * CH + CH / 2 - x) > CH || Math.abs(C.cz * CH + CH / 2 - z) > CH) continue; for (const t of C.trees) { const dx = x - t.x, dz = z - t.z, r = t.r + 0.25; if (dx * dx + dz * dz < r * r) return t; } for (const r of C.rocks) { if (r.s < 0.9) continue; const dx = x - r.x, dz = z - r.z, rr = r.s * 0.8; if (dx * dx + dz * dz < rr * rr) return { x: r.x, z: r.z, r: rr - 0.25 }; } } return null; }
+function tryMove(nx, nz) { let b = blockedBy(nx, nz); if (b) { const dx = nx - b.x, dz = nz - b.z, d = Math.hypot(dx, dz) || 1, r = b.r + 0.26; nx = b.x + dx / d * r; nz = b.z + dz / d * r; if (blockedBy(nx, nz)) return; } ME.x = nx; ME.z = nz; }
+addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (e.code === "KeyV") { comfortVig = !comfortVig; say(comfortVig ? "Comfort vignette on" : "Comfort vignette off"); } if (e.code === "KeyP") { paused = !paused; say(paused ? "Paused" : "Time running"); } });
+addEventListener("keyup", e => keys[e.code] = false);
+let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY }; });
+addEventListener("pointermove", e => { if (!drag) return; yaw -= (e.clientX - drag.x) * 0.004; pitch = clampN(pitch - (e.clientY - drag.y) * 0.004, -1.4, 1.4); drag.x = e.clientX; drag.y = e.clientY; }); addEventListener("pointerup", () => drag = null);
+const HANDS = [0, 1].map(i => { const grip = renderer.xr.getControllerGrip(i); rig.add(grip); const hand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.11), new THREE.MeshStandardMaterial({ color: 0xd8a888, roughness: 0.7 })); grip.add(hand); const H = { grip, src: null };
+  grip.addEventListener("connected", e => { H.src = e.data; if (e.data.handedness === "left") { PANEL.me.position.set(0, 0.05, 0.12); PANEL.me.rotation.set(-Math.PI / 2 + 0.8, 0, 0); grip.add(PANEL.me); } }); return H; });
+// where you start: on a wooded slope a couple of hundred metres from a creek, out of sight of it
+function startSpot() { for (let k = 0; k < 400; k++) { const x = 180 + k * 3.1, z = 80 + (k % 7) * 9, c = nearCreek(x, z); if (Math.abs(c.d) > 150 && Math.abs(c.d) < 260 && openness(x, z) < 0.2 && !blockedBy(x, z)) return [x, z]; } return [200, 80]; }
+window.beginGame = season => { if (started) return; SEASON = season; SZ = SEASONS[season]; T = season === "summer" ? 15 : season === "winter" ? 13 : 14; initMaterials(); const [x, z] = startSpot(); ME.x = x; ME.z = z; ME.y = ground(x, z); yaw = vrYaw = Math.PI * 0.75;
+  updateChunks(ME.x, ME.z, true); started = true; document.getElementById("intro")?.classList.add("gone"); HUD.style.display = renderer.xr.isPresenting ? "none" : "block"; drawPanel(); say(`Lost in the Shawnee National Forest, southern Illinois, ${SZ.name}. Your phone is dead. Read your field guide.`, 8); };
+const VRB = document.getElementById("vr"); if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); await renderer.xr.setSession(s); beginGame(window.SEASON_PICK || "fall"); HUD.style.display = "none"; }; });
+
+// ---------- the loop ----------
+const clock = new THREE.Clock(), _fq = new THREE.Quaternion(); let frame = 0, panelT = 0;
+renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.05), vr = renderer.xr.isPresenting; if (!started) { renderer.render(scene, camera); return; }
+  let mx = 0, my = 0, run = false;
+  if (vr) { const s = renderer.xr.getSession(); for (const src of s ? s.inputSources : []) { const gp = src.gamepad; if (!gp) continue; const a = gp.axes, ax = a.length >= 4 ? 2 : 0;
+      if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; run = !!gp.buttons[0]?.pressed; const bY = gp.buttons[5]?.pressed; if (bY && !prevB.y) { comfortVig = !comfortVig; } prevB.y = bY; }
+      else { const tx = a[ax] || 0; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; } } }
+  else { if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD) mx += 1; if (keys.KeyA) mx -= 1; run = keys.ShiftLeft || keys.ShiftRight; if (keys.ArrowLeft) yaw += dt * 1.5; if (keys.ArrowRight) yaw -= dt * 1.5; }
+  camera.getWorldQuaternion(_fq); const moving = !!(mx || my); let spd = 0;
+  if (moving) { const f = V3(0, 0, -1).applyQuaternion(_fq); f.y = 0; f.normalize(); const sd = V3(-f.z, 0, f.x), inWater = waterAt(ME.x, ME.z); spd = (run ? 3.0 : 1.3) * (inWater ? 0.5 : 1) * (BODY.kcal < 0 ? 0.8 : 1) * (BODY.core < 35 ? 0.6 : 1); tryMove(ME.x + (f.x * -my + sd.x * mx) * spd * dt, ME.z + (f.z * -my + sd.z * mx) * spd * dt);
+    if (inWater) BODY.wet = Math.min(1, BODY.wet + dt * 0.02); }
+  ME.y = lerpN(ME.y, ground(ME.x, ME.z), 0.3); rig.position.set(ME.x, ME.y, ME.z); rig.rotation.set(0, vr ? vrYaw : 0, 0); if (!vr) { camera.position.set(0, 1.6, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
+  VIG.material.opacity = comfortVig && moving ? lerpN(VIG.material.opacity, run ? 0.75 : 0.5, 0.1) : lerpN(VIG.material.opacity, 0, 0.15); VIG.visible = VIG.material.opacity > 0.01;
+  if (!paused) { const dtH = dt * GAME_RATE / 3600; T += dtH; updateBody(dtH, moving, run); }
+  updateChunks(ME.x, ME.z); updateSky(T); frame++; let redraw = false; if (frame % 6 === 0) redraw = updateLook(); panelT -= dt; if (panelT <= 0 || redraw) { panelT = 1; drawPanel(); }
+  msgT -= dt; if (msgT <= 0) MSG.style.display = "none"; renderer.render(scene, camera); });

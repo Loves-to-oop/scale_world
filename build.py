@@ -935,3 +935,24 @@ HS = HS[:i0] + """<div id="intro"><div class="card">
 """ + HS[i1:]
 (HERE / "house.html").write_text(HS.replace("__THREE__", three).replace("__SCENE__", (HERE / "house.js").read_text(encoding="utf-8")), encoding="utf-8")
 print("  wrote house.html")
+
+# Lost in the Shawnee Hills: survive in the woods of southern Illinois until rescue
+WL = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Lost in the Shawnee Hills</title>").replace("background:#c8d4d8", "background:#161a12")
+i0, i1 = WL.index('<div id="intro">'), WL.index('<button id="vr">')
+WL = WL[:i0] + """<div id="intro"><div class="card">
+  <h1>Lost in the Shawnee Hills</h1>
+  <p>You went for a walk in the Shawnee National Forest in southern Illinois, left the trail, and now you don't know where you are. Your phone is
+  dead. You have only the clothes you are wearing. Someone will report you missing, and searchers will find you on the afternoon of the third
+  day. One day passes in an hour. Until then, stay alive, and then learn to be comfortable: the field guide on your wrist teaches what matters, in the order it matters.</p>
+  <p>The forest goes on as far as you walk: oak and hickory ridges, creek valleys with sandstone bluffs and sycamores, old fields growing back
+  in cedar, and the traces of people. Look at anything to learn what it is and what it is good for.</p>
+  <p><b>Choose the season:</b></p>
+  <p><button class="season" data-s="fall">Late October</button> <button class="season" data-s="summer">July</button> <button class="season" data-s="winter">January</button></p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk, drag to look, <kbd>shift</kbd> hurry, <kbd>V</kbd> comfort vignette, <kbd>P</kbd> pause.
+  In VR: pick the season here first, then Enter VR. Left stick walks, right stick snap-turns, left trigger hurries, <b>Y</b> toggles the comfort vignette; the field guide is on your left wrist.</p>
+</div></div>
+<style>.season{font:16px Georgia,serif;padding:8px 16px;margin:2px;border-radius:8px;border:1px solid #8a7a50;background:#2a2a1e;color:#f0e8d0;cursor:pointer}.season.on{background:#6a5a2a}</style>
+<script>addEventListener("DOMContentLoaded",()=>{for(const b of document.querySelectorAll(".season")){b.onclick=e=>{e.stopPropagation();document.querySelectorAll(".season").forEach(x=>x.classList.remove("on"));b.classList.add("on");window.SEASON_PICK=b.dataset.s;if(window.beginGame&&!navigator.xr)beginGame(b.dataset.s);else if(window.beginGame){navigator.xr.isSessionSupported("immersive-vr").then(ok=>{if(!ok)beginGame(b.dataset.s);});}};}});</script>
+""" + WL[i1:]
+(HERE / "wild.html").write_text(WL.replace("__THREE__", three).replace("__SCENE__", (HERE / "wild.js").read_text(encoding="utf-8")), encoding="utf-8")
+print("  wrote wild.html")
