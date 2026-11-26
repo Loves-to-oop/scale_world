@@ -915,3 +915,23 @@ CT = CT[:i0] + """<div id="intro"><div class="card">
 """ + CT[i1:]
 (HERE / "catch.html").write_text(CT.replace("__THREE__", three).replace("__SCENE__", (HERE / "catch.js").read_text(encoding="utf-8")), encoding="utf-8")
 print("  wrote catch.html")
+
+# Building a platform-framed house, step by step
+HS = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>Building a platform-framed house</title>").replace("background:#c8d4d8", "background:#1a1e24")
+i0, i1 = HS.index('<div id="intro">'), HS.index('<button id="vr">')
+HS = HS[:i0] + """<div id="intro"><div class="card">
+  <h1>Building a platform-framed house</h1>
+  <p>A two-storey house, 28 by 40 ft on a full basement, built step by step from the staked lot to the finished house: excavation, footings,
+  foundation walls, sills and beam, the first floor platform, walls framed flat and tilted up, the second platform, its walls, roof trusses,
+  sheathing, stairs, windows, roofing, the rough-in of pipes, wires and ducts, insulation, drywall, siding, and the finish. Every piece is at
+  its true size and spacing. Walk anywhere: floors and stairs carry you as soon as they are built.</p>
+  <p>Platform framing builds each storey as a platform (joists and subfloor) on top of the walls below, then frames the next walls on it.
+  About nine in ten new American houses are wood-framed, and nearly all of those are platform-framed; most of the rest are concrete block or
+  insulated concrete (common in Florida and the Southwest), with a few steel-framed, panelised or timber-framed.</p>
+  <p><kbd>N</kbd>/<kbd>→</kbd> next step &nbsp;&middot;&nbsp; <kbd>P</kbd>/<kbd>←</kbd> back &nbsp;&middot;&nbsp; <kbd>space</kbd> replay &nbsp;&middot;&nbsp; <kbd>X</kbd> x-ray (hide the coverings to see the frame) &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk, drag to look, <kbd>shift</kbd> run &nbsp;&middot;&nbsp; <kbd>G</kbd> fly (<kbd>Q</kbd>/<kbd>E</kbd> down/up) &nbsp;&middot;&nbsp; <kbd>1</kbd>-<kbd>6</kbd> places<br>
+  In VR: left stick walk, right stick turn (and up/down when flying), <b>A</b> next step, <b>B</b> back, right trigger replay, <b>X</b> x-ray, <b>Y</b> places, click the left stick to fly; the step's explanation is on your left wrist</p>
+  <p class="dim">Click to begin.</p>
+</div></div>
+""" + HS[i1:]
+(HERE / "house.html").write_text(HS.replace("__THREE__", three).replace("__SCENE__", (HERE / "house.js").read_text(encoding="utf-8")), encoding="utf-8")
+print("  wrote house.html")
