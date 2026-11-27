@@ -146,14 +146,16 @@ function mergeG(list) { const pos = [], nor = []; for (const g0 of list) { const
 // outfield are flat cut-out figures facing the field, two triangles each
 const STANDING = mergeG([new THREE.BoxGeometry(0.42, 0.64, 0.24).translate(0, 1.16, 0), new THREE.BoxGeometry(0.34, 0.86, 0.2).translate(0, 0.43, 0)]);
 const SEATED = mergeG([new THREE.BoxGeometry(0.42, 0.62, 0.24).translate(0, 0.32, 0.02), new THREE.BoxGeometry(0.36, 0.14, 0.46).translate(0, 0.05, -0.2)]);
-const HEADG = new THREE.IcosahedronGeometry(0.1, 0).scale(0.9, 1.1, 0.95), brim = r => new THREE.CircleGeometry(r, 7).rotateX(-Math.PI / 2);
+const HEADG = new THREE.IcosahedronGeometry(0.1, QL >= 2 ? 1 : 0).scale(0.9, 1.1, 0.95), brim = r => new THREE.CircleGeometry(r, 7).rotateX(-Math.PI / 2);
 const HATS = { derby: mergeG([new THREE.CylinderGeometry(0.085, 0.105, 0.1, 5).translate(0, 0.04, 0), brim(0.16)]), cap: mergeG([new THREE.BoxGeometry(0.21, 0.06, 0.22).translate(0, 0.02, 0), new THREE.BoxGeometry(0.18, 0.012, 0.09).translate(0, 0, -0.14)]),
   boater: mergeG([new THREE.CylinderGeometry(0.1, 0.1, 0.07, 5).translate(0, 0.035, 0), brim(0.17)]), lady: mergeG([new THREE.CylinderGeometry(0.1, 0.12, 0.09, 5).translate(0, 0.045, 0), brim(0.26)]) };
 const CUTOUT = (() => { const c = document.createElement("canvas"), W = 64, H = 128, NV = 8; c.width = W * NV; c.height = H; const g = c.getContext("2d"), coats = ["#23252b", "#2c2b2e", "#1f2331", "#36312b", "#3b3731", "#4a4437", "#2a2a2a", "#56504a"];
   for (let v = 0; v < NV; v++) { const x0 = v * W, cx = x0 + W / 2, hat = v % 4; g.fillStyle = "#2a2622"; g.fillRect(cx - 10, 70, 8, 56); g.fillRect(cx + 2, 70, 8, 56); g.fillStyle = coats[v]; g.beginPath(); g.roundRect(cx - 14, 30, 28, 46, 6); g.fill(); g.fillStyle = "#d8a888"; g.beginPath(); g.arc(cx, 21, 8, 0, 7); g.fill(); g.fillStyle = "#e8e4dc"; g.fillRect(cx - 3, 30, 6, 6);
     g.fillStyle = hat === 2 ? "#ddd0a0" : hat === 3 ? "#5a3a40" : "#1c1c1c"; if (hat === 0) { g.beginPath(); g.ellipse(cx, 14, 8, 6, 0, Math.PI, 0); g.fill(); g.fillRect(cx - 12, 14, 24, 2); } else if (hat === 1) { g.fillRect(cx - 9, 10, 18, 5); g.fillRect(cx - 9, 14, 22, 2); } else if (hat === 2) { g.fillRect(cx - 8, 9, 16, 6); g.fillRect(cx - 12, 14, 24, 2); } else { g.fillRect(cx - 7, 8, 14, 6); g.fillRect(cx - 16, 13, 32, 3); } }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.LinearFilter; return { t, NV }; })();
-const CROWD = { list: [], g: new THREE.Group(), built: false }; const ROOTERS_AT = P2(-24, 64, 4);
+const CROWD = { list: [], g: new THREE.Group(), built: false, cheerU: { value: 0 }, timeU: { value: 0 } };
+// the crowd rises and bobs when it cheers: done in the shader, so 10,000 people cost nothing to move
+function cheerMat(m) { m.onBeforeCompile = sh => { sh.uniforms.uCheer = CROWD.cheerU; sh.uniforms.uTime = CROWD.timeU; sh.vertexShader = "uniform float uCheer; uniform float uTime;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n#ifdef USE_INSTANCING\n vec3 ipos = instanceMatrix[3].xyz; float ph = fract(sin(dot(floor(ipos.xz * 4.0), vec2(12.9898, 78.233))) * 43758.5) * 6.28; transformed.y += uCheer * 0.16 * max(0.0, sin(uTime * 8.0 + ph));\n#endif"); }; return m; } const ROOTERS_AT = P2(-24, 64, 4);
 function buildCrowd() { if (CROWD.built) return; CROWD.built = true; DIAG.stage("seating the crowd");
  const coat = [0x22242a, 0x2a2a2e, 0x1e2230, 0x34302a, 0x3a3630, 0x2c2a26, 0x4a4436, 0x1a1a1c, 0x3e3a3a, 0x5a5448], hatCol = { derby: [0x1a1a1a, 0x2a2420, 0x3a2e24], cap: [0x3a3a3a, 0x4a4438, 0x2a2a30, 0x5a5040], boater: [0xe0d4a8], lady: [0x3a2a3a, 0x2a2a3a, 0x5a3a30, 0x7a6a5a] };
   const people = []; const hatOf = r => r < 0.6 ? "derby" : r < 0.88 ? "cap" : r < 0.94 ? "boater" : "lady";
@@ -173,9 +175,9 @@ function buildCrowd() { if (CROWD.built) return; CROWD.built = true; DIAG.stage(
   const cnt = { s: 0, t: 0, h: 0 }, hc = {}; for (const k in HATS) hc[k] = 0; const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), one = V3(1, 1, 1);
   for (const P of people) { q.setFromAxisAngle(UP, P.face); const sc = 0.92 + R() * 0.16, s = V3(sc, sc, sc), bm = P.seated ? body.s : body.t, k = P.seated ? "s" : "t"; m4.compose(P.p, q, s); bm.setMatrixAt(cnt[k], m4); bm.setColorAt(cnt[k], c.set(P.hat === "lady" ? [0x4a3a4a, 0x3a3a4a, 0x5a4a3a, 0x6a5a6a][R() * 4 | 0] : coat[R() * coat.length | 0])); cnt[k]++;
     const hy = (P.seated ? 0.78 : 1.6) * sc, hp = P.p.clone().add(V3(0, hy, 0)); m4.compose(hp, q, s); head.setMatrixAt(cnt.h, m4); head.setColorAt(cnt.h, c.setHSL(0.06, 0.4 + R() * 0.1, 0.42 + R() * 0.12)); cnt.h++;
-    const hm = hats[P.hat], hcl = hatCol[P.hat]; m4.compose(hp.clone().add(V3(0, 0.07 * sc, 0)), q, s); hm.setMatrixAt(hc[P.hat], m4); hm.setColorAt(hc[P.hat], c.set(hcl[R() * hcl.length | 0])); hc[P.hat]++; P.i = cnt.h - 1; CROWD.list.push(P); }
+    const hm = hats[P.hat], hcl = hatCol[P.hat]; m4.compose(hp.clone().add(V3(0, 0.05 * sc, 0)), q, s); hm.setMatrixAt(hc[P.hat], m4); hm.setColorAt(hc[P.hat], c.set(hcl[R() * hcl.length | 0])); hc[P.hat]++; P.i = cnt.h - 1; CROWD.list.push(P); }
   for (const [im, n] of [[body.s, cnt.s], [body.t, cnt.t], [head, cnt.h], ...Object.keys(HATS).map(k => [hats[k], hc[k]])]) { im.count = n; im.castShadow = false; im.receiveShadow = true; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; CROWD.g.add(im); }
-  CROWD.n = people.length + flatP.length; scene.add(CROWD.g); DIAG.stage("running inside"); }
+  CROWD.n = people.length + flatP.length; CROWD.g.traverse(o => { if (o.isInstancedMesh) cheerMat(o.material); }); scene.add(CROWD.g); DIAG.stage("running inside"); }
 // the ropes, on low stakes, that held the standing crowd back
 { let prev = null; for (let d = -45; d <= 45; d += 3) { const p = dir(d * Math.PI / 180).multiplyScalar(ropeDist(d)); box(0.06, 1.0, 0.06, MAT.wood, p.x, 0.5, p.z); if (prev) { const a = prev.clone().setY(0.92), b = p.clone().setY(0.92), cv = new THREE.QuadraticBezierCurve3(a, a.clone().lerp(b, 0.5).add(V3(0, -0.12, 0)), b); scene.add(new THREE.Mesh(new THREE.TubeGeometry(cv, 6, 0.012, 4), MAT.rope)); } prev = p; } }
 
@@ -215,40 +217,277 @@ const BIO = { "Cy Young": "Boston's pitcher, 36, already the winningest pitcher 
   "Jimmy Collins": "Boston's third baseman and manager, the best fielding third baseman of his day.", "Freddy Parent": "Boston's shortstop.", "Patsy Dougherty": "Boston's left fielder and leadoff man.", "Chick Stahl": "Boston's centre fielder.", "Buck Freeman": "Boston's right fielder, the American League's home-run leader this year with 13.",
   "Ginger Beaumont": "Pittsburgh's centre fielder and leadoff man, the National League's leader in hits this year (209).", "Fred Clarke": "Pittsburgh's left fielder and manager.", "Tommy Leach": "Pittsburgh's third baseman, small and fast.", "Honus Wagner": "Pittsburgh's shortstop, the National League batting champion this year (.355), already called the best player in the game.",
   "Kitty Bransfield": "Pittsburgh's first baseman.", "Claude Ritchey": "Pittsburgh's second baseman.", "Jimmy Sebring": "Pittsburgh's right fielder.", "Ed Phelps": "Pittsburgh's catcher.", "Deacon Phillippe": "Pittsburgh's pitcher, 25 wins this season.",
-  "Tommy Connolly": "The American League umpire, working behind the plate (two umpires for the whole game: one behind the plate, one on the bases).", "Hank O'Day": "The National League umpire, working the bases." };
+  "Jack O'Brien": "A Boston substitute; he will pinch-hit in the ninth.", "Duke Farrell": "Boston's veteran substitute catcher; he will pinch-hit in the ninth.", "Tommy Connolly": "The American League umpire, working behind the plate (two umpires for the whole game: one behind the plate, one on the bases).", "Hank O'Day": "The National League umpire, working the bases." };
 const FIELDPOS = { P: PM.clone().add(V3(0, 0.3, 0)), C: V3(0, 0, 0.9), "1B": B1.clone().add(dir(D45 + 0.25).multiplyScalar(3)).add(V3(0, 0, -2)), "2B": B2.clone().add(V3(4, 0, 4)), SS: B2.clone().add(V3(-5, 0, 5)), "3B": B3.clone().add(V3(1.5, 0, -1.5)), LF: dir(-0.45).multiplyScalar(76), CF: dir(0).multiplyScalar(90), RF: dir(0.45).multiplyScalar(70) };
 const PEOPLE = {};
 function buildPlayers() { if (PEOPLE.built) return; Object.defineProperty(PEOPLE, "built", { value: true, enumerable: false }); const face = (P, x, z, tx, tz) => { P.G.position.set(x, floorAt(x, z), z); P.G.rotation.y = Math.atan2(-(tx - x), -(tz - z)); };
   for (const [name, pos] of LINEUP.BOS) { const P = makePerson("BOS", name, pos); PEOPLE[name] = P; const p = FIELDPOS[pos]; face(P, p.x, p.z, 0, 0); if (pos === "C") { setPose(P, "crouch"); face(P, 0, 0.9, 0, -10); } if (pos === "P") setPose(P, "stand"); }
   LINEUP.PIT.forEach(([name, pos], i) => { const P = makePerson("PIT", name, pos); PEOPLE[name] = P; if (i === 0) { P.G.position.set(0.9, 0, 0.1); P.G.rotation.y = Math.PI / 2; setPose(P, "bat"); const bat = new THREE.Mesh(BATG, BATM); bat.rotation.x = -2.2; P.handR.add(bat); }
     else { const b = BENCH.PIT, off = WA.clone().multiplyScalar(-3.5 + i * 0.85); P.G.position.copy(b).add(off).add(UA.clone().multiplyScalar(-0.1)); P.G.rotation.y = ROT_U; setPose(P, "sit"); } });
+  for (const name of ["Jack O'Brien", "Duke Farrell"]) { const P = makePerson("BOS", name, "PH"); PEOPLE[name] = P; setPose(P, "sit"); }
   for (const [name, pos] of [["Tommy Connolly", "UMP_HP"], ["Hank O'Day", "UMP_B"]]) { const P = makePerson("UMP", name, pos); PEOPLE[name] = P; if (pos === "UMP_HP") { P.G.position.set(0.3, 0, 1.8); P.G.rotation.y = 0; setPose(P, "ready"); } else { const p = B1.clone().add(V3(3, 0, 3)); P.G.position.copy(p); P.G.rotation.y = Math.atan2(p.x, p.z); setPose(P, "ready"); } } }
-
 DIAG.stage("building the streets");
-// ---------- the neighbourhood: Rogers Street with its brick row houses, Huntington Avenue and its trolley line beyond left field, the huge
-// Boston Storage Warehouse, the railroad yards behind first base, and across the tracks the South End Grounds, home of the National League club ----------
-const BMAT = new Map(), WIN = { row: windowsT(6, 4), tall: windowsT(10, 8), low: windowsT(8, 2) };
-function bldg(u0, w0, u1, w1, h, t, roofC = 0x4a4440) { const c = P2((u0 + u1) / 2, (w0 + w1) / 2), lu = Math.abs(u1 - u0), lw = Math.abs(w1 - w0), m = t.clone(); m.needsUpdate = true;
-  const mat = BMAT.get(t) || (BMAT.set(t, new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 })), BMAT.get(t)); const b = new THREE.Mesh(new THREE.BoxGeometry(lu, h, lw), mat); b.position.set(c.x, h / 2, c.z); b.rotation.y = ROT_U + Math.PI / 2 - Math.PI / 2; b.rotation.y = Math.atan2(UA.z, -UA.x) * 0 + (-Math.atan2(UA.z, UA.x)); b.castShadow = b.receiveShadow = true; scene.add(b); return b; }
-{ const r = mulberry(21);
-  // Rogers Street: row houses on the far side, three and four storeys
-  for (let u = -70; u < 210; u += 9 + r() * 6) { const w = 6 + r() * 4; bldg(u, -54, u + w, -70, 10 + (r() * 2 | 0) * 3.5, WIN.row); }
-  // Huntington Avenue: the storage warehouse and a row of buildings beyond left field
-  bldg(150, -20, 182, 90, 30, WIN.tall, 0x3a3a3a); for (let w = 95; w < 200; w += 14 + r() * 8) bldg(150, w, 170, w + 12, 12 + r() * 6, WIN.row); for (let w = -80; w < -22; w += 15) bldg(150, w, 168, w + 13, 11 + r() * 5, WIN.row);
-  // the trolley tracks down the middle of Huntington Avenue, and a pair of trolley cars
+
+// ---------- the neighbourhood, as the 1903 photographs show it: brick row houses on Rogers Street, the huge Boston Storage Warehouse across
+// Huntington Avenue beyond left field (the famous bird's-eye photo of the park was taken from its roof), the railroad yards and a roundhouse
+// beyond the first-base side, the South End Grounds across the tracks, and stables and works beyond right field ----------
+// Facades are drawn bay by bay: brick in running bond, two-over-two sash windows with stone lintels and sills; a stone base course and a
+// projecting cornice are separate pieces, so the windows keep their real size on every building.
+function facadeTex(brick, kind) { return tex(128, 128, (g, w, h) => { const r = mulberry(brick.length * 7 + kind.length); g.fillStyle = "#8a8070"; g.fillRect(0, 0, w, h); const bc = new THREE.Color(brick);
+    for (let y = 0; y < h; y += 4) for (let x = (y / 4) % 2 * 5; x < w + 10; x += 10) { const c = bc.clone().offsetHSL(0, 0, (r() - 0.5) * 0.08); g.fillStyle = "#" + c.getHexString(); g.fillRect(x - 5, y, 9, 3); }
+    if (kind === "plain") return;
+    if (kind === "clap") { g.fillStyle = "#c8c0b0"; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 8) { g.fillStyle = "rgba(0,0,0,0.18)"; g.fillRect(0, y + 6, w, 2); } }
+    const ww = kind === "store" ? 84 : kind === "ware" ? 40 : kind === "clap" ? 34 : 44, wh = kind === "store" ? 76 : kind === "ware" ? 56 : 64, x0 = (w - ww) / 2, y0 = kind === "store" ? 24 : 30;
+    if (kind === "ware") { g.fillStyle = "#c8b8a0"; g.beginPath(); g.arc(w / 2, y0 + 4, ww / 2 + 5, Math.PI, 0); g.fill(); g.fillStyle = "#1e2228"; g.beginPath(); g.arc(w / 2, y0 + 4, ww / 2, Math.PI, 0); g.fill(); }
+    else { g.fillStyle = kind === "clap" ? "#f0ece0" : "#d0c4ac"; g.fillRect(x0 - 5, y0 - 9, ww + 10, 8); }
+    g.fillStyle = kind === "clap" ? "#f0ece0" : "#d8ccb4"; g.fillRect(x0 - 4, y0 + wh, ww + 8, 6); g.fillStyle = "#e8e0cc"; g.fillRect(x0, y0, ww, wh);
+    const gl = g.createLinearGradient(0, y0, 0, y0 + wh); gl.addColorStop(0, "#5a6a78"); gl.addColorStop(0.5, "#262c34"); gl.addColorStop(1, "#1a1e24"); g.fillStyle = gl; const f = 3; g.fillRect(x0 + f, y0 + f, ww - 2 * f, wh / 2 - f * 1.5); g.fillRect(x0 + f, y0 + wh / 2 + f / 2, ww - 2 * f, wh / 2 - f * 1.5);
+    g.fillStyle = "#e8e0cc"; g.fillRect(w / 2 - 1.5, y0, 3, wh); if (kind === "store") { g.fillStyle = "#3a2a1e"; g.fillRect(0, 0, w, 18); } }); }
+const FACADE = {}, facadeMat = (brick, kind) => { const k = brick + kind; if (!FACADE[k]) { const t = facadeTex(brick, kind); FACADE[k] = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }); } return FACADE[k]; };
+const STONE = M(0xb8ae98), CORNICE = M(0x4a443c), ROOFM = M(0x3a3632), TAR = M(0x2a2a2a);
+// a building: lu along the u axis, lw along w, h tall; bayW and floorH set how big each window bay is
+function bldg(u0, w0, u1, w1, h, brick = "#8a4a34", kind = "row", o = {}) { const lu = Math.abs(u1 - u0), lw = Math.abs(w1 - w0), c = P2((u0 + u1) / 2, (w0 + w1) / 2), ry = -Math.atan2(UA.z, UA.x), bay = o.bay || 3.2, fl = o.floor || 3.6;
+  const g = new THREE.BoxGeometry(lu, h, lw), uv = g.attributes.uv; const faceDims = [[lw, h], [lw, h], [lu, lw], [lu, lw], [lu, h], [lu, h]]; for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) { const i = f * 4 + k; uv.setXY(i, uv.getX(i) * Math.max(1, Math.round(faceDims[f][0] / bay)), uv.getY(i) * Math.max(1, Math.round(faceDims[f][1] / fl))); }
+  const m = new THREE.Mesh(g, facadeMat(brick, kind)); m.position.set(c.x, h / 2, c.z); m.rotation.y = ry; m.castShadow = m.receiveShadow = true; scene.add(m);
+  const cap = box(lu + 0.6, 0.55, lw + 0.6, CORNICE, c.x, h + 0.2, c.z, ry); const roof = box(lu, 0.1, lw, TAR, c.x, h + 0.05, c.z, ry); const base = box(lu + 0.12, 0.9, lw + 0.12, STONE, c.x, 0.45, c.z, ry);
+  if (o.chimneys) { const r = mulberry(Math.round(u0 * 13 + w0)); for (let k = 0; k < o.chimneys; k++) { const p = P2(u0 + (k + 0.5) * lu / o.chimneys, w0 + (r() - 0.5) * lw * 0.5); box(0.7, 1.6, 0.9, facadeMat(brick, "plain"), p.x, h + 0.8, p.z, ry); } }
+  return m; }
+function shed(u0, w0, u1, w1, h, ridgeAlongU = true) { const lu = Math.abs(u1 - u0), lw = Math.abs(w1 - w0), c = P2((u0 + u1) / 2, (w0 + w1) / 2), ry = -Math.atan2(UA.z, UA.x); const m = new THREE.Mesh(new THREE.BoxGeometry(lu, h, lw), facadeMat("#8a6a4a", "clap")); m.position.set(c.x, h / 2, c.z); m.rotation.y = ry; m.castShadow = m.receiveShadow = true; scene.add(m);
+  const span = ridgeAlongU ? lw : lu, len = ridgeAlongU ? lu : lw, sh = new THREE.Shape([new THREE.Vector2(-span / 2 - 0.3, 0), new THREE.Vector2(span / 2 + 0.3, 0), new THREE.Vector2(0, span * 0.35)]), rf = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: len + 0.4, bevelEnabled: false }).translate(0, 0, -(len + 0.4) / 2), ROOFM);
+  rf.position.set(c.x, h, c.z); rf.rotation.y = ry + (ridgeAlongU ? Math.PI / 2 : 0); rf.castShadow = true; scene.add(rf); }
+{ const r = mulberry(21), BR = ["#8a4a34", "#7a3e2e", "#94563c", "#6e4434", "#9a6a4a"];
+  // Rogers Street: three- and four-storey brick row houses with shops below, on the far side of the street
+  for (let u = -70; u < 210;) { const w = 6 + r() * 3, n = 2 + (r() * 3 | 0), b = BR[r() * BR.length | 0], h = (3 + (r() * 2 | 0)) * 3.5 + 0.6; bldg(u, -53, u + w * n, -66, h, b, "row", { bay: w / 2, floor: 3.5, chimneys: n }); u += w * n + (r() < 0.2 ? 4 : 0.2); }
+  // the Boston Storage Warehouse: eight storeys of brick with arched windows, across Huntington Avenue
+  bldg(150, -20, 182, 92, 32, "#7a4434", "ware", { bay: 3.4, floor: 4.0 });
+  for (let w = 96; w < 210;) { const L = 12 + r() * 10; bldg(150, w, 168, w + L, 10 + (r() * 3 | 0) * 3.6, BR[r() * BR.length | 0], r() < 0.5 ? "store" : "row", { bay: 3.4, floor: 3.6, chimneys: 2 }); w += L + 0.3; }
+  for (let w = -84; w < -24;) { const L = 13 + r() * 6; bldg(150, w, 168, w + L, 11 + (r() * 2 | 0) * 3.6, BR[r() * BR.length | 0], "store", { bay: 3.4, floor: 3.6, chimneys: 2 }); w += L + 0.3; }
+  // the trolley tracks down the middle of Huntington Avenue, a pair of electric cars, and the wooden poles for the overhead wire
   for (const o of [-0.75, 0.75, 2.45, 3.95]) { const a = P2(137 + o, -200), b = P2(137 + o, 300), L = a.distanceTo(b), m = box(L, 0.04, 0.07, MAT.iron, (a.x + b.x) / 2, 0.02, (a.z + b.z) / 2); m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); }
+  for (let w = -150; w < 280; w += 30) { const p = P2(132.5, w); box(0.25, 7.5, 0.25, MAT.wood, p.x, 3.75, p.z); }
   for (const [w, k] of [[10, 0], [140, 1]]) { const c = P2(137 + k * 3.2, w), car = new THREE.Group(); car.position.set(c.x, 0, c.z); car.rotation.y = -Math.atan2(WA.z, WA.x); scene.add(car);
-    box(10, 2.4, 2.4, M(0x7a5a2a), 0, 1.6, 0, 0, car); box(10.4, 0.3, 2.6, M(0x3a3028), 0, 3.0, 0, 0, car); box(9.6, 0.9, 2.42, M(0xd8c8a0), 0, 2.2, 0, 0, car); const pole = box(0.05, 3, 0.05, MAT.iron, 2, 4.4, 0, 0, car); pole.rotation.z = 0.6; }
-  // the railroad yards behind the first-base side: tracks, freight cars, a locomotive
+    box(10, 2.4, 2.4, M(0x6a4a24), 0, 1.6, 0, 0, car); box(10.4, 0.3, 2.6, M(0x3a3028), 0, 3.0, 0, 0, car); box(9.6, 0.9, 2.42, M(0xd8c8a0), 0, 2.2, 0, 0, car); const pole = box(0.05, 3, 0.05, MAT.iron, 2, 4.4, 0, 0, car); pole.rotation.z = 0.6; }
+  // the railroad yards behind the first-base side: tracks, freight cars
   for (let k = 0; k < 7; k++) { const u = -46 - k * 4.5; for (const o of [-0.72, 0.72]) { const a = P2(u + o, -200), b = P2(u + o, 300), L = a.distanceTo(b), m = box(L, 0.12, 0.08, MAT.iron, (a.x + b.x) / 2, 0.1, (a.z + b.z) / 2); m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); }
     for (let w = -120 + r() * 30; w < 260; w += 12 + r() * 30) { if (r() < 0.45) continue; const c = P2(u, w), fc = box(11, 3.2, 2.8, M([0x6a3424, 0x5a3020, 0x4a3a30, 0x7a4a2a][r() * 4 | 0]), c.x, 1.9, c.z); fc.rotation.y = -Math.atan2(WA.z, WA.x); } }
+  // the roundhouse: a fan of brick engine stalls round a turntable, with a smoke jack over each stall
+  { const C = P2(-112, 95), R0 = 14, R1 = 34; for (let k = 0; k < 13; k++) { const a = Math.PI * 0.15 + k * Math.PI * 0.7 / 12, mid = (R0 + R1) / 2, p = V3(C.x + Math.cos(a) * mid, 0, C.z + Math.sin(a) * mid), st = box(R1 - R0, 7, 6.2, facadeMat("#5e3a2e", "plain"), p.x, 3.5, p.z, -a); box(R1 - R0 + 0.6, 0.4, 6.6, ROOFM, p.x, 7.2, p.z, -a);
+      const j = V3(C.x + Math.cos(a) * (R0 + 6), 0, C.z + Math.sin(a) * (R0 + 6)); box(0.8, 2.2, 0.8, M(0x2a2a2a), j.x, 8.4, j.z, -a); }
+    const tt = new THREE.Mesh(new THREE.CylinderGeometry(R0 - 2, R0 - 2, 0.3, 32), M(0x4a4440)); tt.position.set(C.x, 0.05, C.z); scene.add(tt); }
   // the South End Grounds across the tracks: the Beaneaters' covered grandstand
-  { const c = P2(-128, 10), g = new THREE.Group(); g.position.set(c.x, 0, c.z); g.rotation.y = -Math.atan2(WA.z, WA.x); scene.add(g); box(70, 12, 18, MAT.board, 0, 6, 0, 0, g); box(72, 0.4, 20, MAT.roof, 0, 12.4, 0, 0, g); for (let i = -3; i <= 3; i++) { const t = box(0.8, 3, 0.8, MAT.paint, i * 10, 14, 0, 0, g); } }
-  // stables, breweries and works beyond right field, with smokestacks
-  for (let u = -30; u < 140; u += 18 + r() * 10) bldg(u, 128, u + 15, 150 + r() * 15, 8 + r() * 10, WIN.low);
-  for (const [u, w, h] of [[40, 160, 34], [110, 175, 28], [-60, 180, 40]]) { const c = P2(u, w), s = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.6, h, 12), new THREE.MeshStandardMaterial({ map: brickT, roughness: 0.9 })); s.position.set(c.x, h / 2, c.z); s.castShadow = true; scene.add(s); }
-  // telegraph poles along Rogers Street
+  { const c = P2(-128, 10), g = new THREE.Group(); g.position.set(c.x, 0, c.z); g.rotation.y = -Math.atan2(WA.z, WA.x); scene.add(g); box(70, 10, 16, MAT.board, 0, 5, 0, 0, g); box(72, 0.4, 19, MAT.roof, 0, 11.6, -1, 0, g); for (let i = -6; i <= 6; i++) box(0.3, 2.2, 0.3, MAT.col, i * 5.5, 10.9, 8, 0, g); box(60, 1.2, 0.2, MAT.paint, 0, 10.4, 8.1, 0, g); }
+  // beyond right field: livery stables and sheds in wood, and brick works
+  for (let u = -30; u < 140;) { const L = 14 + r() * 10; if (r() < 0.5) shed(u, 128, u + L, 142, 4.5 + r() * 2); else bldg(u, 128, u + L, 146, 8 + (r() * 2 | 0) * 4, BR[r() * BR.length | 0], "row", { bay: 4, floor: 4, chimneys: 1 }); u += L + 1.5; }
+  // telegraph poles along Rogers Street, with crossarms
   for (let u = -60; u < 200; u += 30) { const c = P2(u, -51.5); box(0.22, 10, 0.22, MAT.wood, c.x, 5, c.z); const arm = box(2.2, 0.12, 0.12, MAT.wood, c.x, 9.3, c.z); arm.rotation.y = ROT_U; } }
+// the rest of the city out to the horizon: Back Bay, the South End and Roxbury as plain blocks of brick, three to six storeys
+{ const r = mulberry(77), BR = ["#8a4a34", "#7a3e2e", "#94563c", "#6e4434", "#9a6a4a"]; for (let u = -420; u <= 520; u += 34) for (let w = -420; w <= 520; w += 34) { const inPark = u > -100 && u < 200 && w > -90 && w < 175, rail = u > -95 && u < -40, round = Math.hypot(u + 112, w - 95) < 45; if (inPark || rail || round || r() < 0.15) continue;
+    const h = (3 + (r() * 4 | 0)) * 3.6, uu = u + (r() - 0.5) * 4, ww = w + (r() - 0.5) * 4; bldg(uu, ww, uu + 22 + r() * 8, ww + 22 + r() * 8, h, BR[r() * BR.length | 0], "row", { bay: 3.3, floor: 3.6, chimneys: r() < 0.5 ? 2 : 0 }); } }
+
+// ---------- the game, play by play, from the official record ----------
+// The information used here was obtained free of charge from and is copyrighted by Retrosheet (www.retrosheet.org).
+// Each play: who (the batter, or the runner for a steal), what happened, where, and where everyone ended up: B is the batter, 1-3 the runners
+// on those bases, H home (a run), x out. The words are Retrosheet's. The record doesn't give the pitches, so the balls and strikes before each
+// result are made up to fit it (fouls count as strikes, the rule both leagues used in 1903).
+const NAMES = { Beaumont: "Ginger Beaumont", Clarke: "Fred Clarke", Leach: "Tommy Leach", Wagner: "Honus Wagner", Bransfield: "Kitty Bransfield", Ritchey: "Claude Ritchey", Sebring: "Jimmy Sebring", Phelps: "Ed Phelps", Phillippe: "Deacon Phillippe",
+  Dougherty: "Patsy Dougherty", Collins: "Jimmy Collins", Stahl: "Chick Stahl", Freeman: "Buck Freeman", Parent: "Freddy Parent", LaChance: "Candy LaChance", Ferris: "Hobe Ferris", Criger: "Lou Criger", Young: "Cy Young", "O'Brien": "Jack O'Brien", Farrell: "Duke Farrell" };
+const LEFTY = new Set(["Beaumont", "Clarke", "Bransfield", "Sebring", "Dougherty", "Stahl", "Freeman"]);
+const ev = (b, k, loc, mv, text) => ({ b, k, loc, mv, text });
+const HALVES = [
+  [ev("Beaumont", "F", 8, "Bx", "Beaumont flied out to center."), ev("Clarke", "Pf", 2, "Bx", "Clarke popped to the catcher in foul territory."), ev("Leach", "Tgr", 9, "B3", "Leach tripled: a ground-rule triple into the overflow crowd."),
+    ev("Wagner", "S", 7, "B1 3H", "Wagner singled to left; Leach scored, the first run in World Series history."), ev("Wagner", "SB", 0, "1-2", "Wagner stole second."), ev("Bransfield", "E", 4, "B1 2-3", "Bransfield reached on an error by Ferris; Wagner to third."),
+    ev("Bransfield", "SBE", 0, "1-3 3H", "Bransfield stole second; Criger's throw got away, Wagner scored and Bransfield went to third."), ev("Ritchey", "BB", 0, "B1", "Ritchey walked."), ev("Ritchey", "SB", 0, "1-2", "Ritchey stole second."),
+    ev("Sebring", "S", 7, "B1 3H 2H", "Sebring singled to left; Bransfield and Ritchey scored."), ev("Phelps", "KE", 0, "B1 1-3", "Phelps struck out, but Criger let the third strike get away and Phelps reached first; Sebring to third."), ev("Phillippe", "K", 0, "Bx", "Phillippe struck out.")],
+  [ev("Dougherty", "K", 0, "Bx", "Dougherty struck out."), ev("Collins", "K", 0, "Bx", "Collins struck out."), ev("Stahl", "S", 7, "B1", "Stahl singled to left."), ev("Freeman", "F", 9, "Bx", "Freeman flied out to right.")],
+  [ev("Beaumont", "K", 0, "Bx", "Beaumont struck out."), ev("Clarke", "SX", 7, "Bx", "Clarke singled to left, but was thrown out trying for second (left fielder to second baseman)."), ev("Leach", "F", 7, "Bx", "Leach flied out to left.")],
+  [ev("Parent", "K", 0, "Bx", "Parent struck out."), ev("LaChance", "K", 0, "Bx", "LaChance struck out."), ev("Ferris", "K", 0, "Bx", "Ferris struck out.")],
+  [ev("Wagner", "P", 5, "Bx", "Wagner popped to third."), ev("Bransfield", "Tgr", 9, "B3", "Bransfield tripled to right: a ground-rule triple into the overflow crowd."), ev("Ritchey", "K", 0, "Bx", "Ritchey struck out."),
+    ev("Sebring", "S", 9, "B1 3H", "Sebring singled to right; Bransfield scored."), ev("Phelps", "G", "1-3", "Bx", "Phelps grounded out, pitcher to first.")],
+  [ev("Criger", "G", "5-3", "Bx", "Criger grounded out, third to first."), ev("Young", "G", "4-3", "Bx", "Young grounded out, second to first."), ev("Dougherty", "F", 8, "Bx", "Dougherty flied out to center.")],
+  [ev("Phillippe", "P", 6, "Bx", "Phillippe popped to shortstop."), ev("Beaumont", "E", 4, "B1", "Beaumont reached on an error by Ferris."), ev("Clarke", "S", 7, "B1 1-2", "Clarke singled to left; Beaumont to second."), ev("Leach", "S", 8, "B1 2H 1-2", "Leach singled to center; Beaumont scored, Clarke to second."),
+    ev("Wagner", "P", 6, "Bx", "Wagner popped to shortstop."), ev("Bransfield", "FC", "4-6", "B1 1x", "Bransfield forced Leach at second, second baseman to shortstop.")],
+  [ev("Collins", "F", 7, "Bx", "Collins flied out to left."), ev("Stahl", "F", 8, "Bx", "Stahl flied out to center."), ev("Freeman", "S", 3, "B1", "Freeman singled to first."), ev("Parent", "E", 5, "B1 1-3", "Parent reached on an error by Leach; Freeman to third."), ev("LaChance", "G", "1-3", "Bx", "LaChance grounded out, pitcher to first.")],
+  [ev("Ritchey", "G", "5-3", "Bx", "Ritchey grounded out, third to first."), ev("Sebring", "G", "5-3", "Bx", "Sebring grounded out, third to first."), ev("Phelps", "S", 9, "B1", "Phelps singled to right."), ev("Phillippe", "P", 4, "Bx", "Phillippe popped to second.")],
+  [ev("Ferris", "K", 0, "Bx", "Ferris struck out."), ev("Criger", "G", "6-3", "Bx", "Criger grounded out, shortstop to first."), ev("Young", "F", 7, "Bx", "Young flied out to left.")],
+  [ev("Beaumont", "Pf", 5, "Bx", "Beaumont popped to third in foul territory."), ev("Clarke", "K", 0, "Bx", "Clarke struck out."), ev("Leach", "S", 5, "B1", "Leach singled to third."), ev("Wagner", "BB", 0, "B1 1-2", "Wagner walked; Leach to second."), ev("Bransfield", "FC", "4-6", "B1 1x", "Bransfield forced Wagner at second, second baseman to shortstop.")],
+  [ev("Dougherty", "P", 4, "Bx", "Dougherty popped to second."), ev("Collins", "G", "4-3", "Bx", "Collins grounded out, second to first."), ev("Stahl", "Kc", 0, "Bx", "Stahl was called out on strikes.")],
+  [ev("Ritchey", "G", "6-3", "Bx", "Ritchey grounded out, shortstop to first."), ev("Sebring", "HRi", 8, "BH", "Sebring hit an inside-the-park home run to center: the first home run in World Series history."), ev("Phelps", "F", 9, "Bx", "Phelps flied out to right."), ev("Phillippe", "G", "6-3", "Bx", "Phillippe grounded out, shortstop to first.")],
+  [ev("Freeman", "T", 9, "B3", "Freeman tripled to right."), ev("Parent", "Tgr", 7, "B3 3H", "Parent tripled to left, a ground-rule triple into the overflow crowd; Freeman scored."), ev("LaChance", "F", 7, "Bx 3H", "LaChance flied to left; Parent scored after the catch."),
+    ev("Ferris", "HBP", 0, "B1", "Ferris was hit by a pitch."), ev("Criger", "K", 0, "Bx", "Criger struck out."), ev("Young", "K", 0, "Bx", "Young struck out.")],
+  [ev("Beaumont", "G", "6-3", "Bx", "Beaumont grounded out, shortstop to first."), ev("Clarke", "F", 9, "Bx", "Clarke flied out to right."), ev("Leach", "T", 9, "B3", "Leach tripled to right."), ev("Wagner", "BB", 0, "B1", "Wagner walked."),
+    ev("Leach", "CS", "2-4-2", "3x", "Leach was caught stealing home: catcher to second baseman and back to the catcher.")],
+  [ev("Dougherty", "P", 6, "Bx", "Dougherty popped to shortstop."), ev("Collins", "G", "6-3", "Bx", "Collins grounded out, shortstop to first."), ev("Stahl", "F", 8, "Bx", "Stahl flied out to center.")],
+  [ev("Bransfield", "F", 8, "Bx", "Bransfield flied out to center."), ev("Ritchey", "G", "5-3", "Bx", "Ritchey grounded out, third to first."), ev("Sebring", "G", "4-3", "Bx", "Sebring grounded out, second to first.")],
+  [ev("Freeman", "E", 6, "B1", "Freeman reached on an error by Wagner."), ev("Parent", "S", 7, "B1 1-2", "Parent singled to left; Freeman to second."), ev("LaChance", "F", 7, "Bx 2-3", "LaChance flied to left; Freeman to third."), ev("Ferris", "S", 8, "B1 3H 1-2", "Ferris singled to center; Freeman scored, Parent to second."),
+    ev("O'Brien", "K", 0, "Bx", "O'Brien, batting for Criger, struck out."), ev("Farrell", "G", "1-3", "Bx", "Farrell, batting for Young, grounded out, pitcher to first. Pittsburgh wins, 7 to 3.")]];
+const EVENTS = []; HALVES.forEach((h, hi) => h.forEach((e, k) => EVENTS.push({ ...e, half: hi, last: k === h.length - 1, i: EVENTS.length })));
+const HALF_NAME = hi => `${hi % 2 ? "Bottom" : "Top"} of the ${["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"][hi >> 1]}`;
+
+// ---------- playing the game: everyone moves, the ball flies, the record decides what happens ----------
+// Speeds are period-plausible: runners about 7.3 m/s, fielders 6-7 m/s, a pitch about 34 m/s (76 mph), a throw about 30 m/s.
+// "Real time" keeps the game's real pace (it took 1 hour 55 minutes); "brisk" cuts the waits between pitches and batters.
+const PACE = { real: { gap: 16, between: 24, change: 90 }, brisk: { gap: 3.2, between: 3, change: 6 } }; let paceKey = "real";
+const POSN = { P: 1, C: 2, "1B": 3, "2B": 4, "3B": 5, SS: 6, LF: 7, CF: 8, RF: 9 }, NPOS = Object.fromEntries(Object.entries(POSN).map(([k, v]) => [v, k]));
+const BP = k => k === 0 || k === 4 ? V3(0, 0, 0) : [null, B1, B2, B3][k], BATTERS_BOX = lefty => V3(lefty ? 0.95 : -0.95, 0, 0.05);
+const BALL = new THREE.Mesh(new THREE.SphereGeometry(0.037, 10, 8), M(0xf4f0e4, { roughness: 0.6 })); BALL.castShadow = true; scene.add(BALL); BALL.visible = false;
+const BATM2 = new THREE.Mesh(BATG, BATM); BATM2.rotation.set(-2.3, 0, 0.2);
+const GAME = { on: false, ei: 0, T: 0, cues: [], st: null, phase: "pre", paused: false, ball: { mode: "hide" }, cheer: 0, last: "", batter: null, balls: 0, strikes: 0 };
+const cue = (t, fn) => GAME.cues.push({ t, fn });
+const team = hi => hi % 2 ? "BOS" : "PIT", other = t => t === "PIT" ? "BOS" : "PIT", P_ = n => PEOPLE[NAMES[n] || n];
+function fielder(n, hi = GAME.st.half) { const t = other(team(hi)); const e = LINEUP[t].find(([, p]) => POSN[p] === n); return PEOPLE[e[0]]; }
+function slotOf(tm, short) { if (short === "O'Brien") return 7; if (short === "Farrell") return 8; return LINEUP[tm].findIndex(([n]) => n === NAMES[short]); }
+function benchSpot(tm, k) { const b = BENCH[tm], along = tm === "PIT" ? WA : UA, back = tm === "PIT" ? UA : WA; return b.clone().addScaledVector(along, -3.6 + k * 0.72).addScaledVector(back, -0.1); }
+const benchFace = tm => tm === "PIT" ? ROT_U : ROT_W;
+
+// ---------- the game's state: bases, outs, runs, whose turn ----------
+function freshState() { return { half: 0, bases: [null, null, null, null], outs: 0, score: { PIT: 0, BOS: 0 }, line: [[], []], order: { PIT: 0, BOS: 0 }, halfRuns: 0, card: [] }; }
+const CODE = e => ({ K: "K", Kc: "Kc", KE: "K", F: "F" + e.loc, P: "P" + e.loc, Pf: "F" + e.loc + "f", G: e.loc, S: "1B", SX: "1B", T: "3B", Tgr: "3B", HRi: "HR", BB: "BB", HBP: "HP", E: "E" + e.loc, FC: "FC" })[e.k];
+function applyEvent(e, S) { const tm = team(e.half), old = S.bases.slice(), nb = [null, null, null, null], moved = new Set(), bat = e.b;
+  for (const tok of e.mv.split(" ")) { const f = tok[0], to = tok[tok.length - 1], who = f === "B" ? bat : old[+f]; if (f !== "B") moved.add(+f); if (to === "H") { S.score[tm]++; S.halfRuns++; } else if (to === "x") S.outs++; else nb[+to] = who; }
+  for (let b = 1; b <= 3; b++) if (old[b] && !moved.has(b) && !nb[b]) nb[b] = old[b]; S.bases = nb;
+  if (!["SB", "SBE", "CS"].includes(e.k)) { const s = slotOf(tm, bat); S.order[tm] = (s + 1) % 9; S.card.push({ tm, slot: s, inn: e.half >> 1, code: CODE(e), pinch: bat === "O'Brien" || bat === "Farrell" ? bat : null }); }
+  if (e.last) { S.line[e.half % 2].push(S.halfRuns); S.halfRuns = 0; S.outs = 0; S.bases = [null, null, null, null]; S.half = e.half + 1; } }
+const stateAt = i => { const S = freshState(); for (let k = 0; k < i; k++) applyEvent(EVENTS[k], S); return S; };
+const batterFor = (e, S) => ["SB", "SBE", "CS"].includes(e.k) ? (() => { const tm = team(e.half), s = S.order[tm]; return LINEUP[tm][s][0].split(" ").pop(); })() : e.b;
+
+// ---------- people moving: a path of points at a speed; then they stand and face something ----------
+function goTo(P, pts, speed, face) { P.path = (Array.isArray(pts) ? pts : [pts]).map(p => p.clone().setY(0)); P.speed = speed; P.faceAt = face || null; }
+function act(P, n, d) { P.act = { n, t0: GAME.T, d }; }
+function stand(P, pose, faceAt) { P.path = []; P.base = pose; if (faceAt) P.faceAt = faceAt; }
+function updatePerson(P, dt) { const G = P.G; let moving = false;
+  if (P.path && P.path.length) { const tgt = P.path[0], d = V3(tgt.x - G.position.x, 0, tgt.z - G.position.z), L = d.length(), step = (P.speed || 3) * dt; if (L <= step) { G.position.x = tgt.x; G.position.z = tgt.z; P.path.shift(); } else { G.position.addScaledVector(d, step / L); moving = true; } if (L > 0.01) G.rotation.y = Math.atan2(-d.x, -d.z); }
+  if (!moving && P.faceAt) { const dx = P.faceAt.x - G.position.x, dz = P.faceAt.z - G.position.z; if (dx * dx + dz * dz > 0.01) { const ty = Math.atan2(-dx, -dz); let dy = ty - G.rotation.y; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI; G.rotation.y += dy * Math.min(1, dt * 6); } }
+  G.position.y = floorAt(G.position.x, G.position.z) * (moving ? 1 : 1);
+  setPose(P, moving ? "stand" : (P.base || "ready")); const z = (j, x, y, zz) => j.rotation.set(x, y || 0, zz || 0);
+  if (moving) { P.ph = (P.ph || 0) + dt * (P.speed || 3) * 1.5; const k = clampN((P.speed || 3) / 7, 0.3, 1), s = Math.sin(P.ph); z(P.lL, s * 0.9 * k); z(P.lR, -s * 0.9 * k); z(P.kL, Math.max(0, -s) * 1.2 * k + 0.1); z(P.kR, Math.max(0, s) * 1.2 * k + 0.1); z(P.aL, -s * 0.8 * k, 0, 0.15); z(P.aR, s * 0.8 * k, 0, -0.15); z(P.eL, -1.2 * k); z(P.eR, -1.2 * k); z(P.torso, -0.25 * k); P.hips.position.y = 0.95 - 0.04 * k + Math.abs(Math.cos(P.ph)) * 0.04 * k; }
+  if (P.act) { const u = (GAME.T - P.act.t0) / P.act.d; if (u > 1 || u < 0) P.act = null; else { const n = P.act.n;
+      if (n === "windup") { if (u < 0.55) { z(P.aL, -2.6, 0, 0.3); z(P.aR, -2.7, 0, -0.3); z(P.lL, -1.1 * Math.sin(u / 0.55 * Math.PI), 0, 0); z(P.kL, 1.2 * Math.sin(u / 0.55 * Math.PI)); } else { const v = (u - 0.55) / 0.45; z(P.torso, -0.5 * v); z(P.lL, -0.6); z(P.kL, 0.4); z(P.aR, lerpN(-2.9, 1.1, v), 0, -0.3); z(P.aL, -0.6, 0, 0.4); } }
+      else if (n === "throw") { z(P.aR, u < 0.4 ? -2.6 : lerpN(-2.6, 0.9, (u - 0.4) / 0.6), 0, -0.3); z(P.torso, -0.3 * u, -0.4 + 0.8 * u); }
+      else if (n === "swing") { z(P.torso, -0.15, lerpN(0.7, -1.1, Math.min(1, u * 1.6))); z(P.aL, -1.45, 0, 0.2); z(P.aR, -1.45, 0, -0.2); z(P.eL, -0.2); z(P.eR, -0.2); }
+      else if (n === "catch") { z(P.aL, -2.2, 0, 0.25); z(P.eL, -0.3); }
+      else if (n === "low") { z(P.torso, -0.9); z(P.aL, -1.0, 0, 0.1); z(P.kL, 0.9); z(P.kR, 0.9); z(P.lL, -0.6); z(P.lR, -0.6); P.hips.position.y = 0.75; }
+      else if (n === "call") { z(P.aR, -2.9, 0, -0.2); z(P.eR, -0.6); }
+      else if (n === "safe") { z(P.aL, -1.5, 0, 1.3); z(P.aR, -1.5, 0, -1.3); } } } }
+
+// ---------- the ball: held, or flying along arcs, rolls and straight lines ----------
+function hold(P, hand = "R") { GAME.ball = { mode: "held", P, hand }; BALL.visible = true; }
+function fly(segs, then) { GAME.ball = { mode: "path", segs, then }; BALL.visible = true; }
+const handPos = (P, hand) => (hand === "L" ? P.handL : P.handR).getWorldPosition(V3(0, 0, 0));
+function updateBall() { const B = GAME.ball; if (B.mode === "hide") { BALL.visible = false; return; } if (B.mode === "held") { BALL.position.copy(handPos(B.P, B.hand)); return; }
+  const T = GAME.T; let s = B.segs.find(s => T < s.t1) || B.segs[B.segs.length - 1]; const u = clampN((T - s.t0) / (s.t1 - s.t0), 0, 1);
+  if (s.type === "roll") { const e = 1 - Math.pow(1 - u, 1.6); BALL.position.copy(s.a).lerp(s.b, e).setY(0.04); } else { BALL.position.copy(s.a).lerp(s.b, u); BALL.position.y += (s.h || 0) * 4 * u * (1 - u); }
+  if (T >= B.segs[B.segs.length - 1].t1 && B.then) { const f = B.then; B.then = null; f(); } }
+const seg = (t0, dur, a, b, h, type) => ({ t0, t1: t0 + dur, a: a.clone(), b: b.clone(), h, type });
+
+// ---------- building blocks of plays ----------
+const RUN = 7.3, THROW = 30;
+function runPath(P, from, to) { const pts = []; for (let b = from + 1; b <= to; b++) pts.push(BP(b)); return pts; }
+const pathLen = (P, pts) => { let d = 0, p = P.G.position.clone().setY(0); for (const q of pts) { d += p.distanceTo(q); p = q; } return d; };
+function runAt(t, P, from, to, speed = RUN) { const pts = runPath(P, from, to); cue(t, () => goTo(P, pts, speed, to < 4 ? V3(0, 0, 0) : null)); return t + 0.2 + (from === 0 ? 27.4 * (to - from) : 27.43 * (to - from)) / speed; }
+function throwAt(t, from, to, toPt, h, onCatch) { const a = from.G.position.clone().setY(1.6), b = (toPt || to.G.position).clone().setY(1.3), d = a.distanceTo(b), dur = Math.max(0.35, d / THROW);
+  cue(t, () => { act(from, "throw", 0.5); }); cue(t + 0.25, () => { const a2 = handPos(from, "R"); fly([seg(GAME.T, dur, a2, b, h ?? d * 0.04, "arc")], () => { if (to) { hold(to, "L"); act(to, "catch", 0.5); } if (onCatch) onCatch(); }); }); return t + 0.25 + dur; }
+function catchAt(t, P) { cue(t, () => { hold(P, "L"); act(P, "catch", 0.6); }); }
+const CONTACT = V3(0.1, 1.0, -0.8);
+function cheer(v, t) { cue(t, () => { GAME.cheer = Math.max(GAME.cheer, v); }); }
+function say2(t, text) { cue(t, () => { GAME.last = text; drawPanel(); }); }
+
+// ---------- one pitch; returns when the ball reaches the plate ----------
+function throwPitch(t, kind, batter, final) { const Pp = fielder(1), C = fielder(2), ump = PEOPLE["Tommy Connolly"], lefty = LEFTY.has(batter.short);
+  cue(t, () => { hold(Pp, "R"); act(Pp, "windup", 1.3); }); const rel = t + 1.25, arr = rel + 0.56;
+  cue(rel, () => { const a = handPos(Pp, "R"), end = kind === "H" ? batter.G.position.clone().setY(1.0) : V3((kind === "B" ? (Math.random() - 0.5) * 0.9 : (Math.random() - 0.5) * 0.3), kind === "B" ? 0.5 + Math.random() * 0.9 : 0.75 + Math.random() * 0.35, 0.55); fly([seg(GAME.T, 0.56, a, end, 0.25, "arc")]); });
+  if (["S", "F", "X"].includes(kind)) cue(arr - 0.18, () => act(batter, "swing", 0.45));
+  cue(arr, () => { if (kind === "B" || kind === "S" || kind === "C") { hold(C, "L"); act(C, "catch", 0.5); if (kind === "C" || kind === "S") act(ump, "call", 1.0); }
+    if (kind === "F") { const side = Math.random() < 0.5 ? -1 : 1, end = V3(side * (8 + Math.random() * 14), 4, 10 + Math.random() * 8); fly([seg(GAME.T, 1.2, CONTACT, end, 6, "arc")], () => { GAME.ball = { mode: "hide" }; }); }
+    if (kind === "H") { act(batter, "safe", 0.6); GAME.ball = { mode: "hide" }; }
+    if (kind === "B") GAME.balls++; else if (kind === "S" || kind === "C" || (kind === "F" && GAME.strikes < 2)) GAME.strikes++; drawPanel();
+    });
+  if (!final && (kind === "B" || kind === "S" || kind === "C")) throwAt(arr + 2.0, C, Pp, null, 1.2);
+  if (kind === "F") cue(arr + 3, () => hold(Pp, "R"));
+  return arr; }
+
+// ---------- the plays themselves ----------
+function locPt(n, kind) { const ang = { 7: -0.5, 8: 0.02, 9: 0.5 }[n]; if (ang !== undefined) return dir(ang).multiplyScalar(kind === "F" ? { 7: 72, 8: 86, 9: 66 }[n] : kind === "S" ? { 7: 52, 8: 58, 9: 50 }[n] : 60); return FIELDPOS[NPOS[n]].clone(); }
+function choreograph(e, S, tc) { const bat = P_(e.b) || GAME.batter, k = e.k, runners = {}; for (let b = 1; b <= 3; b++) if (S.bases[b]) runners[b] = P_(S.bases[b]);
+  const mv = e.mv.split(" "), dest = from => { const t = mv.find(m => m[0] === String(from)); return t ? t[t.length - 1] : null; }, toB = d => d === "H" ? 4 : +d;
+  const advanceRunners = (t0, sp = RUN) => { let end = t0; for (const b of [3, 2, 1]) { const r = runners[b], d = dest(b); if (!r || !d || d === "x") continue; end = Math.max(end, runAt(t0, r, b, toB(d), sp)); } return end; };
+  cue(tc + 0.15, () => { if (bat.bat) { bat.handR.remove(bat.bat); bat.bat = null; } });
+  const BD = dest("B"); let end = tc + 3;
+  if (k === "K" || k === "Kc") { end = tc + 2.5; cue(tc + 1.2, () => goTo(bat, benchSpot(team(e.half), slotOf(team(e.half), e.b)), 2.2)); }
+  else if (k === "KE") { const C = fielder(2), bs = V3(0.5, 0, 16.5); cue(tc, () => fly([seg(GAME.T, 1.1, V3(0, 0.6, 0.6), bs, 0, "roll")])); cue(tc + 0.3, () => goTo(C, bs, 6.2)); const tB = runAt(tc + 0.4, bat, 0, 1); advanceRunners(tc + 0.3); catchAt(tc + 2.8, C); end = throwAt(tc + 3.3, C, fielder(3), B1) + 1; }
+  else if (k === "BB" || k === "HBP") { end = runAt(tc + 1.0, bat, 0, 1, 3.5); advanceRunners(tc + 1.0, 3.5); }
+  else if (k === "F" || k === "P" || k === "Pf") { const n = e.loc, Fp = fielder(n), pt = k === "Pf" ? (n === 2 ? V3(-3, 0, 6) : dir(-D45 - 0.18).multiplyScalar(26)) : k === "P" ? FIELDPOS[NPOS[n]].clone().add(V3(1.5, 0, 2)) : locPt(n, "F");
+    const hang = k === "F" && n >= 7 ? 4.3 : 4.8, h = k === "F" && n >= 7 ? 28 : 34; cue(tc, () => fly([seg(GAME.T, hang, CONTACT, pt.clone().setY(1.7), h, "arc")])); cue(tc + 0.25, () => goTo(Fp, pt, 6.5, V3(0, 0, 0))); catchAt(tc + hang, Fp);
+    cue(tc + 0.3, () => goTo(bat, [V3(0, 0, 0).lerp(B1, 0.6)], 6)); cue(tc + hang + 0.6, () => goTo(bat, benchSpot(team(e.half), slotOf(team(e.half), e.b)), 2.5));
+    end = tc + hang + 2; let tagged = false; for (const b of [3, 2]) { const d = dest(b); if (runners[b] && d && d !== "x") { tagged = true; const ta = runAt(tc + hang + 0.15, runners[b], b, toB(d)); end = Math.max(end, throwAt(tc + hang + 0.6, Fp, d === "H" ? fielder(2) : fielder(5), d === "H" ? V3(0, 0, -0.5) : B3, 4) + 0.5, ta); } } }
+  else if (k === "G" || k === "E" || k === "FC") { const seq = String(e.loc).split("-").map(Number), a = seq[0], Fa = fielder(a), pt = FIELDPOS[NPOS[a]].clone().lerp(V3(0, 0, 0), a === 1 ? 0.25 : 0.12), dur = Math.max(0.6, CONTACT.distanceTo(pt) / 24);
+    cue(tc, () => fly([seg(GAME.T, 0.35, CONTACT, CONTACT.clone().lerp(pt, 0.25).setY(0.05), 0.6, "arc"), seg(GAME.T + 0.35, dur, CONTACT.clone().lerp(pt, 0.25).setY(0.05), pt, 0, "roll")])); cue(tc + 0.1, () => { goTo(Fa, pt, 5); }); cue(tc + 0.35 + dur - 0.05, () => act(Fa, "low", 0.5));
+    const tGet = tc + 0.35 + dur; let tBat;
+    if (k === "E") { cue(tGet, () => fly([seg(GAME.T, 0.8, pt.clone().setY(0.3), pt.clone().add(V3(1.6, 0, -1.2)), 0.2, "roll")])); cue(tGet + 0.2, () => goTo(Fa, pt.clone().add(V3(1.6, 0, -1.2)), 3)); catchAt(tGet + 1.4, Fa); tBat = runAt(tc + 0.3, bat, 0, 1); advanceRunners(tc + 0.2); end = Math.max(tBat, throwAt(tGet + 2.0, Fa, fielder(3), B1) + 0.8); }
+    else if (k === "FC") { const Fb = fielder(seq[1]); catchAt(tGet, Fa); cue(tc + 0.2, () => goTo(Fb, B2.clone().add(V3(0.4, 0, 0.5)), 6.5, Fa.G.position)); const tThrow = throwAt(tGet + 0.3, Fa, Fb, B2); const r1 = runners[1]; cue(tc + 0.1, () => goTo(r1, [B2.clone().lerp(B1, 0.12)], RUN * 0.85)); cue(tThrow + 0.4, () => goTo(r1, benchSpot(team(e.half), slotOf(team(e.half), S.bases[1])), 2.5)); tBat = runAt(tc + 0.3, bat, 0, 1); end = Math.max(tBat, tThrow) + 1; }
+    else { const b = seq[seq.length - 1], Fb = fielder(b), covers = b === 3 ? B1 : b === 1 ? B1 : B2; catchAt(tGet, Fa); if (b !== a) cue(tc + 0.2, () => goTo(Fb, covers.clone(), 6, Fa.G.position)); const tThrow = a === b ? tGet + 1.5 : throwAt(tGet + 0.35, Fa, Fb, covers);
+      cue(tc + 0.3, () => goTo(bat, [B1.clone().lerp(V3(0, 0, 0), 0.04), B1.clone().lerp(V3(0, 0, 0), -0.25)], Math.min(RUN, 27 / Math.max(1, tThrow + 0.35 - tc - 0.3)))); cue(tThrow + 0.6, () => act(PEOPLE["Hank O'Day"], "call", 0.9)); cue(tThrow + 1.2, () => goTo(bat, benchSpot(team(e.half), slotOf(team(e.half), e.b)), 2.5)); end = tThrow + 2; } }
+  else if (k === "S" || k === "SX") { const n = e.loc, Fp = fielder(n); let pt;
+    if (n >= 7) { pt = locPt(n, "S"); const mid = V3(0, 0, 0).lerp(pt, 0.4); cue(tc, () => fly([seg(GAME.T, 0.5, CONTACT, mid.clone().setY(0.05), 1.0, "arc"), seg(GAME.T + 0.5, pt.distanceTo(mid) / 20, mid, pt, 0, "roll")])); const tA = tc + 0.5 + pt.distanceTo(mid) / 20; cue(tc + 0.2, () => goTo(Fp, pt, 6.5)); catchAt(tA, Fp);
+      if (k === "SX") { const F4 = fielder(4); cue(tc + 0.5, () => goTo(F4, B2.clone().add(V3(0.5, 0, 0.6)), 6, pt)); cue(tc + 0.3, () => goTo(bat, [B1.clone().add(V3(0.6, 0, -0.6)), B2.clone().lerp(B1, 0.1)], RUN)); const tT = throwAt(tA + 0.4, Fp, F4, B2, 3); cue(tT + 0.2, () => act(F4, "low", 0.6)); cue(tT + 0.4, () => act(PEOPLE["Hank O'Day"], "call", 0.9)); cue(tT + 1.4, () => goTo(bat, benchSpot(team(e.half), slotOf(team(e.half), e.b)), 2.5)); end = tT + 2.5; }
+      else { const tB = runAt(tc + 0.3, bat, 0, 1), tR = advanceRunners(tc + 0.15); const cut = fielder(6); const tT = throwAt(tA + 0.5, Fp, cut, V3(0, 0, 0).lerp(B2, 0.8), 3); end = Math.max(tB, tR, tT) + 1; cheer(team(e.half) === "BOS" ? 0.8 : 0.15, tc + 0.3); } }
+    else { pt = n === 3 ? B1.clone().add(V3(-4, 0, -1)) : B3.clone().add(V3(4, 0, -1)).lerp(V3(0, 0, 0), 0.25); cue(tc, () => fly([seg(GAME.T, Math.max(1.2, CONTACT.distanceTo(pt) / 9), CONTACT, pt, 0.3, "roll")])); const tA = tc + Math.max(1.2, CONTACT.distanceTo(pt) / 9); cue(tc + 0.2, () => goTo(Fp, pt, 6)); catchAt(tA, Fp);
+      const tB = runAt(tc + 0.3, bat, 0, 1); advanceRunners(tc + 0.2); end = Math.max(tB, throwAt(tA + 0.5, Fp, fielder(n === 3 ? 1 : 3), B1) + 0.6); cue(tB, () => act(PEOPLE["Hank O'Day"], "safe", 0.8)); } }
+  else if (k === "T" || k === "Tgr" || k === "HRi") { const n = e.loc, Fp = fielder(n), ang = { 7: -0.5, 8: 0.05, 9: 0.55 }[n], land = k === "Tgr" ? dir(ang).multiplyScalar(ropeDist(ang * 180 / Math.PI) + 5) : k === "HRi" ? dir(ang).multiplyScalar(112) : dir(ang + 0.08).multiplyScalar(74), hang = k === "T" ? 2.6 : 4.4;
+    cue(tc, () => fly([seg(GAME.T, hang, CONTACT, land.clone().setY(k === "Tgr" ? 1.2 : 0.05), k === "T" ? 9 : 30, "arc")], () => { if (k === "Tgr") GAME.ball = { mode: "hide" }; })); cue(tc + 0.2, () => goTo(Fp, k === "Tgr" ? dir(ang).multiplyScalar(ropeDist(ang * 180 / Math.PI) - 1.5) : land, 6.8));
+    const toBase = k === "HRi" ? 4 : 3, tB = runAt(tc + 0.3, bat, 0, toBase, k === "Tgr" ? 6 : RUN * (k === "HRi" ? 1.03 : 1)), tR = advanceRunners(tc + 0.15); end = Math.max(tB, tR) + 1.5; cheer(team(e.half) === "BOS" ? 1 : 0.2, tc + 0.5);
+    if (k !== "Tgr") { const roll = k === "HRi" ? dir(ang).multiplyScalar(ropeDist(ang * 180 / Math.PI) - 4) : dir(ang + 0.1).multiplyScalar(ropeDist((ang + 0.1) * 180 / Math.PI) - 3), tL = tc + hang, tRoll = tL + land.distanceTo(roll) / 9;
+      cue(tL, () => fly([seg(GAME.T, tRoll - tL, land, roll, 0, "roll")])); cue(tL - 0.5, () => goTo(Fp, roll, 6.8)); catchAt(tRoll + 0.2, Fp); const relay = fielder(n === 9 ? 4 : 6), rp = dir(ang).multiplyScalar(42); cue(tc + 1, () => goTo(relay, rp, 6, roll));
+      const t1 = throwAt(tRoll + 0.6, Fp, relay, rp, 5); end = Math.max(end, throwAt(t1 + 0.4, relay, fielder(k === "HRi" ? 2 : 5), k === "HRi" ? V3(0, 0, -0.4) : B3) + 1); }
+    else { cue(tc + hang + 0.3, () => { act(PEOPLE["Hank O'Day"], "call", 1); }); cue(tc + hang + 3, () => hold(fielder(1), "R")); } }
+  else if (k === "SB" || k === "SBE" || k === "CS") { const C = fielder(2), F4 = fielder(4); if (k === "CS") { const r3 = runners[3], r1 = runners[1]; cue(tc - 1.2, () => goTo(r1, [B1.clone().lerp(B2, 0.45)], RUN)); cue(tc + 0.2, () => goTo(F4, B2.clone().add(V3(0.3, 0, 0.4)), 6, V3(0, 0, 0))); const t1 = throwAt(tc + 0.35, C, F4, B2, 2); cue(tc + 0.5, () => goTo(r3, [B3.clone().lerp(V3(0, 0, 0), 0.92)], RUN)); cue(t1 + 0.3, () => goTo(r1, B1.clone(), 5, B2));
+      const t2 = throwAt(t1 + 0.3, F4, C, V3(0, 0, -0.6), 2); cue(t2 + 0.1, () => act(C, "low", 0.7)); cue(t2 + 0.5, () => act(ump(), "call", 1)); cue(t2 + 1.5, () => goTo(r3, benchSpot(team(e.half), slotOf(team(e.half), S.bases[3])), 2.5)); end = t2 + 3; }
+    else { const r = runners[1], cover = fielder(k === "SB" ? 4 : 4); cue(tc - 1.6, () => goTo(r, [B2.clone().lerp(B1, 0.06)], RUN)); cue(tc + 0.2, () => goTo(cover, B2.clone().add(V3(0.3, 0, 0.5)), 6.5, V3(0, 0, 0)));
+      if (k === "SB") { const t1 = throwAt(tc + 0.35, C, cover, B2, 2); cue(t1 + 0.05, () => act(cover, "low", 0.5)); cue(t1 + 0.3, () => act(PEOPLE["Hank O'Day"], "safe", 0.8)); end = t1 + 2.5; }
+      else { const cfp = dir(0).multiplyScalar(48), F8 = fielder(8); cue(tc + 0.35, () => act(C, "throw", 0.5)); cue(tc + 0.6, () => fly([seg(GAME.T, 0.9, V3(0, 1.5, 0), B2.clone().setY(1.2), 2, "arc"), seg(GAME.T + 0.9, 2.2, B2, cfp, 0, "roll")])); cue(tc + 0.9, () => goTo(F8, cfp, 6.5)); catchAt(tc + 3.8, F8);
+        const tr = runAt(tc + 1.5, r, 2, 3), t3 = runAt(tc + 1.0, runners[3], 3, 4); cheer(0.1, tc + 1.6); end = Math.max(tr, t3, throwAt(tc + 4.2, F8, fielder(5), B3, 4)) + 1; } } }
+  return end; }
+const ump = () => PEOPLE["Tommy Connolly"];
+
+// ---------- pitches the record doesn't give: plausible ones that fit the result ----------
+function pitchesFor(e) { const r = mulberry(e.i * 7919 + 13), seq = [], k = e.k, pick = a => a[r() * a.length | 0];
+  if (k === "SB" || k === "SBE" || k === "CS") return ["B"]; let b = 0, s = 0;
+  const add = c => { seq.push(c); if (c === "B") b++; else if (c === "S" || c === "C" || (c === "F" && s < 2)) s++; };
+  if (k === "K" || k === "Kc" || k === "KE") { const nb = r() * 3 | 0; let pool = [...Array(nb).fill("B"), "S", pick(["S", "F", "C"])]; pool.sort(() => r() - 0.5); pool.forEach(add); if (r() < 0.3) add("F"); seq.push(k === "Kc" ? "C" : "S"); return seq; }
+  if (k === "BB") { const pool = ["B", "B", "B", ...Array(r() * 3 | 0).fill(0).map(() => pick(["S", "F", "C"]))]; pool.sort(() => r() - 0.5); pool.forEach(c => { if ((c !== "B" || b < 3) && (c === "B" || s < 2)) add(c); }); while (b < 3) add("B"); seq.push("B"); return seq; }
+  const n = r() * 3 | 0; for (let i = 0; i < n; i++) { const c = pick(["B", "S", "F", "C", "B"]); if ((c === "B" && b < 3) || (c !== "B" && s < 2)) add(c); } seq.push(k === "HBP" ? "H" : "X"); return seq; }
+
+// ---------- running the game ----------
+function placeAll(S) { GAME.st = S; const bt = team(S.half), ft = other(bt), rng = mulberry(S.half * 31 + 7);
+  for (const [nm, pos] of LINEUP[ft]) { const P = PEOPLE[nm], p = FIELDPOS[pos]; P.path = []; P.G.position.set(p.x, floorAt(p.x, p.z), p.z); stand(P, pos === "C" ? "crouch" : pos === "P" ? "stand" : "ready", V3(0, 0, 0)); if (pos === "C") P.G.position.set(0, 0, 0.95); if (pos === "C") P.faceAt = V3(0, 0, -10); }
+  const onBase = new Set(S.bases.filter(Boolean).map(n => NAMES[n]));
+  const benchers = [...LINEUP[bt].map(([n]) => n), ...(bt === "BOS" ? ["Jack O'Brien", "Duke Farrell"] : [])]; benchers.forEach((nm, k) => { const P = PEOPLE[nm]; if (!P) return; P.path = []; if (onBase.has(nm)) { const b = S.bases.findIndex(x => x && NAMES[x] === nm), p = BP(b).clone().add(b === 1 ? V3(-0.6, 0, 0.6) : b === 2 ? V3(0.6, 0, 0.6) : V3(0.6, 0, -0.4)); P.G.position.copy(p); stand(P, "ready", V3(0, 0, 0)); } else { const p = benchSpot(bt, k); P.G.position.set(p.x, 0, p.z); P.G.rotation.y = benchFace(bt); stand(P, "sit", null); P.faceAt = null; } if (P.bat) { P.handR.remove(P.bat); P.bat = null; } });
+  for (const nm of (ft === "BOS" ? ["Jack O'Brien", "Duke Farrell"] : [])) { const P = PEOPLE[nm]; if (!P) continue; const p = benchSpot("BOS", 10 + (nm[0] === "D" ? 1 : 0)); P.G.position.set(p.x, 0, p.z); P.G.rotation.y = benchFace("BOS"); stand(P, "sit", null); P.faceAt = null; }
+  const u = ump(); u.G.position.set(0.3, 0, 1.9); stand(u, "ready", V3(0, 0, -10)); const o = PEOPLE["Hank O'Day"], op = B1.clone().add(V3(3, 0, 2.5)); o.G.position.copy(op); stand(o, "ready", V3(0, 0, 0));
+  hold(fielder(1, S.half), "R"); GAME.balls = GAME.strikes = 0; SCORE.line = S.line.map(a => a.slice()); drawScore(); drawCard(S); }
+function batterUp(e, S, instant) { const short = batterFor(e, S), P = P_(short); if (!P) return; P.short = short; GAME.batter = P; const box = BATTERS_BOX(LEFTY.has(short)); const done = () => { stand(P, "bat", null); P.G.rotation.y = LEFTY.has(short) ? Math.PI / 2 : -Math.PI / 2; if (!P.bat) { P.bat = BATM2.clone(); P.handR.add(P.bat); } };
+  if (instant) { P.G.position.copy(box); done(); } else { goTo(P, box, 2.4); P.arrive = done; } }
+function startEvent(i, instant) { if (i >= EVENTS.length) { GAME.phase = "over"; GAME.last = "Final: Pittsburgh 7, Boston 3. Phillippe struck out ten; the Pirates lead the Series one game to none."; drawPanel(); return; }
+  const e = EVENTS[i], S = GAME.st; GAME.ei = i; GAME.T = 0; GAME.cues = []; GAME.phase = "play"; GAME.balls = GAME.strikes = 0; batterUp(e, S, instant); const P = GAME.batter, pace = PACE[paceKey];
+  const ps = pitchesFor(e); let t = instant ? 1.0 : 4.5; ps.forEach((c, j) => { const final = j === ps.length - 1; if (!final) { throwPitch(t, c, P); t += pace.gap; } else { const arr = throwPitch(t, c, P, true); const end = choreograph(e, S, arr); GAME.endT = end; cue(end + 0.5, () => finishEvent(e)); } });
+  GAME.last = `${HALF_NAME(e.half)}. ${["SB", "SBE", "CS"].includes(e.k) ? "With " + P.short + " at bat" : P.short + " at bat"}.`; drawPanel(); }
+function finishEvent(e) { applyEvent(e, GAME.st); GAME.last = e.text; markCard(); SCORE.line = GAME.st.line.map(a => a.slice()); drawScore(); drawPanel(); const pace = PACE[paceKey];
+  if (e.last) { GAME.phase = "change"; GAME.T = 0; GAME.cues = []; settle(true); cue(pace.change, () => { placeAll(GAME.st); startEvent(e.i + 1); }); if (e.i === EVENTS.length - 1) { GAME.cues = []; cheer(0.2, 0); cue(1, () => startEvent(EVENTS.length)); } }
+  else { GAME.phase = "between"; GAME.T = 0; GAME.cues = []; settle(false); cue(pace.between, () => startEvent(e.i + 1)); } }
+// after a play: runners to their bases, the others to the bench, fielders back to their places, the ball back to the pitcher
+function settle(change) { const S = GAME.st, bt = team(change ? S.half - 1 : S.half), ft = other(bt);
+  for (const [nm, pos] of LINEUP[ft]) { const P = PEOPLE[nm]; if (change) goTo(P, benchSpot(ft, LINEUP[ft].findIndex(([n]) => n === nm)), 3.2); else goTo(P, pos === "C" ? V3(0, 0, 0.95) : FIELDPOS[pos], 3.5, V3(0, 0, 0)); P.arrive = () => stand(P, change ? "sit" : pos === "C" ? "crouch" : pos === "P" ? "stand" : "ready", change ? null : (pos === "C" ? V3(0, 0, -10) : V3(0, 0, 0))); }
+  const onBase = S.bases.map(n => n && NAMES[n]); [...LINEUP[bt].map(([n]) => n), ...(bt === "BOS" ? ["Jack O'Brien", "Duke Farrell"] : [])].forEach((nm, k) => { const P = PEOPLE[nm]; if (!P) return; if (P.bat) { P.handR.remove(P.bat); P.bat = null; } const b = onBase.indexOf(nm);
+    if (!change && b > 0) { goTo(P, BP(b).clone().add(b === 1 ? V3(-0.6, 0, 0.6) : b === 2 ? V3(0.6, 0, 0.6) : V3(0.6, 0, -0.4)), 3, V3(0, 0, 0)); P.arrive = () => stand(P, "ready", V3(0, 0, 0)); }
+    else if (change) { const pos = LINEUP[bt].find(([n]) => n === nm); if (pos) { goTo(P, pos[1] === "C" ? V3(0, 0, 0.95) : FIELDPOS[pos[1]], 3.2, V3(0, 0, 0)); P.arrive = () => stand(P, pos[1] === "C" ? "crouch" : pos[1] === "P" ? "stand" : "ready", V3(0, 0, 0)); } }
+    else { const p = benchSpot(bt, k); goTo(P, p, 2.6); P.arrive = () => { P.G.rotation.y = benchFace(bt); stand(P, "sit", null); P.faceAt = null; }; } });
+  const Pp = fielder(1, change ? S.half : S.half); if (GAME.ball.mode !== "held" || GAME.ball.P !== Pp) { if (GAME.ball.mode === "held") throwAt(1.0, GAME.ball.P, Pp, null, 3); else cue(1.5, () => hold(Pp, "R")); } }
+function jumpTo(i) { GAME.cues = []; for (const P of Object.values(PEOPLE)) { P.path = []; P.act = null; P.arrive = null; } const S = stateAt(i); placeAll(S); GAME.last = i < EVENTS.length ? HALF_NAME(EVENTS[i].half) + "." : ""; startEvent(i, true); }
+const nextPlay = () => { if (!GAME.on) return; jumpTo(Math.min(EVENTS.length, GAME.phase === "play" ? GAME.ei + 1 : GAME.ei + 1)); };
+const nextHalf = () => { if (!GAME.on) return; const h = GAME.st.half; const i = EVENTS.findIndex(e => e.half > (GAME.phase === "change" ? h - 1 : h)); jumpTo(i < 0 ? EVENTS.length : i); };
+const toInning = n => { if (!GAME.on) startGame(); jumpTo(EVENTS.findIndex(e => e.half === (n - 1) * 2)); };
+function startGame() { if (GAME.on) return; enterPark(); GAME.on = true; placeAll(freshState()); startEvent(0); }
+function updateGame(dt) { if (!GAME.on) return; if (!GAME.paused) { GAME.T += dt; GAME.cues.sort((a, b) => a.t - b.t); while (GAME.cues.length && GAME.cues[0].t <= GAME.T) { const c = GAME.cues.shift(); c.fn(); } }
+  for (const P of Object.values(PEOPLE)) { const was = P.path && P.path.length; updatePerson(P, GAME.paused ? 0 : dt); if (was && !P.path.length && P.arrive) { const f = P.arrive; P.arrive = null; f(); } } updateBall(); GAME.cheer = Math.max(0, GAME.cheer - dt * 0.35); if (CROWD.cheerU) { CROWD.cheerU.value = GAME.cheer; CROWD.timeU.value = performance.now() / 1000; } }
 
 // ---------- getting in: the ticket windows on Rogers Street, the gate, and the refreshment stand inside ----------
 // Prices were doubled for the Series: $1 for the grandstand, 50 cents for the bleachers or standing room. Inside, 5 cents bought a score card
@@ -282,24 +521,31 @@ function tryMove(nx, nz) { for (const W of WALLS) if (segHit(ME.x, ME.z, nx, nz,
 // the things you can do, with the nearest one in front of you
 const ACTS = [{ name: "Ticket window: grand stand, $1.00", p: BOOTH.clone().addScaledVector(UA, -1).addScaledVector(WA, -0.9), ok: () => !ME.ticket, act: () => buy("grand stand", 100, () => { ME.ticket = "grand stand"; enterPark(); }) },
   { name: "Ticket window: bleachers & standing room, 50¢", p: BOOTH.clone().addScaledVector(UA, 1).addScaledVector(WA, -0.9), ok: () => !ME.ticket, act: () => buy("bleacher", 50, () => { ME.ticket = "bleacher"; enterPark(); }) },
-  { name: "Score card, 5¢", p: STAND.clone().addScaledVector(UA, -0.5).addScaledVector(WA, -1), ok: () => !ME.holding.includes("score card"), act: () => buy("score card", 5, () => hold("score card")) },
-  { name: "Bag of peanuts, 5¢", p: STAND.clone().addScaledVector(UA, -0.5), ok: () => !ME.holding.includes("peanuts"), act: () => buy("bag of peanuts", 5, () => hold("peanuts")) },
+  { name: "Score card, 5¢", p: STAND.clone().addScaledVector(UA, -0.5).addScaledVector(WA, -1), ok: () => !ME.holding.includes("score card"), act: () => buy("score card", 5, () => holdItem("score card")) },
+  { name: "Bag of peanuts, 5¢", p: STAND.clone().addScaledVector(UA, -0.5), ok: () => !ME.holding.includes("peanuts"), act: () => buy("bag of peanuts", 5, () => holdItem("peanuts")) },
   { name: "Glass of lemonade, 5¢", p: STAND.clone().addScaledVector(UA, -0.5).addScaledVector(WA, 1), ok: () => true, act: () => buy("glass of lemonade", 5, () => say("Cold lemonade, drunk at the stand; the glass goes back on the counter.")) }];
 function buy(what, c, then) { if (ME.money < c) { say(`You haven't enough money for a ${what}.`); return; } ME.money -= c; then(); say(`You pay ${cents(c)} for a ${what}. You have ${cents(ME.money)} left.`); drawPanel(); }
 let NEAR = null;
 function findNear() { const p = V3(ME.x, 0, ME.z); let best = null, bd = 2.4; for (const A of ACTS) { if (!A.ok()) continue; const d = A.p.distanceTo(p); if (d < bd) { bd = d; best = A; } }
-  for (const V of VENDORS) { const d = V.P.G.position.distanceTo(V3(ME.x, V.P.G.position.y, ME.z)); if (d < 2.2 && Math.abs(V.P.G.position.y - ME.y) < 1.5) { const item = V.item === "Peanuts" ? "peanuts" : "score card"; if (!ME.holding.includes(item)) { best = { name: `${V.item}! 5¢ from the vendor`, act: () => buy(item === "peanuts" ? "bag of peanuts" : "score card", 5, () => hold(item)) }; bd = d; } } }
+  for (const V of VENDORS) { const d = V.P.G.position.distanceTo(V3(ME.x, V.P.G.position.y, ME.z)); if (d < 2.2 && Math.abs(V.P.G.position.y - ME.y) < 1.5) { const item = V.item === "Peanuts" ? "peanuts" : "score card"; if (!ME.holding.includes(item)) { best = { name: `${V.item}! 5¢ from the vendor`, act: () => buy(item === "peanuts" ? "bag of peanuts" : "score card", 5, () => holdItem(item)) }; bd = d; } } }
   if (!best && !ME.seat && ME.inside) { let bs = null, b2 = 1.0; for (const s of SEATS) { if (s.taken) continue; const d = Math.hypot(s.p.x - ME.x, s.p.z - ME.z); if (d < b2 && Math.abs(s.p.y - 0.42 - ME.y) < 0.5) { b2 = d; bs = s; } } if (bs) best = { name: `Sit down (${bs.sec}, row ${bs.row + 1})`, act: () => sit(bs) }; }
   if (ME.seat) best = { name: "Stand up", act: () => standUp() }; if ((best && best.name) !== (NEAR && NEAR.name)) { NEAR = best; drawPanel(); } NEAR = best; }
 function enterPark() { buildCrowd(); buildPlayers(); }
 function sit(s) { enterPark(); if (ME.ticket === "bleacher" && s.sec.includes("grandstand")) { say("An usher checks your ticket: \"Bleacher ticket? This is the grand stand, friend.\""); return; } ME.seat = s; s.taken = true; ME.x = s.p.x; ME.z = s.p.z; yaw = s.face; vrYaw = s.face; say(`You sit down: ${s.sec}, row ${s.row + 1}. Move to stand up.`); drawPanel(); }
 function standUp() { if (!ME.seat) return; ME.seat.taken = false; const s = ME.seat; ME.seat = null; const fwd = V3(-Math.sin(s.face), 0, -Math.cos(s.face)); ME.x = s.p.x + fwd.x * 0.35; ME.z = s.p.z + fwd.z * 0.35; ME.y = floorAt(ME.x, ME.z); drawPanel(); }
 // the score card: the batting orders as printed, held in your left hand in VR
-const CARD = (() => { const c = document.createElement("canvas"); c.width = 512; c.height = 720; const g = c.getContext("2d"); g.fillStyle = "#f0e8d0"; g.fillRect(0, 0, 512, 720); g.strokeStyle = "#3a2a1a"; g.lineWidth = 4; g.strokeRect(8, 8, 496, 704); g.fillStyle = "#2a1e14"; g.textAlign = "center"; g.font = "bold 26px Georgia"; g.fillText("OFFICIAL SCORE CARD", 256, 52); g.font = "18px Georgia"; g.fillText("Huntington Avenue Base Ball Grounds", 256, 80); g.fillText("World's Championship Series · Thursday, October 1, 1903", 256, 104); g.fillText("Price 5 Cents", 256, 128);
-  let y = 172; for (const [team, nm] of [["PIT", "PITTSBURG"], ["BOS", "BOSTON"]]) { g.font = "bold 22px Georgia"; g.textAlign = "left"; g.fillText(nm, 30, y); y += 30; g.font = "19px Georgia"; LINEUP[team].forEach(([n, p], i) => { g.fillText(`${i + 1}. ${n}`, 40, y); g.fillText(p, 300, y); for (let k = 0; k < 4; k++) { g.strokeStyle = "#8a7a6a"; g.lineWidth = 1; g.strokeRect(350 + k * 36, y - 18, 32, 24); } y += 28; }); y += 22; }
-  g.textAlign = "center"; g.font = "italic 17px Georgia"; g.fillText("Umpires: Connolly (American League), O'Day (National League)", 256, y + 10); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const m = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.21), new THREE.MeshStandardMaterial({ map: t, side: THREE.DoubleSide, roughness: 0.9 })); m.visible = false; return { c, t, m }; })();
+const CARD = (() => { const c = document.createElement("canvas"); c.width = 768; c.height = 1024; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const m = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.24), new THREE.MeshStandardMaterial({ map: t, side: THREE.DoubleSide, roughness: 0.9 })); m.visible = false; return { c, t, m }; })();
+// the score card fills in as the game goes: one box per batter per inning, in the scoring shorthand of the day
+function drawCard(S) { const g = CARD.c.getContext("2d"); g.fillStyle = "#f0e8d0"; g.fillRect(0, 0, 768, 1024); g.strokeStyle = "#3a2a1a"; g.lineWidth = 4; g.strokeRect(8, 8, 752, 1008); g.fillStyle = "#2a1e14"; g.textAlign = "center"; g.font = "bold 30px Georgia"; g.fillText("OFFICIAL SCORE CARD", 384, 50); g.font = "18px Georgia"; g.fillText("Huntington Avenue Base Ball Grounds · World's Championship Series", 384, 76); g.fillText("Thursday, October 1, 1903 · Price 5 Cents", 384, 98);
+  let y0 = 130; for (const [tm, nm] of [["PIT", "PITTSBURG"], ["BOS", "BOSTON"]]) { g.textAlign = "left"; g.font = "bold 22px Georgia"; g.fillText(nm, 24, y0 + 6); g.font = "16px Georgia"; g.textAlign = "center"; for (let k = 0; k < 9; k++) g.fillText(String(k + 1), 300 + k * 50, y0 + 6); g.fillText("R", 748 - 10, y0 + 6);
+    LINEUP[tm].forEach(([n, p], i) => { const y = y0 + 20 + i * 40; g.textAlign = "left"; g.font = "17px Georgia"; g.fillStyle = "#2a1e14"; g.fillText(`${i + 1}. ${n.split(" ").pop()}`, 24, y + 26); g.fillText(p, 210, y + 26); for (let k = 0; k < 9; k++) { g.strokeStyle = "#9a8a7a"; g.lineWidth = 1; g.strokeRect(278 + k * 50, y + 2, 46, 36); } });
+    for (const c of (S ? S.card : []).filter(c => c.tm === tm)) { const y = y0 + 20 + c.slot * 40; g.textAlign = "center"; g.fillStyle = c.code === "K" || c.code === "Kc" ? "#8a1a1a" : "#1a1a6a"; g.font = "bold 17px Georgia"; g.fillText(c.code, 301 + c.inn * 50, y + 26); if (c.pinch) { g.font = "italic 12px Georgia"; g.fillText(c.pinch, 301 + c.inn * 50, y + 38); } }
+    g.fillStyle = "#2a1e14"; g.font = "bold 20px Georgia"; g.textAlign = "center"; const runs = S ? S.score[tm] : 0; g.fillText(String(runs), 738, y0 + 200); y0 += 420; }
+  g.font = "italic 15px Georgia"; g.textAlign = "center"; g.fillText("Umpires: Connolly (American League), O'Day (National League)", 384, 990); CARD.t.needsUpdate = true; CARD.url = CARD.c.toDataURL(); }
+function markCard() { drawCard(GAME.st); }
+drawCard(null);
 const BAG = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.14, 8), M(0xc8a878)); BAG.visible = false;
-function hold(item) { ME.holding.push(item); if (item === "score card") CARD.m.visible = true; if (item === "peanuts") BAG.visible = true; }
+function holdItem(item) { ME.holding.push(item); if (item === "score card") CARD.m.visible = true; if (item === "peanuts") BAG.visible = true; }
 
 // ---------- names: look at a player, the umpire, or part of the park ----------
 const SIGHTS = [{ name: "The tool shed", p: dir(0.05).multiplyScalar(fenceDist(3) - 4).setY(1.6), r: 3, text: "The groundskeeper's tool shed, out in deepest centre field and in play: a ball that rolled under or behind it was live. Today it is behind the standing crowd." },
@@ -326,21 +572,36 @@ const MSG = document.createElement("div"); MSG.style.cssText = "position:fixed;l
 const say = (t, s = 4) => { MSG.textContent = t; MSG.style.display = "block"; msgT = s; };
 function wrap(g, text, x, y, w, lh) { const words = text.split(" "); let line = ""; for (const wd of words) { if (g.measureText(line + wd).width > w) { g.fillText(line, x, y); line = ""; y += lh; } line += wd + " "; } g.fillText(line, x, y); return y + lh; }
 let preT = 8 * 60; const preStr = () => preT > 0 ? `First pitch in ${Math.floor(preT / 60)}:${String(Math.floor(preT % 60)).padStart(2, "0")}` : "Play ball!";
-function drawPanel() { const g = PANEL.c.getContext("2d"); g.clearRect(0, 0, 640, 800); g.fillStyle = "rgba(30,24,16,0.92)"; g.beginPath(); g.roundRect(0, 0, 640, 800, 24); g.fill(); g.fillStyle = "#e8c070"; g.font = "bold 28px Georgia"; g.fillText("Boston, October 1, 1903 · " + preStr(), 24, 44);
-  g.fillStyle = "#e0dcd0"; g.font = "21px Georgia"; let y = wrap(g, `In your pocket: ${cents(ME.money)}. ${ME.ticket ? "Ticket: " + ME.ticket + (ME.inside ? " (torn)" : "") : "No ticket yet."}${ME.holding.length ? " Holding: " + ME.holding.join(", ") + "." : ""}${ME.seat ? ` Seated: ${ME.seat.sec}, row ${ME.seat.row + 1}.` : ""}`, 24, 84, 592, 26) + 8;
-  if (NEAR) { g.fillStyle = "#9ad88a"; g.font = "bold 22px Georgia"; y = wrap(g, "Trigger / E: " + NEAR.name, 24, y, 592, 28) + 6; }
-  if (LOOK) { g.fillStyle = "#e8c070"; g.font = "bold 24px Georgia"; g.fillText(LOOK.name, 24, y + 4); y += 34; g.fillStyle = "#e0dcd0"; g.font = "20px Georgia"; y = wrap(g, LOOK.text, 24, y, 592, 25) + 6; }
-  g.fillStyle = "#a8a498"; g.font = "17px sans-serif"; g.fillText("Left stick walk · right stick turn · trigger: buy, sit, stand · Y vignette", 24, 785); PANEL.t.needsUpdate = true;
-  HUD.innerHTML = `<b style="color:#e8c070">Boston, Thursday, October 1, 1903 · ${preStr()}</b><br>In your pocket: ${cents(ME.money)}. ${ME.ticket ? "Ticket: " + ME.ticket + (ME.inside ? " (torn)" : "") : "No ticket yet: the windows are on the street."}${ME.holding.length ? " Holding: " + ME.holding.join(", ") + "." : ""}${ME.seat ? ` Seated: ${ME.seat.sec}, row ${ME.seat.row + 1}.` : ""}
-    ${NEAR ? `<div style="color:#9ad88a;margin-top:4px"><b>E:</b> ${NEAR.name}</div>` : ""}${LOOK ? `<div style="margin-top:6px"><b style="color:#e8c070">${LOOK.name}</b><br>${LOOK.text}</div>` : ""}${ME.holding.includes("score card") ? `<div style="margin-top:6px;font-size:12px"><b>Score card</b>: ${["PIT", "BOS"].map(t => (t === "PIT" ? "Pittsburg: " : "Boston: ") + LINEUP[t].map(([n, p]) => n.split(" ").pop() + " " + p).join(", ")).join("<br>")}</div>` : ""}
-    <div style="margin-top:6px;color:#a8a498;font-size:12px">W A S D walk · drag to look · shift hurry · E buy / sit / stand · look at a player or anything in the park to learn about it · V comfort vignette</div>`; }
+const BTN = [{ id: "next", label: "Next play", x: 16, y: 600, w: 196, h: 56 }, { id: "half", label: "Next half-inning", x: 222, y: 600, w: 236, h: 56 }, { id: "pause", label: "Pause", x: 468, y: 600, w: 156, h: 56 },
+  ...Array.from({ length: 9 }, (_, k) => ({ id: "inn" + (k + 1), label: String(k + 1), x: 16 + k * 68, y: 668, w: 60, h: 50 })), { id: "pace", label: "Pace", x: 16, y: 730, w: 300, h: 50 }, { id: "vig", label: "Vignette", x: 326, y: 730, w: 298, h: 50 }];
+let HOVER = null;
+function pressBtn(id) { if (id === "next") { if (!GAME.on) startGame(); else nextPlay(); } else if (id === "half") { if (!GAME.on) startGame(); nextHalf(); } else if (id === "pause") { GAME.paused = !GAME.paused; say(GAME.paused ? "Game paused" : "Game resumed"); }
+  else if (id.startsWith("inn")) toInning(+id.slice(3)); else if (id === "pace") { paceKey = paceKey === "real" ? "brisk" : "real"; say(paceKey === "real" ? "Real time: the game's own pace (it took 1:55)" : "Brisk: shorter waits between pitches and batters"); } else if (id === "vig") { comfortVig = !comfortVig; } drawPanel(); }
+const gameLine = () => { const S = GAME.st; if (!GAME.on || !S) return preStr(); const h = GAME.phase === "change" ? "Between innings" : GAME.phase === "over" ? "Final" : HALF_NAME(S.half); return `Pittsburg ${S.score.PIT}, Boston ${S.score.BOS} · ${h}${GAME.phase === "over" ? "" : " · " + S.outs + " out"}`; };
+const atBat = () => { const S = GAME.st; if (!GAME.on || !S || GAME.phase === "over" || !GAME.batter) return ""; const r = [1, 2, 3].filter(b => S.bases[b]).map(b => `${S.bases[b]} on ${["", "first", "second", "third"][b]}`); return `At bat: ${GAME.batter.short} · count ${GAME.balls}-${GAME.strikes}${r.length ? " · " + r.join(", ") : ""}`; };
+function drawPanel() { const g = PANEL.c.getContext("2d"); g.clearRect(0, 0, 640, 800); g.fillStyle = "rgba(30,24,16,0.92)"; g.beginPath(); g.roundRect(0, 0, 640, 800, 24); g.fill(); g.fillStyle = "#e8c070"; g.font = "bold 26px Georgia"; g.fillText(gameLine(), 24, 42);
+  g.fillStyle = "#c8e0b8"; g.font = "20px Georgia"; g.fillText(atBat(), 24, 72); g.fillStyle = "#f0ece0"; g.font = "21px Georgia"; let y = wrap(g, GAME.last || "", 24, 104, 592, 26) + 6;
+  g.fillStyle = "#c8c4b8"; g.font = "18px Georgia"; y = wrap(g, `${cents(ME.money)}${ME.ticket ? " · " + ME.ticket + " ticket" : " · no ticket"}${ME.holding.length ? " · " + ME.holding.join(", ") : ""}${ME.seat ? ` · seated: ${ME.seat.sec}, row ${ME.seat.row + 1}` : ""}`, 24, y + 4, 592, 22);
+  if (NEAR) { g.fillStyle = "#9ad88a"; g.font = "bold 19px Georgia"; y = wrap(g, "Trigger / E: " + NEAR.name, 24, y + 2, 592, 24); }
+  if (LOOK) { g.fillStyle = "#e8c070"; g.font = "bold 20px Georgia"; g.fillText(LOOK.name, 24, y + 6); g.fillStyle = "#e0dcd0"; g.font = "17px Georgia"; const words = LOOK.text.split(" "); let line = "", yy = y + 30; for (const w of words) { if (g.measureText(line + w).width > 592) { if (yy > 580) break; g.fillText(line, 24, yy); line = ""; yy += 21; } line += w + " "; } if (yy <= 580) g.fillText(line, 24, yy); }
+  for (const B of BTN) { const on = B.id === "pause" ? GAME.paused : B.id === "pace" ? paceKey === "brisk" : B.id === "vig" ? comfortVig : false; g.fillStyle = HOVER === B.id ? "#8a6a2a" : on ? "#5a4a2a" : "#3a3226"; g.beginPath(); g.roundRect(B.x, B.y, B.w, B.h, 10); g.fill(); g.fillStyle = "#f4ecc8"; g.font = "bold 21px Georgia"; g.textAlign = "center";
+    const lab = B.id === "pause" ? (GAME.paused ? "Resume" : "Pause") : B.id === "pace" ? (paceKey === "real" ? "Pace: real time" : "Pace: brisk") : B.id === "vig" ? (comfortVig ? "Vignette: on" : "Vignette: off") : B.id.startsWith("inn") ? B.label : B.label; g.fillText(lab, B.x + B.w / 2, B.y + B.h / 2 + 7); g.textAlign = "left"; }
+  g.fillStyle = "#a8a498"; g.font = "15px sans-serif"; g.fillText("Point your right hand here and pull the trigger · innings: jump to the top of that inning", 18, 795); PANEL.t.needsUpdate = true;
+  HUD.innerHTML = `<b style="color:#e8c070">${gameLine()}</b><br><span style="color:#c8e0b8">${atBat()}</span><div style="margin:4px 0">${GAME.last || ""}</div>
+    <div style="color:#c8c4b8;font-size:12px">${cents(ME.money)}${ME.ticket ? " · " + ME.ticket + " ticket" : " · no ticket yet: the windows are on the street"}${ME.holding.length ? " · holding " + ME.holding.join(", ") : ""}${ME.seat ? ` · seated: ${ME.seat.sec}, row ${ME.seat.row + 1}` : ""}</div>
+    ${NEAR ? `<div style="color:#9ad88a;margin-top:4px"><b>E:</b> ${NEAR.name}</div>` : ""}${LOOK ? `<div style="margin-top:6px"><b style="color:#e8c070">${LOOK.name}</b><br>${LOOK.text}</div>` : ""}
+    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">${BTN.map(B => `<button data-b="${B.id}" style="font:12px Georgia;padding:3px 7px;border-radius:5px;border:1px solid #8a7a50;background:#3a3226;color:#f4ecc8;cursor:pointer">${B.id === "pause" ? (GAME.paused ? "Resume" : "Pause") : B.id === "pace" ? (paceKey === "real" ? "Pace: real time" : "Pace: brisk") : B.id === "vig" ? (comfortVig ? "Vignette: on" : "Vignette: off") : B.id.startsWith("inn") ? "Inning " + B.label : B.label}</button>`).join("")}</div>
+    ${ME.holding.includes("score card") ? `<div style="margin-top:6px"><img src="${CARD.url}" style="width:100%;border-radius:4px"></div>` : ""}
+    <div style="margin-top:6px;color:#a8a498;font-size:12px">W A S D walk · drag to look · E buy / sit / stand · N next play · H next half-inning · 1-9 jump to an inning · space pause · B pace · V vignette · G start the game now</div>
+    <div style="margin-top:4px;color:#7a7468;font-size:10px">Play-by-play: the information used here was obtained free of charge from and is copyrighted by Retrosheet (www.retrosheet.org).</div>`;
+  HUD.querySelectorAll("[data-b]").forEach(b => b.onclick = e => { e.stopPropagation(); pressBtn(b.dataset.b); }); }
 // the scoreboard: the line score as it stands
 function drawScore() { const g = SCORE.c.getContext("2d"); g.fillStyle = "#1e2a1e"; g.fillRect(0, 0, 1024, 256); g.fillStyle = "#e8e4d0"; g.font = "bold 34px Georgia"; g.textAlign = "center"; for (let i = 0; i < 9; i++) g.fillText(String(i + 1), 230 + i * 78, 50); g.fillText("R", 960, 50); g.textAlign = "left"; g.fillText("PITTSBURG", 20, 130); g.fillText("BOSTON", 20, 210); g.textAlign = "center";
   for (let t = 0; t < 2; t++) { let tot = 0; SCORE.line[t].forEach((r, i) => { g.fillText(String(r), 230 + i * 78, 130 + t * 80); tot += r; }); if (SCORE.line[t].length) g.fillText(String(tot), 960, 130 + t * 80); } SCORE.t.needsUpdate = true; }
 drawScore();
 
 // ---------- controls ----------
-addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (e.code === "KeyE" && NEAR) NEAR.act(); if (e.code === "KeyV") { comfortVig = !comfortVig; say(comfortVig ? "Comfort vignette on" : "Comfort vignette off"); } if (e.code === "KeyG") { preT = 0; } });
+addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if (e.code === "KeyE" && NEAR) NEAR.act(); if (e.code === "KeyV") { comfortVig = !comfortVig; say(comfortVig ? "Comfort vignette on" : "Comfort vignette off"); } if (e.code === "KeyG") { preT = 0; startGame(); } if (e.code === "KeyN") pressBtn("next"); if (e.code === "KeyH") pressBtn("half"); if (e.code === "Space") pressBtn("pause"); if (e.code === "KeyB") pressBtn("pace"); if (/^Digit[1-9]$/.test(e.code)) toInning(+e.code.slice(5)); });
 addEventListener("keyup", e => keys[e.code] = false);
 let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY }; begin(); });
 addEventListener("pointermove", e => { if (!drag) return; yaw -= (e.clientX - drag.x) * 0.004; pitch = clampN(pitch - (e.clientY - drag.y) * 0.004, -1.4, 1.4); drag.x = e.clientX; drag.y = e.clientY; }); addEventListener("pointerup", () => drag = null);
@@ -352,13 +613,21 @@ const VRB = document.getElementById("vr"); if (navigator.xr) navigator.xr.isSess
 
 DIAG.stage("merging the scenery");
 // ---------- drawing it cheaply: everything that never moves is merged into one mesh per material ----------
-{ const groups = new Map(), keep = new Set([window.FLAG]); for (const o of [...scene.children]) { if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || keep.has(o)) continue; if (!groups.has(o.material)) groups.set(o.material, []); groups.get(o.material).push(o); }
+{ const groups = new Map(), keep = new Set([window.FLAG, BALL]); for (const o of [...scene.children]) { if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || keep.has(o)) continue; if (!groups.has(o.material)) groups.set(o.material, []); groups.get(o.material).push(o); }
   scene.updateMatrixWorld(true);
   for (const [mat, list] of groups) { if (list.length < 2) continue; const pos = [], nor = [], uv = []; let shadow = false;
     for (const o of list) { const g = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()).applyMatrix4(o.matrixWorld); if (!g.attributes.normal) g.computeVertexNormals(); pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); if (g.attributes.uv) uv.push(...g.attributes.uv.array); else for (let i = 0; i < g.attributes.position.count; i++) uv.push(0, 0); shadow = shadow || o.castShadow; scene.remove(o); o.geometry.dispose(); g.dispose(); }
     const mg = new THREE.BufferGeometry(); mg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); mg.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); mg.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); const mm = new THREE.Mesh(mg, mat); mm.castShadow = shadow; mm.receiveShadow = true; scene.add(mm); } }
 
 DIAG.stage("drawing the first frame");
+// ---------- pointing at the wrist menu with the right hand ----------
+const CTRL = [0, 1].map(i => { const c = renderer.xr.getController(i); rig.add(c); c.addEventListener("connected", e => { c.userData.hand = e.data.handedness; }); const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(0, 0, 0), V3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xf4ecc8 })); ln.visible = false; c.add(ln); c.userData.line = ln; return c; });
+const _pray = new THREE.Raycaster(), _rm = new THREE.Matrix4(); let POINT_HIT = null;
+function updatePointer() { POINT_HIT = null; if (!renderer.xr.isPresenting || !PANEL.me.parent) { if (HOVER) { HOVER = null; drawPanel(); } return; } const c = CTRL.find(c => c.userData.hand === "right"); if (!c) return;
+  _rm.identity().extractRotation(c.matrixWorld); _pray.ray.origin.setFromMatrixPosition(c.matrixWorld); _pray.ray.direction.set(0, 0, -1).applyMatrix4(_rm); const h = _pray.intersectObject(PANEL.me, false)[0]; c.userData.line.visible = !!h;
+  let id = null; if (h && h.uv) { const x = h.uv.x * 640, y = (1 - h.uv.y) * 800; const B = BTN.find(B => x >= B.x && x <= B.x + B.w && y >= B.y && y <= B.y + B.h); id = B ? B.id : null; c.userData.line.scale.z = h.distance / c.matrixWorld.getMaxScaleOnAxis(); POINT_HIT = h; }
+  if (id !== HOVER) { HOVER = id; drawPanel(); } }
+
 // ---------- the loop ----------
 const clock = new THREE.Clock(), _fq = new THREE.Quaternion(); let frame = 0, panelT = 0;
 renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.05), vr = renderer.xr.isPresenting; let mx = 0, my = 0, run = false, act = false;
@@ -366,15 +635,17 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.05), v
       if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; run = !!gp.buttons[0]?.pressed; const bY = gp.buttons[5]?.pressed; if (bY && !prevB.y) comfortVig = !comfortVig; prevB.y = bY; }
       else { const tx = a[ax] || 0; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const tr = gp.buttons[0]?.pressed; if (tr && !prevB.t) act = true; prevB.t = tr; } } }
   else { if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD) mx += 1; if (keys.KeyA) mx -= 1; run = keys.ShiftLeft || keys.ShiftRight; if (keys.ArrowLeft) yaw += dt * 1.5; if (keys.ArrowRight) yaw -= dt * 1.5; }
-  if (!started) { renderer.render(scene, camera); return; } if (act && NEAR) NEAR.act();
+  if (!started) { renderer.render(scene, camera); return; } if (act && HOVER) pressBtn(HOVER); else if (act && POINT_HIT) {} else if (act && NEAR) NEAR.act();
   camera.getWorldQuaternion(_fq); const moving = !!(mx || my);
   if (moving && ME.seat) standUp(); if (moving && !ME.seat) { const f = V3(0, 0, -1).applyQuaternion(_fq); f.y = 0; f.normalize(); const sd = V3(-f.z, 0, f.x), sp = run ? 3.2 : 1.4; tryMove(ME.x + (f.x * -my + sd.x * mx) * sp * dt, ME.z + (f.z * -my + sd.z * mx) * sp * dt); }
   const inside = toUW(ME.x, ME.z)[1] > LOT.w0 + 0.3; CROWD.g.visible = inside; for (const P of Object.values(PEOPLE)) P.G.visible = inside; for (const V of VENDORS) V.P.G.visible = inside;
   const fy = ME.seat ? ME.seat.p.y - 0.42 : floorAt(ME.x, ME.z); ME.y = lerpN(ME.y, fy, 0.35);
   rig.position.set(ME.x, ME.y, ME.z); rig.rotation.set(0, vr ? vrYaw : 0, 0); if (vr && ME.seat) rig.position.y = ME.seat.p.y + 0.78 - camera.position.y; if (!vr) { camera.position.set(0, ME.seat ? 0.42 + 0.78 : 1.6, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
+  if (window.CAM_OVERRIDE) { rig.position.copy(CAM_OVERRIDE.p); rig.rotation.set(0, 0, 0); camera.position.set(0, 0, 0); camera.lookAt(CAM_OVERRIDE.t); }
   VIG.material.opacity = comfortVig && moving ? lerpN(VIG.material.opacity, run ? 0.7 : 0.45, 0.1) : lerpN(VIG.material.opacity, 0, 0.15); VIG.visible = VIG.material.opacity > 0.01;
   for (const V of VENDORS) { const S = V.S; V.t += V.dir * dt * 0.6 / S.L; if (V.t > 0.95 || V.t < 0.05) V.dir *= -1; const p = S.o.clone().addScaledVector(S.A, V.t * S.L).addScaledVector(S.out, (V.row + 0.15) * S.rowD); V.P.G.position.set(p.x, (V.row + 1) * S.rowH, p.z); V.P.G.rotation.y = Math.atan2(-S.A.x * V.dir, -S.A.z * V.dir); }
   if (window.FLAG) { const pa = FLAG.geometry.attributes.position, tt = performance.now() / 1000; for (let i = 0; i < pa.count; i++) { const x = pa.getX(i) + 1.7; pa.setZ(i, Math.sin(x * 2.2 - tt * 4) * 0.12 * x / 3.4); } pa.needsUpdate = true; }
-  if (preT > 0) { preT -= dt; if (preT <= 0) say("\"Play ball!\" Umpire Connolly calls it, and Cy Young steps onto the pitcher's slab.", 6); }
+  if (preT > 0) { preT -= dt; if (preT <= 0) { say("\"Play ball!\" Umpire Connolly calls it, and Cy Young steps onto the pitcher's slab.", 6); startGame(); } }
+  updateGame(dt); updatePointer();
   frame++; if (frame === 2) DIAG.stage(vr ? "running in VR" : "running"); if (frame === 600) DIAG.stable(); let redraw = false; if (frame % 5 === 0) { redraw = updateLook(); findNear(); } panelT -= dt; if (panelT <= 0 || redraw) { panelT = 1; drawPanel(); }
   msgT -= dt; if (msgT <= 0) MSG.style.display = "none"; renderer.render(scene, camera); });
