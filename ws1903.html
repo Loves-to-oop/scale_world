@@ -53144,7 +53144,7 @@ function IN(n) { return n * 0.0254; }
 
 // ---------- the fence: 14 ft of boards round the outfield and down the sides of the lot ----------
 const FENCE_H = 14 * FT, WALLS = [];
-function boardWall(a, b, h = FENCE_H, gapAt = null) { const L = a.distanceTo(b); if (L < 0.05) return; const m = new THREE.Mesh(new THREE.BoxGeometry(L, h, 0.12), MAT.board.clone()); m.material.map = boardT.clone(); m.material.map.repeat.set(L / 3, 1); m.material.map.needsUpdate = true; m.position.copy(a).add(b).multiplyScalar(0.5).setY(h / 2); m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); m.castShadow = m.receiveShadow = true; scene.add(m); WALLS.push({ a: a.clone(), b: b.clone(), h }); }
+function boardWall(a, b, h = FENCE_H, gapAt = null) { const L = a.distanceTo(b); if (L < 0.05) return; const bg = new THREE.BoxGeometry(L, h, 0.12), uv = bg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * L / 3); const m = new THREE.Mesh(bg, MAT.board); m.position.copy(a).add(b).multiplyScalar(0.5).setY(h / 2); m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); m.castShadow = m.receiveShadow = true; scene.add(m); WALLS.push({ a: a.clone(), b: b.clone(), h }); }
 { let prev = null; for (let d = -45; d <= 45; d += 2.5) { const p = dir(d * Math.PI / 180).multiplyScalar(fenceDist(d)); if (prev) boardWall(prev, p); prev = p; }
   const LFP = dir(-D45).multiplyScalar(fenceDist(-45)), RFP = dir(D45).multiplyScalar(fenceDist(45));
   boardWall(LFP, P2(fenceDist(-45), LOT.w0)); boardWall(RFP, P2(LOT.u0, fenceDist(45))); boardWall(P2(LOT.u0, fenceDist(45)), P2(LOT.u0, LOT.w0));
@@ -53201,30 +53201,40 @@ function floorAt(x, z) { const p = V3(x, 0, z); for (const S of SECTIONS) { cons
 // Men in dark suits and derbies or flat caps, a few straw boaters left over from summer, a few women in broad hats; the Royal Rooters, Boston's
 // loudest fans, in the bleachers behind first base.
 function mergeG(list) { const pos = [], nor = []; for (const g0 of list) { const g = g0.index ? g0.toNonIndexed() : g0; g.computeVertexNormals(); pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); } const m = new THREE.BufferGeometry(); m.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); m.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); return m; }
-const SEATED = mergeG([new THREE.BoxGeometry(0.4, 0.6, 0.24).translate(0, 0.32, 0.02), new THREE.BoxGeometry(0.36, 0.14, 0.46).translate(0, 0.05, -0.2), new THREE.BoxGeometry(0.34, 0.45, 0.14).translate(0, -0.2, -0.42), new THREE.BoxGeometry(0.5, 0.14, 0.22).translate(0, 0.56, 0.02)]);
-const STANDING = mergeG([new THREE.BoxGeometry(0.4, 0.62, 0.24).translate(0, 1.16, 0), new THREE.BoxGeometry(0.34, 0.86, 0.2).translate(0, 0.43, 0), new THREE.BoxGeometry(0.5, 0.14, 0.22).translate(0, 1.42, 0)]);
-const HEADG = new THREE.IcosahedronGeometry(0.105, 1);
-const HATS = { derby: mergeG([new THREE.SphereGeometry(0.11, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 1.1, 1.15), new THREE.CylinderGeometry(0.17, 0.17, 0.015, 14)]), cap: mergeG([new THREE.SphereGeometry(0.115, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).scale(1.05, 0.6, 1.1), new THREE.BoxGeometry(0.2, 0.012, 0.09).translate(0, 0.005, -0.12)]),
-  boater: mergeG([new THREE.CylinderGeometry(0.105, 0.105, 0.07, 14).translate(0, 0.035, 0), new THREE.CylinderGeometry(0.18, 0.18, 0.012, 16)]), lady: mergeG([new THREE.CylinderGeometry(0.1, 0.12, 0.09, 12).translate(0, 0.045, 0), new THREE.CylinderGeometry(0.27, 0.27, 0.015, 16), new THREE.IcosahedronGeometry(0.07, 0).translate(0.08, 0.08, 0)]) };
+// kept very simple so a headset can draw thousands: seated fans are a few boxes, about 70 triangles each; the standing crowd far out in the
+// outfield are flat cut-out figures facing the field, two triangles each
+const STANDING = mergeG([new THREE.BoxGeometry(0.42, 0.64, 0.24).translate(0, 1.16, 0), new THREE.BoxGeometry(0.34, 0.86, 0.2).translate(0, 0.43, 0)]);
+const SEATED = mergeG([new THREE.BoxGeometry(0.42, 0.62, 0.24).translate(0, 0.32, 0.02), new THREE.BoxGeometry(0.36, 0.14, 0.46).translate(0, 0.05, -0.2)]);
+const HEADG = new THREE.IcosahedronGeometry(0.1, 0).scale(0.9, 1.1, 0.95), brim = r => new THREE.CircleGeometry(r, 7).rotateX(-Math.PI / 2);
+const HATS = { derby: mergeG([new THREE.CylinderGeometry(0.085, 0.105, 0.1, 5).translate(0, 0.04, 0), brim(0.16)]), cap: mergeG([new THREE.BoxGeometry(0.21, 0.06, 0.22).translate(0, 0.02, 0), new THREE.BoxGeometry(0.18, 0.012, 0.09).translate(0, 0, -0.14)]),
+  boater: mergeG([new THREE.CylinderGeometry(0.1, 0.1, 0.07, 5).translate(0, 0.035, 0), brim(0.17)]), lady: mergeG([new THREE.CylinderGeometry(0.1, 0.12, 0.09, 5).translate(0, 0.045, 0), brim(0.26)]) };
+const CUTOUT = (() => { const c = document.createElement("canvas"), W = 64, H = 128, NV = 8; c.width = W * NV; c.height = H; const g = c.getContext("2d"), coats = ["#23252b", "#2c2b2e", "#1f2331", "#36312b", "#3b3731", "#4a4437", "#2a2a2a", "#56504a"];
+  for (let v = 0; v < NV; v++) { const x0 = v * W, cx = x0 + W / 2, hat = v % 4; g.fillStyle = "#2a2622"; g.fillRect(cx - 10, 70, 8, 56); g.fillRect(cx + 2, 70, 8, 56); g.fillStyle = coats[v]; g.beginPath(); g.roundRect(cx - 14, 30, 28, 46, 6); g.fill(); g.fillStyle = "#d8a888"; g.beginPath(); g.arc(cx, 21, 8, 0, 7); g.fill(); g.fillStyle = "#e8e4dc"; g.fillRect(cx - 3, 30, 6, 6);
+    g.fillStyle = hat === 2 ? "#ddd0a0" : hat === 3 ? "#5a3a40" : "#1c1c1c"; if (hat === 0) { g.beginPath(); g.ellipse(cx, 14, 8, 6, 0, Math.PI, 0); g.fill(); g.fillRect(cx - 12, 14, 24, 2); } else if (hat === 1) { g.fillRect(cx - 9, 10, 18, 5); g.fillRect(cx - 9, 14, 22, 2); } else if (hat === 2) { g.fillRect(cx - 8, 9, 16, 6); g.fillRect(cx - 12, 14, 24, 2); } else { g.fillRect(cx - 7, 8, 14, 6); g.fillRect(cx - 16, 13, 32, 3); } }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.LinearFilter; return { t, NV }; })();
 const CROWD = { list: [] }; let ROOTERS_AT = null;
 { const coat = [0x22242a, 0x2a2a2e, 0x1e2230, 0x34302a, 0x3a3630, 0x2c2a26, 0x4a4436, 0x1a1a1c, 0x3e3a3a, 0x5a5448], hatCol = { derby: [0x1a1a1a, 0x2a2420, 0x3a2e24], cap: [0x3a3a3a, 0x4a4438, 0x2a2a30, 0x5a5040], boater: [0xe0d4a8], lady: [0x3a2a3a, 0x2a2a3a, 0x5a3a30, 0x7a6a5a] };
   const people = []; const hatOf = r => r < 0.6 ? "derby" : r < 0.88 ? "cap" : r < 0.94 ? "boater" : "lady";
   // seated: most seats filled, every one in the Royal Rooters' block, a few left empty (you can take one)
-  for (const s of SEATS) { const rooter = s.sec === "first-base bleachers" && s.row < 9 && s.p.distanceTo(P2(-17, 70)) < 16; if (!rooter && R() < 0.08) continue; s.taken = true; people.push({ p: s.p.clone(), face: s.face, seated: true, hat: rooter ? "derby" : hatOf(R()), rooter }); }
+  for (const s of SEATS) { const rooter = s.sec === "first-base bleachers" && s.row < 9 && s.p.distanceTo(P2(-17, 70)) < 16; if (!rooter && R() < (IS_HEADSET ? 0.2 : 0.08)) continue; s.taken = true; people.push({ p: s.p.clone(), face: s.face, seated: true, hat: rooter ? "derby" : hatOf(R()), rooter }); }
   ROOTERS_AT = P2(-24, 64, 4);
   // standing: behind the ropes in the outfield, thicker toward the fence
-  let n = 0; while (n < 6200) { const d = (R() - 0.5) * 88, rd = ropeDist(d) + 1.2, fd = fenceDist(d) - 0.8; if (fd <= rd) continue; const dist = lerpN(rd, fd, Math.sqrt(R())), p = dir(d * Math.PI / 180).multiplyScalar(dist); people.push({ p: p.setY(0), face: Math.atan2(p.x, p.z) + (R() - 0.5) * 0.6, seated: false, hat: hatOf(R()) }); n++; }
+  let n = 0; while (n < (IS_HEADSET ? 3000 : 6200)) { const d = (R() - 0.5) * 88, rd = ropeDist(d) + 1.2, fd = fenceDist(d) - 0.8; if (fd <= rd) continue; const dist = lerpN(rd, fd, Math.sqrt(R())), p = dir(d * Math.PI / 180).multiplyScalar(dist); people.push({ p: p.setY(0), face: Math.atan2(p.x, p.z) + (R() - 0.5) * 0.6, seated: false, hat: hatOf(R()) }); n++; }
   // and along the top of the left-field fence
   for (let d = -45; d < -12; d += 0.35) { if (R() < 0.35) continue; const p = dir(d * Math.PI / 180).multiplyScalar(fenceDist(d) + 0.1); people.push({ p: p.setY(FENCE_H - 0.42), face: Math.atan2(p.x, p.z), seated: true, hat: hatOf(R()), fence: true }); }
   // along the street outside, people still waiting to get in
   for (let i = 0; i < 160; i++) { const p = P2(GATE_U - 25 + R() * 50, -40.5 - R() * 3); people.push({ p: p.setY(0), face: Math.atan2(WA.x, WA.z) + (R() - 0.5) * 2, seated: false, hat: hatOf(R()), outside: true }); }
+  const flatP = people.filter(P => (!P.seated || P.fence) && !P.outside), solid = people.filter(P => (P.seated && !P.fence) || P.outside); people.length = 0; people.push(...solid);
+  const cut = []; for (let v = 0; v < CUTOUT.NV; v++) { const g = new THREE.PlaneGeometry(0.62, 1.8).translate(0, 0.9, 0), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, (uv.getX(i) + v) / CUTOUT.NV); const im = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ map: CUTOUT.t, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9 }), flatP.length); im.count = 0; cut.push(im); }
+  { const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(); for (const P of flatP) { const im = cut[R() * CUTOUT.NV | 0], sc = 0.9 + R() * 0.18, y = P.fence ? P.p.y - 0.55 : P.p.y; q.setFromAxisAngle(UP, Math.atan2(P.p.x, P.p.z) + (R() - 0.5) * 0.3); m4.compose(V3(P.p.x, y, P.p.z), q, V3(sc, sc, sc)); im.setMatrixAt(im.count, m4); im.setColorAt(im.count, c.setScalar(0.75 + R() * 0.3)); im.count++; CROWD.list.push(P); }
+    for (const im of cut) { im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; im.receiveShadow = true; scene.add(im); } }
   const N = people.length, body = { s: new THREE.InstancedMesh(SEATED, M(0xffffff), N), t: new THREE.InstancedMesh(STANDING, M(0xffffff), N) }, head = new THREE.InstancedMesh(HEADG, M(0xffffff, { roughness: 0.7 }), N), hats = {}; for (const k in HATS) hats[k] = new THREE.InstancedMesh(HATS[k], M(0xffffff), N);
   const cnt = { s: 0, t: 0, h: 0 }, hc = {}; for (const k in HATS) hc[k] = 0; const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), one = V3(1, 1, 1);
   for (const P of people) { q.setFromAxisAngle(UP, P.face); const sc = 0.92 + R() * 0.16, s = V3(sc, sc, sc), bm = P.seated ? body.s : body.t, k = P.seated ? "s" : "t"; m4.compose(P.p, q, s); bm.setMatrixAt(cnt[k], m4); bm.setColorAt(cnt[k], c.set(P.hat === "lady" ? [0x4a3a4a, 0x3a3a4a, 0x5a4a3a, 0x6a5a6a][R() * 4 | 0] : coat[R() * coat.length | 0])); cnt[k]++;
-    const hy = (P.seated ? 0.78 : 1.6) * sc, hp = P.p.clone().add(V3(0, hy, 0)); m4.compose(hp, q, s); head.setMatrixAt(cnt.h, m4); head.setColorAt(cnt.h, c.setHSL(0.07, 0.35 + R() * 0.1, 0.55 + R() * 0.15)); cnt.h++;
+    const hy = (P.seated ? 0.78 : 1.6) * sc, hp = P.p.clone().add(V3(0, hy, 0)); m4.compose(hp, q, s); head.setMatrixAt(cnt.h, m4); head.setColorAt(cnt.h, c.setHSL(0.06, 0.4 + R() * 0.1, 0.42 + R() * 0.12)); cnt.h++;
     const hm = hats[P.hat], hcl = hatCol[P.hat]; m4.compose(hp.clone().add(V3(0, 0.07 * sc, 0)), q, s); hm.setMatrixAt(hc[P.hat], m4); hm.setColorAt(hc[P.hat], c.set(hcl[R() * hcl.length | 0])); hc[P.hat]++; P.i = cnt.h - 1; CROWD.list.push(P); }
-  for (const [im, n] of [[body.s, cnt.s], [body.t, cnt.t], [head, cnt.h], ...Object.keys(HATS).map(k => [hats[k], hc[k]])]) { im.count = n; im.castShadow = true; im.receiveShadow = true; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; scene.add(im); }
-  CROWD.n = people.length; }
+  for (const [im, n] of [[body.s, cnt.s], [body.t, cnt.t], [head, cnt.h], ...Object.keys(HATS).map(k => [hats[k], hc[k]])]) { im.count = n; im.castShadow = false; im.receiveShadow = true; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; scene.add(im); }
+  CROWD.n = people.length + flatP.length; }
 // the ropes, on low stakes, that held the standing crowd back
 { let prev = null; for (let d = -45; d <= 45; d += 3) { const p = dir(d * Math.PI / 180).multiplyScalar(ropeDist(d)); box(0.06, 1.0, 0.06, MAT.wood, p.x, 0.5, p.z); if (prev) { const a = prev.clone().setY(0.92), b = p.clone().setY(0.92), cv = new THREE.QuadraticBezierCurve3(a, a.clone().lerp(b, 0.5).add(V3(0, -0.12, 0)), b); scene.add(new THREE.Mesh(new THREE.TubeGeometry(cv, 6, 0.012, 4), MAT.rope)); } prev = p; } }
 
@@ -53236,7 +53246,7 @@ function chestTex(word, col) { return tex(256, 128, (g, w, h) => { g.fillStyle =
 const SKIN = M(0xd8a888, { roughness: 0.7 });
 function makePerson(team, name, role) { const T = TEAM[team], G = new THREE.Group(), shirt = M(T.shirt), pant = M(T.shirt), sock = M(T.sock), shoe = M(0x1a1a1a), cap = M(T.cap), trim = M(T.trim);
   const chest = new THREE.MeshStandardMaterial({ map: chestTex(T.word, T.shirt), roughness: 0.85 }), torsoMats = [shirt, shirt, shirt, shirt, shirt, chest];
-  const part = (geo, mat, x, y, z, P = G) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; P.add(m); return m; };
+  const part = (geo, mat, x, y, z, P = G) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = !IS_HEADSET || geo.type === "BoxGeometry" && geo.parameters.height > 0.5; P.add(m); return m; };
   const hips = new THREE.Group(); hips.position.y = 0.95; G.add(hips); const torso = new THREE.Group(); hips.add(torso); part(new THREE.BoxGeometry(0.4, 0.55, 0.24), torsoMats, 0, 0.3, 0, torso); part(new THREE.BoxGeometry(0.2, 0.05, 0.25), trim, 0, 0.56, 0, torso);
   const head = new THREE.Group(); head.position.y = 0.68; torso.add(head); part(new THREE.SphereGeometry(0.11, 14, 10), SKIN, 0, 0.04, 0, head);
   if (team === "UMP") part(new THREE.CylinderGeometry(0.11, 0.12, 0.08, 14), cap, 0, 0.13, 0, head); else { part(new THREE.SphereGeometry(0.115, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.75, 1), cap, 0, 0.09, 0, head); part(new THREE.BoxGeometry(0.16, 0.012, 0.08), cap, 0, 0.09, -0.13, head); }
@@ -53274,9 +53284,9 @@ const PEOPLE = {};
 
 // ---------- the neighbourhood: Rogers Street with its brick row houses, Huntington Avenue and its trolley line beyond left field, the huge
 // Boston Storage Warehouse, the railroad yards behind first base, and across the tracks the South End Grounds, home of the National League club ----------
-const WIN = { row: windowsT(6, 4), tall: windowsT(10, 8), low: windowsT(8, 2) };
+const BMAT = new Map(), WIN = { row: windowsT(6, 4), tall: windowsT(10, 8), low: windowsT(8, 2) };
 function bldg(u0, w0, u1, w1, h, t, roofC = 0x4a4440) { const c = P2((u0 + u1) / 2, (w0 + w1) / 2), lu = Math.abs(u1 - u0), lw = Math.abs(w1 - w0), m = t.clone(); m.needsUpdate = true;
-  const mat = new THREE.MeshStandardMaterial({ map: m, roughness: 0.9 }); m.repeat.set(1, 1); const b = new THREE.Mesh(new THREE.BoxGeometry(lu, h, lw), [mat, mat, M(roofC), M(roofC), mat, mat]); b.position.set(c.x, h / 2, c.z); b.rotation.y = ROT_U + Math.PI / 2 - Math.PI / 2; b.rotation.y = Math.atan2(UA.z, -UA.x) * 0 + (-Math.atan2(UA.z, UA.x)); b.castShadow = b.receiveShadow = true; scene.add(b); return b; }
+  const mat = BMAT.get(t) || (BMAT.set(t, new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 })), BMAT.get(t)); const b = new THREE.Mesh(new THREE.BoxGeometry(lu, h, lw), mat); b.position.set(c.x, h / 2, c.z); b.rotation.y = ROT_U + Math.PI / 2 - Math.PI / 2; b.rotation.y = Math.atan2(UA.z, -UA.x) * 0 + (-Math.atan2(UA.z, UA.x)); b.castShadow = b.receiveShadow = true; scene.add(b); return b; }
 { const r = mulberry(21);
   // Rogers Street: row houses on the far side, three and four storeys
   for (let u = -70; u < 210; u += 9 + r() * 6) { const w = 6 + r() * 4; bldg(u, -54, u + w, -70, 10 + (r() * 2 | 0) * 3.5, WIN.row); }
@@ -53395,6 +53405,13 @@ const HANDS = [0, 1].map(i => { const grip = renderer.xr.getControllerGrip(i); r
 function begin() { if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); const s = P2(GATE_U - 16, -44.5); ME.x = s.x; ME.z = s.z; yaw = vrYaw = ROT_U + 0.25; HUD.style.display = renderer.xr.isPresenting ? "none" : "block"; drawPanel(); say("Rogers Street, Boston, a little before game time. The ticket windows are just ahead.", 6); }
 document.getElementById("intro")?.addEventListener("click", begin);
 const VRB = document.getElementById("vr"); if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); await renderer.xr.setSession(s); begin(); HUD.style.display = "none"; }; });
+
+// ---------- drawing it cheaply: everything that never moves is merged into one mesh per material ----------
+{ const groups = new Map(), keep = new Set([window.FLAG]); for (const o of [...scene.children]) { if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || keep.has(o)) continue; if (!groups.has(o.material)) groups.set(o.material, []); groups.get(o.material).push(o); }
+  scene.updateMatrixWorld(true);
+  for (const [mat, list] of groups) { if (list.length < 2) continue; const pos = [], nor = [], uv = []; let shadow = false;
+    for (const o of list) { const g = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()).applyMatrix4(o.matrixWorld); if (!g.attributes.normal) g.computeVertexNormals(); pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); if (g.attributes.uv) uv.push(...g.attributes.uv.array); else for (let i = 0; i < g.attributes.position.count; i++) uv.push(0, 0); shadow = shadow || o.castShadow; scene.remove(o); o.geometry.dispose(); g.dispose(); }
+    const mg = new THREE.BufferGeometry(); mg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); mg.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); mg.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); const mm = new THREE.Mesh(mg, mat); mm.castShadow = shadow; mm.receiveShadow = true; scene.add(mm); } }
 
 // ---------- the loop ----------
 const clock = new THREE.Clock(), _fq = new THREE.Quaternion(); let frame = 0, panelT = 0;
