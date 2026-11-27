@@ -188,28 +188,49 @@ DIAG.stage("dressing the players");
 const TEAM = { BOS: { shirt: 0xf2f0e8, trim: 0x2a3a7a, sock: 0xb02a2a, cap: 0xf2f0e8, word: "BOSTON" }, PIT: { shirt: 0x9a9a96, trim: 0x22305a, sock: 0x22305a, cap: 0x22305a, word: "" }, UMP: { shirt: 0x1e2234, trim: 0x1e2234, sock: 0x1a1a1a, cap: 0x1e2234, word: "" } };
 function chestTex(word, col) { return tex(256, 128, (g, w, h) => { g.fillStyle = "#" + new THREE.Color(col).getHexString(); g.fillRect(0, 0, w, h); if (!word) return; g.fillStyle = "#2a3a7a"; g.font = "bold 30px Georgia"; g.textAlign = "center"; const n = word.length; for (let i = 0; i < n; i++) { const a = (i - (n - 1) / 2) * 0.16; g.save(); g.translate(w / 2 + Math.sin(a) * 160, 104 - Math.cos(a) * 60); g.rotate(a); g.fillText(word[i], 0, 0); g.restore(); } }); }
 const SKIN = M(0xd8a888, { roughness: 0.7 });
-function makePerson(team, name, role) { const T = TEAM[team], G = new THREE.Group(), shirt = M(T.shirt), pant = M(T.shirt), sock = M(T.sock), shoe = M(0x1a1a1a), cap = M(T.cap), trim = M(T.trim);
-  const chest = new THREE.MeshStandardMaterial({ map: chestTex(T.word, T.shirt), roughness: 0.85 }), torsoMats = [shirt, shirt, shirt, shirt, shirt, chest];
-  const part = (geo, mat, x, y, z, P = G) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = !IS_HEADSET || geo.type === "BoxGeometry" && geo.parameters.height > 0.5; P.add(m); return m; };
-  const hips = new THREE.Group(); hips.position.y = 0.95; G.add(hips); const torso = new THREE.Group(); hips.add(torso); part(new THREE.BoxGeometry(0.4, 0.55, 0.24), torsoMats, 0, 0.3, 0, torso); part(new THREE.BoxGeometry(0.2, 0.05, 0.25), trim, 0, 0.56, 0, torso);
-  const head = new THREE.Group(); head.position.y = 0.68; torso.add(head); part(new THREE.SphereGeometry(0.11, 14, 10), SKIN, 0, 0.04, 0, head);
-  if (team === "UMP") part(new THREE.CylinderGeometry(0.11, 0.12, 0.08, 14), cap, 0, 0.13, 0, head); else { part(new THREE.SphereGeometry(0.115, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.75, 1), cap, 0, 0.09, 0, head); part(new THREE.BoxGeometry(0.16, 0.012, 0.08), cap, 0, 0.09, -0.13, head); }
-  const limb = (P, x, y, len, r, mat, mat2) => { const j = new THREE.Group(); j.position.set(x, y, 0); P.add(j); part(new THREE.CylinderGeometry(r, r * 0.9, len, 8), mat, 0, -len / 2, 0, j); const j2 = new THREE.Group(); j2.position.y = -len; j.add(j2); part(new THREE.CylinderGeometry(r * 0.9, r * 0.75, len, 8), mat2 || mat, 0, -len / 2, 0, j2); return [j, j2]; };
-  const [aL, eL] = limb(torso, -0.25, 0.52, 0.29, 0.05, shirt, team === "UMP" ? shirt : SKIN), [aR, eR] = limb(torso, 0.25, 0.52, 0.29, 0.05, shirt, team === "UMP" ? shirt : SKIN);
-  const [lL, kL] = limb(hips, -0.1, 0, 0.44, 0.075, pant, sock), [lR, kR] = limb(hips, 0.1, 0, 0.44, 0.075, pant, sock); for (const k of [kL, kR]) part(new THREE.BoxGeometry(0.1, 0.07, 0.24), shoe, 0, -0.47, -0.05, k);
-  const handL = new THREE.Group(); handL.position.y = -0.3; eL.add(handL); const handR = new THREE.Group(); handR.position.y = -0.3; eR.add(handR);
-  if (role === "C") { part(new THREE.SphereGeometry(0.12, 12, 8).scale(1, 1, 0.55), M(0x6a4a2a), 0, 0, 0, handL); part(new THREE.BoxGeometry(0.34, 0.4, 0.05), M(0x5a4a3a), 0, 0.28, -0.14, torso); part(new THREE.BoxGeometry(0.2, 0.22, 0.02), M(0x2a2a2a, { wireframe: true }), 0, 0.05, -0.13, head); }
-  else if (team !== "UMP") part(new THREE.BoxGeometry(0.11, 0.14, 0.05), M(0x7a5a3a), 0, 0, 0, handL);
-  G.userData = { name, team, role }; scene.add(G); const P = { G, hips, torso, head, aL, eL, aR, eR, lL, kL, lR, kR, handL, handR, name, team, role };
+function makePerson(team, name, role) { const T = TEAM[team], G = new THREE.Group(), shirt = M(T.shirt, { roughness: 0.95 }), pant = M(T.shirt, { roughness: 0.95 }), sock = M(T.sock), shoe = M(0x161412, { roughness: 0.6 }), cap = M(T.cap), trim = M(T.trim), hair = M(0x3a2a1e), dark = M(0x1a1410);
+  const part = (geo, mat, x, y, z, P = G) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = !IS_HEADSET; P.add(m); return m; }, cap2 = (r, len) => new THREE.CapsuleGeometry(r, len, 4, 10);
+  const hips = new THREE.Group(); hips.position.y = 0.92; G.add(hips); const torso = new THREE.Group(); hips.add(torso);
+  // the shirt: a loose flannel shirt with a turned collar and long sleeves, belted at the waist
+  part(cap2(0.16, 0.3).scale(1.18, 1, 0.78), shirt, 0, 0.32, 0, torso); part(new THREE.CylinderGeometry(0.17, 0.17, 0.05, 16).scale(1.1, 1, 0.8), dark, 0, 0.03, 0, torso); part(new THREE.CylinderGeometry(0.06, 0.08, 0.06, 12), trim, 0, 0.6, 0, torso);
+  if (T.word) { const lt = part(new THREE.PlaneGeometry(0.3, 0.075), new THREE.MeshStandardMaterial({ map: wordTex(T.word), transparent: true, roughness: 0.9 }), 0, 0.43, -0.128, torso); lt.rotation.y = Math.PI; }
+  const neck = part(new THREE.CylinderGeometry(0.048, 0.052, 0.09, 10), SKIN, 0, 0.64, 0, torso);
+  const head = new THREE.Group(); head.position.y = 0.7; torso.add(head); part(new THREE.SphereGeometry(0.1, 16, 12).scale(0.9, 1.1, 0.98), SKIN, 0, 0.06, 0, head);
+  for (const sx of [-1, 1]) { part(new THREE.SphereGeometry(0.022, 8, 6).scale(0.6, 1, 1), SKIN, sx * 0.09, 0.05, 0.005, head); part(new THREE.SphereGeometry(0.011, 6, 5), dark, sx * 0.034, 0.075, -0.088, head); part(new THREE.BoxGeometry(0.03, 0.006, 0.01), hair, sx * 0.034, 0.095, -0.09, head); }
+  part(new THREE.BoxGeometry(0.022, 0.04, 0.03), SKIN, 0, 0.05, -0.1, head); part(new THREE.SphereGeometry(0.098, 12, 8, 0, Math.PI * 2, Math.PI * 0.3, Math.PI * 0.45), hair, 0, 0.06, 0.012, head);
+  if (team === "UMP") { part(new THREE.CylinderGeometry(0.1, 0.106, 0.07, 14), cap, 0, 0.15, 0, head); part(new THREE.BoxGeometry(0.15, 0.01, 0.07), cap, 0, 0.12, -0.11, head); }
+  else { part(new THREE.SphereGeometry(0.106, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.72, 1.02), cap, 0, 0.115, 0, head); part(new THREE.CylinderGeometry(0.075, 0.075, 0.01, 14, 1, false, -Math.PI / 2, Math.PI).scale(1, 1, 0.8), cap, 0, 0.12, -0.075, head); }
+  // arms: upper arm and forearm the same length, so the hands can be placed by inverse kinematics; sleeves to the wrist
+  const A = 0.27, limb = (P, x, y, len, r, mat, mat2) => { const j = new THREE.Group(); j.position.set(x, y, 0); P.add(j); part(cap2(r, len - r), mat, 0, -len / 2, 0, j); const j2 = new THREE.Group(); j2.position.y = -len; j.add(j2); part(cap2(r * 0.85, len - r), mat2 || mat, 0, -len / 2, 0, j2); return [j, j2]; };
+  const [aL, eL] = limb(torso, -0.21, 0.53, A, 0.052, shirt), [aR, eR] = limb(torso, 0.21, 0.53, A, 0.052, shirt);
+  // legs: baggy knickers bloused at the knee, then stockings and high shoes
+  const [lL, kL] = limb(hips, -0.095, -0.02, 0.44, 0.085, pant, sock), [lR, kR] = limb(hips, 0.095, -0.02, 0.44, 0.085, pant, sock);
+  for (const k of [kL, kR]) { part(new THREE.SphereGeometry(0.088, 10, 8).scale(1, 0.75, 1), pant, 0, -0.02, 0, k); k.children[0].scale.set(0.72, 1, 0.72); part(new THREE.BoxGeometry(0.095, 0.08, 0.26), shoe, 0, -0.46, -0.05, k); part(new THREE.BoxGeometry(0.1, 0.02, 0.27), dark, 0, -0.5, -0.05, k); }
+  const handL = new THREE.Group(); handL.position.y = -A; eL.add(handL); const handR = new THREE.Group(); handR.position.y = -A; eR.add(handR);
+  part(new THREE.SphereGeometry(0.04, 8, 6).scale(1, 1.2, 0.7), SKIN, 0, -0.02, 0, handR); if (team === "UMP" || role === "PH" || role === "staff" || role === "vendor") part(new THREE.SphereGeometry(0.04, 8, 6).scale(1, 1.2, 0.7), SKIN, 0, -0.02, 0, handL);
+  if (role === "C") { part(new THREE.SphereGeometry(0.13, 14, 10).scale(1, 1, 0.5), M(0x6a4428), 0, -0.04, -0.02, handL); part(new THREE.BoxGeometry(0.32, 0.42, 0.05), M(0x4a3e30), 0, 0.3, -0.13, torso); part(new THREE.BoxGeometry(0.19, 0.22, 0.1), new THREE.MeshStandardMaterial({ color: 0x1a1a1a, wireframe: true }), 0, 0.07, -0.1, head); }
+  else if (role === "1B") part(new THREE.BoxGeometry(0.13, 0.17, 0.06), M(0x7a5434), 0, -0.05, -0.01, handL);
+  else if (team !== "UMP" && role !== "PH" && role !== "staff" && role !== "vendor") part(new THREE.BoxGeometry(0.1, 0.13, 0.05), M(0x8a6a44), 0, -0.04, -0.01, handL);
+  if (team === "UMP" && role !== "staff" && role !== "vendor") part(new THREE.BoxGeometry(0.36, 0.2, 0.26), shirt, 0, -0.06, 0, torso);
+  G.userData = { name, team, role }; scene.add(G); const P = { G, hips, torso, head, aL, eL, aR, eR, lL, kL, lR, kR, handL, handR, name, team, role, armA: A, armB: A };
   setPose(P, "ready"); return P; }
+function wordTex(word) { return tex(256, 64, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = "#2a3a7a"; g.font = "bold 34px Georgia"; g.textAlign = "center"; const n = word.length; for (let i = 0; i < n; i++) { const a = (i - (n - 1) / 2) * 0.13; g.save(); g.translate(w / 2 + Math.sin(a) * 200, 230 - Math.cos(a) * 190); g.rotate(a); g.fillText(word[i], 0, 0); g.restore(); } }); }
+// placing a hand exactly: two-bone inverse kinematics for an arm, with the elbow bending toward the pole direction
+const _DOWN = V3(0, -1, 0);
+function armIK(P, side, target, pole) { const sh = side === "L" ? P.aL : P.aR, el = side === "L" ? P.eL : P.eR, a = P.armA, b = P.armB; P.G.updateMatrixWorld(true);
+  const tl = P.torso.worldToLocal(target.clone()), s0 = sh.position.clone(), d = tl.sub(s0); let dist = clampN(d.length(), 0.08, a + b - 0.003); d.normalize();
+  const A2 = Math.acos(clampN((a * a + dist * dist - b * b) / (2 * a * dist), -1, 1)), pl = (pole || V3(side === "L" ? -0.6 : 0.6, -1, 0.3)).clone(), n = pl.sub(d.clone().multiplyScalar(pl.dot(d))).normalize();
+  const u = d.clone().multiplyScalar(Math.cos(A2)).add(n.multiplyScalar(Math.sin(A2))); sh.quaternion.setFromUnitVectors(_DOWN, u);
+  const elbow = s0.clone().addScaledVector(u, a), f = s0.clone().addScaledVector(d, dist).sub(elbow).normalize(); el.quaternion.setFromUnitVectors(_DOWN, f.applyQuaternion(sh.quaternion.clone().invert())); }
 function setPose(P, pose) { const z = (j, x, y = 0, zz = 0) => j.rotation.set(x, y, zz); z(P.torso, 0); z(P.aL, 0.1, 0, 0.15); z(P.aR, 0.1, 0, -0.15); z(P.eL, -0.2); z(P.eR, -0.2); z(P.lL, 0); z(P.lR, 0); z(P.kL, 0); z(P.kR, 0); P.hips.position.y = 0.95;
   if (pose === "ready") { z(P.torso, -0.35); P.hips.position.y = 0.86; z(P.lL, -0.35, 0, 0.12); z(P.lR, -0.35, 0, -0.12); z(P.kL, 0.55); z(P.kR, 0.55); z(P.aL, -0.6, 0, 0.2); z(P.aR, -0.6, 0, -0.2); z(P.eL, -0.6); z(P.eR, -0.6); }
   if (pose === "crouch") { P.hips.position.y = 0.5; z(P.torso, -0.25); z(P.lL, -1.5, 0, 0.3); z(P.lR, -1.5, 0, -0.3); z(P.kL, 2.0); z(P.kR, 2.0); z(P.aL, -1.2, 0, 0.3); z(P.eL, -0.3); }
   if (pose === "bat") { z(P.torso, -0.15, 0.5); z(P.lL, -0.15, 0, 0.18); z(P.lR, 0.1, 0, -0.18); z(P.kL, 0.25); z(P.kR, 0.2); z(P.aL, -1.2, 0.6, 0.5); z(P.aR, -1.3, -0.4, -0.2); z(P.eL, -1.0); z(P.eR, -1.1); }
   if (pose === "sit") { P.hips.position.y = 0.48; z(P.lL, -1.55); z(P.lR, -1.55); z(P.kL, 1.55); z(P.kR, 1.55); z(P.aL, -0.4, 0, 0.1); z(P.aR, -0.4, 0, -0.1); z(P.eL, -0.9); z(P.eR, -0.9); }
+  if (pose === "relax") { z(P.torso, -0.42); P.hips.position.y = 0.86; z(P.lL, -0.3, 0, 0.1); z(P.lR, -0.3, 0, -0.1); z(P.kL, 0.45); z(P.kR, 0.45); z(P.aL, -0.75, 0, 0.12); z(P.aR, -0.75, 0, -0.12); z(P.eL, -0.25); z(P.eR, -0.25); }
   if (pose === "stand") { z(P.aL, 0.05, 0, 0.12); z(P.aR, 0.05, 0, -0.12); } }
 // the bat, a heavy ash bat of the time (they were thicker-handled than today's)
-const BATG = new THREE.CylinderGeometry(0.034, 0.018, 0.86, 10).translate(0, 0.43, 0), BATM = M(0xc8a878, { roughness: 0.5 });
+const BATG = new THREE.CylinderGeometry(0.033, 0.016, 0.86, 10).translate(0, 0.43, 0), BATM = M(0xc8a878, { roughness: 0.5 });
 // the lineups (the official record)
 const LINEUP = { PIT: [["Ginger Beaumont", "CF"], ["Fred Clarke", "LF"], ["Tommy Leach", "3B"], ["Honus Wagner", "SS"], ["Kitty Bransfield", "1B"], ["Claude Ritchey", "2B"], ["Jimmy Sebring", "RF"], ["Ed Phelps", "C"], ["Deacon Phillippe", "P"]],
   BOS: [["Patsy Dougherty", "LF"], ["Jimmy Collins", "3B"], ["Chick Stahl", "CF"], ["Buck Freeman", "RF"], ["Freddy Parent", "SS"], ["Candy LaChance", "1B"], ["Hobe Ferris", "2B"], ["Lou Criger", "C"], ["Cy Young", "P"]] };
@@ -329,8 +350,20 @@ const HALF_NAME = hi => `${hi % 2 ? "Bottom" : "Top"} of the ${["1st", "2nd", "3
 const PACE = { real: { gap: 16, between: 24, change: 90 }, brisk: { gap: 3.2, between: 3, change: 6 } }; let paceKey = "real";
 const POSN = { P: 1, C: 2, "1B": 3, "2B": 4, "3B": 5, SS: 6, LF: 7, CF: 8, RF: 9 }, NPOS = Object.fromEntries(Object.entries(POSN).map(([k, v]) => [v, k]));
 const BP = k => k === 0 || k === 4 ? V3(0, 0, 0) : [null, B1, B2, B3][k], BATTERS_BOX = lefty => V3(lefty ? 0.95 : -0.95, 0, 0.05);
-const BALL = new THREE.Mesh(new THREE.SphereGeometry(0.037, 10, 8), M(0xf4f0e4, { roughness: 0.6 })); BALL.castShadow = true; scene.add(BALL); BALL.visible = false;
-const BATM2 = new THREE.Mesh(BATG, BATM); BATM2.rotation.set(-2.3, 0, 0.2);
+const BALL = new THREE.Mesh(new THREE.SphereGeometry(0.037, 12, 10), M(0xf4f0e4, { roughness: 0.6, emissive: 0x555550 }));
+// a faint trail behind the ball in flight, so your eye can follow it (a real ball is very small at 50 m)
+const TRAIL = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 6, 5), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false }), 14); TRAIL.frustumCulled = false; TRAIL.count = 0; scene.add(TRAIL); const TRAILP = []; BALL.castShadow = true; scene.add(BALL); BALL.visible = false;
+// the bat is held in both hands and swung on a real arc: three key positions (the stance, the moment of contact out in front of the plate,
+// the follow-through), with the hands placed on the handle by inverse kinematics. The sweet spot passes through the contact point.
+const BATKEY = s => [[V3(-s * 0.12, 1.32, -0.12), V3(-s * 0.25, 0.95, 0.3).normalize()], [V3(s * 0.02, 1.0, -0.32), V3(s * 0.38, 0.92, -0.92).sub(V3(s * 0.02, 1.0, -0.32)).normalize()], [V3(s * 0.18, 1.25, -0.1), V3(-s * 0.15, 0.55, 0.85).normalize()]];
+const C_LOCAL = s => V3(s * 0.38, 0.92, -0.92);
+function dropBat(P) { if (P.bat) { P.G.remove(P.bat); P.bat = null; } }
+function batFrame(P) { const s = LEFTY.has(P.short) ? 1 : -1, K = BATKEY(s); let H, D, tw; const sw = P.act && P.act.n === "swing" ? clampN((GAME.T - P.act.t0) / P.act.d, 0, 1) : (P.swungAt !== undefined && GAME.T - P.swungAt < 1.2 ? 1 : -1);
+  if (sw < 0) { const wg = Math.sin(GAME.T * 2.2) * 0.05; H = K[0][0].clone(); D = K[0][1].clone().add(V3(0, 0, wg)).normalize(); tw = 0.4 * s; }
+  else if (sw < 0.4) { const t = (sw / 0.4) ** 2; H = K[0][0].clone().lerp(K[1][0], t); D = K[0][1].clone().lerp(K[1][1], t).normalize(); tw = lerpN(0.4 * s, -0.2 * s, t); }
+  else { const t = Math.min(1, (sw - 0.4) / 0.6); H = K[1][0].clone().lerp(K[2][0], t); D = K[1][1].clone().lerp(K[2][1], t).normalize(); tw = lerpN(-0.2 * s, -0.95 * s, t); }
+  P.torso.rotation.y = tw; P.bat.position.copy(H); P.bat.quaternion.setFromUnitVectors(UP, D); const bottom = P.G.localToWorld(H.clone().addScaledVector(D, 0.03)), top = P.G.localToWorld(H.clone().addScaledVector(D, 0.12));
+  armIK(P, s < 0 ? "L" : "R", bottom, V3(s < 0 ? -0.4 : 0.4, -1, 0.3)); armIK(P, s < 0 ? "R" : "L", top, V3(s < 0 ? 0.4 : -0.4, -1, 0.3)); }
 const GAME = { on: false, ei: 0, T: 0, cues: [], st: null, phase: "pre", paused: false, ball: { mode: "hide" }, cheer: 0, last: "", batter: null, balls: 0, strikes: 0 };
 const cue = (t, fn) => GAME.cues.push({ t, fn });
 const team = hi => hi % 2 ? "BOS" : "PIT", other = t => t === "PIT" ? "BOS" : "PIT", P_ = n => PEOPLE[NAMES[n] || n];
@@ -351,14 +384,21 @@ const stateAt = i => { const S = freshState(); for (let k = 0; k < i; k++) apply
 const batterFor = (e, S) => ["SB", "SBE", "CS"].includes(e.k) ? (() => { const tm = team(e.half), s = S.order[tm]; return LINEUP[tm][s][0].split(" ").pop(); })() : e.b;
 
 // ---------- people moving: a path of points at a speed; then they stand and face something ----------
+function turnTo(G, ty, k) { let dy = ty - G.rotation.y; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI; G.rotation.y += dy * Math.min(1, k); }
 function goTo(P, pts, speed, face) { P.path = (Array.isArray(pts) ? pts : [pts]).map(p => p.clone().setY(0)); P.speed = speed; P.faceAt = face || null; }
 function act(P, n, d) { P.act = { n, t0: GAME.T, d }; }
 function stand(P, pose, faceAt) { P.path = []; P.base = pose; if (faceAt) P.faceAt = faceAt; }
-function updatePerson(P, dt) { const G = P.G; let moving = false;
-  if (P.path && P.path.length) { const tgt = P.path[0], d = V3(tgt.x - G.position.x, 0, tgt.z - G.position.z), L = d.length(), step = (P.speed || 3) * dt; if (L <= step) { G.position.x = tgt.x; G.position.z = tgt.z; P.path.shift(); } else { G.position.addScaledVector(d, step / L); moving = true; } if (L > 0.01) G.rotation.y = Math.atan2(-d.x, -d.z); }
-  if (!moving && P.faceAt) { const dx = P.faceAt.x - G.position.x, dz = P.faceAt.z - G.position.z; if (dx * dx + dz * dz > 0.01) { const ty = Math.atan2(-dx, -dz); let dy = ty - G.rotation.y; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI; G.rotation.y += dy * Math.min(1, dt * 6); } }
-  G.position.y = floorAt(G.position.x, G.position.z) * (moving ? 1 : 1);
-  setPose(P, moving ? "stand" : (P.base || "ready")); const z = (j, x, y, zz) => j.rotation.set(x, y || 0, zz || 0);
+function updatePerson(P, dt) { const G = P.G; let moving = false; if (P.ph0 === undefined) P.ph0 = Math.random() * 10;
+  // walking and running: speed builds up and dies away, and they turn smoothly toward where they're going
+  if (P.path && P.path.length) { const tgt = P.path[0], d = V3(tgt.x - G.position.x, 0, tgt.z - G.position.z), L = d.length(), want = P.path.length > 1 ? (P.speed || 3) : Math.min(P.speed || 3, 1.2 + L * 2.2); P.v = lerpN(P.v || 0, want, Math.min(1, dt * 5)); const step = P.v * dt;
+    if (L <= Math.max(step, 0.02)) { G.position.x = tgt.x; G.position.z = tgt.z; P.path.shift(); } else { G.position.addScaledVector(d, step / L); moving = true; }
+    if (L > 0.05) turnTo(G, Math.atan2(-d.x, -d.z), dt * 9); } else P.v = 0;
+  // standing still: face what matters (the ball in play, else where they were told to look)
+  const ballLive = GAME.ball.mode === "path" && BALL.visible, onField = !P.bat && P.base !== "sit";
+  if (!moving) { const f = ballLive && onField ? BALL.position : P.faceAt; if (f) { const dx = f.x - G.position.x, dz = f.z - G.position.z; if (dx * dx + dz * dz > 0.04) turnTo(G, Math.atan2(-dx, -dz), dt * (ballLive ? 7 : 4)); } }
+  G.position.y = floorAt(G.position.x, G.position.z);
+  const base = P.base === "ready" && !GAME.live && P.role !== "UMP_B" ? "relax" : (P.base || "ready"); setPose(P, moving ? "stand" : base); const z = (j, x, y, zz) => j.rotation.set(x, y || 0, zz || 0);
+  if (!moving && base !== "sit") { const t = GAME.T + P.ph0; P.torso.rotation.z += Math.sin(t * 0.9) * 0.025; P.hips.position.x = Math.sin(t * 0.45) * 0.02; P.torso.rotation.x += Math.sin(t * 1.7) * 0.012; }
   if (moving) { P.ph = (P.ph || 0) + dt * (P.speed || 3) * 1.5; const k = clampN((P.speed || 3) / 7, 0.3, 1), s = Math.sin(P.ph); z(P.lL, s * 0.9 * k); z(P.lR, -s * 0.9 * k); z(P.kL, Math.max(0, -s) * 1.2 * k + 0.1); z(P.kR, Math.max(0, s) * 1.2 * k + 0.1); z(P.aL, -s * 0.8 * k, 0, 0.15); z(P.aR, s * 0.8 * k, 0, -0.15); z(P.eL, -1.2 * k); z(P.eR, -1.2 * k); z(P.torso, -0.25 * k); P.hips.position.y = 0.95 - 0.04 * k + Math.abs(Math.cos(P.ph)) * 0.04 * k; }
   if (P.act) { const u = (GAME.T - P.act.t0) / P.act.d; if (u > 1 || u < 0) P.act = null; else { const n = P.act.n;
       if (n === "windup") { if (u < 0.55) { z(P.aL, -2.6, 0, 0.3); z(P.aR, -2.7, 0, -0.3); z(P.lL, -1.1 * Math.sin(u / 0.55 * Math.PI), 0, 0); z(P.kL, 1.2 * Math.sin(u / 0.55 * Math.PI)); } else { const v = (u - 0.55) / 0.45; z(P.torso, -0.5 * v); z(P.lL, -0.6); z(P.kL, 0.4); z(P.aR, lerpN(-2.9, 1.1, v), 0, -0.3); z(P.aL, -0.6, 0, 0.4); } }
@@ -367,12 +407,18 @@ function updatePerson(P, dt) { const G = P.G; let moving = false;
       else if (n === "catch") { z(P.aL, -2.2, 0, 0.25); z(P.eL, -0.3); }
       else if (n === "low") { z(P.torso, -0.9); z(P.aL, -1.0, 0, 0.1); z(P.kL, 0.9); z(P.kR, 0.9); z(P.lL, -0.6); z(P.lR, -0.6); P.hips.position.y = 0.75; }
       else if (n === "call") { z(P.aR, -2.9, 0, -0.2); z(P.eR, -0.6); }
-      else if (n === "safe") { z(P.aL, -1.5, 0, 1.3); z(P.aR, -1.5, 0, -1.3); } } } }
+      else if (n === "safe") { z(P.aL, -1.5, 0, 1.3); z(P.aR, -1.5, 0, -1.3); } } }
+  if (P.bat && !moving) batFrame(P);
+  // the head follows the ball (or home plate), within what a neck can do
+  { const tgt = ballLive ? BALL.position : P.base === "sit" ? null : V3(0, 1.2, 0); if (tgt) { P.G.updateMatrixWorld(true); const hp = P.head.getWorldPosition(V3(0, 0, 0)), d = tgt.clone().sub(hp), inv = P.torso.getWorldQuaternion(new THREE.Quaternion()).invert(), l = d.applyQuaternion(inv);
+      const yw = clampN(Math.atan2(-l.x, -l.z), -1.2, 1.2), pt = clampN(Math.atan2(l.y, Math.hypot(l.x, l.z)), -0.7, 0.6); P.hy = lerpN(P.hy || 0, yw, Math.min(1, dt * 8)); P.hx = lerpN(P.hx || 0, pt, Math.min(1, dt * 8)); P.head.rotation.set(P.hx, P.hy, 0, "YXZ"); } }
+  if (P.reach && GAME.T < P.reach && BALL.visible) { P.G.updateMatrixWorld(true); const sh = P.aL.getWorldPosition(V3(0, 0, 0)), d = BALL.position.clone().sub(sh), L = d.length(); armIK(P, "L", L < 0.6 ? BALL.position : sh.addScaledVector(d, 0.55 / L), V3(-0.8, -0.6, 0.4)); } else if (P.reach && GAME.T >= P.reach) P.reach = null; }
 
 // ---------- the ball: held, or flying along arcs, rolls and straight lines ----------
 function hold(P, hand = "R") { GAME.ball = { mode: "held", P, hand }; BALL.visible = true; }
 function fly(segs, then) { GAME.ball = { mode: "path", segs, then }; BALL.visible = true; }
 const handPos = (P, hand) => (hand === "L" ? P.handL : P.handR).getWorldPosition(V3(0, 0, 0));
+function updateTrail() { const B = GAME.ball; if (B.mode === "path" && BALL.visible) { TRAILP.unshift(BALL.position.clone()); if (TRAILP.length > 14) TRAILP.pop(); } else TRAILP.length = 0; const m = new THREE.Matrix4(); TRAIL.count = Math.max(0, TRAILP.length - 1); for (let i = 1; i < TRAILP.length; i++) { const r = 0.034 * (1 - i / 15); m.makeScale(r, r, r).setPosition(TRAILP[i]); TRAIL.setMatrixAt(i - 1, m); } TRAIL.instanceMatrix.needsUpdate = true; }
 function updateBall() { const B = GAME.ball; if (B.mode === "hide") { BALL.visible = false; return; } if (B.mode === "held") { BALL.position.copy(handPos(B.P, B.hand)); return; }
   const T = GAME.T; let s = B.segs.find(s => T < s.t1) || B.segs[B.segs.length - 1]; const u = clampN((T - s.t0) / (s.t1 - s.t0), 0, 1);
   if (s.type === "roll") { const e = 1 - Math.pow(1 - u, 1.6); BALL.position.copy(s.a).lerp(s.b, e).setY(0.04); } else { BALL.position.copy(s.a).lerp(s.b, u); BALL.position.y += (s.h || 0) * 4 * u * (1 - u); }
@@ -385,18 +431,22 @@ function runPath(P, from, to) { const pts = []; for (let b = from + 1; b <= to; 
 const pathLen = (P, pts) => { let d = 0, p = P.G.position.clone().setY(0); for (const q of pts) { d += p.distanceTo(q); p = q; } return d; };
 function runAt(t, P, from, to, speed = RUN) { const pts = runPath(P, from, to); cue(t, () => goTo(P, pts, speed, to < 4 ? V3(0, 0, 0) : null)); return t + 0.2 + (from === 0 ? 27.4 * (to - from) : 27.43 * (to - from)) / speed; }
 function throwAt(t, from, to, toPt, h, onCatch) { const a = from.G.position.clone().setY(1.6), b = (toPt || to.G.position).clone().setY(1.3), d = a.distanceTo(b), dur = Math.max(0.35, d / THROW);
-  cue(t, () => { act(from, "throw", 0.5); }); cue(t + 0.25, () => { const a2 = handPos(from, "R"); fly([seg(GAME.T, dur, a2, b, h ?? d * 0.04, "arc")], () => { if (to) { hold(to, "L"); act(to, "catch", 0.5); } if (onCatch) onCatch(); }); }); return t + 0.25 + dur; }
-function catchAt(t, P) { cue(t, () => { hold(P, "L"); act(P, "catch", 0.6); }); }
-const CONTACT = V3(0.1, 1.0, -0.8);
+  cue(t, () => { act(from, "throw", 0.5); }); if (to) cue(t + 0.25 + dur - 0.4, () => { to.reach = t + 0.25 + dur + 0.2; }); cue(t + 0.25, () => { const a2 = handPos(from, "R"); fly([seg(GAME.T, dur, a2, b, h ?? d * 0.04, "arc")], () => { if (to) { hold(to, "L"); act(to, "catch", 0.5); sfx("pop", to.G.position, 0.5); } if (onCatch) onCatch(); }); }); return t + 0.25 + dur; }
+function catchAt(t, P) { cue(t - 0.45, () => { P.reach = t + 0.25; }); cue(t, () => { hold(P, "L"); act(P, "catch", 0.6); sfx("pop", P.G.position, 0.5); }); }
+const CONTACT = V3(0.3, 0.92, 0.1);
 function cheer(v, t) { cue(t, () => { GAME.cheer = Math.max(GAME.cheer, v); }); }
 function say2(t, text) { cue(t, () => { GAME.last = text; drawPanel(); }); }
 
 // ---------- one pitch; returns when the ball reaches the plate ----------
 function throwPitch(t, kind, batter, final) { const Pp = fielder(1), C = fielder(2), ump = PEOPLE["Tommy Connolly"], lefty = LEFTY.has(batter.short);
-  cue(t, () => { hold(Pp, "R"); act(Pp, "windup", 1.3); }); const rel = t + 1.25, arr = rel + 0.56;
-  cue(rel, () => { const a = handPos(Pp, "R"), end = kind === "H" ? batter.G.position.clone().setY(1.0) : V3((kind === "B" ? (Math.random() - 0.5) * 0.9 : (Math.random() - 0.5) * 0.3), kind === "B" ? 0.5 + Math.random() * 0.9 : 0.75 + Math.random() * 0.35, 0.55); fly([seg(GAME.T, 0.56, a, end, 0.25, "arc")]); });
-  if (["S", "F", "X"].includes(kind)) cue(arr - 0.18, () => act(batter, "swing", 0.45));
-  cue(arr, () => { if (kind === "B" || kind === "S" || kind === "C") { hold(C, "L"); act(C, "catch", 0.5); if (kind === "C" || kind === "S") act(ump, "call", 1.0); }
+  cue(t, () => { hold(Pp, "R"); act(Pp, "windup", 1.3); GAME.live = true; }); cue(t + 1.81 + (final ? 6 : 1.4), () => { GAME.live = false; }); const rel = t + 1.25, arr = rel + 0.56;
+  const MITT = V3(0, 0.75, 0.75);
+  cue(rel, () => { const a = handPos(Pp, "R"); if (kind === "H") fly([seg(GAME.T, 0.56, a, batter.G.position.clone().setY(1.0), 0.25, "arc")]); else if (kind === "X" || kind === "F") fly([seg(GAME.T, 0.56, a, CONTACT, 0.25, "arc")]);
+    else { const m = MITT.clone().add(kind === "B" ? V3((Math.random() - 0.5) * 0.9, (Math.random() - 0.5) * 0.7, 0) : V3((Math.random() - 0.5) * 0.25, (Math.random() - 0.5) * 0.2, 0)), mid = V3(m.x * 0.6, m.y + 0.05, -0.2); fly([seg(GAME.T, 0.5, a, mid, 0.25, "arc"), seg(GAME.T + 0.5, 0.07, mid, m, 0, "line")]); } });
+  cue(arr - 0.45, () => { C.reach = arr + 0.4; });
+  if (!final) for (let b = 1; b <= 3; b++) { const rn = GAME.st.bases[b] && P_(GAME.st.bases[b]); if (!rn) continue; const home = BP(b).clone().add(b === 1 ? V3(-0.6, 0, 0.6) : b === 2 ? V3(0.6, 0, 0.6) : V3(0.6, 0, -0.4)), lead = BP(b).clone().lerp(BP(b + 1), b === 3 ? 0.08 : 0.12); cue(t + 0.1, () => goTo(rn, lead, 1.8, V3(0, 0, 0))); cue(arr + 1.0, () => { goTo(rn, home, 2.2, V3(0, 0, 0)); rn.arrive = () => stand(rn, "ready", V3(0, 0, 0)); }); }
+  if (["S", "F", "X"].includes(kind)) cue(arr - 0.18, () => { act(batter, "swing", 0.45); batter.swungAt = GAME.T; });
+  cue(arr, () => { if (kind === "X" || kind === "F") sfx("crack", CONTACT, kind === "X" ? 1 : 0.6); if (kind === "B" || kind === "S" || kind === "C") cue(GAME.T + 0.07, () => { hold(C, "L"); act(C, "catch", 0.5); sfx("pop", MITT, 0.7); if (kind === "C" || kind === "S") act(ump, "call", 1.0); });
     if (kind === "F") { const side = Math.random() < 0.5 ? -1 : 1, end = V3(side * (8 + Math.random() * 14), 4, 10 + Math.random() * 8); fly([seg(GAME.T, 1.2, CONTACT, end, 6, "arc")], () => { GAME.ball = { mode: "hide" }; }); }
     if (kind === "H") { act(batter, "safe", 0.6); GAME.ball = { mode: "hide" }; }
     if (kind === "B") GAME.balls++; else if (kind === "S" || kind === "C" || (kind === "F" && GAME.strikes < 2)) GAME.strikes++; drawPanel();
@@ -410,7 +460,7 @@ function locPt(n, kind) { const ang = { 7: -0.5, 8: 0.02, 9: 0.5 }[n]; if (ang !
 function choreograph(e, S, tc) { const bat = P_(e.b) || GAME.batter, k = e.k, runners = {}; for (let b = 1; b <= 3; b++) if (S.bases[b]) runners[b] = P_(S.bases[b]);
   const mv = e.mv.split(" "), dest = from => { const t = mv.find(m => m[0] === String(from)); return t ? t[t.length - 1] : null; }, toB = d => d === "H" ? 4 : +d;
   const advanceRunners = (t0, sp = RUN) => { let end = t0; for (const b of [3, 2, 1]) { const r = runners[b], d = dest(b); if (!r || !d || d === "x") continue; end = Math.max(end, runAt(t0, r, b, toB(d), sp)); } return end; };
-  cue(tc + 0.15, () => { if (bat.bat) { bat.handR.remove(bat.bat); bat.bat = null; } });
+  cue(tc + 0.15, () => { if (bat.bat) { dropBat(bat); bat.swungAt = undefined; } });
   const BD = dest("B"); let end = tc + 3;
   if (k === "K" || k === "Kc") { end = tc + 2.5; cue(tc + 1.2, () => goTo(bat, benchSpot(team(e.half), slotOf(team(e.half), e.b)), 2.2)); }
   else if (k === "KE") { const C = fielder(2), bs = V3(0.5, 0, 16.5); cue(tc, () => fly([seg(GAME.T, 1.1, V3(0, 0.6, 0.6), bs, 0, "roll")])); cue(tc + 0.3, () => goTo(C, bs, 6.2)); const tB = runAt(tc + 0.4, bat, 0, 1); advanceRunners(tc + 0.3); catchAt(tc + 2.8, C); end = throwAt(tc + 3.3, C, fielder(3), B1) + 1; }
@@ -460,11 +510,12 @@ function pitchesFor(e) { const r = mulberry(e.i * 7919 + 13), seq = [], k = e.k,
 function placeAll(S) { GAME.st = S; const bt = team(S.half), ft = other(bt), rng = mulberry(S.half * 31 + 7);
   for (const [nm, pos] of LINEUP[ft]) { const P = PEOPLE[nm], p = FIELDPOS[pos]; P.path = []; P.G.position.set(p.x, floorAt(p.x, p.z), p.z); stand(P, pos === "C" ? "crouch" : pos === "P" ? "stand" : "ready", V3(0, 0, 0)); if (pos === "C") P.G.position.set(0, 0, 0.95); if (pos === "C") P.faceAt = V3(0, 0, -10); }
   const onBase = new Set(S.bases.filter(Boolean).map(n => NAMES[n]));
-  const benchers = [...LINEUP[bt].map(([n]) => n), ...(bt === "BOS" ? ["Jack O'Brien", "Duke Farrell"] : [])]; benchers.forEach((nm, k) => { const P = PEOPLE[nm]; if (!P) return; P.path = []; if (onBase.has(nm)) { const b = S.bases.findIndex(x => x && NAMES[x] === nm), p = BP(b).clone().add(b === 1 ? V3(-0.6, 0, 0.6) : b === 2 ? V3(0.6, 0, 0.6) : V3(0.6, 0, -0.4)); P.G.position.copy(p); stand(P, "ready", V3(0, 0, 0)); } else { const p = benchSpot(bt, k); P.G.position.set(p.x, 0, p.z); P.G.rotation.y = benchFace(bt); stand(P, "sit", null); P.faceAt = null; } if (P.bat) { P.handR.remove(P.bat); P.bat = null; } });
+  const benchers = [...LINEUP[bt].map(([n]) => n), ...(bt === "BOS" ? ["Jack O'Brien", "Duke Farrell"] : [])]; benchers.forEach((nm, k) => { const P = PEOPLE[nm]; if (!P) return; P.path = []; if (onBase.has(nm)) { const b = S.bases.findIndex(x => x && NAMES[x] === nm), p = BP(b).clone().add(b === 1 ? V3(-0.6, 0, 0.6) : b === 2 ? V3(0.6, 0, 0.6) : V3(0.6, 0, -0.4)); P.G.position.copy(p); stand(P, "ready", V3(0, 0, 0)); } else { const p = benchSpot(bt, k); P.G.position.set(p.x, 0, p.z); P.G.rotation.y = benchFace(bt); stand(P, "sit", null); P.faceAt = null; } dropBat(P); });
   for (const nm of (ft === "BOS" ? ["Jack O'Brien", "Duke Farrell"] : [])) { const P = PEOPLE[nm]; if (!P) continue; const p = benchSpot("BOS", 10 + (nm[0] === "D" ? 1 : 0)); P.G.position.set(p.x, 0, p.z); P.G.rotation.y = benchFace("BOS"); stand(P, "sit", null); P.faceAt = null; }
   const u = ump(); u.G.position.set(0.3, 0, 1.9); stand(u, "ready", V3(0, 0, -10)); const o = PEOPLE["Hank O'Day"], op = B1.clone().add(V3(3, 0, 2.5)); o.G.position.copy(op); stand(o, "ready", V3(0, 0, 0));
   hold(fielder(1, S.half), "R"); GAME.balls = GAME.strikes = 0; SCORE.line = S.line.map(a => a.slice()); drawScore(); drawCard(S); }
-function batterUp(e, S, instant) { const short = batterFor(e, S), P = P_(short); if (!P) return; P.short = short; GAME.batter = P; const box = BATTERS_BOX(LEFTY.has(short)); const done = () => { stand(P, "bat", null); P.G.rotation.y = LEFTY.has(short) ? Math.PI / 2 : -Math.PI / 2; if (!P.bat) { P.bat = BATM2.clone(); P.handR.add(P.bat); } };
+function batterUp(e, S, instant) { const short = batterFor(e, S), P = P_(short); if (!P) return; P.short = short; GAME.batter = P; const box = BATTERS_BOX(LEFTY.has(short)); const rotY = LEFTY.has(short) ? Math.PI / 2 : -Math.PI / 2; CONTACT.copy(C_LOCAL(LEFTY.has(short) ? 1 : -1).applyAxisAngle(UP, rotY).add(box)); P.swungAt = undefined;
+  const done = () => { stand(P, "bat", null); P.G.rotation.y = rotY; if (!P.bat) { P.bat = new THREE.Mesh(BATG, BATM); P.bat.castShadow = true; P.G.add(P.bat); } };
   if (instant) { P.G.position.copy(box); done(); } else { goTo(P, box, 2.4); P.arrive = done; } }
 function startEvent(i, instant) { if (i >= EVENTS.length) { GAME.phase = "over"; GAME.last = "Final: Pittsburgh 7, Boston 3. Phillippe struck out ten; the Pirates lead the Series one game to none."; drawPanel(); return; }
   const e = EVENTS[i], S = GAME.st; GAME.ei = i; GAME.T = 0; GAME.cues = []; GAME.phase = "play"; GAME.balls = GAME.strikes = 0; batterUp(e, S, instant); const P = GAME.batter, pace = PACE[paceKey];
@@ -476,7 +527,7 @@ function finishEvent(e) { applyEvent(e, GAME.st); GAME.last = e.text; markCard()
 // after a play: runners to their bases, the others to the bench, fielders back to their places, the ball back to the pitcher
 function settle(change) { const S = GAME.st, bt = team(change ? S.half - 1 : S.half), ft = other(bt);
   for (const [nm, pos] of LINEUP[ft]) { const P = PEOPLE[nm]; if (change) goTo(P, benchSpot(ft, LINEUP[ft].findIndex(([n]) => n === nm)), 3.2); else goTo(P, pos === "C" ? V3(0, 0, 0.95) : FIELDPOS[pos], 3.5, V3(0, 0, 0)); P.arrive = () => stand(P, change ? "sit" : pos === "C" ? "crouch" : pos === "P" ? "stand" : "ready", change ? null : (pos === "C" ? V3(0, 0, -10) : V3(0, 0, 0))); }
-  const onBase = S.bases.map(n => n && NAMES[n]); [...LINEUP[bt].map(([n]) => n), ...(bt === "BOS" ? ["Jack O'Brien", "Duke Farrell"] : [])].forEach((nm, k) => { const P = PEOPLE[nm]; if (!P) return; if (P.bat) { P.handR.remove(P.bat); P.bat = null; } const b = onBase.indexOf(nm);
+  const onBase = S.bases.map(n => n && NAMES[n]); [...LINEUP[bt].map(([n]) => n), ...(bt === "BOS" ? ["Jack O'Brien", "Duke Farrell"] : [])].forEach((nm, k) => { const P = PEOPLE[nm]; if (!P) return; dropBat(P); const b = onBase.indexOf(nm);
     if (!change && b > 0) { goTo(P, BP(b).clone().add(b === 1 ? V3(-0.6, 0, 0.6) : b === 2 ? V3(0.6, 0, 0.6) : V3(0.6, 0, -0.4)), 3, V3(0, 0, 0)); P.arrive = () => stand(P, "ready", V3(0, 0, 0)); }
     else if (change) { const pos = LINEUP[bt].find(([n]) => n === nm); if (pos) { goTo(P, pos[1] === "C" ? V3(0, 0, 0.95) : FIELDPOS[pos[1]], 3.2, V3(0, 0, 0)); P.arrive = () => stand(P, pos[1] === "C" ? "crouch" : pos[1] === "P" ? "stand" : "ready", V3(0, 0, 0)); } }
     else { const p = benchSpot(bt, k); goTo(P, p, 2.6); P.arrive = () => { P.G.rotation.y = benchFace(bt); stand(P, "sit", null); P.faceAt = null; }; } });
@@ -487,7 +538,19 @@ const nextHalf = () => { if (!GAME.on) return; const h = GAME.st.half; const i =
 const toInning = n => { if (!GAME.on) startGame(); jumpTo(EVENTS.findIndex(e => e.half === (n - 1) * 2)); };
 function startGame() { if (GAME.on) return; enterPark(); GAME.on = true; placeAll(freshState()); startEvent(0); }
 function updateGame(dt) { if (!GAME.on) return; if (!GAME.paused) { GAME.T += dt; GAME.cues.sort((a, b) => a.t - b.t); while (GAME.cues.length && GAME.cues[0].t <= GAME.T) { const c = GAME.cues.shift(); c.fn(); } }
-  for (const P of Object.values(PEOPLE)) { const was = P.path && P.path.length; updatePerson(P, GAME.paused ? 0 : dt); if (was && !P.path.length && P.arrive) { const f = P.arrive; P.arrive = null; f(); } } updateBall(); GAME.cheer = Math.max(0, GAME.cheer - dt * 0.35); if (CROWD.cheerU) { CROWD.cheerU.value = GAME.cheer; CROWD.timeU.value = performance.now() / 1000; } }
+  for (const P of Object.values(PEOPLE)) { const was = P.path && P.path.length; updatePerson(P, GAME.paused ? 0 : dt); if (was && !P.path.length && P.arrive) { const f = P.arrive; P.arrive = null; f(); } } updateBall(); updateTrail(); GAME.cheer = Math.max(0, GAME.cheer - dt * 0.35); audioFrame(); if (CROWD.cheerU) { CROWD.cheerU.value = GAME.cheer; CROWD.timeU.value = performance.now() / 1000; } }
+
+// ---------- sound: the crack of the bat, the pop of the glove, and the crowd (made from noise, nothing recorded) ----------
+const AUD = { L: null };
+function audioInit() { if (AUD.L) { AUD.L.context.resume(); return; } const L = new THREE.AudioListener(); camera.add(L); AUD.L = L; const ctx = L.context, sr = ctx.sampleRate;
+  const buf = (sec, f) => { const b = ctx.createBuffer(1, Math.floor(sr * sec), sr), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = f(i / sr); return b; };
+  AUD.crack = buf(0.3, t => (Math.random() * 2 - 1) * Math.exp(-t * 70) * 0.9 + Math.sin(2 * Math.PI * 1150 * t) * Math.exp(-t * 32) * 0.45 + Math.sin(2 * Math.PI * 640 * t) * Math.exp(-t * 24) * 0.3);
+  AUD.pop = buf(0.2, t => Math.sin(2 * Math.PI * 170 * t) * Math.exp(-t * 38) * 0.8 + (Math.random() * 2 - 1) * Math.exp(-t * 90) * 0.5);
+  let last = 0; const noise = (sec, k) => buf(sec, () => (last += ((Math.random() * 2 - 1) - last) * k));
+  const loop = (b, freq, type, vol) => { const a = new THREE.Audio(L); a.setBuffer(b); a.setLoop(true); a.setVolume(vol); const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; a.setFilter(f); a.play(); return a; };
+  AUD.murmur = loop(noise(5, 0.12), 900, "lowpass", 0.08); AUD.roar = loop(noise(5, 0.3), 750, "bandpass", 0); }
+function sfx(kind, pos, vol = 1) { if (!AUD.L || !AUD[kind]) return; const a = new THREE.PositionalAudio(AUD.L); a.setBuffer(AUD[kind]); a.setRefDistance(kind === "crack" ? 18 : 8); a.setVolume(vol); const o = new THREE.Object3D(); o.position.copy(pos); o.add(a); scene.add(o); a.play(); setTimeout(() => { scene.remove(o); try { a.disconnect(); } catch (e) {} }, 1200); }
+function audioFrame() { if (!AUD.roar) return; const inside = CROWD.g.visible; AUD.roar.setVolume((inside ? 0.7 : 0.15) * GAME.cheer); AUD.murmur.setVolume(inside ? 0.09 : 0.04); }
 
 // ---------- getting in: the ticket windows on Rogers Street, the gate, and the refreshment stand inside ----------
 // Prices were doubled for the Series: $1 for the grandstand, 50 cents for the bleachers or standing room. Inside, 5 cents bought a score card
@@ -503,10 +566,10 @@ const BOOTH = P2(GATE_U - 7, -39.6), STAND = P2(GATE_U + 3.6, -30), GATEP = P2(G
   box(0.4, FENCE_H, 0.4, MAT.paint, ...[GATEP.clone().addScaledVector(UA, -3)].map(q => [q.x, FENCE_H / 2, q.z]).flat()); box(0.4, FENCE_H, 0.4, MAT.paint, ...[GATEP.clone().addScaledVector(UA, 3)].map(q => [q.x, FENCE_H / 2, q.z]).flat());
   box(0.6, 1.0, 3.6, MAT.wood, STAND.x, 0.5, STAND.z, ROT_U); box(1.6, 0.1, 4.2, MAT.roof, STAND.x, 2.6, STAND.z, ROT_U);
   signMesh([["REFRESHMENTS", 40], ["Score Cards 5¢   Peanuts 5¢", 32], ["Lemonade 5¢   Cigars 5¢", 32]], 2.6, 1.0, STAND.clone().addScaledVector(UA, -0.4), ROT_U, 2.0); }
-const STAFF = []; { const mk = (p, ry, coat = 0x2a2a2a, white = false) => { const P = makePerson("UMP", "", "staff"); P.G.position.copy(p); P.G.rotation.y = ry; setPose(P, "stand"); if (white) P.torso.children[0].material = Array(6).fill(M(0xf0eee6)); STAFF.push(P); return P; };
+const STAFF = []; { const mk = (p, ry, coat = 0x2a2a2a, white = false) => { const P = makePerson("UMP", "", "staff"); P.G.position.copy(p); P.G.rotation.y = ry; setPose(P, "stand"); if (white) P.torso.children[0].material = M(0xf0eee6); STAFF.push(P); return P; };
   mk(BOOTH.clone().addScaledVector(WA, 0.2), FACE_STREET + Math.PI); mk(GATEP.clone().addScaledVector(WA, 1.2).addScaledVector(UA, 1.4), FACE_IN + Math.PI); mk(STAND.clone().addScaledVector(UA, 0.9), ROT_U + Math.PI / 2, 0, true); }
 // vendors walking the aisles in white jackets
-const VENDORS = []; for (let i = 0; i < 4; i++) { const P = makePerson("UMP", "", "vendor"); P.torso.children[0].material = Array(6).fill(M(0xf0eee6)); setPose(P, "stand"); const bk = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, 0.28), M(0x9a7a4a)); bk.position.set(0, -0.05, -0.12); P.handL.add(bk); VENDORS.push({ P, S: SECTIONS[i % 5], t: 0.2 + i * 0.2, dir: 1, row: 4 + i * 3, item: i % 2 ? "Score cards" : "Peanuts" }); }
+const VENDORS = []; for (let i = 0; i < 4; i++) { const P = makePerson("UMP", "", "vendor"); P.torso.children[0].material = M(0xf0eee6); setPose(P, "stand"); const bk = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, 0.28), M(0x9a7a4a)); bk.position.set(0, -0.05, -0.12); P.handL.add(bk); VENDORS.push({ P, S: SECTIONS[i % 5], t: 0.2 + i * 0.2, dir: 1, row: 4 + i * 3, item: i % 2 ? "Score cards" : "Peanuts" }); }
 
 // ---------- you: walking, sitting, money, what you hold ----------
 const ME = { x: 0, y: 0, z: 0, seat: null, money: 200, ticket: null, inside: false, holding: [] }; let yaw = 0, pitch = 0, vrYaw = 0, started = false, comfortVig = true; const keys = {}, prevB = {};
@@ -610,7 +673,7 @@ let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag
 addEventListener("pointermove", e => { if (!drag) return; yaw -= (e.clientX - drag.x) * 0.004; pitch = clampN(pitch - (e.clientY - drag.y) * 0.004, -1.4, 1.4); drag.x = e.clientX; drag.y = e.clientY; }); addEventListener("pointerup", () => drag = null);
 const HANDS = [0, 1].map(i => { const grip = renderer.xr.getControllerGrip(i); rig.add(grip); const hand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.11), SKIN); grip.add(hand); const H = { grip, src: null };
   grip.addEventListener("connected", e => { H.src = e.data; if (e.data.handedness === "left") { PANEL.me.position.set(0, 0.05, 0.12); PANEL.me.rotation.set(-Math.PI / 2 + 0.8, 0, 0); grip.add(PANEL.me); } else { CARD.m.position.set(0, 0.02, -0.1); CARD.m.rotation.set(-1.0, 0, 0); grip.add(CARD.m); BAG.position.set(0.05, 0, -0.05); grip.add(BAG); } }); return H; });
-function begin() { if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); const s = P2(GATE_U - 14, -46); ME.x = s.x; ME.z = s.z; yaw = vrYaw = ROT_U + 0.25; HUD.style.display = renderer.xr.isPresenting ? "none" : "block"; drawPanel(); say("Rogers Street, Boston, a little before game time. Buy a ticket at the green booth ahead (walk up to its window and pull the trigger), then go in through the gate.", 9); }
+function begin() { audioInit(); if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); const s = P2(GATE_U - 14, -46); ME.x = s.x; ME.z = s.z; yaw = vrYaw = ROT_U + 0.25; HUD.style.display = renderer.xr.isPresenting ? "none" : "block"; drawPanel(); say("Rogers Street, Boston, a little before game time. Buy a ticket at the green booth ahead (walk up to its window and pull the trigger), then go in through the gate.", 9); }
 document.getElementById("intro")?.addEventListener("click", begin);
 const VRB = document.getElementById("vr"); if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); DIAG.stage("entering VR"); await renderer.xr.setSession(s); frame = 0; begin(); HUD.style.display = "none"; }; });
 
