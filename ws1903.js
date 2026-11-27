@@ -44,7 +44,7 @@ DIAG.stage("building the field");
 const UA = dir(-D45), WA = dir(D45), P2 = (u, w, y = 0) => V3(u * UA.x + w * WA.x, y, u * UA.z + w * WA.z), toUW = (x, z) => [x * UA.x + z * UA.z, x * WA.x + z * WA.z];
 const ROT_U = Math.atan2(-UA.x, -UA.z), ROT_W = Math.atan2(-WA.x, -WA.z);
 // Rogers Street behind the third-base side, the railroad behind the first-base side, Huntington Avenue beyond left field
-var GATE_U = 42, SCORE = { c: null, t: null, line: [[], []] };
+var GATE_U = 42, LF_GATE = null, SCORE = { c: null, t: null, line: [[], []] };
 const ROGERS = [-50, -38], RAIL = [-80, -42], HUNT = [128, 146], LOT = { u0: -40, w0: -38 };
 const SKYC = 0xb8cce0; scene.background = new THREE.Color(SKYC); scene.fog = new THREE.Fog(SKYC, 250, 1400);
 const hemi = new THREE.HemisphereLight(0xdde6f0, 0x6a5e48, 1.0); scene.add(hemi);
@@ -56,7 +56,7 @@ Object.assign(sun.shadow.camera, { left: -130, right: 130, top: 130, bottom: -13
 const grassT = tex(256, 256, (g, w, h) => { g.fillStyle = "#5a7a34"; g.fillRect(0, 0, w, h); const r = mulberry(3); for (let i = 0; i < 5000; i++) { const v = r(); g.fillStyle = v < 0.4 ? "#4e6e2c" : v < 0.8 ? "#68883c" : "#7a8a48"; g.fillRect(r() * w, r() * h, 1.5, 3); } }, [60, 60]);
 const dirtT = tex(256, 256, (g, w, h) => { g.fillStyle = "#9a7a58"; g.fillRect(0, 0, w, h); const r = mulberry(4); for (let i = 0; i < 4000; i++) { const v = 120 + r() * 60 | 0; g.fillStyle = `rgba(${v},${v * 0.8 | 0},${v * 0.6 | 0},0.5)`; g.fillRect(r() * w, r() * h, 2, 2); } }, [30, 30]);
 const streetT = tex(256, 256, (g, w, h) => { g.fillStyle = "#8a8070"; g.fillRect(0, 0, w, h); const r = mulberry(5); for (let i = 0; i < 3000; i++) { const v = 100 + r() * 70 | 0; g.fillStyle = `rgba(${v},${v * 0.95 | 0},${v * 0.85 | 0},0.6)`; g.fillRect(r() * w, r() * h, 3, 2); } for (let i = 0; i < 40; i++) { g.fillStyle = "rgba(90,70,40,0.3)"; g.beginPath(); g.ellipse(r() * w, r() * h, 6, 3, r() * 3, 0, 7); g.fill(); } }, [40, 40]);
-const boardT = tex(128, 256, (g, w, h) => { g.fillStyle = "#6a5a44"; g.fillRect(0, 0, w, h); for (let x = 0; x < w; x += 16) { g.fillStyle = `rgba(0,0,0,${0.15 + (x % 32 ? 0.1 : 0)})`; g.fillRect(x, 0, 2, h); } const r = mulberry(6); for (let i = 0; i < 300; i++) { g.fillStyle = `rgba(255,240,220,${r() * 0.08})`; g.fillRect(r() * w, r() * h, 1, 20); } }, [1, 1]);
+const boardT = tex(128, 256, (g, w, h) => { g.fillStyle = "#9a958a"; g.fillRect(0, 0, w, h); for (let x = 0; x < w; x += 16) { g.fillStyle = `rgba(0,0,0,${0.15 + (x % 32 ? 0.1 : 0)})`; g.fillRect(x, 0, 2, h); } const r = mulberry(6); for (let i = 0; i < 300; i++) { g.fillStyle = `rgba(255,240,220,${r() * 0.08})`; g.fillRect(r() * w, r() * h, 1, 20); } }, [1, 1]);
 const brickT = tex(256, 256, (g, w, h) => { g.fillStyle = "#8a4a34"; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 8) for (let x = (y / 8) % 2 * 8; x < w; x += 16) { g.fillStyle = `rgb(${130 + Math.random() * 30 | 0},${62 + Math.random() * 15 | 0},${44 + Math.random() * 10 | 0})`; g.fillRect(x, y, 15, 7); } }, [1, 1]);
 function windowsT(cols, rows, base = "#8a4a34") { return tex(512, 512, (g, w, h) => { g.drawImage(brickT.image, 0, 0, w, h); g.drawImage(brickT.image, 256, 0); g.drawImage(brickT.image, 0, 256); g.drawImage(brickT.image, 256, 256); const cw = w / cols, rh = h / rows; for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) { g.fillStyle = "#c8b898"; g.fillRect(i * cw + cw * 0.22, j * rh + rh * 0.18, cw * 0.56, rh * 0.62); g.fillStyle = Math.random() < 0.2 ? "#5a6470" : "#2a2e34"; g.fillRect(i * cw + cw * 0.27, j * rh + rh * 0.22, cw * 0.46, rh * 0.54); } }); }
 const MAT = { grass: new THREE.MeshStandardMaterial({ map: grassT, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), dirt: new THREE.MeshStandardMaterial({ map: dirtT, roughness: 1, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }), street: new THREE.MeshStandardMaterial({ map: streetT, roughness: 1 }), board: new THREE.MeshStandardMaterial({ map: boardT, roughness: 0.95 }),
@@ -75,7 +75,7 @@ const MAT = { grass: new THREE.MeshStandardMaterial({ map: grassT, roughness: 1,
   flat(new THREE.CircleGeometry(13 * FT, 32), MAT.dirt, 0.013); const mound = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.9, 0.3, 24), MAT.dirt); mound.position.set(PM.x, 0.15, PM.z); mound.receiveShadow = true; scene.add(mound);
   const rubber = box(24 * IN(1), 0.03, 6 * IN(1), MAT.white, PM.x, 0.31, PM.z);
   // the sandy patches in the outfield where the grass would not grow (they're in every account of the park)
-  const r = mulberry(11); for (let i = 0; i < 9; i++) { const a = (r() - 0.5) * 1.4, d = 50 + r() * 70, p = dir(a).multiplyScalar(d), s = flat(new THREE.CircleGeometry(1, 18), MAT.dirt, 0.008); s.position.set(p.x, 0.008, p.z); s.scale.set(3 + r() * 6, 1, 2 + r() * 4); s.rotation.y = r() * 3; s.material = MAT.dirt; }
+  const r = mulberry(11); for (let i = 0; i < 9; i++) { const a = (r() - 0.5) * 1.4, d = 50 + r() * 70, p = dir(a).multiplyScalar(d), s = flat(new THREE.CircleGeometry(1, 18), MAT.dirt, 0.008); s.position.set(p.x, 0.008, p.z); s.scale.set(1.5 + r() * 2.5, 1, 1 + r() * 2); s.rotation.y = r() * 3; s.material = MAT.dirt; }
   // home plate (a 17-in pentagon since 1900), the bases (15-in canvas bags), the foul lines, the batter's and coaches' boxes
   const hp = new THREE.Shape([[0, 0], [8.5, -8.5], [8.5, -17], [-8.5, -17], [-8.5, -8.5]].map(([x, y]) => new THREE.Vector2(x * IN(1), y * IN(1)))); const hpm = new THREE.Mesh(new THREE.ShapeGeometry(hp).rotateX(-Math.PI / 2), MAT.white); hpm.rotation.y = Math.PI; hpm.position.y = 0.02; scene.add(hpm);
   for (const b of [B1, B2, B3]) box(15 * IN(1), 0.1, 15 * IN(1), MAT.white, b.x, 0.05, b.z, D45);
@@ -86,7 +86,7 @@ function IN(n) { return n * 0.0254; }
 // ---------- the fence: 14 ft of boards round the outfield and down the sides of the lot ----------
 const FENCE_H = 14 * FT, WALLS = [];
 function boardWall(a, b, h = FENCE_H, gapAt = null) { const L = a.distanceTo(b); if (L < 0.05) return; const bg = new THREE.BoxGeometry(L, h, 0.12), uv = bg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * L / 3); const m = new THREE.Mesh(bg, MAT.board); m.position.copy(a).add(b).multiplyScalar(0.5).setY(h / 2); m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); m.castShadow = m.receiveShadow = true; scene.add(m); WALLS.push({ a: a.clone(), b: b.clone(), h }); }
-{ let prev = null; for (let d = -45; d <= 45; d += 2.5) { const p = dir(d * Math.PI / 180).multiplyScalar(fenceDist(d)); if (prev) boardWall(prev, p); prev = p; }
+{ let prev = null; for (let d = -45; d <= 45; d += 2.5) { const p = dir(d * Math.PI / 180).multiplyScalar(fenceDist(d)); if (prev && d > -42.6 + 0.01) boardWall(prev, p); prev = p; }
   const LFP = dir(-D45).multiplyScalar(fenceDist(-45)), RFP = dir(D45).multiplyScalar(fenceDist(45));
   boardWall(LFP, P2(fenceDist(-45), LOT.w0)); boardWall(RFP, P2(LOT.u0, fenceDist(45))); boardWall(P2(LOT.u0, fenceDist(45)), P2(LOT.u0, LOT.w0));
   // the Rogers Street side, with the gate between the grandstand and the third-base bleachers
@@ -97,6 +97,22 @@ function boardWall(a, b, h = FENCE_H, gapAt = null) { const L = a.distanceTo(b);
   const fp = dir(-0.12).multiplyScalar(fenceDist(-7) - 3); const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.14, 24, 8), MAT.white); pole.position.set(fp.x, 12, fp.z); scene.add(pole);
   const flag = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.8, 8, 1), new THREE.MeshStandardMaterial({ map: tex(170, 90, (g) => { for (let i = 0; i < 13; i++) { g.fillStyle = i % 2 ? "#f0f0f0" : "#b22234"; g.fillRect(0, i * 90 / 13, 170, 90 / 13 + 1); } g.fillStyle = "#3c3b6e"; g.fillRect(0, 0, 70, 48); g.fillStyle = "#fff"; for (let j = 0; j < 9; j++) for (let i = 0; i < (j % 2 ? 5 : 6); i++) g.fillRect(5 + i * 11 + (j % 2 ? 5 : 0), 3 + j * 5, 2, 2); }), side: THREE.DoubleSide }));
   flag.position.set(fp.x + 1.75, 22.8, fp.z); scene.add(flag); window.FLAG = flag;
+  // painted advertisements on the fence, as the 1903 photographs show them. Inside, on the right-field fence (facing the stands): the ones legible
+  // in the September 22, 1903 panorama; the others there can't be read, so they are left as faded, unreadable lettering. Outside, along
+  // Huntington Avenue: "EMERSON SHOE" and the arched sign over the left-field entrance, from the World Series photo taken from the warehouse.
+  const adTex = (lines, bg, fg, script) => tex(512, 160, (g, w, h) => { g.fillStyle = bg; g.fillRect(0, 0, w, h); g.strokeStyle = fg; g.lineWidth = 5; g.strokeRect(6, 6, w - 12, h - 12); g.fillStyle = fg; g.textAlign = "center";
+    if (!lines) { const r = mulberry(bg.length + w); g.globalAlpha = 0.35; for (let k = 0; k < 3; k++) for (let x = 40; x < w - 40; x += 12 + r() * 20) g.fillRect(x, 40 + k * 36, 6 + r() * 14, 16); return; }
+    lines.forEach(([t, sz], i) => { g.font = (script && i === 0 ? "italic bold " : "bold ") + sz + "px Georgia"; g.fillText(t, w / 2, 20 + (i + 1) * (h - 24) / (lines.length + 0.25)); }); });
+  const ad = (deg0, deg1, t, inside = true, y0 = 0.6, hh = 3.4) => { const a = dir(deg0 * Math.PI / 180).multiplyScalar(fenceDist(deg0)), b = dir(deg1 * Math.PI / 180).multiplyScalar(fenceDist(deg1)), L = a.distanceTo(b), m = new THREE.Mesh(new THREE.PlaneGeometry(L * 0.94, hh), new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }));
+    const c = a.clone().add(b).multiplyScalar(0.5), n = c.clone().normalize(); m.position.copy(c).addScaledVector(n, inside ? -0.08 : 0.08).setY(y0 + hh / 2); m.lookAt(inside ? V3(0, y0 + hh / 2, 0) : c.clone().addScaledVector(n, 10).setY(y0 + hh / 2)); scene.add(m); };
+  ad(41, 44.5, adTex([["IVER JOHNSON", 46], ["SPORTING GOODS CO.", 34]], "#f0ece0", "#1a1a1a")); ad(37.5, 40.5, adTex([["CCA", 70]], "#f0ece0", "#1a1a1a")); ad(30, 32, adTex(null, "#e8e4d8", "#2a2a2a"));
+  ad(25, 29, adTex([["Red Fox Ale", 64]], "#f4f0e6", "#a82020", true)); ad(20, 24.5, adTex(null, "#ece8dc", "#3a2a2a")); ad(15, 19.5, adTex(null, "#e0dccc", "#2a2a3a"));
+  ad(-40, -36, adTex([["EMERSON SHOE", 54]], "#f0ece0", "#1a1a1a"), false); ad(-35.5, -31, adTex(null, "#e8e0d0", "#3a2a1a"), false); ad(-30.5, -26, adTex(null, "#f0ece0", "#1a2a3a"), false); ad(-25.5, -21, adTex(null, "#e4dccc", "#2a2a2a"), false);
+  // the left-field entrance from Huntington Avenue, with its arched sign
+  { const a = dir(-45 * Math.PI / 180).multiplyScalar(fenceDist(-45)), b = dir(-42.5 * Math.PI / 180).multiplyScalar(fenceDist(-42.5)), c = a.clone().add(b).multiplyScalar(0.5), n = c.clone().normalize(); LF_GATE = c.clone();
+    for (const p of [a, b]) box(0.45, FENCE_H + 1.5, 0.45, MAT.paint, p.x, (FENCE_H + 1.5) / 2, p.z);
+    const arch = new THREE.Mesh(new THREE.PlaneGeometry(a.distanceTo(b) + 1.2, 1.8), new THREE.MeshStandardMaterial({ map: tex(512, 180, (g, w, h) => { g.fillStyle = "#f0ece0"; g.beginPath(); g.moveTo(0, h); g.lineTo(0, 60); g.quadraticCurveTo(w / 2, -40, w, 60); g.lineTo(w, h); g.closePath(); g.fill(); g.strokeStyle = "#1a1a1a"; g.lineWidth = 6; g.stroke(); g.fillStyle = "#1a1a1a"; g.textAlign = "center"; g.font = "bold 34px Georgia"; g.fillText("HUNTINGTON AVE.", w / 2, 92); g.font = "bold 40px Georgia"; g.fillText("BASE BALL GROUNDS", w / 2, 146); }), transparent: true, alphaTest: 0.5, side: THREE.DoubleSide }));
+    arch.position.copy(c).addScaledVector(n, 0.3).setY(FENCE_H + 0.6); arch.lookAt(c.clone().addScaledVector(n, 10).setY(FENCE_H + 0.6)); scene.add(arch); }
   // the scoreboard, mounted above the right-field fence toward right-centre, with the innings in a row
   const sbA = 33, sbP = dir(sbA * Math.PI / 180).multiplyScalar(fenceDist(sbA) - 0.3); SCORE.c = document.createElement("canvas"); SCORE.c.width = 1024; SCORE.c.height = 256; SCORE.t = new THREE.CanvasTexture(SCORE.c); SCORE.t.colorSpace = THREE.SRGBColorSpace;
   const sb = new THREE.Mesh(new THREE.PlaneGeometry(12, 3), new THREE.MeshStandardMaterial({ map: SCORE.t, roughness: 0.9 })); sb.position.set(sbP.x, FENCE_H + 2, sbP.z); sb.lookAt(0, FENCE_H + 2, 0); scene.add(sb); box(12.4, 3.4, 0.2, MAT.wood, sbP.x, FENCE_H + 2, sbP.z, sb.rotation.y).position.addScaledVector(V3(sbP.x, 0, sbP.z).normalize(), 0.12);
@@ -105,7 +121,7 @@ function boardWall(a, b, h = FENCE_H, gapAt = null) { const L = a.distanceTo(b);
 DIAG.stage("building the stands");
 // ---------- the grandstand (covered, behind home) and the open bleachers down both lines ----------
 // Each section is a run of stepped rows; the grandstand wings and the corner behind home overlap at the joins.
-const SECTIONS = [], SEATS = [], T225 = Math.tan(Math.PI / 8);
+const SECTIONS = [], SEATS = [], T225 = Math.tan(Math.PI / 8); let _archM = null; const WHITEWALL = M(0xe8e6dc); const ARCHM = t => _archM || (_archM = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }));
 function section(name, a, b, out, rows, rowD, rowH, roof, extA, extB) { const A = b.clone().sub(a), L = A.length(); A.normalize(); const S = { name, o: a.clone(), A, out: out.clone().normalize(), L, rows, rowD, rowH, roof, extA, extB }; SECTIONS.push(S);
   const ry = -Math.atan2(A.z, A.x), mat = roof ? MAT.wood : MAT.wood;
   for (let k = 0; k < rows; k++) { const e0 = extA ? k * rowD * T225 + 0.3 : 0, e1 = extB ? k * rowD * T225 + 0.3 : 0, len = L + e0 + e1, y = (k + 1) * rowH, c = a.clone().addScaledVector(A, (L + e1 - e0) / 2).addScaledVector(S.out, (k + 0.5) * rowD);
@@ -113,22 +129,24 @@ function section(name, a, b, out, rows, rowD, rowH, roof, extA, extB) { const A 
     const bn = new THREE.Mesh(new THREE.BoxGeometry(len, 0.05, 0.3), MAT.seat); bn.position.copy(c).addScaledVector(S.out, 0.05).setY(y + 0.42); bn.rotation.y = ry; bn.receiveShadow = true; scene.add(bn);
     for (let t = -e0 + 0.4; t < L + e1 - 0.4; t += 0.56) { const p = a.clone().addScaledVector(A, t).addScaledVector(S.out, k * rowD + rowD * 0.55); SEATS.push({ p: p.setY(y + 0.42), face: Math.atan2(S.out.x, S.out.z), sec: name, row: k, taken: false }); } }
   const D = rows * rowD, H = rows * rowH, back = a.clone().addScaledVector(S.out, D), eA = extA ? D * T225 : 0, eB = extB ? D * T225 : 0;
-  if (roof) { const rb = H + 4.2, rf = 28 * FT, cA = a.clone().addScaledVector(A, -eA * 0.2), N = Math.ceil(L / 6);
+  if (roof) { const rb = H + 3.2, rf = 28 * FT, ridge = rb + 3.4, N = Math.ceil(L / 6), len = L + eA + eB + 1, mid = a.clone().addScaledVector(A, (L + eB - eA) / 2);
+    // posts along the front, a peaked gable roof (front slope up to a ridge, back slope down to the back wall), and the back wall with its row of round arches
     for (let i = 0; i <= N; i++) { const p = a.clone().addScaledVector(A, i * L / N).addScaledVector(S.out, rowD * 0.5); const cl = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, rf, 8), MAT.col); cl.position.set(p.x, rf / 2, p.z); cl.castShadow = true; scene.add(cl); }
-    const len = L + eA + eB + 1, mid = a.clone().addScaledVector(A, (L + eB - eA) / 2), slope = Math.atan2(rb - rf, D), rl = Math.hypot(D + 1.5, rb - rf), rm = new THREE.Mesh(new THREE.BoxGeometry(len, 0.15, rl), MAT.roof);
-    rm.position.copy(mid).addScaledVector(S.out, (D - 1.5) / 2).setY((rf + rb) / 2 + 0.1); rm.rotation.set(0, 0, 0); rm.rotation.y = ry; rm.rotateX(S.out.dot(V3(-Math.sin(ry), 0, -Math.cos(ry))) > 0 ? slope : -slope); rm.castShadow = true; scene.add(rm);
-    const fascia = new THREE.Mesh(new THREE.BoxGeometry(len, 0.8, 0.1), MAT.paint); fascia.position.copy(mid).addScaledVector(S.out, -1.5).setY(rf - 0.2); fascia.rotation.y = ry; scene.add(fascia);
-    const bw = new THREE.Mesh(new THREE.BoxGeometry(len, rb, 0.3), MAT.board); bw.position.copy(back).addScaledVector(A, (L + eB - eA) / 2 - L / 2 * 0).setY(rb / 2); bw.position.copy(mid).addScaledVector(S.out, D + 0.15).setY(rb / 2); bw.rotation.y = ry; bw.castShadow = bw.receiveShadow = true; scene.add(bw); }
+    const slab = (d0, y0, d1, y1) => { const L2 = Math.hypot(d1 - d0, y1 - y0), m = new THREE.Mesh(new THREE.BoxGeometry(len, 0.15, L2 + 0.3), MAT.roof); m.position.copy(mid).addScaledVector(S.out, (d0 + d1) / 2).setY((y0 + y1) / 2); const q = new THREE.Quaternion().setFromUnitVectors(V3(0, 0, 1), S.out.clone().multiplyScalar(d1 - d0).setY(y1 - y0).normalize()); m.quaternion.copy(q); const q2 = new THREE.Quaternion().setFromUnitVectors(V3(1, 0, 0).applyQuaternion(q), A.clone()); m.quaternion.premultiply(q2); m.castShadow = true; scene.add(m); };
+    slab(-1.5, rf, D * 0.55, ridge); slab(D * 0.55, ridge, D + 0.3, rb);
+    const fascia = new THREE.Mesh(new THREE.BoxGeometry(len, 0.7, 0.1), MAT.paint); fascia.position.copy(mid).addScaledVector(S.out, -1.5).setY(rf - 0.15); fascia.rotation.y = ry; scene.add(fascia);
+    const archT = tex(256, 128, (g, w, h) => { g.fillStyle = "#8a8070"; g.fillRect(0, 0, w, h); g.fillStyle = "#2a2622"; for (let k = 0; k < 2; k++) { const cx = 64 + k * 128; g.beginPath(); g.moveTo(cx - 34, h - 10); g.lineTo(cx - 34, 58); g.arc(cx, 58, 34, Math.PI, 0); g.lineTo(cx + 34, h - 10); g.fill(); } g.fillStyle = "rgba(255,255,255,0.08)"; for (let y = 0; y < h; y += 8) g.fillRect(0, y, w, 1); });
+    const bg = new THREE.BoxGeometry(len, rb, 0.3), buv = bg.attributes.uv; for (let k = 0; k < buv.count; k++) buv.setX(k, buv.getX(k) * len / 7); const bw = new THREE.Mesh(bg, [MAT.board, MAT.board, MAT.board, MAT.board, ARCHM(archT), ARCHM(archT)]); bw.position.copy(mid).addScaledVector(S.out, D + 0.15).setY(rb / 2); bw.rotation.y = ry; bw.castShadow = bw.receiveShadow = true; scene.add(bw); }
   else { const bw = new THREE.Mesh(new THREE.BoxGeometry(L, H + 1.1, 0.12), MAT.board); bw.position.copy(a).addScaledVector(A, L / 2).addScaledVector(S.out, D).setY((H + 1.1) / 2); bw.rotation.y = ry; bw.castShadow = true; scene.add(bw); }
   WALLS.push({ a: a.clone().addScaledVector(S.out, D).addScaledVector(A, -eA), b: a.clone().addScaledVector(S.out, D).addScaledVector(A, L + eB), h: 20 });
   // a rail along the front of each section
-  const rail = new THREE.Mesh(new THREE.BoxGeometry(L, 0.9, 0.08), MAT.paint); rail.position.copy(a).addScaledVector(A, L / 2).addScaledVector(S.out, -0.1).setY(0.45); rail.rotation.y = ry; scene.add(rail); return S; }
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(L, 1.25, 0.1), WHITEWALL); rail.position.copy(a).addScaledVector(A, L / 2).addScaledVector(S.out, -0.1).setY(0.62); rail.rotation.y = ry; scene.add(rail); return S; }
 const GS = 19, RD = 0.78, RH = 0.36;
 section("third-base grandstand", P2(-6, -GS), P2(38, -GS), WA.clone().negate(), 22, RD, RH, true, true, false);
 section("grandstand behind home", P2(-GS, -6), P2(-6, -GS), V3(0, 0, 1), 22, RD, RH, true, true, true);
 section("first-base grandstand", P2(-GS, 40), P2(-GS, -6), UA.clone().negate(), 22, RD, RH, true, false, true);
-section("third-base bleachers", P2(46, -17), P2(100, -17), WA.clone().negate(), 12, 0.72, 0.34, false, false, false);
-section("first-base bleachers", P2(-17, 92), P2(-17, 46), UA.clone().negate(), 12, 0.72, 0.34, false, false, false);
+section("third-base bleachers", P2(46, -17), P2(100, -17), WA.clone().negate(), 20, 0.72, 0.36, false, false, false);
+section("first-base bleachers", P2(-17, 92), P2(-17, 46), UA.clone().negate(), 20, 0.72, 0.36, false, false, false);
 // the wire screen behind home plate, to keep foul balls out of the best seats
 { const a = P2(-GS + 0.6, -5), b = P2(-5, -GS + 0.6), L = a.distanceTo(b), scr = new THREE.Mesh(new THREE.PlaneGeometry(L + 8, 7), new THREE.MeshStandardMaterial({ map: tex(64, 64, (g) => { g.strokeStyle = "rgba(40,40,40,0.9)"; g.lineWidth = 2; for (let i = 0; i <= 64; i += 8) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 64, 64); g.stroke(); g.beginPath(); g.moveTo(i, 64); g.lineTo(i + 64, 0); g.stroke(); g.beginPath(); g.moveTo(i - 64, 0); g.lineTo(i, 64); g.stroke(); g.beginPath(); g.moveTo(i - 64, 64); g.lineTo(i, 0); g.stroke(); } }, [(L + 8) * 2, 14]), transparent: true, alphaTest: 0.3, side: THREE.DoubleSide }));
   scr.position.copy(a).add(b).multiplyScalar(0.5).setY(3.5); scr.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); scene.add(scr); }
@@ -263,7 +281,7 @@ function facadeTex(brick, kind) { return tex(128, 128, (g, w, h) => { const r = 
     for (let y = 0; y < h; y += 4) for (let x = (y / 4) % 2 * 5; x < w + 10; x += 10) { const c = bc.clone().offsetHSL(0, 0, (r() - 0.5) * 0.08); g.fillStyle = "#" + c.getHexString(); g.fillRect(x - 5, y, 9, 3); }
     if (kind === "plain") return;
     if (kind === "clap") { g.fillStyle = "#c8c0b0"; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 8) { g.fillStyle = "rgba(0,0,0,0.18)"; g.fillRect(0, y + 6, w, 2); } }
-    const ww = kind === "store" ? 84 : kind === "ware" ? 40 : kind === "clap" ? 34 : 44, wh = kind === "store" ? 76 : kind === "ware" ? 56 : 64, x0 = (w - ww) / 2, y0 = kind === "store" ? 24 : 30;
+    const ww = kind === "store" ? 84 : kind === "ware" ? 40 : kind === "clap" ? 34 : kind === "low" ? 70 : 44, wh = kind === "store" ? 76 : kind === "ware" ? 56 : 64, x0 = (w - ww) / 2, y0 = kind === "store" ? 24 : 30;
     if (kind === "ware") { g.fillStyle = "#c8b8a0"; g.beginPath(); g.arc(w / 2, y0 + 4, ww / 2 + 5, Math.PI, 0); g.fill(); g.fillStyle = "#1e2228"; g.beginPath(); g.arc(w / 2, y0 + 4, ww / 2, Math.PI, 0); g.fill(); }
     else { g.fillStyle = kind === "clap" ? "#f0ece0" : "#d0c4ac"; g.fillRect(x0 - 5, y0 - 9, ww + 10, 8); }
     g.fillStyle = kind === "clap" ? "#f0ece0" : "#d8ccb4"; g.fillRect(x0 - 4, y0 + wh, ww + 8, 6); g.fillStyle = "#e8e0cc"; g.fillRect(x0, y0, ww, wh);
@@ -314,17 +332,28 @@ function rowhouses(u0, n, wFront, depth, floors, brick, rng) { const W = 5.6, h 
   for (let k = 0; k < 7; k++) { const u = -46 - k * 4.5; for (const o of [-0.72, 0.72]) { const a = P2(u + o, -200), b = P2(u + o, 300), L = a.distanceTo(b), m = box(L, 0.12, 0.08, MAT.iron, (a.x + b.x) / 2, 0.1, (a.z + b.z) / 2); m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); }
     for (let w = -120 + r() * 30; w < 260; w += 12 + r() * 30) { if (r() < 0.45) continue; const c = P2(u, w), fc = box(11, 3.2, 2.8, M([0x6a3424, 0x5a3020, 0x4a3a30, 0x7a4a2a][r() * 4 | 0]), c.x, 1.9, c.z); fc.rotation.y = -Math.atan2(WA.z, WA.x); } }
   // the roundhouse: a fan of brick engine stalls round a turntable, with a smoke jack over each stall
-  { const C = P2(-112, 95), R0 = 14, R1 = 34; for (let k = 0; k < 13; k++) { const a = Math.PI * 0.15 + k * Math.PI * 0.7 / 12, mid = (R0 + R1) / 2, p = V3(C.x + Math.cos(a) * mid, 0, C.z + Math.sin(a) * mid), st = box(R1 - R0, 7, 6.2, facadeMat("#5e3a2e", "plain"), p.x, 3.5, p.z, -a); box(R1 - R0 + 0.6, 0.4, 6.6, ROOFM, p.x, 7.2, p.z, -a);
+  { const C = P2(-168, 150), R0 = 14, R1 = 34; for (let k = 0; k < 13; k++) { const a = Math.PI * 0.15 + k * Math.PI * 0.7 / 12, mid = (R0 + R1) / 2, p = V3(C.x + Math.cos(a) * mid, 0, C.z + Math.sin(a) * mid), st = box(R1 - R0, 7, 6.2, facadeMat("#5e3a2e", "plain"), p.x, 3.5, p.z, -a); box(R1 - R0 + 0.6, 0.4, 6.6, ROOFM, p.x, 7.2, p.z, -a);
       const j = V3(C.x + Math.cos(a) * (R0 + 6), 0, C.z + Math.sin(a) * (R0 + 6)); box(0.8, 2.2, 0.8, M(0x2a2a2a), j.x, 8.4, j.z, -a); }
     const tt = new THREE.Mesh(new THREE.CylinderGeometry(R0 - 2, R0 - 2, 0.3, 32), M(0x4a4440)); tt.position.set(C.x, 0.05, C.z); scene.add(tt); }
   // the South End Grounds across the tracks: the Beaneaters' covered grandstand
   { const c = P2(-128, 10), g = new THREE.Group(); g.position.set(c.x, 0, c.z); g.rotation.y = -Math.atan2(WA.z, WA.x); scene.add(g); box(70, 10, 16, MAT.board, 0, 5, 0, 0, g); box(72, 0.4, 19, MAT.roof, 0, 11.6, -1, 0, g); for (let i = -6; i <= 6; i++) box(0.3, 2.2, 0.3, MAT.col, i * 5.5, 10.9, 8, 0, g); box(60, 1.2, 0.2, MAT.paint, 0, 10.4, 8.1, 0, g); }
-  // beyond right field: livery stables and sheds in wood, and brick works
-  for (let u = -30; u < 140;) { const L = 14 + r() * 10; if (r() < 0.5) shed(u, 128, u + L, 142, 4.5 + r() * 2); else bldg(u, 128, u + L, 146, 8 + (r() * 2 | 0) * 4, BR[r() * BR.length | 0], "row", { bay: 4, floor: 4, chimneys: 1 }); u += L + 1.5; }
+  // beyond right field, as the September 1903 panorama shows it: a long, dark, gable-roofed barn right behind the fence (with ventilators along
+  // the ridge), and brick works behind it with a smoking chimney
+  { const c = P2(8, 116), ry = -Math.atan2(UA.z, UA.x), lu = 46, lw = 16, h = 7; const m = new THREE.Mesh(new THREE.BoxGeometry(lu, h, lw), facadeMat("#4a3a2e", "clap")); m.material = M(0x4e4238, { roughness: 0.95 }); m.position.set(c.x, h / 2, c.z); m.rotation.y = ry; m.castShadow = m.receiveShadow = true; scene.add(m);
+    const sh = new THREE.Shape([new THREE.Vector2(-lw / 2 - 0.4, 0), new THREE.Vector2(lw / 2 + 0.4, 0), new THREE.Vector2(0, lw * 0.32)]), rf = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: lu + 0.6, bevelEnabled: false }).translate(0, 0, -(lu + 0.6) / 2), M(0x3a3634)); rf.position.set(c.x, h, c.z); rf.rotation.y = ry + Math.PI / 2; rf.castShadow = true; scene.add(rf);
+    for (let k = 0; k < 5; k++) { const p = P2(8 - lu / 2 + 6 + k * (lu - 12) / 4, 116, h + lw * 0.32 + 0.6); box(1.6, 1.3, 1.6, M(0x5a5048), p.x, p.y, p.z, ry); box(2.2, 0.2, 2.2, M(0x3a3634), p.x, p.y + 0.75, p.z, ry); } }
+  for (let u = -30; u < 150;) { const L = 14 + r() * 10; bldg(u, 132, u + L, 150, 9 + (r() * 3 | 0) * 4, BR[r() * BR.length | 0], "row", { bay: 4, floor: 4, chimneys: 1 }); u += L + 1.5; }
+  // behind the first-base bleachers, across the railroad: long two- and three-storey factories with rows of windows, telegraph poles,
+  // a water tower, and the chimneys of their boiler houses (one big brick one, two slender iron ones), all in the 1903 panorama
+  for (let w = -20; w < 170;) { const L = 30 + r() * 25; bldg(-118, w, -96, w + L, 8 + (r() * 2 | 0) * 4, BR[r() * BR.length | 0], "low", { bay: 3.0, floor: 4.0 }); w += L + 2; }
+  for (let w = -30; w < 170; w += 26) { const p = P2(-90, w); box(0.22, 11, 0.22, MAT.wood, p.x, 5.5, p.z); const arm = box(2.4, 0.12, 0.12, MAT.wood, p.x, 10.2, p.z); arm.rotation.y = ROT_W; }
+  { const p = P2(-108, 92); for (const [dx, dz] of [[-1.6, -1.6], [1.6, -1.6], [1.6, 1.6], [-1.6, 1.6]]) box(0.25, 14, 0.25, MAT.wood, p.x + dx, 7, p.z + dz); const tk = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 5, 16), M(0x6a5a4a)); tk.position.set(p.x, 16.5, p.z); tk.castShadow = true; scene.add(tk); const cone = new THREE.Mesh(new THREE.ConeGeometry(3.3, 1.8, 16), M(0x4a4440)); cone.position.set(p.x, 19.9, p.z); scene.add(cone); }
+  const STACKS = [[-110, 52, 34, 1.8, 2.3, "brick"], [-112, 12, 30, 0.7, 0.8, "iron"], [-104, 128, 28, 0.6, 0.7, "iron"], [40, 160, 30, 1.2, 1.7, "brick"]];
+  window.SMOKE_AT = []; for (const [u, w, h, r0, r1, kind] of STACKS) { const c = P2(u, w), st = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, 12), kind === "brick" ? facadeMat("#7a4434", "plain") : M(0x2a2a2a, { metalness: 0.4, roughness: 0.6 })); st.position.set(c.x, h / 2, c.z); st.castShadow = true; scene.add(st); if (kind === "brick") box(r0 * 2.6, 0.8, r0 * 2.6, CORNICE, c.x, h, c.z); SMOKE_AT.push(V3(c.x, h + 0.5, c.z)); }
   // telegraph poles along Rogers Street, with crossarms
   for (let u = -60; u < 200; u += 30) { const c = P2(u, -51.5); box(0.22, 10, 0.22, MAT.wood, c.x, 5, c.z); const arm = box(2.2, 0.12, 0.12, MAT.wood, c.x, 9.3, c.z); arm.rotation.y = ROT_U; } }
 // the rest of the city out to the horizon: Back Bay, the South End and Roxbury as plain blocks of brick, three to six storeys
-{ const r = mulberry(77), BR = ["#8a4a34", "#7a3e2e", "#94563c", "#6e4434", "#9a6a4a"]; for (let u = -420; u <= 520; u += 34) for (let w = -420; w <= 520; w += 34) { const inPark = u > -100 && u < 200 && w > -90 && w < 175, rail = u > -95 && u < -40, round = Math.hypot(u + 112, w - 95) < 45; if (inPark || rail || round || r() < 0.15) continue;
+{ const r = mulberry(77), BR = ["#8a4a34", "#7a3e2e", "#94563c", "#6e4434", "#9a6a4a"]; for (let u = -420; u <= 520; u += 34) for (let w = -420; w <= 520; w += 34) { const inPark = u > -100 && u < 200 && w > -90 && w < 175, rail = u > -95 && u < -40, round = Math.hypot(u + 168, w - 150) < 45 || (u > -145 && u < -88 && w > -45 && w < 180); if (inPark || rail || round || r() < 0.15) continue;
     const h = (3 + (r() * 4 | 0)) * 3.6, uu = u + (r() - 0.5) * 4, ww = w + (r() - 0.5) * 4; const lu = 22 + r() * 8, lw = 22 + r() * 8; bldg(uu, ww, uu + lu, ww + lw, h, BR[r() * BR.length | 0], "row", { bay: 3.3, floor: 3.6, chimneys: r() < 0.5 ? 2 : 0 }); if (r() < 0.4) mansard(uu, uu + lu, ww, ww + lw, h, 3.0); } }
 
 // ---------- the game, play by play, from the official record ----------
@@ -604,6 +633,7 @@ const cents = c => c >= 100 ? "$" + (c / 100).toFixed(2) : c + "¢";
 function segHit(ax, az, bx, bz, cx, cz, dx, dz) { const d = (bx - ax) * (dz - cz) - (bz - az) * (dx - cx); if (Math.abs(d) < 1e-9) return false; const t = ((cx - ax) * (dz - cz) - (cz - az) * (dx - cx)) / d, u = ((cx - ax) * (bz - az) - (cz - az) * (bx - ax)) / d; return t >= 0 && t <= 1 && u >= 0 && u <= 1; }
 function tryMove(nx, nz) { for (const W of WALLS) if (segHit(ME.x, ME.z, nx, nz, W.a.x, W.a.z, W.b.x, W.b.z) && W.h > ME.y + 0.5) return; const [u, w] = toUW(nx, nz), [u0, w0] = toUW(ME.x, ME.z);
   if (w0 < LOT.w0 !== w < LOT.w0 && Math.abs(u - GATE_U) < 3 && !ME.ticket) { say("The ticket taker stops you: \"Ticket, please.\" The windows are just along the street."); return; }
+  if (LF_GATE && Math.hypot(nx - LF_GATE.x, nz - LF_GATE.z) < 4) { const rOld = Math.hypot(ME.x, ME.z), rNew = Math.hypot(nx, nz), lim = fenceDist(-43.75); if (rOld > lim && rNew <= lim) { if (!ME.ticket) { say("A ticket taker at the Huntington Avenue gate: \"Ticket, please.\" The ticket windows are round on Rogers Street, behind third base."); return; } if (!ME.inside) { ME.inside = true; enterPark(); say(`The ticket taker tears your ${ME.ticket} ticket and waves you in.`); } } }
   if (w0 < LOT.w0 !== w < LOT.w0 && Math.abs(u - GATE_U) < 3 && ME.ticket && !ME.inside) { ME.inside = true; say(`The ticket taker tears your ${ME.ticket} ticket and waves you in.`); drawPanel(); }
   const fy = floorAt(nx, nz); if (fy - ME.y > 0.55) return; ME.x = nx; ME.z = nz; }
 // the things you can do, with the nearest one in front of you
@@ -713,8 +743,13 @@ document.getElementById("intro")?.addEventListener("click", begin);
 const VRB = document.getElementById("vr"); if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); DIAG.stage("entering VR"); await renderer.xr.setSession(s); frame = 0; begin(); HUD.style.display = "none"; }; });
 
 DIAG.stage("merging the scenery");
+// smoke drifting from the chimneys: a few soft grey puffs rising and spreading downwind
+const SMOKE = []; { const st = tex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 2, 32, 32, 30); gr.addColorStop(0, "rgba(200,200,200,0.55)"); gr.addColorStop(1, "rgba(200,200,200,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); }); const sm = new THREE.SpriteMaterial({ map: st, transparent: true, depthWrite: false, fog: true });
+  for (const p of (window.SMOKE_AT || [])) for (let k = 0; k < 10; k++) { const sp = new THREE.Sprite(sm.clone()); sp.userData = { p, t: k / 10 }; scene.add(sp); SMOKE.push(sp); } }
+function updateSmoke(dt) { for (const sp of SMOKE) { const u = sp.userData; u.t = (u.t + dt * 0.06) % 1; const s = 2 + u.t * 14; sp.position.copy(u.p).add(V3(u.t * 30, u.t * 18, u.t * 12)); sp.scale.set(s, s, 1); sp.material.opacity = (1 - u.t) * 0.7; } }
+signMesh([["REFRESHMENTS", 46]], 3.6, 0.8, P2(-17.8, 43.5), ROT_U + Math.PI, 2.4);
 // ---------- drawing it cheaply: everything that never moves is merged into one mesh per material ----------
-{ const groups = new Map(), keep = new Set([window.FLAG, BALL]); for (const o of [...scene.children]) { if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || keep.has(o)) continue; if (!groups.has(o.material)) groups.set(o.material, []); groups.get(o.material).push(o); }
+{ const groups = new Map(), keep = new Set([window.FLAG, BALL, ...SMOKE]); for (const o of [...scene.children]) { if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || keep.has(o)) continue; if (!groups.has(o.material)) groups.set(o.material, []); groups.get(o.material).push(o); }
   scene.updateMatrixWorld(true);
   for (const [mat, list] of groups) { if (list.length < 2) continue; const pos = [], nor = [], uv = []; let shadow = false;
     for (const o of list) { const g = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()).applyMatrix4(o.matrixWorld); if (!g.attributes.normal) g.computeVertexNormals(); pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); if (g.attributes.uv) uv.push(...g.attributes.uv.array); else for (let i = 0; i < g.attributes.position.count; i++) uv.push(0, 0); shadow = shadow || o.castShadow; scene.remove(o); o.geometry.dispose(); g.dispose(); }
@@ -748,6 +783,6 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.05), v
   if (window.FLAG) { const pa = FLAG.geometry.attributes.position, tt = performance.now() / 1000; for (let i = 0; i < pa.count; i++) { const x = pa.getX(i) + 1.7; pa.setZ(i, Math.sin(x * 2.2 - tt * 4) * 0.12 * x / 3.4); } pa.needsUpdate = true; }
   if (fadeT >= 0) { fadeT += dt; const u = fadeT / 0.25; FADE.material.opacity = u < 1 ? u : Math.max(0, 2 - u); if (u >= 1 && fadeDo) { const f = fadeDo; fadeDo = null; f(); } if (u >= 2) { fadeT = -1; FADE.visible = false; } }
   if (preT > 0) { preT -= dt; if (preT <= 0) { say("\"Play ball!\" Umpire Connolly calls it, and Cy Young steps onto the pitcher's slab.", 6); startGame(); } }
-  updateGame(dt); updatePointer();
+  updateGame(dt); updatePointer(); updateSmoke(dt);
   frame++; if (frame === 2) DIAG.stage(vr ? "running in VR" : "running"); if (frame === 600) DIAG.stable(); let redraw = false; if (frame % 5 === 0) { redraw = updateLook(); findNear(); } panelT -= dt; if (panelT <= 0 || redraw) { panelT = 1; drawPanel(); }
   msgT -= dt; if (msgT <= 0) { MSG.style.display = "none"; TOAST.m.visible = false; } renderer.render(scene, camera); });
