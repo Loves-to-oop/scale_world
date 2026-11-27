@@ -956,3 +956,22 @@ WL = WL[:i0] + """<div id="intro"><div class="card">
 """ + WL[i1:]
 (HERE / "wild.html").write_text(WL.replace("__THREE__", three).replace("__SCENE__", (HERE / "wild.js").read_text(encoding="utf-8")), encoding="utf-8")
 print("  wrote wild.html")
+
+# The first World Series, Game 1: Boston, October 1, 1903
+WS = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>The first World Series, 1903</title>").replace("background:#c8d4d8", "background:#1e1a14")
+i0, i1 = WS.index('<div id="intro">'), WS.index('<button id="vr">')
+WS = WS[:i0] + """<div id="intro"><div class="card">
+  <h1>The first World Series, Game 1</h1>
+  <p>Thursday, October 1, 1903, at the Huntington Avenue Baseball Grounds in Boston: the Boston Americans, champions of the new American League,
+  against the Pittsburgh Pirates, champions of the National League, in the first "World's Championship Series." Cy Young pitches for Boston,
+  Deacon Phillippe for Pittsburgh. 16,242 people paid to get in, thousands more than the park could seat, and the overflow stood in the outfield behind ropes.</p>
+  <p>You arrive on Rogers Street. Buy a ticket at the window, go in through the gate, buy a score card or peanuts, and walk anywhere or sit in any empty seat.
+  Look at a player, the umpires or anything in the park to learn about it. The park, the crowd, the uniforms and the prices are rebuilt from the records
+  of the day; every play of the game will come from the official play-by-play.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk, drag to look, <kbd>shift</kbd> hurry, <kbd>E</kbd> buy, sit or stand, <kbd>V</kbd> comfort vignette, <kbd>G</kbd> skip to the first pitch.
+  In VR: left stick walks, right stick snap-turns, right trigger buys, sits or stands, <b>Y</b> comfort vignette; your money and what you're looking at are on your left wrist, your score card in your right hand.</p>
+  <p class="dim">Click to begin.</p>
+</div></div>
+""" + WS[i1:]
+(HERE / "ws1903.html").write_text(WS.replace("__THREE__", three).replace("__SCENE__", (HERE / "ws1903.js").read_text(encoding="utf-8")), encoding="utf-8")
+print("  wrote ws1903.html")
