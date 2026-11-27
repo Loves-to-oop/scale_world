@@ -68,8 +68,10 @@ const MAT = { grass: new THREE.MeshStandardMaterial({ map: grassT, roughness: 1,
   pts.forEach((p, i) => i ? sh.lineTo(p.x, -p.z) : sh.moveTo(p.x, -p.z)); const f = new THREE.Mesh(new THREE.ShapeGeometry(sh).rotateX(-Math.PI / 2), MAT.grass); f.receiveShadow = true; scene.add(f);
   const flat = (geo, mat, y) => { const m = new THREE.Mesh(geo.rotateX(-Math.PI / 2), mat); m.position.y = y; m.receiveShadow = true; scene.add(m); return m; };
   // the base paths, the dirt round home and the bases, and the pitcher's box (a raised mound, at most 15 in under the 1903 rules)
-  for (const [a, b] of [[V3(0, 0, 0), B1], [B1, B2], [B2, B3], [B3, V3(0, 0, 0)]]) { const L = a.distanceTo(b), m = flat(new THREE.PlaneGeometry(6 * FT, L + 2), MAT.dirt, 0.01); m.position.copy(a).add(b).multiplyScalar(0.5).setY(0.01); m.rotation.y = Math.atan2(b.x - a.x, b.z - a.z); }
-  for (const b of [B1, B2, B3]) flat(new THREE.CircleGeometry(13 * FT / 2 + 0.6, 24), MAT.dirt, 0.012).position.set(b.x, 0.012, b.z);
+  // the infield was skinned, all dirt, as the 1903 panorama photographs show: from home plate out to an arc 95 ft from the pitcher's box
+  { const R0 = 95 * FT, sh = new THREE.Shape(), pts = [V3(0, 0, 0)], hit = s => { let lo = 0, hi = 60; for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (dir(s * D45).multiplyScalar(m).distanceTo(PM) < R0) lo = m; else hi = m; } return dir(s * D45).multiplyScalar(lo); };
+    const p1 = hit(1), p3 = hit(-1), a1 = Math.atan2(p1.x - PM.x, -(p1.z - PM.z)), a3 = Math.atan2(p3.x - PM.x, -(p3.z - PM.z)); pts.push(dir(D45).multiplyScalar(1).add(V3(0, 0, 0)), p1); for (let k = 1; k < 30; k++) { const a = lerpN(a1, a3, k / 30); pts.push(V3(PM.x + Math.sin(a) * R0, 0, PM.z - Math.cos(a) * R0)); } pts.push(p3);
+    pts.forEach((p, k) => k ? sh.lineTo(p.x, -p.z) : sh.moveTo(p.x, -p.z)); const m = new THREE.Mesh(new THREE.ShapeGeometry(sh).rotateX(-Math.PI / 2), MAT.dirt); m.position.y = 0.011; m.receiveShadow = true; scene.add(m); }
   flat(new THREE.CircleGeometry(13 * FT, 32), MAT.dirt, 0.013); const mound = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.9, 0.3, 24), MAT.dirt); mound.position.set(PM.x, 0.15, PM.z); mound.receiveShadow = true; scene.add(mound);
   const rubber = box(24 * IN(1), 0.03, 6 * IN(1), MAT.white, PM.x, 0.31, PM.z);
   // the sandy patches in the outfield where the grass would not grow (they're in every account of the park)
@@ -202,7 +204,8 @@ function makePerson(team, name, role) { const T = TEAM[team], G = new THREE.Grou
   else { part(new THREE.SphereGeometry(0.106, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.72, 1.02), cap, 0, 0.115, 0, head); part(new THREE.CylinderGeometry(0.075, 0.075, 0.01, 14, 1, false, -Math.PI / 2, Math.PI).scale(1, 1, 0.8), cap, 0, 0.12, -0.075, head); }
   // arms: upper arm and forearm the same length, so the hands can be placed by inverse kinematics; sleeves to the wrist
   const A = 0.27, limb = (P, x, y, len, r, mat, mat2) => { const j = new THREE.Group(); j.position.set(x, y, 0); P.add(j); part(cap2(r, len - r), mat, 0, -len / 2, 0, j); const j2 = new THREE.Group(); j2.position.y = -len; j.add(j2); part(cap2(r * 0.85, len - r), mat2 || mat, 0, -len / 2, 0, j2); return [j, j2]; };
-  const [aL, eL] = limb(torso, -0.21, 0.53, A, 0.052, shirt), [aR, eR] = limb(torso, 0.21, 0.53, A, 0.052, shirt);
+  const [aL, eL] = limb(torso, -0.21, 0.53, A, 0.052, shirt), [aR, eR] = limb(torso, 0.21, 0.53, A, 0.052, shirt); for (const j of [aL, aR]) part(new THREE.SphereGeometry(0.066, 10, 8), shirt, 0, 0, 0, j); for (const j of [eL, eR]) part(new THREE.SphereGeometry(0.046, 8, 6), shirt, 0, 0, 0, j);
+  part(cap2(0.11, 0.12).rotateZ(Math.PI / 2).scale(1, 1, 0.85), pant, 0, -0.04, 0, hips);
   // legs: baggy knickers bloused at the knee, then stockings and high shoes
   const [lL, kL] = limb(hips, -0.095, -0.02, 0.44, 0.085, pant, sock), [lR, kR] = limb(hips, 0.095, -0.02, 0.44, 0.085, pant, sock);
   for (const k of [kL, kR]) { part(new THREE.SphereGeometry(0.088, 10, 8).scale(1, 0.75, 1), pant, 0, -0.02, 0, k); k.children[0].scale.set(0.72, 1, 0.72); part(new THREE.BoxGeometry(0.095, 0.08, 0.26), shoe, 0, -0.46, -0.05, k); part(new THREE.BoxGeometry(0.1, 0.02, 0.27), dark, 0, -0.5, -0.05, k); }
@@ -212,6 +215,7 @@ function makePerson(team, name, role) { const T = TEAM[team], G = new THREE.Grou
   else if (role === "1B") part(new THREE.BoxGeometry(0.13, 0.17, 0.06), M(0x7a5434), 0, -0.05, -0.01, handL);
   else if (team !== "UMP" && role !== "PH" && role !== "staff" && role !== "vendor") part(new THREE.BoxGeometry(0.1, 0.13, 0.05), M(0x8a6a44), 0, -0.04, -0.01, handL);
   if (team === "UMP" && role !== "staff" && role !== "vendor") part(new THREE.BoxGeometry(0.36, 0.2, 0.26), shirt, 0, -0.06, 0, torso);
+  { let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 997; G.scale.setScalar(0.94 + (h % 100) / 100 * 0.12); }
   G.userData = { name, team, role }; scene.add(G); const P = { G, hips, torso, head, aL, eL, aR, eR, lL, kL, lR, kR, handL, handR, name, team, role, armA: A, armB: A };
   setPose(P, "ready"); return P; }
 function wordTex(word) { return tex(256, 64, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = "#2a3a7a"; g.font = "bold 34px Georgia"; g.textAlign = "center"; const n = word.length; for (let i = 0; i < n; i++) { const a = (i - (n - 1) / 2) * 0.13; g.save(); g.translate(w / 2 + Math.sin(a) * 200, 230 - Math.cos(a) * 190); g.rotate(a); g.fillText(word[i], 0, 0); g.restore(); } }); }
@@ -222,13 +226,14 @@ function armIK(P, side, target, pole) { const sh = side === "L" ? P.aL : P.aR, e
   const A2 = Math.acos(clampN((a * a + dist * dist - b * b) / (2 * a * dist), -1, 1)), pl = (pole || V3(side === "L" ? -0.6 : 0.6, -1, 0.3)).clone(), n = pl.sub(d.clone().multiplyScalar(pl.dot(d))).normalize();
   const u = d.clone().multiplyScalar(Math.cos(A2)).add(n.multiplyScalar(Math.sin(A2))); sh.quaternion.setFromUnitVectors(_DOWN, u);
   const elbow = s0.clone().addScaledVector(u, a), f = s0.clone().addScaledVector(d, dist).sub(elbow).normalize(); el.quaternion.setFromUnitVectors(_DOWN, f.applyQuaternion(sh.quaternion.clone().invert())); }
-function setPose(P, pose) { const z = (j, x, y = 0, zz = 0) => j.rotation.set(x, y, zz); z(P.torso, 0); z(P.aL, 0.1, 0, 0.15); z(P.aR, 0.1, 0, -0.15); z(P.eL, -0.2); z(P.eR, -0.2); z(P.lL, 0); z(P.lR, 0); z(P.kL, 0); z(P.kR, 0); P.hips.position.y = 0.95;
-  if (pose === "ready") { z(P.torso, -0.35); P.hips.position.y = 0.86; z(P.lL, -0.35, 0, 0.12); z(P.lR, -0.35, 0, -0.12); z(P.kL, 0.55); z(P.kR, 0.55); z(P.aL, -0.6, 0, 0.2); z(P.aR, -0.6, 0, -0.2); z(P.eL, -0.6); z(P.eR, -0.6); }
-  if (pose === "crouch") { P.hips.position.y = 0.5; z(P.torso, -0.25); z(P.lL, -1.5, 0, 0.3); z(P.lR, -1.5, 0, -0.3); z(P.kL, 2.0); z(P.kR, 2.0); z(P.aL, -1.2, 0, 0.3); z(P.eL, -0.3); }
-  if (pose === "bat") { z(P.torso, -0.15, 0.5); z(P.lL, -0.15, 0, 0.18); z(P.lR, 0.1, 0, -0.18); z(P.kL, 0.25); z(P.kR, 0.2); z(P.aL, -1.2, 0.6, 0.5); z(P.aR, -1.3, -0.4, -0.2); z(P.eL, -1.0); z(P.eR, -1.1); }
-  if (pose === "sit") { P.hips.position.y = 0.48; z(P.lL, -1.55); z(P.lR, -1.55); z(P.kL, 1.55); z(P.kR, 1.55); z(P.aL, -0.4, 0, 0.1); z(P.aR, -0.4, 0, -0.1); z(P.eL, -0.9); z(P.eR, -0.9); }
-  if (pose === "relax") { z(P.torso, -0.42); P.hips.position.y = 0.86; z(P.lL, -0.3, 0, 0.1); z(P.lR, -0.3, 0, -0.1); z(P.kL, 0.45); z(P.kR, 0.45); z(P.aL, -0.75, 0, 0.12); z(P.aR, -0.75, 0, -0.12); z(P.eL, -0.25); z(P.eR, -0.25); }
-  if (pose === "stand") { z(P.aL, 0.05, 0, 0.12); z(P.aR, 0.05, 0, -0.12); } }
+// joint angles: a thigh or arm swings forward with a positive angle; a knee bends with a negative one, an elbow with a positive one
+function setPose(P, pose) { const z = (j, x, y = 0, zz = 0) => j.rotation.set(x, y, zz); z(P.torso, 0); z(P.aL, 0.08, 0, -0.1); z(P.aR, 0.08, 0, 0.1); z(P.eL, 0.15); z(P.eR, 0.15); z(P.lL, 0); z(P.lR, 0); z(P.kL, 0); z(P.kR, 0); P.hips.position.y = 0.92; P.hips.position.x = 0;
+  if (pose === "ready") { z(P.torso, -0.35); P.hips.position.y = 0.84; z(P.lL, 0.4, 0, -0.12); z(P.lR, 0.4, 0, 0.12); z(P.kL, -0.7); z(P.kR, -0.7); z(P.aL, 0.7, 0, -0.15); z(P.aR, 0.6, 0, 0.15); z(P.eL, 0.6); z(P.eR, 0.6); }
+  if (pose === "crouch") { P.hips.position.y = 0.5; z(P.torso, -0.25); z(P.lL, 1.5, 0, -0.35); z(P.lR, 1.5, 0, 0.35); z(P.kL, -2.1); z(P.kR, -2.1); z(P.aL, 1.1, 0, -0.2); z(P.eL, 0.4); z(P.aR, 0.5, 0, 0.2); z(P.eR, 1.2); }
+  if (pose === "bat") { z(P.lL, 0.12, 0, -0.16); z(P.lR, -0.06, 0, 0.16); z(P.kL, -0.25); z(P.kR, -0.2); P.hips.position.y = 0.9; }
+  if (pose === "sit") { P.hips.position.y = 0.48; z(P.lL, 1.55, 0, -0.06); z(P.lR, 1.55, 0, 0.06); z(P.kL, -1.55); z(P.kR, -1.55); z(P.aL, 0.35, 0, -0.1); z(P.aR, 0.35, 0, 0.1); z(P.eL, 1.0); z(P.eR, 1.0); }
+  if (pose === "relax") { z(P.torso, -0.45); P.hips.position.y = 0.85; z(P.lL, 0.35, 0, -0.1); z(P.lR, 0.35, 0, 0.1); z(P.kL, -0.55); z(P.kR, -0.55); z(P.aL, 0.8, 0, -0.12); z(P.aR, 0.8, 0, 0.12); z(P.eL, 0.15); z(P.eR, 0.15); }
+  if (pose === "stand") { z(P.aL, 0.04, 0, -0.08); z(P.aR, 0.04, 0, 0.08); z(P.eL, 0.12); z(P.eR, 0.12); } }
 // the bat, a heavy ash bat of the time (they were thicker-handled than today's)
 const BATG = new THREE.CylinderGeometry(0.033, 0.016, 0.86, 10).translate(0, 0.43, 0), BATM = M(0xc8a878, { roughness: 0.5 });
 // the lineups (the official record)
@@ -276,11 +281,28 @@ function bldg(u0, w0, u1, w1, h, brick = "#8a4a34", kind = "row", o = {}) { cons
 function shed(u0, w0, u1, w1, h, ridgeAlongU = true) { const lu = Math.abs(u1 - u0), lw = Math.abs(w1 - w0), c = P2((u0 + u1) / 2, (w0 + w1) / 2), ry = -Math.atan2(UA.z, UA.x); const m = new THREE.Mesh(new THREE.BoxGeometry(lu, h, lw), facadeMat("#8a6a4a", "clap")); m.position.set(c.x, h / 2, c.z); m.rotation.y = ry; m.castShadow = m.receiveShadow = true; scene.add(m);
   const span = ridgeAlongU ? lw : lu, len = ridgeAlongU ? lu : lw, sh = new THREE.Shape([new THREE.Vector2(-span / 2 - 0.3, 0), new THREE.Vector2(span / 2 + 0.3, 0), new THREE.Vector2(0, span * 0.35)]), rf = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: len + 0.4, bevelEnabled: false }).translate(0, 0, -(len + 0.4) / 2), ROOFM);
   rf.position.set(c.x, h, c.z); rf.rotation.y = ry + (ridgeAlongU ? Math.PI / 2 : 0); rf.castShadow = true; scene.add(rf); }
+// the South End's signature house: a four-storey brick row house with a rounded bow front, brownstone steps up to a raised first floor,
+// and a steep slate mansard roof with dormer windows (most of the South End was built this way in the 1850s-70s)
+const SLATE = M(0x4a4650, { roughness: 0.8 }), BROWN = M(0x6a4a3a, { roughness: 0.9 });
+function mansard(u0, u1, w0, w1, y, hgt, mat = SLATE) { const lu = Math.abs(u1 - u0), d = Math.abs(w1 - w0), c = P2((u0 + u1) / 2, (w0 + w1) / 2), ry = -Math.atan2(UA.z, UA.x), inset = Math.min(1.4, d * 0.18);
+  const sh = new THREE.Shape([new THREE.Vector2(-d / 2, 0), new THREE.Vector2(d / 2, 0), new THREE.Vector2(d / 2 - inset, hgt), new THREE.Vector2(-d / 2 + inset, hgt)]), g = new THREE.ExtrudeGeometry(sh, { depth: lu, bevelEnabled: false }).translate(0, 0, -lu / 2).rotateY(Math.PI / 2);
+  const m = new THREE.Mesh(g, mat); m.position.set(c.x, y, c.z); m.rotation.y = ry; m.castShadow = true; scene.add(m); }
+function rowhouses(u0, n, wFront, depth, floors, brick, rng) { const W = 5.6, h = floors * 3.4 + 1.2, ry = -Math.atan2(UA.z, UA.x), back = wFront - depth;
+  for (let k = 0; k < n; k++) { const ua = u0 + k * W, ub = ua + W, um = (ua + ub) / 2; bldg(ua, back, ub, wFront, h, brick, "row", { bay: W / 3, floor: 3.4 });
+    const bow = new THREE.CylinderGeometry(1.9, 1.9, h - 1.2, 12, 1, true, 0, Math.PI), uv = bow.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2, uv.getY(i) * floors); const bm = new THREE.Mesh(bow, facadeMat(brick, "row")), bp = P2(um, wFront, (h - 1.2) / 2 + 1.2); bm.position.copy(bp); bm.rotation.y = ry - Math.PI / 2; bm.castShadow = true; scene.add(bm);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.0, 0.4, 12, 1, false, 0, Math.PI), CORNICE); cap.position.copy(P2(um, wFront, h - 0.1)); cap.rotation.y = ry - Math.PI / 2; scene.add(cap);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(1.95, 1.95, 1.2, 12, 1, false, 0, Math.PI), BROWN); base.position.copy(P2(um, wFront, 0.6)); base.rotation.y = ry - Math.PI / 2; scene.add(base);
+    const sp = P2(ub - 0.9, wFront + 1.5); box(1.5, 1.2, 3.0, BROWN, sp.x, 0.6, sp.z, ry); for (let st = 0; st < 3; st++) { const q = P2(ub - 0.9, wFront + 1.5 + 1.0 + st * 0.35); box(1.5, 0.15, 0.35, BROWN, q.x, 1.05 - st * 0.35, q.z, ry); }
+    const dp = P2(um, wFront - 0.7, h + 1.5); box(1.2, 1.5, 0.9, facadeMat(brick, "clap"), dp.x, dp.y, dp.z, ry); box(1.4, 0.15, 1.1, SLATE, dp.x, dp.y + 0.82, dp.z, ry);
+    const ch = P2(ua + 0.4, (wFront + back) / 2, h + 3.2); box(0.6, 1.6, 1.2, facadeMat(brick, "plain"), ch.x, ch.y, ch.z, ry); }
+  mansard(u0, u0 + n * W, back, wFront, h, 3.2); }
 { const r = mulberry(21), BR = ["#8a4a34", "#7a3e2e", "#94563c", "#6e4434", "#9a6a4a"];
   // Rogers Street: three- and four-storey brick row houses with shops below, on the far side of the street
-  for (let u = -70; u < 210;) { const w = 6 + r() * 3, n = 2 + (r() * 3 | 0), b = BR[r() * BR.length | 0], h = (3 + (r() * 2 | 0)) * 3.5 + 0.6; bldg(u, -53, u + w * n, -66, h, b, "row", { bay: w / 2, floor: 3.5, chimneys: n }); u += w * n + (r() < 0.2 ? 4 : 0.2); }
+  for (let u = -70; u < 210;) { const n = 3 + (r() * 5 | 0), b = BR[r() * BR.length | 0]; rowhouses(u, n, -55.5, 14, r() < 0.3 ? 3 : 4, b, r); u += n * 5.6 + (r() < 0.3 ? 8 : 0.4); }
   // the Boston Storage Warehouse: eight storeys of brick with arched windows, across Huntington Avenue
-  bldg(150, -20, 182, 92, 32, "#7a4434", "ware", { bay: 3.4, floor: 4.0 });
+  bldg(150, -20, 182, 92, 32, "#a8957a", "ware", { bay: 3.4, floor: 4.0 });
+  // a few factory chimneys in the distance: the 1903 panorama shows thin stacks well beyond the park
+  for (const [u, w, h] of [[-190, 260, 42], [40, 430, 36], [-300, 120, 46]]) { const c = P2(u, w), st = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.6, h, 12), facadeMat("#7a4434", "plain")); st.position.set(c.x, h / 2, c.z); st.castShadow = true; scene.add(st); box(2.6, 1, 2.6, CORNICE, c.x, h, c.z); }
   for (let w = 96; w < 210;) { const L = 12 + r() * 10; bldg(150, w, 168, w + L, 10 + (r() * 3 | 0) * 3.6, BR[r() * BR.length | 0], r() < 0.5 ? "store" : "row", { bay: 3.4, floor: 3.6, chimneys: 2 }); w += L + 0.3; }
   for (let w = -84; w < -24;) { const L = 13 + r() * 6; bldg(150, w, 168, w + L, 11 + (r() * 2 | 0) * 3.6, BR[r() * BR.length | 0], "store", { bay: 3.4, floor: 3.6, chimneys: 2 }); w += L + 0.3; }
   // the trolley tracks down the middle of Huntington Avenue, a pair of electric cars, and the wooden poles for the overhead wire
@@ -303,7 +325,7 @@ function shed(u0, w0, u1, w1, h, ridgeAlongU = true) { const lu = Math.abs(u1 - 
   for (let u = -60; u < 200; u += 30) { const c = P2(u, -51.5); box(0.22, 10, 0.22, MAT.wood, c.x, 5, c.z); const arm = box(2.2, 0.12, 0.12, MAT.wood, c.x, 9.3, c.z); arm.rotation.y = ROT_U; } }
 // the rest of the city out to the horizon: Back Bay, the South End and Roxbury as plain blocks of brick, three to six storeys
 { const r = mulberry(77), BR = ["#8a4a34", "#7a3e2e", "#94563c", "#6e4434", "#9a6a4a"]; for (let u = -420; u <= 520; u += 34) for (let w = -420; w <= 520; w += 34) { const inPark = u > -100 && u < 200 && w > -90 && w < 175, rail = u > -95 && u < -40, round = Math.hypot(u + 112, w - 95) < 45; if (inPark || rail || round || r() < 0.15) continue;
-    const h = (3 + (r() * 4 | 0)) * 3.6, uu = u + (r() - 0.5) * 4, ww = w + (r() - 0.5) * 4; bldg(uu, ww, uu + 22 + r() * 8, ww + 22 + r() * 8, h, BR[r() * BR.length | 0], "row", { bay: 3.3, floor: 3.6, chimneys: r() < 0.5 ? 2 : 0 }); } }
+    const h = (3 + (r() * 4 | 0)) * 3.6, uu = u + (r() - 0.5) * 4, ww = w + (r() - 0.5) * 4; const lu = 22 + r() * 8, lw = 22 + r() * 8; bldg(uu, ww, uu + lu, ww + lw, h, BR[r() * BR.length | 0], "row", { bay: 3.3, floor: 3.6, chimneys: r() < 0.5 ? 2 : 0 }); if (r() < 0.4) mansard(uu, uu + lu, ww, ww + lw, h, 3.0); } }
 
 // ---------- the game, play by play, from the official record ----------
 // The information used here was obtained free of charge from and is copyrighted by Retrosheet (www.retrosheet.org).
@@ -399,15 +421,18 @@ function updatePerson(P, dt) { const G = P.G; let moving = false; if (P.ph0 === 
   G.position.y = floorAt(G.position.x, G.position.z);
   const base = P.base === "ready" && !GAME.live && P.role !== "UMP_B" ? "relax" : (P.base || "ready"); setPose(P, moving ? "stand" : base); const z = (j, x, y, zz) => j.rotation.set(x, y || 0, zz || 0);
   if (!moving && base !== "sit") { const t = GAME.T + P.ph0; P.torso.rotation.z += Math.sin(t * 0.9) * 0.025; P.hips.position.x = Math.sin(t * 0.45) * 0.02; P.torso.rotation.x += Math.sin(t * 1.7) * 0.012; }
-  if (moving) { P.ph = (P.ph || 0) + dt * (P.speed || 3) * 1.5; const k = clampN((P.speed || 3) / 7, 0.3, 1), s = Math.sin(P.ph); z(P.lL, s * 0.9 * k); z(P.lR, -s * 0.9 * k); z(P.kL, Math.max(0, -s) * 1.2 * k + 0.1); z(P.kR, Math.max(0, s) * 1.2 * k + 0.1); z(P.aL, -s * 0.8 * k, 0, 0.15); z(P.aR, s * 0.8 * k, 0, -0.15); z(P.eL, -1.2 * k); z(P.eR, -1.2 * k); z(P.torso, -0.25 * k); P.hips.position.y = 0.95 - 0.04 * k + Math.abs(Math.cos(P.ph)) * 0.04 * k; }
+  if (moving) { // a real stride: step length and cadence from the speed; the thigh swings forward, the knee bends during the swing, the arms swing opposite
+    const v = Math.max(0.4, P.v), run = v > 3.0, stepL = run ? 0.6 + 0.24 * v : 0.3 + 0.28 * v, A = clampN(Math.asin(Math.min(0.95, stepL / 2 / 0.88)), 0.15, run ? 0.9 : 0.5), kneeMax = run ? 1.7 : 0.7; P.ph = (P.ph || 0) + dt * Math.PI * v / stepL; const s = Math.sin(P.ph), c = Math.cos(P.ph);
+    z(P.lL, A * s, 0, -0.04); z(P.lR, -A * s, 0, 0.04); z(P.kL, -(0.06 + kneeMax * Math.pow(Math.max(0, c), 1.4))); z(P.kR, -(0.06 + kneeMax * Math.pow(Math.max(0, -c), 1.4)));
+    z(P.aL, -(run ? 0.75 : 0.32) * s, 0, -0.1); z(P.aR, (run ? 0.75 : 0.32) * s, 0, 0.1); z(P.eL, run ? 1.5 : 0.25); z(P.eR, run ? 1.5 : 0.25); z(P.torso, run ? -0.22 : -0.04, 0.1 * s); P.hips.position.y = run ? 0.89 + 0.045 * Math.abs(s) : 0.905 + 0.02 * Math.cos(2 * P.ph); }
   if (P.act) { const u = (GAME.T - P.act.t0) / P.act.d; if (u > 1 || u < 0) P.act = null; else { const n = P.act.n;
-      if (n === "windup") { if (u < 0.55) { z(P.aL, -2.6, 0, 0.3); z(P.aR, -2.7, 0, -0.3); z(P.lL, -1.1 * Math.sin(u / 0.55 * Math.PI), 0, 0); z(P.kL, 1.2 * Math.sin(u / 0.55 * Math.PI)); } else { const v = (u - 0.55) / 0.45; z(P.torso, -0.5 * v); z(P.lL, -0.6); z(P.kL, 0.4); z(P.aR, lerpN(-2.9, 1.1, v), 0, -0.3); z(P.aL, -0.6, 0, 0.4); } }
-      else if (n === "throw") { z(P.aR, u < 0.4 ? -2.6 : lerpN(-2.6, 0.9, (u - 0.4) / 0.6), 0, -0.3); z(P.torso, -0.3 * u, -0.4 + 0.8 * u); }
+      if (n === "windup") { if (u < 0.55) { const k = Math.sin(u / 0.55 * Math.PI); z(P.aL, -2.6, 0, -0.3); z(P.aR, -2.7, 0, 0.3); z(P.lL, 1.1 * k); z(P.kL, -1.3 * k); z(P.torso, 0.1 * k, 0.3 * k); } else { const v = (u - 0.55) / 0.45; z(P.torso, -0.5 * v); z(P.lL, 0.7); z(P.kL, -0.5); z(P.lR, -0.3); z(P.kR, -0.4); z(P.aR, lerpN(-2.9, 1.1, v), 0, 0.3); z(P.aL, 0.6, 0, -0.4); z(P.eL, 1.2); } }
+      else if (n === "throw") { z(P.aR, u < 0.4 ? -2.6 : lerpN(-2.6, 0.9, (u - 0.4) / 0.6), 0, 0.3); z(P.eR, u < 0.4 ? 1.4 : 0.3); z(P.aL, 0.8, 0, -0.3); z(P.torso, -0.3 * u, -0.4 + 0.8 * u); z(P.lL, 0.4); z(P.kL, -0.3); }
       else if (n === "swing") { z(P.torso, -0.15, lerpN(0.7, -1.1, Math.min(1, u * 1.6))); z(P.aL, -1.45, 0, 0.2); z(P.aR, -1.45, 0, -0.2); z(P.eL, -0.2); z(P.eR, -0.2); }
-      else if (n === "catch") { z(P.aL, -2.2, 0, 0.25); z(P.eL, -0.3); }
-      else if (n === "low") { z(P.torso, -0.9); z(P.aL, -1.0, 0, 0.1); z(P.kL, 0.9); z(P.kR, 0.9); z(P.lL, -0.6); z(P.lR, -0.6); P.hips.position.y = 0.75; }
-      else if (n === "call") { z(P.aR, -2.9, 0, -0.2); z(P.eR, -0.6); }
-      else if (n === "safe") { z(P.aL, -1.5, 0, 1.3); z(P.aR, -1.5, 0, -1.3); } } }
+      else if (n === "catch") { z(P.aL, 1.9, 0, -0.25); z(P.eL, 0.4); }
+      else if (n === "low") { z(P.torso, -0.95); z(P.aL, 1.1, 0, -0.1); z(P.aR, 0.9, 0, 0.1); z(P.kL, -1.0); z(P.kR, -1.0); z(P.lL, 0.7, 0, -0.2); z(P.lR, 0.7, 0, 0.2); P.hips.position.y = 0.72; }
+      else if (n === "call") { z(P.aR, -2.9, 0, 0.2); z(P.eR, 0.5); }
+      else if (n === "safe") { z(P.aL, 0, 0, -1.45); z(P.aR, 0, 0, 1.45); z(P.eL, 0); z(P.eR, 0); } } }
   if (P.bat && !moving) batFrame(P);
   // the head follows the ball (or home plate), within what a neck can do
   { const tgt = ballLive ? BALL.position : P.base === "sit" ? null : V3(0, 1.2, 0); if (tgt) { P.G.updateMatrixWorld(true); const hp = P.head.getWorldPosition(V3(0, 0, 0)), d = tgt.clone().sub(hp), inv = P.torso.getWorldQuaternion(new THREE.Quaternion()).invert(), l = d.applyQuaternion(inv);
@@ -516,10 +541,10 @@ function placeAll(S) { GAME.st = S; const bt = team(S.half), ft = other(bt), rng
   hold(fielder(1, S.half), "R"); GAME.balls = GAME.strikes = 0; SCORE.line = S.line.map(a => a.slice()); drawScore(); drawCard(S); }
 function batterUp(e, S, instant) { const short = batterFor(e, S), P = P_(short); if (!P) return; P.short = short; GAME.batter = P; const box = BATTERS_BOX(LEFTY.has(short)); const rotY = LEFTY.has(short) ? Math.PI / 2 : -Math.PI / 2; CONTACT.copy(C_LOCAL(LEFTY.has(short) ? 1 : -1).applyAxisAngle(UP, rotY).add(box)); P.swungAt = undefined;
   const done = () => { stand(P, "bat", null); P.G.rotation.y = rotY; if (!P.bat) { P.bat = new THREE.Mesh(BATG, BATM); P.bat.castShadow = true; P.G.add(P.bat); } };
-  if (instant) { P.G.position.copy(box); done(); } else { goTo(P, box, 2.4); P.arrive = done; } }
+  if (instant) { P.G.position.copy(box); done(); P.walkT = 0; } else { const sp = paceKey === "brisk" ? 3.4 : 2.0; P.walkT = P.G.position.distanceTo(box) / sp; goTo(P, box, sp); P.arrive = done; } }
 function startEvent(i, instant) { if (i >= EVENTS.length) { GAME.phase = "over"; GAME.last = "Final: Pittsburgh 7, Boston 3. Phillippe struck out ten; the Pirates lead the Series one game to none."; drawPanel(); return; }
   const e = EVENTS[i], S = GAME.st; GAME.ei = i; GAME.T = 0; GAME.cues = []; GAME.phase = "play"; GAME.balls = GAME.strikes = 0; batterUp(e, S, instant); const P = GAME.batter, pace = PACE[paceKey];
-  const ps = pitchesFor(e); let t = instant ? 1.0 : 4.5; ps.forEach((c, j) => { const final = j === ps.length - 1; if (!final) { throwPitch(t, c, P); t += pace.gap; } else { const arr = throwPitch(t, c, P, true); const end = choreograph(e, S, arr); GAME.endT = end; cue(end + 0.5, () => finishEvent(e)); } });
+  const ps = pitchesFor(e); let t = instant ? 1.0 : Math.max(3.0, (P.walkT || 0) + 2.5); ps.forEach((c, j) => { const final = j === ps.length - 1; if (!final) { throwPitch(t, c, P); t += pace.gap; } else { const arr = throwPitch(t, c, P, true); const end = choreograph(e, S, arr); GAME.endT = end; cue(end + 0.5, () => finishEvent(e)); } });
   GAME.last = `${HALF_NAME(e.half)}. ${["SB", "SBE", "CS"].includes(e.k) ? "With " + P.short + " at bat" : P.short + " at bat"}.`; drawPanel(); }
 function finishEvent(e) { applyEvent(e, GAME.st); GAME.last = e.text; markCard(); SCORE.line = GAME.st.line.map(a => a.slice()); drawScore(); drawPanel(); const pace = PACE[paceKey];
   if (e.last) { GAME.phase = "change"; GAME.T = 0; GAME.cues = []; settle(true); cue(pace.change, () => { placeAll(GAME.st); startEvent(e.i + 1); }); if (e.i === EVENTS.length - 1) { GAME.cues = []; cheer(0.2, 0); cue(1, () => startEvent(EVENTS.length)); } }
@@ -594,7 +619,7 @@ function findNear() { const p = V3(ME.x, 0, ME.z); let best = null, bd = 2.4; fo
   if (!best && !ME.seat && ME.inside) { let bs = null, b2 = 1.0; for (const s of SEATS) { if (s.taken) continue; const d = Math.hypot(s.p.x - ME.x, s.p.z - ME.z); if (d < b2 && Math.abs(s.p.y - 0.42 - ME.y) < 0.5) { b2 = d; bs = s; } } if (bs) best = { name: `Sit down (${bs.sec}, row ${bs.row + 1})`, act: () => sit(bs) }; }
   if (ME.seat) best = { name: "Stand up", act: () => standUp() }; if ((best && best.name) !== (NEAR && NEAR.name)) { NEAR = best; drawPanel(); } NEAR = best; }
 function enterPark() { buildCrowd(); buildPlayers(); }
-function sit(s) { enterPark(); if (ME.ticket === "bleacher" && s.sec.includes("grandstand")) { say("An usher checks your ticket: \"Bleacher ticket? This is the grand stand, friend.\""); return; } ME.seat = s; s.taken = true; ME.x = s.p.x; ME.z = s.p.z; yaw = s.face; vrYaw = s.face; say(`You sit down: ${s.sec}, row ${s.row + 1}. Move to stand up.`); drawPanel(); }
+function sit(s) { enterPark(); if (ME.ticket === "bleacher" && s.sec.includes("grandstand")) { say("An usher checks your ticket: \"Bleacher ticket? This is the grand stand, friend.\""); return; } ME.seat = s; s.taken = true; ME.x = s.p.x; ME.z = s.p.z; say(`You sit down: ${s.sec}, row ${s.row + 1}. Move to stand up.`); drawPanel(); }
 function standUp() { if (!ME.seat) return; ME.seat.taken = false; const s = ME.seat; ME.seat = null; const fwd = V3(-Math.sin(s.face), 0, -Math.cos(s.face)); ME.x = s.p.x + fwd.x * 0.35; ME.z = s.p.z + fwd.z * 0.35; ME.y = floorAt(ME.x, ME.z); drawPanel(); }
 // the score card: the batting orders as printed, held in your left hand in VR
 const CARD = (() => { const c = document.createElement("canvas"); c.width = 768; c.height = 1024; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const m = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.24), new THREE.MeshStandardMaterial({ map: t, side: THREE.DoubleSide, roughness: 0.9 })); m.visible = false; return { c, t, m }; })();
@@ -638,25 +663,35 @@ function toast(text) { const g = TOAST.c.getContext("2d"); g.clearRect(0, 0, 102
 const say = (t, s = 4) => { MSG.textContent = t; MSG.style.display = "block"; msgT = s; toast(t); TOAST.m.visible = renderer.xr.isPresenting; };
 function wrap(g, text, x, y, w, lh) { const words = text.split(" "); let line = ""; for (const wd of words) { if (g.measureText(line + wd).width > w) { g.fillText(line, x, y); line = ""; y += lh; } line += wd + " "; } g.fillText(line, x, y); return y + lh; }
 let preT = 8 * 60; const preStr = () => preT > 0 ? `First pitch in ${Math.floor(preT / 60)}:${String(Math.floor(preT % 60)).padStart(2, "0")}` : "Play ball!";
-const BTN = [{ id: "next", label: "Next play", x: 16, y: 600, w: 196, h: 56 }, { id: "half", label: "Next half-inning", x: 222, y: 600, w: 236, h: 56 }, { id: "pause", label: "Pause", x: 468, y: 600, w: 156, h: 56 },
-  ...Array.from({ length: 9 }, (_, k) => ({ id: "inn" + (k + 1), label: String(k + 1), x: 16 + k * 68, y: 668, w: 60, h: 50 })), { id: "pace", label: "Pace", x: 16, y: 730, w: 300, h: 50 }, { id: "vig", label: "Vignette", x: 326, y: 730, w: 298, h: 50 }];
+const GOTO = [["seat", "Seat behind home"], ["rooters", "Royal Rooters"], ["bleach3", "3rd-base bleachers"], ["field", "Behind the plate"], ["lf", "Left-field crowd"], ["street", "Rogers Street"]];
+const BTN = [{ id: "next", label: "Next play", x: 16, y: 470, w: 196, h: 50 }, { id: "half", label: "Next half-inning", x: 222, y: 470, w: 236, h: 50 }, { id: "pause", label: "Pause", x: 468, y: 470, w: 156, h: 50 },
+  ...Array.from({ length: 9 }, (_, k) => ({ id: "inn" + (k + 1), label: String(k + 1), x: 16 + k * 68, y: 528, w: 60, h: 44 })), { id: "pace", label: "Pace", x: 16, y: 580, w: 300, h: 44 }, { id: "vig", label: "Vignette", x: 326, y: 580, w: 298, h: 44 },
+  ...GOTO.map(([id, label], k) => ({ id: "go_" + id, label, x: 16 + (k % 3) * 204, y: 660 + (k / 3 | 0) * 54, w: 196, h: 46 }))];
 let HOVER = null;
 function pressBtn(id) { if (id === "next") { if (!GAME.on) startGame(); else nextPlay(); } else if (id === "half") { if (!GAME.on) startGame(); nextHalf(); } else if (id === "pause") { GAME.paused = !GAME.paused; say(GAME.paused ? "Game paused" : "Game resumed"); }
-  else if (id.startsWith("inn")) toInning(+id.slice(3)); else if (id === "pace") { paceKey = paceKey === "real" ? "brisk" : "real"; say(paceKey === "real" ? "Real time: the game's own pace (it took 1:55)" : "Brisk: shorter waits between pitches and batters"); } else if (id === "vig") { comfortVig = !comfortVig; } drawPanel(); }
+  else if (id.startsWith("inn")) toInning(+id.slice(3)); else if (id === "pace") { paceKey = paceKey === "real" ? "brisk" : "real"; say(paceKey === "real" ? "Real time: the game's own pace (it took 1:55)" : "Brisk: shorter waits between pitches and batters"); } else if (id === "vig") { comfortVig = !comfortVig; } else if (id.startsWith("go_")) teleport(id.slice(3)); drawPanel(); }
+// teleporting: a quick fade to black and back, and you keep facing the way you were facing
+const FADE = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 12), new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide, transparent: true, opacity: 0, depthTest: false, depthWrite: false, fog: false })); FADE.renderOrder = 1000; FADE.visible = false; camera.add(FADE); let fadeT = -1, fadeDo = null;
+function teleport(where) { fadeDo = () => { if (ME.seat) { ME.seat.taken = false; ME.seat = null; } if (where !== "street") { enterPark(); if (!ME.ticket) ME.ticket = "grand stand"; ME.inside = true; }
+    const seatNear = (sec, p) => { let best = null, bd = 1e9; for (const s of SEATS) { if (s.taken || s.sec !== sec) continue; const d = s.p.distanceTo(p); if (d < bd) { bd = d; best = s; } } return best; };
+    if (where === "seat") { const s = seatNear("grandstand behind home", P2(-GS - 6, -GS - 6, 3)); if (s) sit(s); } else if (where === "rooters") { const s = seatNear("first-base bleachers", ROOTERS_AT); if (s) sit(s); } else if (where === "bleach3") { const s = seatNear("third-base bleachers", P2(60, -22, 2)); if (s) sit(s); }
+    else { const p = where === "field" ? V3(0.5, 0, 12) : where === "lf" ? dir(-0.55).multiplyScalar(ropeDist(-31) + 1.0) : P2(GATE_U - 12, -45); ME.x = p.x; ME.z = p.z; ME.y = floorAt(p.x, p.z); }
+    say(GOTO.find(g => g[0] === where)[1]); }; fadeT = 0; FADE.visible = true; }
 const gameLine = () => { const S = GAME.st; if (!GAME.on || !S) return preStr(); const h = GAME.phase === "change" ? "Between innings" : GAME.phase === "over" ? "Final" : HALF_NAME(S.half); return `Pittsburg ${S.score.PIT}, Boston ${S.score.BOS} · ${h}${GAME.phase === "over" ? "" : " · " + S.outs + " out"}`; };
 const atBat = () => { const S = GAME.st; if (!GAME.on || !S || GAME.phase === "over" || !GAME.batter) return ""; const r = [1, 2, 3].filter(b => S.bases[b]).map(b => `${S.bases[b]} on ${["", "first", "second", "third"][b]}`); return `At bat: ${GAME.batter.short} · count ${GAME.balls}-${GAME.strikes}${r.length ? " · " + r.join(", ") : ""}`; };
 function drawPanel() { const g = PANEL.c.getContext("2d"); g.clearRect(0, 0, 640, 800); g.fillStyle = "rgba(30,24,16,0.92)"; g.beginPath(); g.roundRect(0, 0, 640, 800, 24); g.fill(); g.fillStyle = "#e8c070"; g.font = "bold 26px Georgia"; g.fillText(gameLine(), 24, 42);
   g.fillStyle = "#c8e0b8"; g.font = "20px Georgia"; g.fillText(atBat(), 24, 72); g.fillStyle = "#f0ece0"; g.font = "21px Georgia"; let y = wrap(g, GAME.last || "", 24, 104, 592, 26) + 6;
   g.fillStyle = "#c8c4b8"; g.font = "18px Georgia"; y = wrap(g, `${cents(ME.money)}${ME.ticket ? " · " + ME.ticket + " ticket" : " · no ticket"}${ME.holding.length ? " · " + ME.holding.join(", ") : ""}${ME.seat ? ` · seated: ${ME.seat.sec}, row ${ME.seat.row + 1}` : ""}`, 24, y + 4, 592, 22);
   if (NEAR) { g.fillStyle = "#9ad88a"; g.font = "bold 19px Georgia"; y = wrap(g, "Trigger / E: " + NEAR.name, 24, y + 2, 592, 24); }
-  if (LOOK) { g.fillStyle = "#e8c070"; g.font = "bold 20px Georgia"; g.fillText(LOOK.name, 24, y + 6); g.fillStyle = "#e0dcd0"; g.font = "17px Georgia"; const words = LOOK.text.split(" "); let line = "", yy = y + 30; for (const w of words) { if (g.measureText(line + w).width > 592) { if (yy > 580) break; g.fillText(line, 24, yy); line = ""; yy += 21; } line += w + " "; } if (yy <= 580) g.fillText(line, 24, yy); }
-  for (const B of BTN) { const on = B.id === "pause" ? GAME.paused : B.id === "pace" ? paceKey === "brisk" : B.id === "vig" ? comfortVig : false; g.fillStyle = HOVER === B.id ? "#8a6a2a" : on ? "#5a4a2a" : "#3a3226"; g.beginPath(); g.roundRect(B.x, B.y, B.w, B.h, 10); g.fill(); g.fillStyle = "#f4ecc8"; g.font = "bold 21px Georgia"; g.textAlign = "center";
+  if (LOOK) { g.fillStyle = "#e8c070"; g.font = "bold 20px Georgia"; g.fillText(LOOK.name, 24, y + 6); g.fillStyle = "#e0dcd0"; g.font = "17px Georgia"; const words = LOOK.text.split(" "); let line = "", yy = y + 30; for (const w of words) { if (g.measureText(line + w).width > 592) { if (yy > 450) break; g.fillText(line, 24, yy); line = ""; yy += 21; } line += w + " "; } if (yy <= 450) g.fillText(line, 24, yy); }
+  g.fillStyle = "#a8a498"; g.font = "bold 16px sans-serif"; g.fillText("GO TO", 18, 650);
+  for (const B of BTN) { const on = B.id === "pause" ? GAME.paused : B.id === "pace" ? paceKey === "brisk" : B.id === "vig" ? comfortVig : false; g.fillStyle = HOVER === B.id ? "#8a6a2a" : on ? "#5a4a2a" : "#3a3226"; g.beginPath(); g.roundRect(B.x, B.y, B.w, B.h, 10); g.fill(); g.fillStyle = "#f4ecc8"; g.font = B.id.startsWith("go_") ? "bold 17px Georgia" : "bold 20px Georgia"; g.textAlign = "center";
     const lab = B.id === "pause" ? (GAME.paused ? "Resume" : "Pause") : B.id === "pace" ? (paceKey === "real" ? "Pace: real time" : "Pace: brisk") : B.id === "vig" ? (comfortVig ? "Vignette: on" : "Vignette: off") : B.id.startsWith("inn") ? B.label : B.label; g.fillText(lab, B.x + B.w / 2, B.y + B.h / 2 + 7); g.textAlign = "left"; }
   g.fillStyle = "#a8a498"; g.font = "15px sans-serif"; g.fillText("Point your right hand here and pull the trigger · innings: jump to the top of that inning", 18, 795); PANEL.t.needsUpdate = true;
   HUD.innerHTML = `<b style="color:#e8c070">${gameLine()}</b><br><span style="color:#c8e0b8">${atBat()}</span><div style="margin:4px 0">${GAME.last || ""}</div>
     <div style="color:#c8c4b8;font-size:12px">${cents(ME.money)}${ME.ticket ? " · " + ME.ticket + " ticket" : " · no ticket yet: the windows are on the street"}${ME.holding.length ? " · holding " + ME.holding.join(", ") : ""}${ME.seat ? ` · seated: ${ME.seat.sec}, row ${ME.seat.row + 1}` : ""}</div>
     ${NEAR ? `<div style="color:#9ad88a;margin-top:4px"><b>E:</b> ${NEAR.name}</div>` : ""}${LOOK ? `<div style="margin-top:6px"><b style="color:#e8c070">${LOOK.name}</b><br>${LOOK.text}</div>` : ""}
-    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">${BTN.map(B => `<button data-b="${B.id}" style="font:12px Georgia;padding:3px 7px;border-radius:5px;border:1px solid #8a7a50;background:#3a3226;color:#f4ecc8;cursor:pointer">${B.id === "pause" ? (GAME.paused ? "Resume" : "Pause") : B.id === "pace" ? (paceKey === "real" ? "Pace: real time" : "Pace: brisk") : B.id === "vig" ? (comfortVig ? "Vignette: on" : "Vignette: off") : B.id.startsWith("inn") ? "Inning " + B.label : B.label}</button>`).join("")}</div>
+    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">${BTN.map(B => `<button data-b="${B.id}" style="font:12px Georgia;padding:3px 7px;border-radius:5px;border:1px solid #8a7a50;background:#3a3226;color:#f4ecc8;cursor:pointer">${B.id === "pause" ? (GAME.paused ? "Resume" : "Pause") : B.id === "pace" ? (paceKey === "real" ? "Pace: real time" : "Pace: brisk") : B.id === "vig" ? (comfortVig ? "Vignette: on" : "Vignette: off") : B.id.startsWith("inn") ? "Inning " + B.label : B.id.startsWith("go_") ? "Go to: " + B.label : B.label}</button>`).join("")}</div>
     ${ME.holding.includes("score card") ? `<div style="margin-top:6px"><img src="${CARD.url}" style="width:100%;border-radius:4px"></div>` : ""}
     <div style="margin-top:6px;color:#a8a498;font-size:12px">W A S D walk · drag to look · E buy / sit / stand · N next play · H next half-inning · 1-9 jump to an inning · space pause · B pace · V vignette · G start the game now</div>
     <div style="margin-top:4px;color:#7a7468;font-size:10px">Play-by-play: the information used here was obtained free of charge from and is copyrighted by Retrosheet (www.retrosheet.org).</div>`;
@@ -711,6 +746,7 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.05), v
   VIG.material.opacity = comfortVig && moving ? lerpN(VIG.material.opacity, run ? 0.7 : 0.45, 0.1) : lerpN(VIG.material.opacity, 0, 0.15); VIG.visible = VIG.material.opacity > 0.01;
   for (const V of VENDORS) { const S = V.S; V.t += V.dir * dt * 0.6 / S.L; if (V.t > 0.95 || V.t < 0.05) V.dir *= -1; const p = S.o.clone().addScaledVector(S.A, V.t * S.L).addScaledVector(S.out, (V.row + 0.15) * S.rowD); V.P.G.position.set(p.x, (V.row + 1) * S.rowH, p.z); V.P.G.rotation.y = Math.atan2(-S.A.x * V.dir, -S.A.z * V.dir); }
   if (window.FLAG) { const pa = FLAG.geometry.attributes.position, tt = performance.now() / 1000; for (let i = 0; i < pa.count; i++) { const x = pa.getX(i) + 1.7; pa.setZ(i, Math.sin(x * 2.2 - tt * 4) * 0.12 * x / 3.4); } pa.needsUpdate = true; }
+  if (fadeT >= 0) { fadeT += dt; const u = fadeT / 0.25; FADE.material.opacity = u < 1 ? u : Math.max(0, 2 - u); if (u >= 1 && fadeDo) { const f = fadeDo; fadeDo = null; f(); } if (u >= 2) { fadeT = -1; FADE.visible = false; } }
   if (preT > 0) { preT -= dt; if (preT <= 0) { say("\"Play ball!\" Umpire Connolly calls it, and Cy Young steps onto the pitcher's slab.", 6); startGame(); } }
   updateGame(dt); updatePointer();
   frame++; if (frame === 2) DIAG.stage(vr ? "running in VR" : "running"); if (frame === 600) DIAG.stable(); let redraw = false; if (frame % 5 === 0) { redraw = updateLook(); findNear(); } panelT -= dt; if (panelT <= 0 || redraw) { panelT = 1; drawPanel(); }
