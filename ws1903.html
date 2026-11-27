@@ -53080,7 +53080,7 @@ const THREE = {ACESFilmicToneMapping, AddEquation, AddOperation, AdditiveAnimati
 const IS_HEADSET = /OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent);
 // ---------- a black box: how far the last visit got, and any error, kept in local storage. If the last visit never got going, this one
 // starts at a lighter quality level (2 full, 1 light, 0 minimal); ?q=0, 1 or 2 in the address sets it by hand. ----------
-const DIAG = (() => { const K = "ws1903diag"; let prev = null; try { prev = JSON.parse(localStorage.getItem(K) || "null"); } catch (e) {} const qp = new URLSearchParams(location.search).get("q");
+const DIAG = (() => { const K = "ws1903diag2"; let prev = null; try { prev = JSON.parse(localStorage.getItem(K) || "null"); } catch (e) {} const qp = new URLSearchParams(location.search).get("q");
   const q = qp !== null ? clampQ(+qp) : prev ? (prev.stable ? prev.q : clampQ(prev.q - 1)) : (IS_HEADSET ? 1 : 2), cur = { q, stage: "loading", stable: false, err: "", when: Date.now() };
   const save = () => { try { localStorage.setItem(K, JSON.stringify(cur)); } catch (e) {} }; save();
   addEventListener("error", e => { cur.err = String(e.message || e.error || "error").slice(0, 160) + (e.lineno ? " (line " + e.lineno + ")" : ""); save(); }); addEventListener("unhandledrejection", e => { cur.err = String(e.reason || "promise").slice(0, 160); save(); });
@@ -53437,7 +53437,7 @@ const clock = new THREE.Clock(), _fq = new THREE.Quaternion(); let frame = 0, pa
 renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.05), vr = renderer.xr.isPresenting; let mx = 0, my = 0, run = false, act = false;
   if (vr) { const s = renderer.xr.getSession(); for (const src of s ? s.inputSources : []) { const gp = src.gamepad; if (!gp) continue; const a = gp.axes, ax = a.length >= 4 ? 2 : 0;
       if (src.handedness === "left") { mx = Math.abs(a[ax]) > 0.15 ? a[ax] : 0; my = Math.abs(a[ax + 1]) > 0.15 ? a[ax + 1] : 0; run = !!gp.buttons[0]?.pressed; const bY = gp.buttons[5]?.pressed; if (bY && !prevB.y) comfortVig = !comfortVig; prevB.y = bY; }
-      else { const tx = a[ax] || 0; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.signMesh(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const tr = gp.buttons[0]?.pressed; if (tr && !prevB.t) act = true; prevB.t = tr; } } }
+      else { const tx = a[ax] || 0; if (Math.abs(tx) > 0.7 && !prevB.turn) { vrYaw -= Math.sign(tx) * Math.PI / 6; prevB.turn = true; } else if (Math.abs(tx) < 0.3) prevB.turn = false; const tr = gp.buttons[0]?.pressed; if (tr && !prevB.t) act = true; prevB.t = tr; } } }
   else { if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyD) mx += 1; if (keys.KeyA) mx -= 1; run = keys.ShiftLeft || keys.ShiftRight; if (keys.ArrowLeft) yaw += dt * 1.5; if (keys.ArrowRight) yaw -= dt * 1.5; }
   if (!started) { renderer.render(scene, camera); return; } if (act && NEAR) NEAR.act();
   camera.getWorldQuaternion(_fq); const moving = !!(mx || my);
