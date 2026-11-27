@@ -53078,8 +53078,19 @@ const THREE = {ACESFilmicToneMapping, AddEquation, AddOperation, AdditiveAnimati
 // outfield behind ropes (a ball hit into them was a ground-rule triple). Every play of the game comes from the official record (Retrosheet).
 // Built into ws1903.html by build.py.
 const IS_HEADSET = /OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent);
+// ---------- a black box: how far the last visit got, and any error, kept in local storage. If the last visit never got going, this one
+// starts at a lighter quality level (2 full, 1 light, 0 minimal); ?q=0, 1 or 2 in the address sets it by hand. ----------
+const DIAG = (() => { const K = "ws1903diag"; let prev = null; try { prev = JSON.parse(localStorage.getItem(K) || "null"); } catch (e) {} const qp = new URLSearchParams(location.search).get("q");
+  const q = qp !== null ? clampQ(+qp) : prev ? (prev.stable ? prev.q : clampQ(prev.q - 1)) : (IS_HEADSET ? 1 : 2), cur = { q, stage: "loading", stable: false, err: "", when: Date.now() };
+  const save = () => { try { localStorage.setItem(K, JSON.stringify(cur)); } catch (e) {} }; save();
+  addEventListener("error", e => { cur.err = String(e.message || e.error || "error").slice(0, 160) + (e.lineno ? " (line " + e.lineno + ")" : ""); save(); }); addEventListener("unhandledrejection", e => { cur.err = String(e.reason || "promise").slice(0, 160); save(); });
+  addEventListener("DOMContentLoaded", () => { const card = document.querySelector("#intro .card"); if (!card) return; const p = document.createElement("p"); p.className = "dim"; p.style.fontSize = "13px";
+    p.textContent = prev && !prev.stable ? `Last time it stopped while ${prev.stage}${prev.err ? " (error: " + prev.err + ")" : ""}, at quality ${prev.q}. Trying quality ${q} now (2 full, 1 light, 0 minimal).` : `Quality ${q} (2 full, 1 light, 0 minimal; add ?q=0 to the address for the lightest).`; card.appendChild(p); });
+  return { q, prev, stage: s => { cur.stage = s; save(); }, stable: () => { if (!cur.stable) { cur.stable = true; save(); } } }; })();
+function clampQ(v) { return Math.max(0, Math.min(2, v | 0)); }
+const QL = DIAG.q;
 const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, IS_HEADSET ? 1 : 2)); renderer.setSize(innerWidth, innerHeight);
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1; renderer.xr.enabled = true; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; document.body.appendChild(renderer.domElement);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1; renderer.xr.enabled = true; renderer.xr.setFramebufferScaleFactor(QL === 0 ? 0.75 : 1); renderer.shadowMap.enabled = QL >= 2; renderer.shadowMap.type = THREE.PCFSoftShadowMap; document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 4000), rig = new THREE.Group(); rig.add(camera); scene.add(rig); camera.position.set(0, 1.6, 0);
 addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z), clampN = THREE.MathUtils.clamp, lerpN = THREE.MathUtils.lerp, UP = V3(0, 1, 0), FT = 0.3048;
@@ -53101,6 +53112,7 @@ const fenceDist = deg => { for (let i = 0; i < FENCE.length - 1; i++) if (deg <=
 const ROPE = [[-45, 290], [-22.5, 330], [0, 420], [22.5, 320], [45, 265]];
 const ropeDist = deg => { for (let i = 0; i < ROPE.length - 1; i++) if (deg <= ROPE[i + 1][0]) { const t = (deg - ROPE[i][0]) / (ROPE[i + 1][0] - ROPE[i][0]); return lerpN(ROPE[i][1], ROPE[i + 1][1], t) * FT; } return ROPE[4][1] * FT; };
 
+DIAG.stage("building the field");
 // ---------- the lot, in a frame along the foul lines: u runs out the third-base line (north-west), w out the first-base line (north-east) ----------
 const UA = dir(-D45), WA = dir(D45), P2 = (u, w, y = 0) => V3(u * UA.x + w * WA.x, y, u * UA.z + w * WA.z), toUW = (x, z) => [x * UA.x + z * UA.z, x * WA.x + z * WA.z];
 const ROT_U = Math.atan2(-UA.x, -UA.z), ROT_W = Math.atan2(-WA.x, -WA.z);
@@ -53110,7 +53122,7 @@ const ROGERS = [-50, -38], RAIL = [-80, -42], HUNT = [128, 146], LOT = { u0: -40
 const SKYC = 0xb8cce0; scene.background = new THREE.Color(SKYC); scene.fog = new THREE.Fog(SKYC, 250, 1400);
 const hemi = new THREE.HemisphereLight(0xdde6f0, 0x6a5e48, 1.0); scene.add(hemi);
 // October 1, about 3:30 in the afternoon in Boston: the sun in the south-west, about 30° up, behind the third-base stands
-const sun = new THREE.DirectionalLight(0xfff0dc, 2.6); sun.position.set(-140, 120, 150); sun.castShadow = true; sun.shadow.mapSize.set(IS_HEADSET ? 2048 : 4096, IS_HEADSET ? 2048 : 4096);
+const sun = new THREE.DirectionalLight(0xfff0dc, 2.6); sun.position.set(-140, 120, 150); sun.castShadow = QL >= 2; sun.shadow.mapSize.set(IS_HEADSET ? 2048 : 4096, IS_HEADSET ? 2048 : 4096);
 Object.assign(sun.shadow.camera, { left: -130, right: 130, top: 130, bottom: -130, near: 10, far: 500 }); sun.shadow.bias = -0.0004; sun.target.position.set(0, 0, -60); scene.add(sun, sun.target);
 
 // ---------- textures ----------
@@ -53161,6 +53173,7 @@ function boardWall(a, b, h = FENCE_H, gapAt = null) { const L = a.distanceTo(b);
   const sb = new THREE.Mesh(new THREE.PlaneGeometry(12, 3), new THREE.MeshStandardMaterial({ map: SCORE.t, roughness: 0.9 })); sb.position.set(sbP.x, FENCE_H + 2, sbP.z); sb.lookAt(0, FENCE_H + 2, 0); scene.add(sb); box(12.4, 3.4, 0.2, MAT.wood, sbP.x, FENCE_H + 2, sbP.z, sb.rotation.y).position.addScaledVector(V3(sbP.x, 0, sbP.z).normalize(), 0.12);
   for (const s of [-5, 5]) { const p = sbP.clone().add(V3(-sbP.z, 0, sbP.x).normalize().multiplyScalar(s)); box(0.25, FENCE_H + 3.5, 0.25, MAT.wood, p.x, (FENCE_H + 3.5) / 2, p.z); } }
 
+DIAG.stage("building the stands");
 // ---------- the grandstand (covered, behind home) and the open bleachers down both lines ----------
 // Each section is a run of stepped rows; the grandstand wings and the corner behind home overlap at the joins.
 const SECTIONS = [], SEATS = [], T225 = Math.tan(Math.PI / 8);
@@ -53197,6 +53210,7 @@ for (const [k, p] of Object.entries(BENCH)) { const ry = k === "BOS" ? ROT_U + M
 function floorAt(x, z) { const p = V3(x, 0, z); for (const S of SECTIONS) { const d = p.clone().sub(S.o), v = d.dot(S.out), t = d.dot(S.A); if (v < 0 || v > S.rows * S.rowD) continue; const k = Math.floor(v / S.rowD), e0 = S.extA ? k * S.rowD * T225 + 0.3 : 0, e1 = S.extB ? k * S.rowD * T225 + 0.3 : 0; if (t < -e0 || t > S.L + e1) continue; return (k + 1) * S.rowH; }
   const dm = Math.hypot(x - PM.x, z - PM.z); return dm < 2.9 ? 0.3 * clampN((2.9 - dm) / 1.3, 0, 1) : 0; }
 
+DIAG.stage("seating the crowd");
 // ---------- the crowd: 16,242 paid. About 7,000 seated, the rest standing in the outfield behind the ropes, on the left-field bank and on the fence ----------
 // Men in dark suits and derbies or flat caps, a few straw boaters left over from summer, a few women in broad hats; the Royal Rooters, Boston's
 // loudest fans, in the bleachers behind first base.
@@ -53216,14 +53230,14 @@ const CROWD = { list: [] }; let ROOTERS_AT = null;
 { const coat = [0x22242a, 0x2a2a2e, 0x1e2230, 0x34302a, 0x3a3630, 0x2c2a26, 0x4a4436, 0x1a1a1c, 0x3e3a3a, 0x5a5448], hatCol = { derby: [0x1a1a1a, 0x2a2420, 0x3a2e24], cap: [0x3a3a3a, 0x4a4438, 0x2a2a30, 0x5a5040], boater: [0xe0d4a8], lady: [0x3a2a3a, 0x2a2a3a, 0x5a3a30, 0x7a6a5a] };
   const people = []; const hatOf = r => r < 0.6 ? "derby" : r < 0.88 ? "cap" : r < 0.94 ? "boater" : "lady";
   // seated: most seats filled, every one in the Royal Rooters' block, a few left empty (you can take one)
-  for (const s of SEATS) { const rooter = s.sec === "first-base bleachers" && s.row < 9 && s.p.distanceTo(P2(-17, 70)) < 16; if (!rooter && R() < (IS_HEADSET ? 0.2 : 0.08)) continue; s.taken = true; people.push({ p: s.p.clone(), face: s.face, seated: true, hat: rooter ? "derby" : hatOf(R()), rooter }); }
+  for (const s of SEATS) { const rooter = s.sec === "first-base bleachers" && s.row < 9 && s.p.distanceTo(P2(-17, 70)) < 16; if (!rooter && R() < [0.7, 0.4, IS_HEADSET ? 0.2 : 0.08][QL]) continue; s.taken = true; people.push({ p: s.p.clone(), face: s.face, seated: true, hat: rooter ? "derby" : hatOf(R()), rooter }); }
   ROOTERS_AT = P2(-24, 64, 4);
   // standing: behind the ropes in the outfield, thicker toward the fence
-  let n = 0; while (n < (IS_HEADSET ? 3000 : 6200)) { const d = (R() - 0.5) * 88, rd = ropeDist(d) + 1.2, fd = fenceDist(d) - 0.8; if (fd <= rd) continue; const dist = lerpN(rd, fd, Math.sqrt(R())), p = dir(d * Math.PI / 180).multiplyScalar(dist); people.push({ p: p.setY(0), face: Math.atan2(p.x, p.z) + (R() - 0.5) * 0.6, seated: false, hat: hatOf(R()) }); n++; }
+  let n = 0; while (n < [800, 2000, IS_HEADSET ? 3000 : 6200][QL]) { const d = (R() - 0.5) * 88, rd = ropeDist(d) + 1.2, fd = fenceDist(d) - 0.8; if (fd <= rd) continue; const dist = lerpN(rd, fd, Math.sqrt(R())), p = dir(d * Math.PI / 180).multiplyScalar(dist); people.push({ p: p.setY(0), face: Math.atan2(p.x, p.z) + (R() - 0.5) * 0.6, seated: false, hat: hatOf(R()) }); n++; }
   // and along the top of the left-field fence
   for (let d = -45; d < -12; d += 0.35) { if (R() < 0.35) continue; const p = dir(d * Math.PI / 180).multiplyScalar(fenceDist(d) + 0.1); people.push({ p: p.setY(FENCE_H - 0.42), face: Math.atan2(p.x, p.z), seated: true, hat: hatOf(R()), fence: true }); }
   // along the street outside, people still waiting to get in
-  for (let i = 0; i < 160; i++) { const p = P2(GATE_U - 25 + R() * 50, -40.5 - R() * 3); people.push({ p: p.setY(0), face: Math.atan2(WA.x, WA.z) + (R() - 0.5) * 2, seated: false, hat: hatOf(R()), outside: true }); }
+  for (let i = 0; i < 60; i++) { const p = P2(GATE_U - 6 - i * 0.75 + R() * 0.3, -40.6 - R() * 0.5); people.push({ p: p.setY(0), face: Math.atan2(WA.x, WA.z) + (R() - 0.5) * 2, seated: false, hat: hatOf(R()), outside: true }); }
   const flatP = people.filter(P => (!P.seated || P.fence) && !P.outside), solid = people.filter(P => (P.seated && !P.fence) || P.outside); people.length = 0; people.push(...solid);
   const cut = []; for (let v = 0; v < CUTOUT.NV; v++) { const g = new THREE.PlaneGeometry(0.62, 1.8).translate(0, 0.9, 0), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, (uv.getX(i) + v) / CUTOUT.NV); const im = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ map: CUTOUT.t, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9 }), flatP.length); im.count = 0; cut.push(im); }
   { const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(); for (const P of flatP) { const im = cut[R() * CUTOUT.NV | 0], sc = 0.9 + R() * 0.18, y = P.fence ? P.p.y - 0.55 : P.p.y; q.setFromAxisAngle(UP, Math.atan2(P.p.x, P.p.z) + (R() - 0.5) * 0.3); m4.compose(V3(P.p.x, y, P.p.z), q, V3(sc, sc, sc)); im.setMatrixAt(im.count, m4); im.setColorAt(im.count, c.setScalar(0.75 + R() * 0.3)); im.count++; CROWD.list.push(P); }
@@ -53238,6 +53252,7 @@ const CROWD = { list: [] }; let ROOTERS_AT = null;
 // the ropes, on low stakes, that held the standing crowd back
 { let prev = null; for (let d = -45; d <= 45; d += 3) { const p = dir(d * Math.PI / 180).multiplyScalar(ropeDist(d)); box(0.06, 1.0, 0.06, MAT.wood, p.x, 0.5, p.z); if (prev) { const a = prev.clone().setY(0.92), b = p.clone().setY(0.92), cv = new THREE.QuadraticBezierCurve3(a, a.clone().lerp(b, 0.5).add(V3(0, -0.12, 0)), b); scene.add(new THREE.Mesh(new THREE.TubeGeometry(cv, 6, 0.012, 4), MAT.rope)); } prev = p; } }
 
+DIAG.stage("dressing the players");
 // ---------- the players and umpires ----------
 // Boston at home in white, "BOSTON" arched in blue across the chest, red stockings; Pittsburgh in road grey with blue trim and blue stockings.
 // Gloves were small then, the catcher's mitt a round pillow; catchers wore a wire mask and a chest protector; the umpires wore dark blue suits.
@@ -53282,6 +53297,7 @@ const PEOPLE = {};
     else { const b = BENCH.PIT, off = WA.clone().multiplyScalar(-3.5 + i * 0.85); P.G.position.copy(b).add(off).add(UA.clone().multiplyScalar(-0.1)); P.G.rotation.y = ROT_U; setPose(P, "sit"); } });
   for (const [name, pos] of [["Tommy Connolly", "UMP_HP"], ["Hank O'Day", "UMP_B"]]) { const P = makePerson("UMP", name, pos); PEOPLE[name] = P; if (pos === "UMP_HP") { P.G.position.set(0.3, 0, 1.8); P.G.rotation.y = 0; setPose(P, "ready"); } else { const p = B1.clone().add(V3(3, 0, 3)); P.G.position.copy(p); P.G.rotation.y = Math.atan2(p.x, p.z); setPose(P, "ready"); } } }
 
+DIAG.stage("building the streets");
 // ---------- the neighbourhood: Rogers Street with its brick row houses, Huntington Avenue and its trolley line beyond left field, the huge
 // Boston Storage Warehouse, the railroad yards behind first base, and across the tracks the South End Grounds, home of the National League club ----------
 const BMAT = new Map(), WIN = { row: windowsT(6, 4), tall: windowsT(10, 8), low: windowsT(8, 2) };
@@ -53316,11 +53332,11 @@ const FACE_STREET = Math.atan2(WA.x, WA.z), FACE_IN = FACE_STREET + Math.PI;
 const BOOTH = P2(GATE_U - 7, -39.6), STAND = P2(GATE_U + 3.6, -30), GATEP = P2(GATE_U, -38);
 { box(4.2, 2.8, 1.6, MAT.paint, BOOTH.x, 1.4, BOOTH.z, ROT_U); box(4.6, 0.15, 2.0, MAT.roof, BOOTH.x, 2.9, BOOTH.z, ROT_U);
   for (const s of [-1, 1]) { const p = BOOTH.clone().addScaledVector(UA, s * 1.0).addScaledVector(WA, -0.82); box(0.7, 0.5, 0.02, M(0x1a1a1a), p.x, 1.45, p.z, ROT_U); }
-  signMesh([["WORLD'S CHAMPIONSHIP SERIES", 30], ["GRAND STAND  $1.00", 44], ["BLEACHERS & STANDING  50¢", 36]], 3.6, 1.0, BOOTH.clone().addScaledVector(WA, -0.83), ROT_U + Math.PI, 2.35);
-  signMesh([["BOSTON AMERICANS", 40], ["vs. PITTSBURG", 40]], 3.2, 0.9, GATEP.clone().addScaledVector(WA, -0.1), ROT_U + Math.PI, FENCE_H - 0.7);
+  signMesh([["WORLD'S CHAMPIONSHIP SERIES", 30], ["GRAND STAND  $1.00", 44], ["BLEACHERS & STANDING  50¢", 36]], 3.6, 1.0, BOOTH.clone().addScaledVector(WA, -0.83), ROT_W, 2.35);
+  signMesh([["BOSTON AMERICANS", 40], ["vs. PITTSBURG", 40]], 3.2, 0.9, GATEP.clone().addScaledVector(WA, -0.1), ROT_W, FENCE_H - 0.7);
   box(0.4, FENCE_H, 0.4, MAT.paint, ...[GATEP.clone().addScaledVector(UA, -3)].map(q => [q.x, FENCE_H / 2, q.z]).flat()); box(0.4, FENCE_H, 0.4, MAT.paint, ...[GATEP.clone().addScaledVector(UA, 3)].map(q => [q.x, FENCE_H / 2, q.z]).flat());
   box(0.6, 1.0, 3.6, MAT.wood, STAND.x, 0.5, STAND.z, ROT_U); box(1.6, 0.1, 4.2, MAT.roof, STAND.x, 2.6, STAND.z, ROT_U);
-  signMesh([["REFRESHMENTS", 40], ["Score Cards 5¢   Peanuts 5¢", 32], ["Lemonade 5¢   Cigars 5¢", 32]], 2.6, 1.0, STAND.clone().addScaledVector(UA, 0.4), ROT_U - Math.PI / 2, 2.0); }
+  signMesh([["REFRESHMENTS", 40], ["Score Cards 5¢   Peanuts 5¢", 32], ["Lemonade 5¢   Cigars 5¢", 32]], 2.6, 1.0, STAND.clone().addScaledVector(UA, -0.4), ROT_U, 2.0); }
 const STAFF = []; { const mk = (p, ry, coat = 0x2a2a2a, white = false) => { const P = makePerson("UMP", "", "staff"); P.G.position.copy(p); P.G.rotation.y = ry; setPose(P, "stand"); if (white) P.torso.children[0].material = Array(6).fill(M(0xf0eee6)); STAFF.push(P); return P; };
   mk(BOOTH.clone().addScaledVector(WA, 0.2), FACE_STREET + Math.PI); mk(GATEP.clone().addScaledVector(WA, 1.2).addScaledVector(UA, 1.4), FACE_IN + Math.PI); mk(STAND.clone().addScaledVector(UA, 0.9), ROT_U + Math.PI / 2, 0, true); }
 // vendors walking the aisles in white jackets
@@ -53402,10 +53418,11 @@ let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag
 addEventListener("pointermove", e => { if (!drag) return; yaw -= (e.clientX - drag.x) * 0.004; pitch = clampN(pitch - (e.clientY - drag.y) * 0.004, -1.4, 1.4); drag.x = e.clientX; drag.y = e.clientY; }); addEventListener("pointerup", () => drag = null);
 const HANDS = [0, 1].map(i => { const grip = renderer.xr.getControllerGrip(i); rig.add(grip); const hand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.11), SKIN); grip.add(hand); const H = { grip, src: null };
   grip.addEventListener("connected", e => { H.src = e.data; if (e.data.handedness === "left") { PANEL.me.position.set(0, 0.05, 0.12); PANEL.me.rotation.set(-Math.PI / 2 + 0.8, 0, 0); grip.add(PANEL.me); } else { CARD.m.position.set(0, 0.02, -0.1); CARD.m.rotation.set(-1.0, 0, 0); grip.add(CARD.m); BAG.position.set(0.05, 0, -0.05); grip.add(BAG); } }); return H; });
-function begin() { if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); const s = P2(GATE_U - 16, -44.5); ME.x = s.x; ME.z = s.z; yaw = vrYaw = ROT_U + 0.25; HUD.style.display = renderer.xr.isPresenting ? "none" : "block"; drawPanel(); say("Rogers Street, Boston, a little before game time. The ticket windows are just ahead.", 6); }
+function begin() { if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); const s = P2(GATE_U - 14, -46); ME.x = s.x; ME.z = s.z; yaw = vrYaw = ROT_U + 0.25; HUD.style.display = renderer.xr.isPresenting ? "none" : "block"; drawPanel(); say("Rogers Street, Boston, a little before game time. The ticket windows are just ahead.", 6); }
 document.getElementById("intro")?.addEventListener("click", begin);
-const VRB = document.getElementById("vr"); if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); await renderer.xr.setSession(s); begin(); HUD.style.display = "none"; }; });
+const VRB = document.getElementById("vr"); if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); DIAG.stage("entering VR"); await renderer.xr.setSession(s); frame = 0; begin(); HUD.style.display = "none"; }; });
 
+DIAG.stage("merging the scenery");
 // ---------- drawing it cheaply: everything that never moves is merged into one mesh per material ----------
 { const groups = new Map(), keep = new Set([window.FLAG]); for (const o of [...scene.children]) { if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || keep.has(o)) continue; if (!groups.has(o.material)) groups.set(o.material, []); groups.get(o.material).push(o); }
   scene.updateMatrixWorld(true);
@@ -53413,6 +53430,7 @@ const VRB = document.getElementById("vr"); if (navigator.xr) navigator.xr.isSess
     for (const o of list) { const g = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()).applyMatrix4(o.matrixWorld); if (!g.attributes.normal) g.computeVertexNormals(); pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); if (g.attributes.uv) uv.push(...g.attributes.uv.array); else for (let i = 0; i < g.attributes.position.count; i++) uv.push(0, 0); shadow = shadow || o.castShadow; scene.remove(o); o.geometry.dispose(); g.dispose(); }
     const mg = new THREE.BufferGeometry(); mg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); mg.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); mg.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); const mm = new THREE.Mesh(mg, mat); mm.castShadow = shadow; mm.receiveShadow = true; scene.add(mm); } }
 
+DIAG.stage("drawing the first frame");
 // ---------- the loop ----------
 const clock = new THREE.Clock(), _fq = new THREE.Quaternion(); let frame = 0, panelT = 0;
 renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.05), vr = renderer.xr.isPresenting; let mx = 0, my = 0, run = false, act = false;
@@ -53429,7 +53447,7 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.05), v
   for (const V of VENDORS) { const S = V.S; V.t += V.dir * dt * 0.6 / S.L; if (V.t > 0.95 || V.t < 0.05) V.dir *= -1; const p = S.o.clone().addScaledVector(S.A, V.t * S.L).addScaledVector(S.out, (V.row + 0.15) * S.rowD); V.P.G.position.set(p.x, (V.row + 1) * S.rowH, p.z); V.P.G.rotation.y = Math.atan2(-S.A.x * V.dir, -S.A.z * V.dir); }
   if (window.FLAG) { const pa = FLAG.geometry.attributes.position, tt = performance.now() / 1000; for (let i = 0; i < pa.count; i++) { const x = pa.getX(i) + 1.7; pa.setZ(i, Math.sin(x * 2.2 - tt * 4) * 0.12 * x / 3.4); } pa.needsUpdate = true; }
   if (preT > 0) { preT -= dt; if (preT <= 0) say("\"Play ball!\" Umpire Connolly calls it, and Cy Young steps onto the pitcher's slab.", 6); }
-  frame++; let redraw = false; if (frame % 5 === 0) { redraw = updateLook(); findNear(); } panelT -= dt; if (panelT <= 0 || redraw) { panelT = 1; drawPanel(); }
+  frame++; if (frame === 2) DIAG.stage(vr ? "running in VR" : "running"); if (frame === 600) DIAG.stable(); let redraw = false; if (frame % 5 === 0) { redraw = updateLook(); findNear(); } panelT -= dt; if (panelT <= 0 || redraw) { panelT = 1; drawPanel(); }
   msgT -= dt; if (msgT <= 0) MSG.style.display = "none"; renderer.render(scene, camera); });
 
 </script></body></html>
