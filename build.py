@@ -975,3 +975,21 @@ WS = WS[:i0] + """<div id="intro"><div class="card">
 """ + WS[i1:]
 (HERE / "ws1903.html").write_text(WS.replace("__THREE__", three).replace("__SCENE__", (HERE / "ws1903.js").read_text(encoding="utf-8")), encoding="utf-8")
 print("  wrote ws1903.html")
+
+# A hole through the floor, in mixed reality: the rock under Glen Carbon, Illinois
+HL = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>A hole through the floor: the rock under Glen Carbon</title>").replace("background:#c8d4d8", "background:#1a1c1e")
+i0, i1 = HL.index('<div id="intro">'), HL.index('<button id="vr">')
+HL = HL[:i0] + """<div id="intro"><div class="card">
+  <h1>A hole through the floor</h1>
+  <p>A round hole 5 ft across opens in your floor. A ladder goes down through a basement and on down a shaft lit by lamps every 10 ft,
+  through the real layers of rock under Glen Carbon, Illinois: ice-age loess and till, the shales, limestones and coals of the Pennsylvanian
+  (Glen Carbon's mines worked the Herrin Coal, about 150 ft down), the Mississippian limestones full of crinoids, and on down past the
+  Devonian, Silurian, Ordovician and Cambrian to granite 4,400 ft below. Each layer is at its real depth, with the fossils found in it set in the wall.</p>
+  <p>On a Quest, <b>Enter mixed reality</b> puts the hole in your own floor: your room stays around it, and the ladder goes down through the opening.
+  Right stick up and down climbs; the left trigger goes five times faster; the menu and the layer you are in are on your left wrist.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk, drag to look, <kbd>R</kbd> climb up, <kbd>F</kbd> climb down, <kbd>[</kbd> <kbd>]</kbd> layer by layer, <kbd>V</kbd> comfort vignette.</p>
+  <p class="dim">Layers to 770 ft: Illinois State Geological Survey, Bethalto Quadrangle. Deeper layers: regional Illinois Basin column, approximate. The basement is made up. Click to begin.</p>
+</div></div>
+""" + HL[i1:]
+(HERE / "hole.html").write_text(HL.replace("__THREE__", three).replace("__SCENE__", (HERE / "hole.js").read_text(encoding="utf-8")), encoding="utf-8")
+print("  wrote hole.html")
