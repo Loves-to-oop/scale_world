@@ -985,7 +985,7 @@ HL = HL[:i0] + """<div id="intro"><div class="card">
   through the real layers of rock under Glen Carbon, Illinois: ice-age loess and till, the shales, limestones and coals of the Pennsylvanian
   (Glen Carbon's mines worked the Herrin Coal, about 150 ft down), the Mississippian limestones full of crinoids, and on down past the
   Devonian, Silurian, Ordovician and Cambrian to granite 4,400 ft below. Each layer is at its real depth, with the fossils found in it set in the wall.</p>
-  <p>On a Quest there are two buttons. <b>Enter VR</b> puts you in the living room, and it rises above you as you ride down. <b>Enter mixed reality</b> puts the hole in your own floor: your room stays around it, and the lift goes down through the opening.
+  <p>On a Quest there are two buttons. <b>Enter VR</b> puts you in the living room, and it rises above you as you ride down. <b>Enter mixed reality</b> stands a round booth over a hole in your own floor: step in onto the lift, press DOWN, and the door slides shut behind you before you go down, so your room is hidden and the booth rises away above you.
   Step onto the lift, point at its yellow control box and pull the trigger on UP, STOP or DOWN (or hold the right stick); the menu and the layer you are in are on your left wrist.</p>
   <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk, drag to look, <kbd>R</kbd> lift up, <kbd>F</kbd> lift down, <kbd>space</kbd> stop, <kbd>[</kbd> <kbd>]</kbd> layer by layer, <kbd>V</kbd> comfort vignette.</p>
   <p class="dim">Layers to 770 ft: Illinois State Geological Survey, Bethalto Quadrangle. Deeper layers: regional Illinois Basin column, approximate. The basement is made up. Click to begin.</p>

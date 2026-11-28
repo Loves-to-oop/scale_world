@@ -59,7 +59,7 @@ STRATA.forEach(([name, top, bot, age, rock, kind, col], i) => { const t0 = Math.
 // ---------- the lift: a round steel platform with a railing, climbing two toothed guide rails on the shaft wall like a construction hoist ----------
 // At the top it sits flush with your floor. A yellow control box on the railing has up, stop and down buttons; it starts and stops gently.
 const LAD_BOT = yOfFt(BOTTOM_FT), PLAT = { y: 0, v: 0, dir: 0 }, GAP_A = 2.265, GAP_H = 0.5, LIFTMATS = [];
-function liftMat(mat) { mat.stencilWrite = true; mat.stencilRef = 1; mat.stencilFunc = THREE.AlwaysStencilFunc; mat.stencilFail = mat.stencilZFail = mat.stencilZPass = THREE.KeepStencilOp; LIFTMATS.push(mat); return mat; }
+function liftMat(mat) { LIFTMATS.push(mat); return mat; }
 const angDiff = (a, b) => Math.abs(((a - b + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
 { const rack = texOf((g, w, h) => { g.fillStyle = "#7a7c78"; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 16) { g.fillStyle = "#a8aaa6"; g.fillRect(0, y, w, 8); g.fillStyle = "#4a4c48"; g.fillRect(0, y + 8, w, 2); } }, 32, 64);
   const H = -LAD_BOT, rk = rack.clone(); rk.needsUpdate = true; rk.repeat.set(1, H / 0.05);
