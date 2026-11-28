@@ -32,12 +32,36 @@ const box = (w, h, d, mat, x, y, z, ry = 0, P = scene) => { const m = new THREE.
 const dir = a => V3(Math.sin(a), 0, -Math.cos(a)), D45 = Math.PI / 4;
 const BASE = 90 * FT, MOUND = 60.5 * FT;
 const B1 = dir(D45).multiplyScalar(BASE), B3 = dir(-D45).multiplyScalar(BASE), B2 = V3(0, 0, -BASE * Math.SQRT2), PM = V3(0, 0, -MOUND);
-// the fence, in feet from home: 350 down the left-field line, 440 in left-centre, 530 to centre, 320 down the right-field line
-const FENCE = [[-45, 350], [-22.5, 440], [0, 530], [22.5, 420], [45, 320]];
-const fenceDist = deg => { for (let i = 0; i < FENCE.length - 1; i++) if (deg <= FENCE[i + 1][0]) { const t = (deg - FENCE[i][0]) / (FENCE[i + 1][0] - FENCE[i][0]); return lerpN(FENCE[i][1], FENCE[i + 1][1], t) * FT; } return FENCE[4][1] * FT; };
+// the fence: how far it is from home plate in any direction (set from the 1902 atlas's lot lines, below)
+let fenceDist = deg => 100;
 // the ropes that held the overflow crowd back (reconstructed: the crowd was deepest where the fence was farthest)
 const ROPE = [[-45, 290], [-22.5, 330], [0, 420], [22.5, 320], [45, 265]];
-const ropeDist = deg => { for (let i = 0; i < ROPE.length - 1; i++) if (deg <= ROPE[i + 1][0]) { const t = (deg - ROPE[i][0]) / (ROPE[i + 1][0] - ROPE[i][0]); return lerpN(ROPE[i][1], ROPE[i + 1][1], t) * FT; } return ROPE[4][1] * FT; };
+const ropeDist0 = deg => { for (let i = 0; i < ROPE.length - 1; i++) if (deg <= ROPE[i + 1][0]) { const t = (deg - ROPE[i][0]) / (ROPE[i + 1][0] - ROPE[i][0]); return lerpN(ROPE[i][1], ROPE[i + 1][1], t) * FT; } return ROPE[4][1] * FT; };
+
+const ropeDist = deg => Math.min(ropeDist0(deg), fenceDist(deg) - 4);
+
+// ---------- the 1902 Bromley atlas of Boston, plate 31 (80 ft to the inch), as the ground plan of everything ----------
+// The ballpark, its lot, the streets and every building near it are traced from the atlas (Boston Public Library, Leventhal Map Center).
+// Home plate is placed where the map's horseshoe grandstand puts it; then the lot gives the park's recorded dimensions: 350 ft to the
+// Huntington Avenue fence in left, 529 ft to the far corner in centre, 281 ft to the New Gravelly Point Road fence in right, a 59 ft backstop.
+// "crop" coordinates are pixels of a 1600-px-wide detail of the plate around the park (0.506 ft each); "plate" coordinates are pixels of the
+// whole plate at 1601 px wide.
+const MAPS = 0.506 * FT, MAP_H = [432, 872], MAP_C = [Math.cos(-20 * Math.PI / 180), Math.sin(-20 * Math.PI / 180)], MAP_P = [-MAP_C[1], MAP_C[0]];
+const fromCrop = (cx, cy) => { const vx = cx - MAP_H[0], vy = cy - MAP_H[1]; return V3((vx * MAP_P[0] + vy * MAP_P[1]) * MAPS, 0, -(vx * MAP_C[0] + vy * MAP_C[1]) * MAPS); };
+const fromPlate = (px, py) => fromCrop(2.997 * px - 770.4, 2.997 * py - 1303.7);
+// the ballpark's lot: the irregular line against the neighbouring lots on the north-west, Huntington Avenue, the east lot line, New Gravelly Point Road, the west lot line
+const LOTPOLY = [[110, 672], [440, 330], [550, 255], [660, 215], [1440, 520], [1062, 1040], [232, 1450]].map(([x, y]) => fromCrop(x, y));
+function inPolyEarly(x, z) { return inPoly(LOTPOLY, x, z); }
+function inPoly(P, x, z) { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a.z > z) !== (b.z > z) && x < (b.x - a.x) * (z - a.z) / (b.z - a.z) + a.x) c = !c; } return c; }
+const inLot = (x, z) => inPoly(LOTPOLY, x, z);
+function rayPoly(P, o, d) { let best = Infinity; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], ex = b.x - a.x, ez = b.z - a.z, den = d.x * ez - d.z * ex; if (Math.abs(den) < 1e-9) continue; const t = ((a.x - o.x) * ez - (a.z - o.z) * ex) / den, u = ((a.x - o.x) * d.z - (a.z - o.z) * d.x) / den; if (t > 0 && u >= 0 && u <= 1) best = Math.min(best, t); } return best; }
+// streets: Huntington Avenue (100 ft wide, a grass reservation down the middle carrying the trolley tracks), Rogers Avenue over the Stony Brook culvert,
+// New Gravelly Point Road between the park and the Boston & Providence Railroad yards
+const HUNT_S = [fromCrop(-400, -230), fromCrop(2200, 773)], HUNT_DIR = HUNT_S[1].clone().sub(HUNT_S[0]).normalize(), HUNT_N = V3(HUNT_DIR.z, 0, -HUNT_DIR.x);
+// HUNT_N points away from the ballpark, across the avenue
+{ const m = HUNT_S[0].clone().lerp(HUNT_S[1], 0.4); if (inPolyEarly(m.x + HUNT_N.x * -8, m.z + HUNT_N.z * -8) === false && inPolyEarly(m.x + HUNT_N.x * 8, m.z + HUNT_N.z * 8)) HUNT_N.negate(); }
+const ROGERS_L = [fromCrop(-120, 760), fromCrop(330, -180)], ROAD_L = [fromCrop(-200, 1660), fromCrop(1062, 1040), fromCrop(1700, 160)];
+{ const tab = new Map(); fenceDist = deg => { const k = Math.round(deg * 4); if (!tab.has(k)) tab.set(k, rayPoly(LOTPOLY, V3(0, 0, 0), dir(k / 4 * Math.PI / 180))); return tab.get(k); }; }
 
 DIAG.stage("building the field");
 // ---------- the lot, in a frame along the foul lines: u runs out the third-base line (north-west), w out the first-base line (north-east) ----------
@@ -64,7 +88,7 @@ const MAT = { grass: new THREE.MeshStandardMaterial({ map: grassT, roughness: 1,
 
 // ---------- the ground: streets and yards outside, the playing field inside ----------
 { const g = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000).rotateX(-Math.PI / 2), MAT.street); g.position.y = -0.05; g.receiveShadow = true; scene.add(g);
-  const sh = new THREE.Shape(); const pts = [P2(LOT.u0, LOT.w0), P2(LOT.u0, 100)]; for (let d = 45; d >= -45; d -= 2.5) pts.push(dir(d * Math.PI / 180).multiplyScalar(fenceDist(d) + 0.3)); pts.push(P2(108, LOT.w0));
+  const sh = new THREE.Shape(); const pts = LOTPOLY;
   pts.forEach((p, i) => i ? sh.lineTo(p.x, -p.z) : sh.moveTo(p.x, -p.z)); const f = new THREE.Mesh(new THREE.ShapeGeometry(sh).rotateX(-Math.PI / 2), MAT.grass); f.receiveShadow = true; scene.add(f);
   const flat = (geo, mat, y) => { const m = new THREE.Mesh(geo.rotateX(-Math.PI / 2), mat); m.position.y = y; m.receiveShadow = true; scene.add(m); return m; };
   // the base paths, the dirt round home and the bases, and the pitcher's box (a raised mound, at most 15 in under the 1903 rules)
@@ -86,11 +110,13 @@ function IN(n) { return n * 0.0254; }
 // ---------- the fence: 14 ft of boards round the outfield and down the sides of the lot ----------
 const FENCE_H = 14 * FT, WALLS = [];
 function boardWall(a, b, h = FENCE_H, gapAt = null) { const L = a.distanceTo(b); if (L < 0.05) return; const bg = new THREE.BoxGeometry(L, h, 0.12), uv = bg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * L / 3); const m = new THREE.Mesh(bg, MAT.board); m.position.copy(a).add(b).multiplyScalar(0.5).setY(h / 2); m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); m.castShadow = m.receiveShadow = true; scene.add(m); WALLS.push({ a: a.clone(), b: b.clone(), h }); }
-{ let prev = null; for (let d = -45; d <= 45; d += 2.5) { const p = dir(d * Math.PI / 180).multiplyScalar(fenceDist(d)); if (prev && d > -42.6 + 0.01) boardWall(prev, p); prev = p; }
-  const LFP = dir(-D45).multiplyScalar(fenceDist(-45)), RFP = dir(D45).multiplyScalar(fenceDist(45));
-  boardWall(LFP, P2(fenceDist(-45), LOT.w0)); boardWall(RFP, P2(LOT.u0, fenceDist(45))); boardWall(P2(LOT.u0, fenceDist(45)), P2(LOT.u0, LOT.w0));
-  // the Rogers Street side, with the gate between the grandstand and the third-base bleachers
-  boardWall(P2(fenceDist(-45), LOT.w0), P2(GATE_U + 3, LOT.w0)); boardWall(P2(GATE_U - 3, LOT.w0), P2(LOT.u0, LOT.w0));
+// the fence along every line of the lot, with two gates: the main entrance from Huntington Avenue in the left-field corner (the one in the
+// crowd photograph, under its arched sign) and one from the Rogers Avenue side, behind the gap between the grandstand and the third-base bleachers
+const GATES = []; { const gate = (edge, frac, name) => { const a = LOTPOLY[edge], b = LOTPOLY[(edge + 1) % LOTPOLY.length], c = a.clone().lerp(b, frac), t = b.clone().sub(a).normalize(), n = V3(t.z, 0, -t.x); if (inLot(c.x + n.x * 2, c.z + n.z * 2)) n.negate(); GATES.push({ name, c, t, n, half: 3, edge }); };
+  gate(3, 0.07, "Huntington Avenue"); gate(6, 0.83, "Rogers Avenue");
+  for (let i = 0; i < LOTPOLY.length; i++) { const a = LOTPOLY[i], b = LOTPOLY[(i + 1) % LOTPOLY.length], gs = GATES.filter(g => g.edge === i).sort((g1, g2) => a.distanceTo(g1.c) - a.distanceTo(g2.c)); let p = a;
+    for (const g of gs) { boardWall(p, g.c.clone().addScaledVector(g.t, -g.half)); p = g.c.clone().addScaledVector(g.t, g.half); for (const s of [-1, 1]) { const q = g.c.clone().addScaledVector(g.t, s * g.half); box(0.45, FENCE_H + 1.2, 0.45, MAT.paint, q.x, (FENCE_H + 1.2) / 2, q.z); } } boardWall(p, b); } }
+{
   // foul poles were not yet used everywhere; this park marked the line on the fence
   // the tool shed in deep centre field (in play) and the flagpole
   const tsP = dir(0.05).multiplyScalar(fenceDist(3) - 4); box(6, 3.2, 4, MAT.board, tsP.x, 1.6, tsP.z, 0.05); box(6.6, 0.2, 4.6, MAT.roof, tsP.x, 3.3, tsP.z, 0.05);
@@ -108,53 +134,66 @@ function boardWall(a, b, h = FENCE_H, gapAt = null) { const L = a.distanceTo(b);
   ad(41, 44.5, adTex([["IVER JOHNSON", 46], ["SPORTING GOODS CO.", 34]], "#f0ece0", "#1a1a1a")); ad(37.5, 40.5, adTex([["CCA", 70]], "#f0ece0", "#1a1a1a")); ad(30, 32, adTex(null, "#e8e4d8", "#2a2a2a"));
   ad(25, 29, adTex([["Red Fox Ale", 64]], "#f4f0e6", "#a82020", true)); ad(20, 24.5, adTex(null, "#ece8dc", "#3a2a2a")); ad(15, 19.5, adTex(null, "#e0dccc", "#2a2a3a"));
   ad(-40, -36, adTex([["EMERSON SHOE", 54]], "#f0ece0", "#1a1a1a"), false); ad(-35.5, -31, adTex(null, "#e8e0d0", "#3a2a1a"), false); ad(-30.5, -26, adTex(null, "#f0ece0", "#1a2a3a"), false); ad(-25.5, -21, adTex(null, "#e4dccc", "#2a2a2a"), false);
-  // the left-field entrance from Huntington Avenue, with its arched sign
-  { const a = dir(-45 * Math.PI / 180).multiplyScalar(fenceDist(-45)), b = dir(-42.5 * Math.PI / 180).multiplyScalar(fenceDist(-42.5)), c = a.clone().add(b).multiplyScalar(0.5), n = c.clone().normalize(); LF_GATE = c.clone();
-    for (const p of [a, b]) box(0.45, FENCE_H + 1.5, 0.45, MAT.paint, p.x, (FENCE_H + 1.5) / 2, p.z);
-    const arch = new THREE.Mesh(new THREE.PlaneGeometry(a.distanceTo(b) + 1.2, 1.8), new THREE.MeshStandardMaterial({ map: tex(512, 180, (g, w, h) => { g.fillStyle = "#f0ece0"; g.beginPath(); g.moveTo(0, h); g.lineTo(0, 60); g.quadraticCurveTo(w / 2, -40, w, 60); g.lineTo(w, h); g.closePath(); g.fill(); g.strokeStyle = "#1a1a1a"; g.lineWidth = 6; g.stroke(); g.fillStyle = "#1a1a1a"; g.textAlign = "center"; g.font = "bold 34px Georgia"; g.fillText("HUNTINGTON AVE.", w / 2, 92); g.font = "bold 40px Georgia"; g.fillText("BASE BALL GROUNDS", w / 2, 146); }), transparent: true, alphaTest: 0.5, side: THREE.DoubleSide }));
-    arch.position.copy(c).addScaledVector(n, 0.3).setY(FENCE_H + 0.6); arch.lookAt(c.clone().addScaledVector(n, 10).setY(FENCE_H + 0.6)); scene.add(arch); }
+  // the arched sign over the Huntington Avenue entrance
+  { const g = GATES[0], c = g.c; LF_GATE = c.clone();
+    const arch = new THREE.Mesh(new THREE.PlaneGeometry(g.half * 2 + 1.2, 1.8), new THREE.MeshStandardMaterial({ map: tex(512, 180, (gg, w, h) => { gg.fillStyle = "#f0ece0"; gg.beginPath(); gg.moveTo(0, h); gg.lineTo(0, 60); gg.quadraticCurveTo(w / 2, -40, w, 60); gg.lineTo(w, h); gg.closePath(); gg.fill(); gg.strokeStyle = "#1a1a1a"; gg.lineWidth = 6; gg.stroke(); gg.fillStyle = "#1a1a1a"; gg.textAlign = "center"; gg.font = "bold 34px Georgia"; gg.fillText("HUNTINGTON AVE.", w / 2, 92); gg.font = "bold 40px Georgia"; gg.fillText("BASE BALL GROUNDS", w / 2, 146); }), transparent: true, alphaTest: 0.5, side: THREE.DoubleSide }));
+    arch.position.copy(c).addScaledVector(g.n, 0.3).setY(FENCE_H + 0.6); arch.lookAt(c.clone().addScaledVector(g.n, 10).setY(FENCE_H + 0.6)); scene.add(arch); }
   // the scoreboard, mounted above the right-field fence toward right-centre, with the innings in a row
   const sbA = 33, sbP = dir(sbA * Math.PI / 180).multiplyScalar(fenceDist(sbA) - 0.3); SCORE.c = document.createElement("canvas"); SCORE.c.width = 1024; SCORE.c.height = 256; SCORE.t = new THREE.CanvasTexture(SCORE.c); SCORE.t.colorSpace = THREE.SRGBColorSpace;
   const sb = new THREE.Mesh(new THREE.PlaneGeometry(12, 3), new THREE.MeshStandardMaterial({ map: SCORE.t, roughness: 0.9 })); sb.position.set(sbP.x, FENCE_H + 2, sbP.z); sb.lookAt(0, FENCE_H + 2, 0); scene.add(sb); box(12.4, 3.4, 0.2, MAT.wood, sbP.x, FENCE_H + 2, sbP.z, sb.rotation.y).position.addScaledVector(V3(sbP.x, 0, sbP.z).normalize(), 0.12);
   for (const s of [-5, 5]) { const p = sbP.clone().add(V3(-sbP.z, 0, sbP.x).normalize().multiplyScalar(s)); box(0.25, FENCE_H + 3.5, 0.25, MAT.wood, p.x, (FENCE_H + 3.5) / 2, p.z); } }
-
 DIAG.stage("building the stands");
-// ---------- the grandstand (covered, behind home) and the open bleachers down both lines ----------
-// Each section is a run of stepped rows; the grandstand wings and the corner behind home overlap at the joins.
-const SECTIONS = [], SEATS = [], T225 = Math.tan(Math.PI / 8); let _archM = null; const WHITEWALL = M(0xe8e6dc); const ARCHM = t => _archM || (_archM = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }));
-function section(name, a, b, out, rows, rowD, rowH, roof, extA, extB) { const A = b.clone().sub(a), L = A.length(); A.normalize(); const S = { name, o: a.clone(), A, out: out.clone().normalize(), L, rows, rowD, rowH, roof, extA, extB }; SECTIONS.push(S);
-  const ry = -Math.atan2(A.z, A.x), mat = roof ? MAT.wood : MAT.wood;
-  for (let k = 0; k < rows; k++) { const e0 = extA ? k * rowD * T225 + 0.3 : 0, e1 = extB ? k * rowD * T225 + 0.3 : 0, len = L + e0 + e1, y = (k + 1) * rowH, c = a.clone().addScaledVector(A, (L + e1 - e0) / 2).addScaledVector(S.out, (k + 0.5) * rowD);
-    const st = new THREE.Mesh(new THREE.BoxGeometry(len, y, rowD), mat); st.position.set(c.x, y / 2, c.z); st.rotation.y = ry; st.receiveShadow = true; st.castShadow = k === rows - 1; scene.add(st);
-    const bn = new THREE.Mesh(new THREE.BoxGeometry(len, 0.05, 0.3), MAT.seat); bn.position.copy(c).addScaledVector(S.out, 0.05).setY(y + 0.42); bn.rotation.y = ry; bn.receiveShadow = true; scene.add(bn);
-    for (let t = -e0 + 0.4; t < L + e1 - 0.4; t += 0.56) { const p = a.clone().addScaledVector(A, t).addScaledVector(S.out, k * rowD + rowD * 0.55); SEATS.push({ p: p.setY(y + 0.42), face: Math.atan2(S.out.x, S.out.z), sec: name, row: k, taken: false }); } }
-  const D = rows * rowD, H = rows * rowH, back = a.clone().addScaledVector(S.out, D), eA = extA ? D * T225 : 0, eB = extB ? D * T225 : 0;
-  if (roof) { const rb = H + 3.2, rf = 28 * FT, ridge = rb + 3.4, N = Math.ceil(L / 6), len = L + eA + eB + 1, mid = a.clone().addScaledVector(A, (L + eB - eA) / 2);
-    // posts along the front, a peaked gable roof (front slope up to a ridge, back slope down to the back wall), and the back wall with its row of round arches
-    for (let i = 0; i <= N; i++) { const p = a.clone().addScaledVector(A, i * L / N).addScaledVector(S.out, rowD * 0.5); const cl = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, rf, 8), MAT.col); cl.position.set(p.x, rf / 2, p.z); cl.castShadow = true; scene.add(cl); }
-    const slab = (d0, y0, d1, y1) => { const L2 = Math.hypot(d1 - d0, y1 - y0), m = new THREE.Mesh(new THREE.BoxGeometry(len, 0.15, L2 + 0.3), MAT.roof); m.position.copy(mid).addScaledVector(S.out, (d0 + d1) / 2).setY((y0 + y1) / 2); const q = new THREE.Quaternion().setFromUnitVectors(V3(0, 0, 1), S.out.clone().multiplyScalar(d1 - d0).setY(y1 - y0).normalize()); m.quaternion.copy(q); const q2 = new THREE.Quaternion().setFromUnitVectors(V3(1, 0, 0).applyQuaternion(q), A.clone()); m.quaternion.premultiply(q2); m.castShadow = true; scene.add(m); };
-    slab(-1.5, rf, D * 0.55, ridge); slab(D * 0.55, ridge, D + 0.3, rb);
-    const fascia = new THREE.Mesh(new THREE.BoxGeometry(len, 0.7, 0.1), MAT.paint); fascia.position.copy(mid).addScaledVector(S.out, -1.5).setY(rf - 0.15); fascia.rotation.y = ry; scene.add(fascia);
-    const archT = tex(256, 128, (g, w, h) => { g.fillStyle = "#8a8070"; g.fillRect(0, 0, w, h); g.fillStyle = "#2a2622"; for (let k = 0; k < 2; k++) { const cx = 64 + k * 128; g.beginPath(); g.moveTo(cx - 34, h - 10); g.lineTo(cx - 34, 58); g.arc(cx, 58, 34, Math.PI, 0); g.lineTo(cx + 34, h - 10); g.fill(); } g.fillStyle = "rgba(255,255,255,0.08)"; for (let y = 0; y < h; y += 8) g.fillRect(0, y, w, 1); });
-    const bg = new THREE.BoxGeometry(len, rb, 0.3), buv = bg.attributes.uv; for (let k = 0; k < buv.count; k++) buv.setX(k, buv.getX(k) * len / 7); const bw = new THREE.Mesh(bg, [MAT.board, MAT.board, MAT.board, MAT.board, ARCHM(archT), ARCHM(archT)]); bw.position.copy(mid).addScaledVector(S.out, D + 0.15).setY(rb / 2); bw.rotation.y = ry; bw.castShadow = bw.receiveShadow = true; scene.add(bw); }
-  else { const bw = new THREE.Mesh(new THREE.BoxGeometry(L, H + 1.1, 0.12), MAT.board); bw.position.copy(a).addScaledVector(A, L / 2).addScaledVector(S.out, D).setY((H + 1.1) / 2); bw.rotation.y = ry; bw.castShadow = true; scene.add(bw); }
-  WALLS.push({ a: a.clone().addScaledVector(S.out, D).addScaledVector(A, -eA), b: a.clone().addScaledVector(S.out, D).addScaledVector(A, L + eB), h: 20 });
-  // a rail along the front of each section
-  const rail = new THREE.Mesh(new THREE.BoxGeometry(L, 1.25, 0.1), WHITEWALL); rail.position.copy(a).addScaledVector(A, L / 2).addScaledVector(S.out, -0.1).setY(0.62); rail.rotation.y = ry; scene.add(rail); return S; }
-const GS = 19, RD = 0.78, RH = 0.36;
-section("third-base grandstand", P2(-6, -GS), P2(38, -GS), WA.clone().negate(), 22, RD, RH, true, true, false);
-section("grandstand behind home", P2(-GS, -6), P2(-6, -GS), V3(0, 0, 1), 22, RD, RH, true, true, true);
-section("first-base grandstand", P2(-GS, 40), P2(-GS, -6), UA.clone().negate(), 22, RD, RH, true, false, true);
-section("third-base bleachers", P2(46, -17), P2(100, -17), WA.clone().negate(), 20, 0.72, 0.36, false, false, false);
-section("first-base bleachers", P2(-17, 92), P2(-17, 46), UA.clone().negate(), 20, 0.72, 0.36, false, false, false);
-// the wire screen behind home plate, to keep foul balls out of the best seats
-{ const a = P2(-GS + 0.6, -5), b = P2(-5, -GS + 0.6), L = a.distanceTo(b), scr = new THREE.Mesh(new THREE.PlaneGeometry(L + 8, 7), new THREE.MeshStandardMaterial({ map: tex(64, 64, (g) => { g.strokeStyle = "rgba(40,40,40,0.9)"; g.lineWidth = 2; for (let i = 0; i <= 64; i += 8) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 64, 64); g.stroke(); g.beginPath(); g.moveTo(i, 64); g.lineTo(i + 64, 0); g.stroke(); g.beginPath(); g.moveTo(i - 64, 0); g.lineTo(i, 64); g.stroke(); g.beginPath(); g.moveTo(i - 64, 64); g.lineTo(i, 0); g.stroke(); } }, [(L + 8) * 2, 14]), transparent: true, alphaTest: 0.3, side: THREE.DoubleSide }));
+
+// ---------- the stands, traced from the 1902 atlas: a horseshoe of wooden stands round home plate ----------
+// The covered grand stand is the curved section behind the plate; the open bleachers are the two wings, up the third-base side and out along
+// the first-base side beside New Gravelly Point Road. The gaps between them are the passages in from outside. Each section is a strip between
+// its front (field side) and back edge as drawn on the map; its rows of benches step up from front to back.
+const SECTIONS = [], SEATS = [], WHITEWALL = M(0xe8e6dc); let _archM = null; const ARCHM = t => _archM || (_archM = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }));
+const STRIPS = [{ name: "third-base bleachers", I: [[330, 820], [485, 548]], O: [[240, 795], [435, 473]], rows: 18, roof: false },
+  { name: "grand stand", I: [[318, 840], [298, 920], [305, 1000], [330, 1050], [395, 1098]], O: [[205, 800], [178, 900], [190, 1010], [240, 1110], [345, 1205]], rows: 22, roof: true },
+  { name: "first-base bleachers", I: [[405, 1105], [500, 1125], [600, 1125], [700, 1105], [780, 1068]], O: [[388, 1190], [480, 1205], [600, 1200], [700, 1180], [812, 1145]], rows: 16, roof: false }];
+const RH = 0.36, F0 = 0.07;
+// the height of the floor anywhere in the stands, kept on a 20-cm grid
+const RAS = { x0: -80, z0: -40, cell: 0.2, nx: 0, nz: 0, h: null }; RAS.nx = Math.ceil(120 / RAS.cell); RAS.nz = Math.ceil(140 / RAS.cell); RAS.h = new Float32Array(RAS.nx * RAS.nz);
+function rasterPoly(P, hgt) { let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const p of P) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z); }
+  for (let i = Math.max(0, Math.floor((x0 - RAS.x0) / RAS.cell)); i <= Math.min(RAS.nx - 1, Math.ceil((x1 - RAS.x0) / RAS.cell)); i++) for (let j = Math.max(0, Math.floor((z0 - RAS.z0) / RAS.cell)); j <= Math.min(RAS.nz - 1, Math.ceil((z1 - RAS.z0) / RAS.cell)); j++) { const x = RAS.x0 + (i + 0.5) * RAS.cell, z = RAS.z0 + (j + 0.5) * RAS.cell; if (inPoly(P, x, z)) RAS.h[j * RAS.nx + i] = Math.max(RAS.h[j * RAS.nx + i], hgt); } }
+const lerpLine = (A, B, f) => A.map((a, i) => a.clone().lerp(B[i], f));
+function polyLen(L) { let d = 0; for (let i = 1; i < L.length; i++) d += L[i].distanceTo(L[i - 1]); return d; }
+function alongLine(L, s) { for (let i = 1; i < L.length; i++) { const d = L[i].distanceTo(L[i - 1]); if (s <= d || i === L.length - 1) { const t = Math.min(1, s / d); return [L[i - 1].clone().lerp(L[i], t), L[i].clone().sub(L[i - 1]).normalize()]; } s -= d; } return [L[L.length - 1].clone(), V3(1, 0, 0)]; }
+function buildStrip(def) { const I = def.I.map(([x, y]) => fromCrop(x, y)), O = def.O.map(([x, y]) => fromCrop(x, y)), n = def.rows, S = { name: def.name, I, O, rows: n, rowH: RH, roof: def.roof }; SECTIONS.push(S);
+  const toField = (I[0].clone().add(I[I.length - 1]).multiplyScalar(0.5)).sub(O[0].clone().add(O[O.length - 1]).multiplyScalar(0.5)).normalize();
+  const pos = [], quad = (a, b, c, d) => pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z, a.x, a.y, a.z, c.x, c.y, c.z, d.x, d.y, d.z), seatPos = [];
+  const fAt = k => F0 + (1 - F0) * k / n; S.rowLine = (k, frac = 0.55) => lerpLine(I, O, fAt(k + frac));
+  for (let k = 0; k < n; k++) { const A = lerpLine(I, O, fAt(k)), B = lerpLine(I, O, fAt(k + 1)), y0 = k * RH, y1 = (k + 1) * RH;
+    for (let i = 0; i < A.length - 1; i++) { const a0 = A[i].clone().setY(y1), a1 = A[i + 1].clone().setY(y1), b1 = B[i + 1].clone().setY(y1), b0 = B[i].clone().setY(y1); quad(a0, a1, b1, b0); quad(A[i].clone().setY(y0), A[i + 1].clone().setY(y0), a1, a0); }
+    rasterPoly([...A, ...B.slice().reverse()], y1);
+    // the benches along the row, and a seat every 56 cm
+    const C = S.rowLine(k), L = polyLen(C); for (let s = 0.4; s < L - 0.4; s += 0.56) { const [p, t] = alongLine(C, s); let nrm = V3(-t.z, 0, t.x); if (nrm.dot(toField) < 0) nrm.negate(); SEATS.push({ p: p.setY(y1 + 0.42), face: Math.atan2(-nrm.x, -nrm.z), sec: def.name, row: k, taken: false }); }
+    const Bn = lerpLine(I, O, fAt(k + 0.5)), Bn2 = lerpLine(I, O, fAt(k + 0.62)); for (let i = 0; i < Bn.length - 1; i++) { const a = Bn[i].clone().setY(y1 + 0.42), b = Bn[i + 1].clone().setY(y1 + 0.42), c = Bn2[i + 1].clone().setY(y1 + 0.42), d = Bn2[i].clone().setY(y1 + 0.42); seatPos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z, a.x, a.y, a.z, c.x, c.y, c.z, d.x, d.y, d.z); } }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x7a6448, roughness: 0.9, side: THREE.DoubleSide })); m.receiveShadow = true; m.castShadow = true; scene.add(m);
+  const gb = new THREE.BufferGeometry(); gb.setAttribute("position", new THREE.Float32BufferAttribute(seatPos, 3)); gb.computeVertexNormals(); const mb = new THREE.Mesh(gb, new THREE.MeshStandardMaterial({ color: 0x5a4a38, roughness: 0.85, side: THREE.DoubleSide })); scene.add(mb);
+  const top = n * RH, hb = def.roof ? top + 3.2 : top + 1.1, wall = (a, b, h, mat, front) => { const L = a.distanceTo(b); if (L < 0.05) return; const bg = new THREE.BoxGeometry(L, h, front ? 0.1 : 0.25), uv = bg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * L / 7); const w = new THREE.Mesh(bg, mat); w.position.copy(a).add(b).multiplyScalar(0.5).setY(h / 2); w.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); w.castShadow = w.receiveShadow = true; scene.add(w); if (!front) WALLS.push({ a: a.clone(), b: b.clone(), h: 20 }); };
+  // the back wall (on the grand stand, the row of round arches the 1903 panorama shows), the ends, and a low white wall along the front
+  const archT = tex(256, 128, (gg, w, h) => { gg.fillStyle = "#8a8070"; gg.fillRect(0, 0, w, h); gg.fillStyle = "#2a2622"; for (let k = 0; k < 2; k++) { const cx = 64 + k * 128; gg.beginPath(); gg.moveTo(cx - 34, h - 10); gg.lineTo(cx - 34, 58); gg.arc(cx, 58, 34, Math.PI, 0); gg.lineTo(cx + 34, h - 10); gg.fill(); } });
+  for (let i = 0; i < O.length - 1; i++) wall(O[i], O[i + 1], hb, def.roof ? [MAT.board, MAT.board, MAT.board, MAT.board, ARCHM(archT), ARCHM(archT)] : MAT.board);
+  wall(I[0].clone().lerp(O[0], F0), O[0], top + 0.4, MAT.board); wall(I[I.length - 1].clone().lerp(O[O.length - 1], F0), O[O.length - 1], top + 0.4, MAT.board);
+  const FR = lerpLine(I, O, F0 * 0.6); for (let i = 0; i < FR.length - 1; i++) wall(FR[i], FR[i + 1], 1.2, WHITEWALL, true);
+  if (def.roof) { const rf = 28 * FT, ridge = hb + 3.4, Fr = lerpLine(I, O, F0 * 0.4), Rg = lerpLine(I, O, 0.55), rp = [];
+    for (let i = 0; i < Fr.length - 1; i++) { const a = Fr[i].clone().setY(rf), b = Fr[i + 1].clone().setY(rf), c = Rg[i + 1].clone().setY(ridge), d = Rg[i].clone().setY(ridge), e = O[i + 1].clone().setY(hb), f = O[i].clone().setY(hb); for (const [p, q, r, s] of [[a, b, c, d], [d, c, e, f]]) rp.push(p.x, p.y, p.z, q.x, q.y, q.z, r.x, r.y, r.z, p.x, p.y, p.z, r.x, r.y, r.z, s.x, s.y, s.z); }
+    const rg = new THREE.BufferGeometry(); rg.setAttribute("position", new THREE.Float32BufferAttribute(rp, 3)); rg.computeVertexNormals(); const rm = new THREE.Mesh(rg, new THREE.MeshStandardMaterial({ color: 0x4a4846, roughness: 0.75, side: THREE.DoubleSide })); rm.castShadow = true; scene.add(rm);
+    const L = polyLen(Fr); for (let s = 0; s <= L + 0.01; s += L / Math.ceil(L / 6)) { const [p] = alongLine(Fr, s); const cl = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, rf, 8), MAT.col); cl.position.set(p.x, rf / 2, p.z); cl.castShadow = true; scene.add(cl); } }
+  return S; }
+for (const d of STRIPS) buildStrip(d);
+const GS = 19;
+// the wire screen behind home plate
+{ const a = fromCrop(360, 790), b = fromCrop(345, 1010), L = a.distanceTo(b), mid = fromCrop(330, 900), scr = new THREE.Mesh(new THREE.PlaneGeometry(L, 7), new THREE.MeshStandardMaterial({ map: tex(64, 64, (g) => { g.strokeStyle = "rgba(40,40,40,0.9)"; g.lineWidth = 2; for (let i = -64; i <= 128; i += 8) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 64, 64); g.stroke(); g.beginPath(); g.moveTo(i, 64); g.lineTo(i + 64, 0); g.stroke(); } }, [L * 2, 14]), transparent: true, alphaTest: 0.3, side: THREE.DoubleSide }));
   scr.position.copy(a).add(b).multiplyScalar(0.5).setY(3.5); scr.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); scene.add(scr); }
-// the players' benches: open benches in front of the stands, Boston on the third-base side, Pittsburgh on the first-base side
-const BENCH = { BOS: P2(14, -13), PIT: P2(-13, 14) };
-for (const [k, p] of Object.entries(BENCH)) { const ry = k === "BOS" ? ROT_U + Math.PI / 2 : ROT_W - Math.PI / 2; box(8, 0.45, 0.45, MAT.wood, p.x, 0.22, p.z, ry); box(8.4, 0.08, 1.8, MAT.roof, p.x, 2.2, p.z, ry); box(8.4, 2.2, 0.08, MAT.board, ...[p.clone().add((k === "BOS" ? WA.clone().negate() : UA.clone().negate()).multiplyScalar(0.8))].map(q => [q.x, 1.1, q.z]).flat(), ry); }
-// how high the floor is anywhere: the stepped rows of the stands, the pitcher's mound, and level ground everywhere else
-function floorAt(x, z) { const p = V3(x, 0, z); for (const S of SECTIONS) { const d = p.clone().sub(S.o), v = d.dot(S.out), t = d.dot(S.A); if (v < 0 || v > S.rows * S.rowD) continue; const k = Math.floor(v / S.rowD), e0 = S.extA ? k * S.rowD * T225 + 0.3 : 0, e1 = S.extB ? k * S.rowD * T225 + 0.3 : 0; if (t < -e0 || t > S.L + e1) continue; return (k + 1) * S.rowH; }
+// the dugouts, as the 1903 World Series photograph shows Boston's: a whitewashed board shelter with a roof, open to the field, in front of the stands
+const BENCH = {}; { const DUG = M(0xe4e0d4); const mk = (tm, S, frac) => { const [p, t] = alongLine(S.I, polyLen(S.I) * frac); let n = V3(-t.z, 0, t.x); const tf = V3(0, 0, 0).sub(p); if (n.dot(tf) < 0) n.negate(); const c = p.clone().addScaledVector(n, 3.0), ry = -Math.atan2(t.z, t.x);
+    box(9, 2.3, 0.15, DUG, ...c.clone().addScaledVector(n, -1.0).toArray(), ry).position.y = 1.15; box(9.4, 0.12, 2.4, DUG, c.x, 2.35, c.z, ry); for (const s of [-1, 1]) { const e = c.clone().addScaledVector(t, s * 4.5); box(0.15, 2.3, 2.2, DUG, e.x, 1.15, e.z, ry); }
+    box(8.6, 0.45, 0.45, MAT.wood, ...c.clone().addScaledVector(n, -0.6).toArray(), ry).position.y = 0.22; BENCH[tm] = { p: c.clone().addScaledVector(n, -0.55), along: t.clone(), back: n.clone().negate(), face: Math.atan2(-n.x, -n.z) }; };
+  mk("BOS", SECTIONS[0], 0.22); mk("PIT", SECTIONS[2], 0.18); }
+function floorAt(x, z) { const i = Math.floor((x - RAS.x0) / RAS.cell), j = Math.floor((z - RAS.z0) / RAS.cell); if (i >= 0 && j >= 0 && i < RAS.nx && j < RAS.nz) { const h = RAS.h[j * RAS.nx + i]; if (h > 0) return h; }
   const dm = Math.hypot(x - PM.x, z - PM.z); return dm < 2.9 ? 0.3 * clampN((2.9 - dm) / 1.3, 0, 1) : 0; }
 
 DIAG.stage("seating the crowd");
@@ -175,18 +214,18 @@ const CUTOUT = (() => { const c = document.createElement("canvas"), W = 64, H = 
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.LinearFilter; return { t, NV }; })();
 const CROWD = { list: [], g: new THREE.Group(), built: false, cheerU: { value: 0 }, timeU: { value: 0 } };
 // the crowd rises and bobs when it cheers: done in the shader, so 10,000 people cost nothing to move
-function cheerMat(m) { m.onBeforeCompile = sh => { sh.uniforms.uCheer = CROWD.cheerU; sh.uniforms.uTime = CROWD.timeU; sh.vertexShader = "uniform float uCheer; uniform float uTime;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n#ifdef USE_INSTANCING\n vec3 ipos = instanceMatrix[3].xyz; float ph = fract(sin(dot(floor(ipos.xz * 4.0), vec2(12.9898, 78.233))) * 43758.5) * 6.28; transformed.y += uCheer * 0.16 * max(0.0, sin(uTime * 8.0 + ph));\n#endif"); }; return m; } const ROOTERS_AT = P2(-24, 64, 4);
+function cheerMat(m) { m.onBeforeCompile = sh => { sh.uniforms.uCheer = CROWD.cheerU; sh.uniforms.uTime = CROWD.timeU; sh.vertexShader = "uniform float uCheer; uniform float uTime;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n#ifdef USE_INSTANCING\n vec3 ipos = instanceMatrix[3].xyz; float ph = fract(sin(dot(floor(ipos.xz * 4.0), vec2(12.9898, 78.233))) * 43758.5) * 6.28; transformed.y += uCheer * 0.16 * max(0.0, sin(uTime * 8.0 + ph));\n#endif"); }; return m; } const ROOTERS_AT = fromCrop(600, 1165).setY(4);
 function buildCrowd() { if (CROWD.built) return; CROWD.built = true; DIAG.stage("seating the crowd");
  const coat = [0x22242a, 0x2a2a2e, 0x1e2230, 0x34302a, 0x3a3630, 0x2c2a26, 0x4a4436, 0x1a1a1c, 0x3e3a3a, 0x5a5448], hatCol = { derby: [0x1a1a1a, 0x2a2420, 0x3a2e24], cap: [0x3a3a3a, 0x4a4438, 0x2a2a30, 0x5a5040], boater: [0xe0d4a8], lady: [0x3a2a3a, 0x2a2a3a, 0x5a3a30, 0x7a6a5a] };
   const people = []; const hatOf = r => r < 0.6 ? "derby" : r < 0.88 ? "cap" : r < 0.94 ? "boater" : "lady";
   // seated: most seats filled, every one in the Royal Rooters' block, a few left empty (you can take one)
-  for (const s of SEATS) { const rooter = s.sec === "first-base bleachers" && s.row < 9 && s.p.distanceTo(P2(-17, 70)) < 16; if (!rooter && R() < [0.7, 0.4, IS_HEADSET ? 0.2 : 0.08][QL]) continue; s.taken = true; people.push({ p: s.p.clone(), face: s.face, seated: true, hat: rooter ? "derby" : hatOf(R()), rooter }); }
+  for (const s of SEATS) { const rooter = s.sec === "first-base bleachers" && s.row < 9 && s.p.distanceTo(ROOTERS_AT) < 16; if (!rooter && R() < [0.7, 0.4, IS_HEADSET ? 0.2 : 0.08][QL]) continue; s.taken = true; people.push({ p: s.p.clone(), face: s.face, seated: true, hat: rooter ? "derby" : hatOf(R()), rooter }); }
   // standing: behind the ropes in the outfield, thicker toward the fence
   let n = 0; while (n < [800, 2000, IS_HEADSET ? 3000 : 6200][QL]) { const d = (R() - 0.5) * 88, rd = ropeDist(d) + 1.2, fd = fenceDist(d) - 0.8; if (fd <= rd) continue; const dist = lerpN(rd, fd, Math.sqrt(R())), p = dir(d * Math.PI / 180).multiplyScalar(dist); people.push({ p: p.setY(0), face: Math.atan2(p.x, p.z) + (R() - 0.5) * 0.6, seated: false, hat: hatOf(R()) }); n++; }
   // and along the top of the left-field fence
   for (let d = -45; d < -12; d += 0.35) { if (R() < 0.35) continue; const p = dir(d * Math.PI / 180).multiplyScalar(fenceDist(d) + 0.1); people.push({ p: p.setY(FENCE_H - 0.42), face: Math.atan2(p.x, p.z), seated: true, hat: hatOf(R()), fence: true }); }
   // along the street outside, people still waiting to get in
-  for (let i = 0; i < 60; i++) { const p = P2(GATE_U - 6 - i * 0.75 + R() * 0.3, -40.6 - R() * 0.5); people.push({ p: p.setY(0), face: Math.atan2(WA.x, WA.z) + (R() - 0.5) * 2, seated: false, hat: hatOf(R()), outside: true }); }
+  for (let i = 0; i < 60; i++) { const G0 = GATES[0], p = G0.c.clone().addScaledVector(G0.n, 1.6 + R() * 0.5).addScaledVector(G0.t, G0.half + 4 + i * 0.75); people.push({ p: p.setY(0), face: Math.atan2(GATES[0].t.x, GATES[0].t.z) + (R() - 0.5) * 0.8, seated: false, hat: hatOf(R()), outside: true }); }
   const flatP = people.filter(P => (!P.seated || P.fence) && !P.outside), solid = people.filter(P => (P.seated && !P.fence) || P.outside); people.length = 0; people.push(...solid);
   const cut = []; for (let v = 0; v < CUTOUT.NV; v++) { const g = new THREE.PlaneGeometry(0.62, 1.8).translate(0, 0.9, 0), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, (uv.getX(i) + v) / CUTOUT.NV); const im = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ map: CUTOUT.t, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9 }), flatP.length); im.count = 0; cut.push(im); }
   { const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(); for (const P of flatP) { const im = cut[R() * CUTOUT.NV | 0], sc = 0.9 + R() * 0.18, y = P.fence ? P.p.y - 0.55 : P.p.y; q.setFromAxisAngle(UP, Math.atan2(P.p.x, P.p.z) + (R() - 0.5) * 0.3); m4.compose(V3(P.p.x, y, P.p.z), q, V3(sc, sc, sc)); im.setMatrixAt(im.count, m4); im.setColorAt(im.count, c.setScalar(0.75 + R() * 0.3)); im.count++; CROWD.list.push(P); }
@@ -267,7 +306,7 @@ const PEOPLE = {};
 function buildPlayers() { if (PEOPLE.built) return; Object.defineProperty(PEOPLE, "built", { value: true, enumerable: false }); const face = (P, x, z, tx, tz) => { P.G.position.set(x, floorAt(x, z), z); P.G.rotation.y = Math.atan2(-(tx - x), -(tz - z)); };
   for (const [name, pos] of LINEUP.BOS) { const P = makePerson("BOS", name, pos); PEOPLE[name] = P; const p = FIELDPOS[pos]; face(P, p.x, p.z, 0, 0); if (pos === "C") { setPose(P, "crouch"); face(P, 0, 0.9, 0, -10); } if (pos === "P") setPose(P, "stand"); }
   LINEUP.PIT.forEach(([name, pos], i) => { const P = makePerson("PIT", name, pos); PEOPLE[name] = P; if (i === 0) { P.G.position.set(0.9, 0, 0.1); P.G.rotation.y = Math.PI / 2; setPose(P, "bat"); const bat = new THREE.Mesh(BATG, BATM); bat.rotation.x = -2.2; P.handR.add(bat); }
-    else { const b = BENCH.PIT, off = WA.clone().multiplyScalar(-3.5 + i * 0.85); P.G.position.copy(b).add(off).add(UA.clone().multiplyScalar(-0.1)); P.G.rotation.y = ROT_U; setPose(P, "sit"); } });
+    else { P.G.position.copy(benchSpot("PIT", i)); P.G.rotation.y = benchFace("PIT"); setPose(P, "sit"); } });
   for (const name of ["Jack O'Brien", "Duke Farrell"]) { const P = makePerson("BOS", name, "PH"); PEOPLE[name] = P; setPose(P, "sit"); }
   for (const [name, pos] of [["Tommy Connolly", "UMP_HP"], ["Hank O'Day", "UMP_B"]]) { const P = makePerson("UMP", name, pos); PEOPLE[name] = P; if (pos === "UMP_HP") { P.G.position.set(0.3, 0, 1.8); P.G.rotation.y = 0; setPose(P, "ready"); } else { const p = B1.clone().add(V3(3, 0, 3)); P.G.position.copy(p); P.G.rotation.y = Math.atan2(p.x, p.z); setPose(P, "ready"); } } }
 DIAG.stage("building the streets");
@@ -314,47 +353,75 @@ function rowhouses(u0, n, wFront, depth, floors, brick, rng) { const W = 5.6, h 
     const dp = P2(um, wFront - 0.7, h + 1.5); box(1.2, 1.5, 0.9, facadeMat(brick, "clap"), dp.x, dp.y, dp.z, ry); box(1.4, 0.15, 1.1, SLATE, dp.x, dp.y + 0.82, dp.z, ry);
     const ch = P2(ua + 0.4, (wFront + back) / 2, h + 3.2); box(0.6, 1.6, 1.2, facadeMat(brick, "plain"), ch.x, ch.y, ch.z, ry); }
   mansard(u0, u0 + n * W, back, wFront, h, 3.2); }
-{ const r = mulberry(21), BR = ["#8a4a34", "#7a3e2e", "#94563c", "#6e4434", "#9a6a4a"];
-  // Rogers Street: three- and four-storey brick row houses with shops below, on the far side of the street
-  for (let u = -70; u < 210;) { const n = 3 + (r() * 5 | 0), b = BR[r() * BR.length | 0]; rowhouses(u, n, -55.5, 14, r() < 0.3 ? 3 : 4, b, r); u += n * 5.6 + (r() < 0.3 ? 8 : 0.4); }
-  // the Boston Storage Warehouse: eight storeys of brick with arched windows, across Huntington Avenue
-  bldg(150, -20, 182, 92, 32, "#a8957a", "ware", { bay: 3.4, floor: 4.0 });
-  // a few factory chimneys in the distance: the 1903 panorama shows thin stacks well beyond the park
-  for (const [u, w, h] of [[-190, 260, 42], [40, 430, 36], [-300, 120, 46]]) { const c = P2(u, w), st = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.6, h, 12), facadeMat("#7a4434", "plain")); st.position.set(c.x, h / 2, c.z); st.castShadow = true; scene.add(st); box(2.6, 1, 2.6, CORNICE, c.x, h, c.z); }
-  for (let w = 96; w < 210;) { const L = 12 + r() * 10; bldg(150, w, 168, w + L, 10 + (r() * 3 | 0) * 3.6, BR[r() * BR.length | 0], r() < 0.5 ? "store" : "row", { bay: 3.4, floor: 3.6, chimneys: 2 }); w += L + 0.3; }
-  for (let w = -84; w < -24;) { const L = 13 + r() * 6; bldg(150, w, 168, w + L, 11 + (r() * 2 | 0) * 3.6, BR[r() * BR.length | 0], "store", { bay: 3.4, floor: 3.6, chimneys: 2 }); w += L + 0.3; }
-  // the trolley tracks down the middle of Huntington Avenue, a pair of electric cars, and the wooden poles for the overhead wire
-  for (const o of [-0.75, 0.75, 2.45, 3.95]) { const a = P2(137 + o, -200), b = P2(137 + o, 300), L = a.distanceTo(b), m = box(L, 0.04, 0.07, MAT.iron, (a.x + b.x) / 2, 0.02, (a.z + b.z) / 2); m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); }
-  for (let w = -150; w < 280; w += 30) { const p = P2(132.5, w); box(0.25, 7.5, 0.25, MAT.wood, p.x, 3.75, p.z); }
-  for (const [w, k] of [[10, 0], [140, 1]]) { const c = P2(137 + k * 3.2, w), car = new THREE.Group(); car.position.set(c.x, 0, c.z); car.rotation.y = -Math.atan2(WA.z, WA.x); scene.add(car);
+// a building with the exact footprint drawn in the atlas (pink is brick or stone, yellow is wood); walls get window bays at their real size
+const FACADE_X = new Map();
+function mapBldg(pts, h, brick, kind, o = {}) { const P = pts.map(([x, y]) => (o.crop ? fromCrop(x, y) : fromPlate(x, y))), bay = o.bay || 3.3, fl = o.floor || 3.6, pos = [], uv = [];
+  let area = 0; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; area += a.x * b.z - b.x * a.z; } const cw = area > 0;
+  for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], L = a.distanceTo(b), u1 = Math.max(1, Math.round(L / bay)), v1 = Math.max(1, Math.round(h / fl)), [p, q] = cw ? [b, a] : [a, b];
+    pos.push(p.x, 0, p.z, q.x, 0, q.z, q.x, h, q.z, p.x, 0, p.z, q.x, h, q.z, p.x, h, p.z); uv.push(0, 0, u1, 0, u1, v1, 0, 0, u1, v1, 0, v1); }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, o.mat || facadeMat(brick, kind)); m.castShadow = m.receiveShadow = true; scene.add(m);
+  const sh = new THREE.Shape(P.map(p => new THREE.Vector2(p.x, -p.z))), roof = new THREE.Mesh(new THREE.ShapeGeometry(sh).rotateX(-Math.PI / 2), o.roofMat || TAR); roof.position.y = h; scene.add(roof);
+  if (o.gable) { const a = P[0], b = P[1], c = P[2], len = a.distanceTo(b), span = b.distanceTo(c), mid = a.clone().add(c).multiplyScalar(0.5), sh2 = new THREE.Shape([new THREE.Vector2(-span / 2 - 0.3, 0), new THREE.Vector2(span / 2 + 0.3, 0), new THREE.Vector2(0, span * 0.33)]), rf = new THREE.Mesh(new THREE.ExtrudeGeometry(sh2, { depth: len + 0.6, bevelEnabled: false }).translate(0, 0, -(len + 0.6) / 2), o.roofMat || ROOFM);
+    rf.position.set(mid.x, h, mid.z); rf.rotation.y = Math.atan2(b.x - a.x, b.z - a.z); rf.castShadow = true; scene.add(rf); }
+  if (!o.gable && !o.noCornice) for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], L = a.distanceTo(b); const c = box(L + 0.5, 0.5, 0.5, CORNICE, (a.x + b.x) / 2, h + 0.15, (a.z + b.z) / 2); c.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); }
+  if (o.mansard) { const c = P.reduce((s, p) => s.add(p), V3(0, 0, 0)).multiplyScalar(1 / P.length); const sh3 = new THREE.Shape(P.map(p => new THREE.Vector2(p.x, -p.z))), mg = new THREE.ExtrudeGeometry(sh3, { depth: 2.8, bevelEnabled: false }); mg.rotateX(-Math.PI / 2); const pa = mg.attributes.position; for (let i = 0; i < pa.count; i++) if (pa.getY(i) > 1) { pa.setX(i, lerpN(pa.getX(i), c.x, 0.12)); pa.setZ(i, lerpN(pa.getZ(i), c.z, 0.12)); } mg.computeVertexNormals(); const mm = new THREE.Mesh(mg, SLATE); mm.position.y = h; mm.castShadow = true; scene.add(mm); }
+  if (o.chimneys) for (const [x, y, ch] of o.chimneys) { const c = o.crop ? fromCrop(x, y) : fromPlate(x, y), st = new THREE.Mesh(new THREE.CylinderGeometry(ch > 25 ? 1.2 : 0.7, ch > 25 ? 1.8 : 0.9, ch, 12), facadeMat("#7a4434", "plain")); st.position.set(c.x, ch / 2, c.z); st.castShadow = true; scene.add(st); (window.SMOKE_AT = window.SMOKE_AT || []).push(V3(c.x, ch + 0.5, c.z)); }
+  return m; }
+const WOOD_DARK = M(0x4e4238, { roughness: 0.95 }), WOOD_GREY = M(0x8a8478, { roughness: 0.95 });
+{ // the ground outside the park: streets, and vacant lots grown up in weeds (most of the land round the park was still unbuilt in 1903)
+  const lotT = tex(256, 256, (g, w, h) => { g.fillStyle = "#7a7458"; g.fillRect(0, 0, w, h); const r = mulberry(31); for (let i = 0; i < 4000; i++) { const v = r(); g.fillStyle = v < 0.4 ? "#6a6a44" : v < 0.7 ? "#8a8060" : v < 0.85 ? "#5a6a3a" : "#9a8a6a"; g.fillRect(r() * w, r() * h, 2 + r() * 3, 1 + r() * 3); } }, [120, 120]);
+  const vac = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: lotT, roughness: 1 })); vac.position.y = -0.06; vac.receiveShadow = true; scene.add(vac);
+  const strip = (a, b, w, mat, y = -0.03) => { const L = a.distanceTo(b), m = new THREE.Mesh(new THREE.PlaneGeometry(L, w).rotateX(-Math.PI / 2), mat); m.position.copy(a).add(b).multiplyScalar(0.5).setY(y); m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); m.receiveShadow = true; scene.add(m); return m; };
+  const STREET = new THREE.MeshStandardMaterial({ map: streetT, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1 }), GRASS2 = M(0x5a7a3a, { polygonOffset: true, polygonOffsetFactor: -2 }), WALK = M(0xa8a090, { polygonOffset: true, polygonOffsetFactor: -1 });
+  // Huntington Avenue: two roadways either side of the grass reservation with the trolley tracks, and brick sidewalks
+  const hA = HUNT_S[0], hB = HUNT_S[1], off = (p, d) => p.clone().addScaledVector(HUNT_N, -d), hw = 30.5;
+  strip(off(hA, -hw / 2), off(hB, -hw / 2), hw, STREET); strip(off(hA, -hw / 2), off(hB, -hw / 2), 8, GRASS2, -0.02); strip(off(hA, -1.6), off(hB, -1.6), 2.6, WALK, -0.025); strip(off(hA, -hw + 1.6), off(hB, -hw + 1.6), 2.8, WALK, -0.025);
+  for (const o of [-13.2, -14.6, -16.4, -17.8]) { const a = off(hA, o), b = off(hB, o), m = box(a.distanceTo(b), 0.04, 0.07, MAT.iron, (a.x + b.x) / 2, 0.02, (a.z + b.z) / 2); m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); }
+  { const L = hA.distanceTo(hB); for (let s = 0; s < L; s += 32) { const p = off(hA.clone().addScaledVector(HUNT_DIR, s), -hw / 2); box(0.22, 7.5, 0.22, MAT.wood, p.x, 3.75, p.z); const arm = box(5.5, 0.12, 0.12, MAT.wood, p.x, 7.2, p.z); arm.rotation.y = -Math.atan2(HUNT_N.z, HUNT_N.x); } }
+  for (const [s, k] of [[180, 0], [330, 1]]) { const c = off(hA.clone().addScaledVector(HUNT_DIR, s), k ? -17.1 : -13.9), car = new THREE.Group(); car.position.set(c.x, 0, c.z); car.rotation.y = -Math.atan2(HUNT_DIR.z, HUNT_DIR.x); scene.add(car);
     box(10, 2.4, 2.4, M(0x6a4a24), 0, 1.6, 0, 0, car); box(10.4, 0.3, 2.6, M(0x3a3028), 0, 3.0, 0, 0, car); box(9.6, 0.9, 2.42, M(0xd8c8a0), 0, 2.2, 0, 0, car); const pole = box(0.05, 3, 0.05, MAT.iron, 2, 4.4, 0, 0, car); pole.rotation.z = 0.6; }
-  // the railroad yards behind the first-base side: tracks, freight cars
-  for (let k = 0; k < 7; k++) { const u = -46 - k * 4.5; for (const o of [-0.72, 0.72]) { const a = P2(u + o, -200), b = P2(u + o, 300), L = a.distanceTo(b), m = box(L, 0.12, 0.08, MAT.iron, (a.x + b.x) / 2, 0.1, (a.z + b.z) / 2); m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); }
-    for (let w = -120 + r() * 30; w < 260; w += 12 + r() * 30) { if (r() < 0.45) continue; const c = P2(u, w), fc = box(11, 3.2, 2.8, M([0x6a3424, 0x5a3020, 0x4a3a30, 0x7a4a2a][r() * 4 | 0]), c.x, 1.9, c.z); fc.rotation.y = -Math.atan2(WA.z, WA.x); } }
-  // the roundhouse: a fan of brick engine stalls round a turntable, with a smoke jack over each stall
-  { const C = P2(-168, 150), R0 = 14, R1 = 34; for (let k = 0; k < 13; k++) { const a = Math.PI * 0.15 + k * Math.PI * 0.7 / 12, mid = (R0 + R1) / 2, p = V3(C.x + Math.cos(a) * mid, 0, C.z + Math.sin(a) * mid), st = box(R1 - R0, 7, 6.2, facadeMat("#5e3a2e", "plain"), p.x, 3.5, p.z, -a); box(R1 - R0 + 0.6, 0.4, 6.6, ROOFM, p.x, 7.2, p.z, -a);
-      const j = V3(C.x + Math.cos(a) * (R0 + 6), 0, C.z + Math.sin(a) * (R0 + 6)); box(0.8, 2.2, 0.8, M(0x2a2a2a), j.x, 8.4, j.z, -a); }
-    const tt = new THREE.Mesh(new THREE.CylinderGeometry(R0 - 2, R0 - 2, 0.3, 32), M(0x4a4440)); tt.position.set(C.x, 0.05, C.z); scene.add(tt); }
-  // the South End Grounds across the tracks: the Beaneaters' covered grandstand
-  { const c = P2(-128, 10), g = new THREE.Group(); g.position.set(c.x, 0, c.z); g.rotation.y = -Math.atan2(WA.z, WA.x); scene.add(g); box(70, 10, 16, MAT.board, 0, 5, 0, 0, g); box(72, 0.4, 19, MAT.roof, 0, 11.6, -1, 0, g); for (let i = -6; i <= 6; i++) box(0.3, 2.2, 0.3, MAT.col, i * 5.5, 10.9, 8, 0, g); box(60, 1.2, 0.2, MAT.paint, 0, 10.4, 8.1, 0, g); }
-  // beyond right field, as the September 1903 panorama shows it: a long, dark, gable-roofed barn right behind the fence (with ventilators along
-  // the ridge), and brick works behind it with a smoking chimney
-  { const c = P2(8, 116), ry = -Math.atan2(UA.z, UA.x), lu = 46, lw = 16, h = 7; const m = new THREE.Mesh(new THREE.BoxGeometry(lu, h, lw), facadeMat("#4a3a2e", "clap")); m.material = M(0x4e4238, { roughness: 0.95 }); m.position.set(c.x, h / 2, c.z); m.rotation.y = ry; m.castShadow = m.receiveShadow = true; scene.add(m);
-    const sh = new THREE.Shape([new THREE.Vector2(-lw / 2 - 0.4, 0), new THREE.Vector2(lw / 2 + 0.4, 0), new THREE.Vector2(0, lw * 0.32)]), rf = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: lu + 0.6, bevelEnabled: false }).translate(0, 0, -(lu + 0.6) / 2), M(0x3a3634)); rf.position.set(c.x, h, c.z); rf.rotation.y = ry + Math.PI / 2; rf.castShadow = true; scene.add(rf);
-    for (let k = 0; k < 5; k++) { const p = P2(8 - lu / 2 + 6 + k * (lu - 12) / 4, 116, h + lw * 0.32 + 0.6); box(1.6, 1.3, 1.6, M(0x5a5048), p.x, p.y, p.z, ry); box(2.2, 0.2, 2.2, M(0x3a3634), p.x, p.y + 0.75, p.z, ry); } }
-  for (let u = -30; u < 150;) { const L = 14 + r() * 10; bldg(u, 132, u + L, 150, 9 + (r() * 3 | 0) * 4, BR[r() * BR.length | 0], "row", { bay: 4, floor: 4, chimneys: 1 }); u += L + 1.5; }
-  // behind the first-base bleachers, across the railroad: long two- and three-storey factories with rows of windows, telegraph poles,
-  // a water tower, and the chimneys of their boiler houses (one big brick one, two slender iron ones), all in the 1903 panorama
-  for (let w = -20; w < 170;) { const L = 30 + r() * 25; bldg(-118, w, -96, w + L, 8 + (r() * 2 | 0) * 4, BR[r() * BR.length | 0], "low", { bay: 3.0, floor: 4.0 }); w += L + 2; }
-  for (let w = -30; w < 170; w += 26) { const p = P2(-90, w); box(0.22, 11, 0.22, MAT.wood, p.x, 5.5, p.z); const arm = box(2.4, 0.12, 0.12, MAT.wood, p.x, 10.2, p.z); arm.rotation.y = ROT_W; }
-  { const p = P2(-108, 92); for (const [dx, dz] of [[-1.6, -1.6], [1.6, -1.6], [1.6, 1.6], [-1.6, 1.6]]) box(0.25, 14, 0.25, MAT.wood, p.x + dx, 7, p.z + dz); const tk = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 5, 16), M(0x6a5a4a)); tk.position.set(p.x, 16.5, p.z); tk.castShadow = true; scene.add(tk); const cone = new THREE.Mesh(new THREE.ConeGeometry(3.3, 1.8, 16), M(0x4a4440)); cone.position.set(p.x, 19.9, p.z); scene.add(cone); }
-  const STACKS = [[-110, 52, 34, 1.8, 2.3, "brick"], [-112, 12, 30, 0.7, 0.8, "iron"], [-104, 128, 28, 0.6, 0.7, "iron"], [40, 160, 30, 1.2, 1.7, "brick"]];
-  window.SMOKE_AT = []; for (const [u, w, h, r0, r1, kind] of STACKS) { const c = P2(u, w), st = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, 12), kind === "brick" ? facadeMat("#7a4434", "plain") : M(0x2a2a2a, { metalness: 0.4, roughness: 0.6 })); st.position.set(c.x, h / 2, c.z); st.castShadow = true; scene.add(st); if (kind === "brick") box(r0 * 2.6, 0.8, r0 * 2.6, CORNICE, c.x, h, c.z); SMOKE_AT.push(V3(c.x, h + 0.5, c.z)); }
-  // telegraph poles along Rogers Street, with crossarms
-  for (let u = -60; u < 200; u += 30) { const c = P2(u, -51.5); box(0.22, 10, 0.22, MAT.wood, c.x, 5, c.z); const arm = box(2.2, 0.12, 0.12, MAT.wood, c.x, 9.3, c.z); arm.rotation.y = ROT_U; } }
-// the rest of the city out to the horizon: Back Bay, the South End and Roxbury as plain blocks of brick, three to six storeys
-{ const r = mulberry(77), BR = ["#8a4a34", "#7a3e2e", "#94563c", "#6e4434", "#9a6a4a"]; for (let u = -420; u <= 520; u += 34) for (let w = -420; w <= 520; w += 34) { const inPark = u > -100 && u < 200 && w > -90 && w < 175, rail = u > -95 && u < -40, round = Math.hypot(u + 168, w - 150) < 45 || (u > -145 && u < -88 && w > -45 && w < 180); if (inPark || rail || round || r() < 0.15) continue;
-    const h = (3 + (r() * 4 | 0)) * 3.6, uu = u + (r() - 0.5) * 4, ww = w + (r() - 0.5) * 4; const lu = 22 + r() * 8, lw = 22 + r() * 8; bldg(uu, ww, uu + lu, ww + lw, h, BR[r() * BR.length | 0], "row", { bay: 3.3, floor: 3.6, chimneys: r() < 0.5 ? 2 : 0 }); if (r() < 0.4) mansard(uu, uu + lu, ww, ww + lw, h, 3.0); } }
+  // Rogers Avenue over the Stony Brook culvert, and New Gravelly Point Road along the railroad
+  strip(ROGERS_L[0], ROGERS_L[1], 18, STREET); strip(ROAD_L[0], ROAD_L[1], 12, STREET); strip(ROAD_L[1], ROAD_L[2], 12, STREET);
+  // the Boston & Providence Railroad yards beyond the road
+  const rd = ROAD_L[1].clone().sub(ROAD_L[0]).normalize(), rn = V3(rd.z, 0, -rd.x), r = mulberry(5); { const m = ROAD_L[1].clone().lerp(ROAD_L[0], 0.3); if (inLot(m.x + rn.x * 15, m.z + rn.z * 15)) rn.negate(); }
+  for (let k = 0; k < 9; k++) { const o = 22 + k * 4.6, a = ROAD_L[0].clone().addScaledVector(rn, o).addScaledVector(rd, -100), b = ROAD_L[1].clone().addScaledVector(rn, o).addScaledVector(rd, 200); for (const e of [-0.72, 0.72]) { const pa = a.clone().addScaledVector(rn, e), pb = b.clone().addScaledVector(rn, e), m = box(pa.distanceTo(pb), 0.12, 0.08, MAT.iron, (pa.x + pb.x) / 2, 0.08, (pa.z + pb.z) / 2); m.rotation.y = -Math.atan2(pb.z - pa.z, pb.x - pa.x); }
+    for (let s = r() * 30; s < a.distanceTo(b); s += 14 + r() * 40) { if (r() < 0.5) continue; const c = a.clone().addScaledVector(rd, s), fc = box(11, 3.2, 2.8, M([0x6a3424, 0x5a3020, 0x4a3a30, 0x7a4a2a][r() * 4 | 0]), c.x, 1.9, c.z); fc.rotation.y = -Math.atan2(rd.z, rd.x); } } }
+const BR = ["#8a4a34", "#7a3e2e", "#94563c", "#6e4434", "#9a6a4a"];
+// across Huntington Avenue
+mapBldg([[430, 292], [562, 326], [547, 398], [416, 362]], 30, "#a8957a", "ware", { bay: 3.4, floor: 4.0 });   // Mass. Fire Proof Storage & Warehouse Co.
+mapBldg([[524, 266], [556, 275], [552, 292], [520, 284]], 10, "#8a4a34", "row");
+mapBldg([[205, 410], [275, 412], [300, 466], [268, 535], [242, 522], [220, 474]], 20, "#c0b49c", "row", { bay: 3.0, floor: 4.0 });   // Tufts Medical College
+mapBldg([[862, 68], [892, 72], [1010, 245], [1040, 385], [1010, 392], [982, 255], [868, 98]], 13, "#8a4a34", "row", { bay: 2.8, floor: 3.4, mansard: true });   // the row houses on Gainsborough Street
+mapBldg([[1022, 385], [1068, 392], [1066, 445], [1024, 440]], 15, "#8a8478", "plain", { gable: true, mat: M(0x8a8478) });   // the Church of the Messiah
+mapBldg([[875, 455], [1065, 515], [1060, 545], [870, 485]], 12, "#7a3e2e", "row", { bay: 2.8, floor: 3.4, mansard: true });
+mapBldg([[880, 540], [970, 560], [960, 600], [880, 585]], 6, "#8a6a4a", "clap", { mat: WOOD_GREY });   // Connecticut River Lumber Co.
+mapBldg([[985, 575], [1085, 605], [1080, 640], [980, 620]], 14, "#94563c", "row");
+mapBldg([[1120, 495], [1370, 495], [1370, 560], [1120, 560]], 13, "#8a4a34", "row", { bay: 2.8, floor: 3.4, mansard: true });
+mapBldg([[1060, 270], [1100, 270], [1100, 450], [1060, 450]], 13, "#7a3e2e", "row", { mansard: true }); mapBldg([[1160, 230], [1200, 230], [1200, 455], [1160, 455]], 13, "#94563c", "row", { mansard: true }); mapBldg([[1250, 200], [1300, 200], [1300, 455], [1250, 455]], 13, "#8a4a34", "row", { mansard: true });
+mapBldg([[1125, 575], [1290, 575], [1290, 640], [1125, 640]], 15, "#9a6a4a", "row");   // Children's Hospital
+mapBldg([[1378, 505], [1470, 505], [1470, 640], [1378, 640]], 22, "#8a4a34", "ware", { bay: 4.5, floor: 5.5 });   // Symphony Hall
+// on the park's side of the avenue, east of the grounds
+mapBldg([[1003, 700], [1088, 700], [1088, 830], [1003, 830]], 18, "#94563c", "row", { bay: 3.4, floor: 4.2 });   // New England Conservatory of Music
+mapBldg([[957, 880], [1085, 880], [1085, 1045], [957, 1045]], 8, "#4e4238", "clap", { mat: WOOD_DARK, gable: true });   // Boston Elevated Railway, wooden building
+mapBldg([[1112, 700], [1135, 700], [1135, 1050], [1112, 1050]], 12, "#7a3e2e", "row", { mansard: true });
+mapBldg([[1195, 940], [1225, 925], [1375, 1080], [1345, 1110]], 7, "#4e4238", "clap", { crop: true, mat: WOOD_DARK, gable: true });   // the barn behind the right-field fence
+mapBldg([[1290, 1160], [1330, 1160], [1330, 1192], [1290, 1192]], 4, "", "", { crop: true, mat: WOOD_GREY, noCornice: true });
+// the railroad: repair shops and roundhouse (brick), sheds along the road (wood)
+mapBldg([[368, 932], [565, 932], [565, 972], [368, 972]], 9, "#7a4434", "low", { bay: 3.0, floor: 4.5, chimneys: [[470, 952, 30], [530, 945, 22]] });
+mapBldg([[470, 895], [575, 895], [575, 930], [470, 930]], 9, "#6e4434", "low", { bay: 3.0, floor: 4.5 });
+mapBldg([[172, 995], [287, 995], [287, 1018], [172, 1018]], 7, "#7a4434", "low"); mapBldg([[62, 965], [143, 965], [143, 1015], [62, 1015]], 6, "", "", { mat: WOOD_GREY, gable: true });
+mapBldg([[600, 1335], [860, 1213], [872, 1238], [612, 1358]], 5, "", "", { crop: true, mat: WOOD_GREY, gable: true }); mapBldg([[855, 1200], [920, 1175], [945, 1232], [880, 1258]], 5, "", "", { crop: true, mat: WOOD_GREY, gable: true });
+{ const C = fromPlate(657, 935), R0 = 9, R1 = 30, base = Math.atan2(fromPlate(700, 935).z - C.z, fromPlate(700, 935).x - C.x); for (let k = 0; k < 15; k++) { const a = base + 0.75 + k * (Math.PI * 2 - 1.5) / 14, mid = (R0 + R1) / 2, p = V3(C.x + Math.cos(a) * mid, 0, C.z + Math.sin(a) * mid);
+    box(R1 - R0, 7, 5.6, facadeMat("#5e3a2e", "plain"), p.x, 3.5, p.z, -a); box(R1 - R0 + 0.6, 0.4, 6.0, ROOFM, p.x, 7.2, p.z, -a); const j = V3(C.x + Math.cos(a) * (R0 + 6), 0, C.z + Math.sin(a) * (R0 + 6)); box(0.8, 2.2, 0.8, M(0x2a2a2a), j.x, 8.4, j.z, -a); }
+  const tt = new THREE.Mesh(new THREE.CylinderGeometry(R0 - 1, R0 - 1, 0.3, 32), M(0x4a4440)); tt.position.set(C.x, 0.05, C.z); scene.add(tt);
+  const wt = fromPlate(592, 889); for (const [dx, dz] of [[-1.6, -1.6], [1.6, -1.6], [1.6, 1.6], [-1.6, 1.6]]) box(0.25, 12, 0.25, MAT.wood, wt.x + dx, 6, wt.z + dz); const tk = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 5, 16), M(0x6a5a4a)); tk.position.set(wt.x, 14.5, wt.z); tk.castShadow = true; scene.add(tk); const cone = new THREE.Mesh(new THREE.ConeGeometry(3.3, 1.8, 16), M(0x4a4440)); cone.position.set(wt.x, 17.9, wt.z); scene.add(cone);
+  const st = fromPlate(610, 960), sm = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.8, 28, 12), facadeMat("#7a4434", "plain")); sm.position.set(st.x, 14, st.z); scene.add(sm); window.SMOKE_AT.push(V3(st.x, 28.5, st.z)); }
+// small wooden houses by Rogers Avenue
+mapBldg([[90, 758], [110, 758], [110, 776], [90, 776]], 6, "", "", { mat: WOOD_GREY, gable: true }); mapBldg([[116, 762], [134, 762], [134, 778], [116, 778]], 6, "", "", { mat: WOOD_GREY, gable: true });
+// the city further off, beyond the atlas plate: the Back Bay and South End to the north and east as plain blocks of brick
+{ const r = mulberry(77); for (let x = -900; x <= 900; x += 40) for (let z = -900; z <= 900; z += 40) { const p = V3(x, 0, z), d = p.length(); if (d < 520 || r() < 0.2) continue; const ang = Math.atan2(x, -z); if (ang > -2.2 && ang < -0.9 && d < 700) continue;
+    const h = (3 + (r() * 3 | 0)) * 3.6, w = 24 + r() * 10, dd = 24 + r() * 10; const m = box(w, h, dd, facadeMat(BR[r() * BR.length | 0], "row"), x, h / 2, z); const g = m.geometry.attributes.uv; for (let i = 0; i < g.count; i++) g.setXY(i, g.getX(i) * 7, g.getY(i) * Math.round(h / 3.6)); } }
 
 // ---------- the game, play by play, from the official record ----------
 // The information used here was obtained free of charge from and is copyrighted by Retrosheet (www.retrosheet.org).
@@ -420,8 +487,8 @@ const cue = (t, fn) => GAME.cues.push({ t, fn });
 const team = hi => hi % 2 ? "BOS" : "PIT", other = t => t === "PIT" ? "BOS" : "PIT", P_ = n => PEOPLE[NAMES[n] || n];
 function fielder(n, hi = GAME.st.half) { const t = other(team(hi)); const e = LINEUP[t].find(([, p]) => POSN[p] === n); return PEOPLE[e[0]]; }
 function slotOf(tm, short) { if (short === "O'Brien") return 7; if (short === "Farrell") return 8; return LINEUP[tm].findIndex(([n]) => n === NAMES[short]); }
-function benchSpot(tm, k) { const b = BENCH[tm], along = tm === "PIT" ? WA : UA, back = tm === "PIT" ? UA : WA; return b.clone().addScaledVector(along, -3.6 + k * 0.72).addScaledVector(back, -0.1); }
-const benchFace = tm => tm === "PIT" ? ROT_U : ROT_W;
+function benchSpot(tm, k) { const B = BENCH[tm]; return B.p.clone().addScaledVector(B.along, -3.9 + k * 0.7); }
+const benchFace = tm => BENCH[tm].face;
 
 // ---------- the game's state: bases, outs, runs, whose turn ----------
 function freshState() { return { half: 0, bases: [null, null, null, null], outs: 0, score: { PIT: 0, BOS: 0 }, line: [[], []], order: { PIT: 0, BOS: 0 }, halfRuns: 0, card: [] }; }
@@ -611,19 +678,19 @@ function audioFrame() { if (!AUD.roar) return; const inside = CROWD.g.visible; A
 // (the batting orders printed, with a grid to keep score), a bag of peanuts, a glass of lemonade or a cigar.
 const signT = (lines, w = 512, h = 256, bg = "#f0e6c8", fg = "#2a1e14") => tex(w, h, (g) => { g.fillStyle = bg; g.fillRect(0, 0, w, h); g.strokeStyle = fg; g.lineWidth = 6; g.strokeRect(8, 8, w - 16, h - 16); g.fillStyle = fg; g.textAlign = "center"; lines.forEach(([t, s], i) => { g.font = `bold ${s}px Georgia`; g.fillText(t, w / 2, 20 + (i + 1) * (h - 30) / (lines.length + 0.3)); }); });
 const signMesh = (lines, w, h, p, ry, y) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: signT(lines), roughness: 0.9, side: THREE.DoubleSide })); m.position.copy(p).setY(y); m.rotation.y = ry; scene.add(m); return m; };
-const FACE_STREET = Math.atan2(WA.x, WA.z), FACE_IN = FACE_STREET + Math.PI;
-const BOOTH = P2(GATE_U - 7, -39.6), STAND = P2(GATE_U + 3.6, -30), GATEP = P2(GATE_U, -38);
-{ box(4.2, 2.8, 1.6, MAT.paint, BOOTH.x, 1.4, BOOTH.z, ROT_U); box(4.6, 0.15, 2.0, MAT.roof, BOOTH.x, 2.9, BOOTH.z, ROT_U);
-  for (const s of [-1, 1]) { const p = BOOTH.clone().addScaledVector(UA, s * 1.0).addScaledVector(WA, -0.82); box(0.7, 0.5, 0.02, M(0x1a1a1a), p.x, 1.45, p.z, ROT_U); }
-  signMesh([["WORLD'S CHAMPIONSHIP SERIES", 30], ["GRAND STAND  $1.00", 44], ["BLEACHERS & STANDING  50¢", 36]], 3.6, 1.0, BOOTH.clone().addScaledVector(WA, -0.83), ROT_W, 2.35);
-  signMesh([["TICKETS AT THE WINDOW", 34], ["BOSTON vs. PITTSBURG", 36]], 3.2, 0.9, GATEP.clone().addScaledVector(WA, -0.1), ROT_W, FENCE_H - 0.7);
-  box(0.4, FENCE_H, 0.4, MAT.paint, ...[GATEP.clone().addScaledVector(UA, -3)].map(q => [q.x, FENCE_H / 2, q.z]).flat()); box(0.4, FENCE_H, 0.4, MAT.paint, ...[GATEP.clone().addScaledVector(UA, 3)].map(q => [q.x, FENCE_H / 2, q.z]).flat());
-  box(0.6, 1.0, 3.6, MAT.wood, STAND.x, 0.5, STAND.z, ROT_U); box(1.6, 0.1, 4.2, MAT.roof, STAND.x, 2.6, STAND.z, ROT_U);
-  signMesh([["REFRESHMENTS", 40], ["Score Cards 5¢   Peanuts 5¢", 32], ["Lemonade 5¢   Cigars 5¢", 32]], 2.6, 1.0, STAND.clone().addScaledVector(UA, -0.4), ROT_U, 2.0); }
+const HG = GATES[0], FACE_STREET = Math.atan2(HG.n.x, HG.n.z), FACE_IN = FACE_STREET + Math.PI, ROT_G = -Math.atan2(HG.t.z, HG.t.x);
+const BOOTH = HG.c.clone().addScaledVector(HG.n, 4.5).addScaledVector(HG.t, -7), STAND = HG.c.clone().addScaledVector(HG.n, -6).addScaledVector(HG.t, 5), GATEP = HG.c.clone();
+// the ticket booth: a small wooden booth with a hipped roof and two grilled windows, set out on the Huntington Avenue sidewalk by the gate
+{ const ry = ROT_G, wood = M(0x5a4a36), trim = M(0xd8d0bc); box(4.4, 2.6, 2.0, wood, BOOTH.x, 1.3, BOOTH.z, ry); box(4.6, 0.25, 2.2, trim, BOOTH.x, 2.72, BOOTH.z, ry);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(3.4, 1.3, 4, 1), M(0x3a3632)); roof.position.set(BOOTH.x, 3.45, BOOTH.z); roof.rotation.y = ry + Math.PI / 4; roof.scale.set(1, 1, 0.55); scene.add(roof);
+  for (const sx of [-1, 1]) { const p = BOOTH.clone().addScaledVector(HG.t, sx * 1.05).addScaledVector(HG.n, 1.01); const win = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.6), new THREE.MeshStandardMaterial({ map: tex(64, 64, (g) => { g.fillStyle = "#1a1612"; g.fillRect(0, 0, 64, 64); g.strokeStyle = "#a89870"; g.lineWidth = 2; for (let x = 4; x < 64; x += 8) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 64); g.stroke(); } g.fillStyle = "#c8b890"; g.fillRect(20, 52, 24, 12); }) })); win.position.copy(p).setY(1.45); win.rotation.y = FACE_STREET; scene.add(win); box(0.9, 0.06, 0.25, trim, p.x, 1.12, p.z, ry); }
+  signMesh([["TICKETS", 44], ["GRAND STAND  $1.00", 34], ["BLEACHERS & STANDING  50¢", 30]], 3.6, 1.0, BOOTH.clone().addScaledVector(HG.n, 1.02), FACE_STREET, 2.25);
+  box(0.6, 1.0, 3.6, MAT.wood, STAND.x, 0.5, STAND.z, ry + Math.PI / 2); box(1.6, 0.1, 4.2, MAT.roof, STAND.x, 2.6, STAND.z, ry + Math.PI / 2);
+  signMesh([["REFRESHMENTS", 40], ["Score Cards 5¢   Peanuts 5¢", 32], ["Lemonade 5¢   Cigars 5¢", 32]], 2.6, 1.0, STAND.clone().addScaledVector(HG.n, 0.4), FACE_STREET, 2.0); }
 const STAFF = []; { const mk = (p, ry, coat = 0x2a2a2a, white = false) => { const P = makePerson("UMP", "", "staff"); P.G.position.copy(p); P.G.rotation.y = ry; setPose(P, "stand"); if (white) P.torso.children[0].material = M(0xf0eee6); STAFF.push(P); return P; };
-  mk(BOOTH.clone().addScaledVector(WA, 0.2), FACE_STREET + Math.PI); mk(GATEP.clone().addScaledVector(WA, 1.2).addScaledVector(UA, 1.4), FACE_IN + Math.PI); mk(STAND.clone().addScaledVector(UA, 0.9), ROT_U + Math.PI / 2, 0, true); }
+  mk(BOOTH.clone().addScaledVector(HG.n, -0.2), FACE_STREET + Math.PI); mk(GATEP.clone().addScaledVector(HG.n, -1.4).addScaledVector(HG.t, 1.6), FACE_IN + Math.PI); mk(STAND.clone().addScaledVector(HG.n, -0.9), FACE_IN, 0, true); }
 // vendors walking the aisles in white jackets
-const VENDORS = []; for (let i = 0; i < 4; i++) { const P = makePerson("UMP", "", "vendor"); P.torso.children[0].material = M(0xf0eee6); setPose(P, "stand"); const bk = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, 0.28), M(0x9a7a4a)); bk.position.set(0, -0.05, -0.12); P.handL.add(bk); VENDORS.push({ P, S: SECTIONS[i % 5], t: 0.2 + i * 0.2, dir: 1, row: 4 + i * 3, item: i % 2 ? "Score cards" : "Peanuts" }); }
+const VENDORS = []; for (let i = 0; i < 4; i++) { const P = makePerson("UMP", "", "vendor"); P.torso.children[0].material = M(0xf0eee6); setPose(P, "stand"); const bk = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, 0.28), M(0x9a7a4a)); bk.position.set(0, -0.05, -0.12); P.handL.add(bk); VENDORS.push({ P, S: SECTIONS[i % 3], t: 0.2 + i * 0.2, dir: 1, row: 3 + i * 3, item: i % 2 ? "Score cards" : "Peanuts" }); }
 
 // ---------- you: walking, sitting, money, what you hold ----------
 const ME = { x: 0, y: 0, z: 0, seat: null, money: 200, ticket: null, inside: false, holding: [] }; let yaw = 0, pitch = 0, vrYaw = 0, started = false, comfortVig = true; const keys = {}, prevB = {};
@@ -631,17 +698,15 @@ const VIG = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), new THREE.MeshBasi
 VIG.position.z = -0.35; VIG.renderOrder = 998; camera.add(VIG);
 const cents = c => c >= 100 ? "$" + (c / 100).toFixed(2) : c + "¢";
 function segHit(ax, az, bx, bz, cx, cz, dx, dz) { const d = (bx - ax) * (dz - cz) - (bz - az) * (dx - cx); if (Math.abs(d) < 1e-9) return false; const t = ((cx - ax) * (dz - cz) - (cz - az) * (dx - cx)) / d, u = ((cx - ax) * (bz - az) - (cz - az) * (bx - ax)) / d; return t >= 0 && t <= 1 && u >= 0 && u <= 1; }
-function tryMove(nx, nz) { for (const W of WALLS) if (segHit(ME.x, ME.z, nx, nz, W.a.x, W.a.z, W.b.x, W.b.z) && W.h > ME.y + 0.5) return; const [u, w] = toUW(nx, nz), [u0, w0] = toUW(ME.x, ME.z);
-  if (w0 < LOT.w0 !== w < LOT.w0 && Math.abs(u - GATE_U) < 3 && !ME.ticket) { say("The ticket taker stops you: \"Ticket, please.\" The windows are just along the street."); return; }
-  if (LF_GATE && Math.hypot(nx - LF_GATE.x, nz - LF_GATE.z) < 4) { const rOld = Math.hypot(ME.x, ME.z), rNew = Math.hypot(nx, nz), lim = fenceDist(-43.75); if (rOld > lim && rNew <= lim) { if (!ME.ticket) { say("A ticket taker at the Huntington Avenue gate: \"Ticket, please.\" The ticket windows are round on Rogers Street, behind third base."); return; } if (!ME.inside) { ME.inside = true; enterPark(); say(`The ticket taker tears your ${ME.ticket} ticket and waves you in.`); } } }
-  if (w0 < LOT.w0 !== w < LOT.w0 && Math.abs(u - GATE_U) < 3 && ME.ticket && !ME.inside) { ME.inside = true; say(`The ticket taker tears your ${ME.ticket} ticket and waves you in.`); drawPanel(); }
+function tryMove(nx, nz) { for (const W of WALLS) if (segHit(ME.x, ME.z, nx, nz, W.a.x, W.a.z, W.b.x, W.b.z) && W.h > ME.y + 0.5) return;
+  if (!inLot(ME.x, ME.z) && inLot(nx, nz)) { const G = GATES.find(g => Math.hypot(nx - g.c.x, nz - g.c.z) < 5) || GATES[0]; if (!ME.ticket) { say(G === GATES[0] ? "The ticket taker stops you: \"Ticket, please.\" The ticket booth is right here on the sidewalk." : "The gateman stops you: \"Ticket, please.\" Tickets are sold at the booth by the Huntington Avenue entrance."); return; } if (!ME.inside) { ME.inside = true; enterPark(); say(`The ticket taker tears your ${ME.ticket} ticket and waves you in.`); drawPanel(); } }
   const fy = floorAt(nx, nz); if (fy - ME.y > 0.55) return; ME.x = nx; ME.z = nz; }
 // the things you can do, with the nearest one in front of you
-const ACTS = [{ name: "Ticket window: grand stand, $1.00", p: BOOTH.clone().addScaledVector(UA, -1).addScaledVector(WA, -0.9), ok: () => !ME.ticket, act: () => buy("grand stand", 100, () => { ME.ticket = "grand stand"; enterPark(); }) },
-  { name: "Ticket window: bleachers & standing room, 50¢", p: BOOTH.clone().addScaledVector(UA, 1).addScaledVector(WA, -0.9), ok: () => !ME.ticket, act: () => buy("bleacher", 50, () => { ME.ticket = "bleacher"; enterPark(); }) },
-  { name: "Score card, 5¢", p: STAND.clone().addScaledVector(UA, -0.5).addScaledVector(WA, -1), ok: () => !ME.holding.includes("score card"), act: () => buy("score card", 5, () => holdItem("score card")) },
-  { name: "Bag of peanuts, 5¢", p: STAND.clone().addScaledVector(UA, -0.5), ok: () => !ME.holding.includes("peanuts"), act: () => buy("bag of peanuts", 5, () => holdItem("peanuts")) },
-  { name: "Glass of lemonade, 5¢", p: STAND.clone().addScaledVector(UA, -0.5).addScaledVector(WA, 1), ok: () => true, act: () => buy("glass of lemonade", 5, () => say("Cold lemonade, drunk at the stand; the glass goes back on the counter.")) }];
+const ACTS = [{ name: "Ticket window: grand stand, $1.00", p: BOOTH.clone().addScaledVector(HG.t, -1.05).addScaledVector(HG.n, 1.6), ok: () => !ME.ticket, act: () => buy("grand stand", 100, () => { ME.ticket = "grand stand"; enterPark(); }) },
+  { name: "Ticket window: bleachers & standing room, 50¢", p: BOOTH.clone().addScaledVector(HG.t, 1.05).addScaledVector(HG.n, 1.6), ok: () => !ME.ticket, act: () => buy("bleacher", 50, () => { ME.ticket = "bleacher"; enterPark(); }) },
+  { name: "Score card, 5¢", p: STAND.clone().addScaledVector(HG.n, -1).addScaledVector(HG.t, -1), ok: () => !ME.holding.includes("score card"), act: () => buy("score card", 5, () => holdItem("score card")) },
+  { name: "Bag of peanuts, 5¢", p: STAND.clone().addScaledVector(HG.n, -1), ok: () => !ME.holding.includes("peanuts"), act: () => buy("bag of peanuts", 5, () => holdItem("peanuts")) },
+  { name: "Glass of lemonade, 5¢", p: STAND.clone().addScaledVector(HG.n, -1).addScaledVector(HG.t, 1), ok: () => true, act: () => buy("glass of lemonade", 5, () => say("Cold lemonade, drunk at the stand; the glass goes back on the counter.")) }];
 function buy(what, c, then) { if (ME.money < c) { say(`You haven't enough money for a ${what}.`); return; } ME.money -= c; then(); say(`You pay ${cents(c)} for a ${what}. You have ${cents(ME.money)} left.`); drawPanel(); }
 let NEAR = null;
 function findNear() { const p = V3(ME.x, 0, ME.z); let best = null, bd = 2.4; for (const A of ACTS) { if (!A.ok()) continue; const d = A.p.distanceTo(p); if (d < bd) { bd = d; best = A; } }
@@ -670,11 +735,14 @@ const SIGHTS = [{ name: "The tool shed", p: dir(0.05).multiplyScalar(fenceDist(3
   { name: "The scoreboard", p: dir(33 * Math.PI / 180).multiplyScalar(fenceDist(33)).setY(FENCE_H + 2), r: 6, text: "Mounted above the right-field fence. Boys hang the numbers for each half-inning by hand." },
   { name: "The ropes and the overflow crowd", p: dir(-0.3).multiplyScalar(ropeDist(-17)).setY(1), r: 25, text: "The park seats about 9,000; 16,242 paid today. The rest stand in the outfield behind ropes, and on the bank and the fence in left. The ground rule for the day: a ball hit into the crowd is a three-base hit." },
   { name: "The Royal Rooters", p: ROOTERS_AT, r: 10, text: "Boston's most devoted fans, led by Michael 'Nuf Ced' McGreevy, who keeps a saloon on Columbus Avenue. They have reserved seats in the bleachers behind first base, and they sing." },
-  { name: "The South End Grounds", p: P2(-128, 10, 8), r: 30, text: "Across the railroad tracks: the home of Boston's National League club, the Beaneaters. When the American League put a team here in 1901, it built this park almost next door." },
-  { name: "The Boston Storage Warehouse", p: P2(165, 35, 15), r: 40, text: "A huge brick storage warehouse on Huntington Avenue, beyond left field." },
-  { name: "Huntington Avenue", p: P2(137, 60, 2), r: 30, text: "Electric trolleys run down the middle of the avenue; most of the crowd came by streetcar." },
-  { name: "The covered grand stand", p: P2(-25, -25, 6), r: 18, text: "A roof of expanded metal and roughcast concrete on 28-ft columns, the rest of it wood. $1 today." },
-  { name: "The wire screen", p: P2(-12, -12, 3), r: 6, text: "Wire netting behind home plate, to keep foul balls out of the best seats." }];
+  { name: "The Mass. Fire Proof Storage & Warehouse Co.", p: fromPlate(490, 345).setY(15), r: 30, text: "The huge storage warehouse across Huntington Avenue, beyond left field. The famous bird's-eye photograph of the park during this Series was taken from its roof." },
+  { name: "Tufts Medical College", p: fromPlate(250, 470).setY(10), r: 25, text: "Tufts College's new medical school building (1901), across Huntington Avenue at Rogers Avenue: the big pale building in the photograph of the crowd at the entrance." },
+  { name: "Huntington Avenue", p: HG.c.clone().addScaledVector(HG.n, 16).setY(2), r: 30, text: "A 100-ft avenue with a grass reservation down the middle carrying the electric trolleys of the Boston Elevated Railway; most of the crowd came by streetcar. Across it, much of the land is still vacant, waiting to be built on." },
+  { name: "The Boston & Providence Railroad shops", p: fromPlate(470, 950).setY(6), r: 40, text: "Across New Gravelly Point Road: the railroad's repair shops and roundhouse, with its turntable, water tank and chimneys. Their smoke drifts over the first-base bleachers." },
+  { name: "The New England Conservatory of Music", p: fromPlate(1045, 765).setY(9), r: 20, text: "Opened in 1902 on Huntington Avenue, a block east of the ball grounds." },
+  { name: "Symphony Hall", p: fromPlate(1424, 572).setY(12), r: 25, text: "Home of the Boston Symphony Orchestra, opened in 1900 at Huntington and Massachusetts Avenues." },
+  { name: "The covered grand stand", p: fromCrop(250, 950).setY(6), r: 18, text: "A roof of expanded metal and roughcast concrete on 28-ft columns, the rest of it wood: the curved section behind the plate. $1 today. The open wings are the bleachers." },
+  { name: "The wire screen", p: fromCrop(345, 900).setY(3), r: 6, text: "Wire netting behind home plate, to keep foul balls out of the best seats." }];
 const LABEL = (() => { const c = document.createElement("canvas"); c.width = 512; c.height = 64; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true })); sp.renderOrder = 20; sp.visible = false; scene.add(sp); return { c, t, sp, text: "" }; })();
 let LOOK = null; const _eye = V3(0, 0, 0), _dir = V3(0, 0, 0);
 function updateLook() { camera.getWorldPosition(_eye); camera.getWorldDirection(_dir); let best = null, bs = 1e9; const consider = (name, text, p, r) => { const v = p.clone().sub(_eye), d = v.length(); if (d < 0.5 || d > 200) return; const ang = Math.acos(clampN(v.dot(_dir) / d, -1, 1)), tol = Math.atan(r / d) + 0.015; if (ang > tol) return; const s = ang / tol + d * 0.002; if (s < bs) { bs = s; best = { name, text, p }; } };
@@ -693,7 +761,7 @@ function toast(text) { const g = TOAST.c.getContext("2d"); g.clearRect(0, 0, 102
 const say = (t, s = 4) => { MSG.textContent = t; MSG.style.display = "block"; msgT = s; toast(t); TOAST.m.visible = renderer.xr.isPresenting; };
 function wrap(g, text, x, y, w, lh) { const words = text.split(" "); let line = ""; for (const wd of words) { if (g.measureText(line + wd).width > w) { g.fillText(line, x, y); line = ""; y += lh; } line += wd + " "; } g.fillText(line, x, y); return y + lh; }
 let preT = 8 * 60; const preStr = () => preT > 0 ? `First pitch in ${Math.floor(preT / 60)}:${String(Math.floor(preT % 60)).padStart(2, "0")}` : "Play ball!";
-const GOTO = [["seat", "Seat behind home"], ["rooters", "Royal Rooters"], ["bleach3", "3rd-base bleachers"], ["field", "Behind the plate"], ["lf", "Left-field crowd"], ["street", "Rogers Street"]];
+const GOTO = [["seat", "Grand stand"], ["rooters", "Royal Rooters"], ["bleach3", "3rd-base bleachers"], ["field", "Behind the plate"], ["lf", "Left-field crowd"], ["street", "Huntington Ave."]];
 const BTN = [{ id: "next", label: "Next play", x: 16, y: 470, w: 196, h: 50 }, { id: "half", label: "Next half-inning", x: 222, y: 470, w: 236, h: 50 }, { id: "pause", label: "Pause", x: 468, y: 470, w: 156, h: 50 },
   ...Array.from({ length: 9 }, (_, k) => ({ id: "inn" + (k + 1), label: String(k + 1), x: 16 + k * 68, y: 528, w: 60, h: 44 })), { id: "pace", label: "Pace", x: 16, y: 580, w: 300, h: 44 }, { id: "vig", label: "Vignette", x: 326, y: 580, w: 298, h: 44 },
   ...GOTO.map(([id, label], k) => ({ id: "go_" + id, label, x: 16 + (k % 3) * 204, y: 660 + (k / 3 | 0) * 54, w: 196, h: 46 }))];
@@ -704,8 +772,8 @@ function pressBtn(id) { if (id === "next") { if (!GAME.on) startGame(); else nex
 const FADE = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 12), new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide, transparent: true, opacity: 0, depthTest: false, depthWrite: false, fog: false })); FADE.renderOrder = 1000; FADE.visible = false; camera.add(FADE); let fadeT = -1, fadeDo = null;
 function teleport(where) { fadeDo = () => { if (ME.seat) { ME.seat.taken = false; ME.seat = null; } if (where !== "street") { enterPark(); if (!ME.ticket) ME.ticket = "grand stand"; ME.inside = true; }
     const seatNear = (sec, p) => { let best = null, bd = 1e9; for (const s of SEATS) { if (s.taken || s.sec !== sec) continue; const d = s.p.distanceTo(p); if (d < bd) { bd = d; best = s; } } return best; };
-    if (where === "seat") { const s = seatNear("grandstand behind home", P2(-GS - 6, -GS - 6, 3)); if (s) sit(s); } else if (where === "rooters") { const s = seatNear("first-base bleachers", ROOTERS_AT); if (s) sit(s); } else if (where === "bleach3") { const s = seatNear("third-base bleachers", P2(60, -22, 2)); if (s) sit(s); }
-    else { const p = where === "field" ? V3(0.5, 0, 12) : where === "lf" ? dir(-0.55).multiplyScalar(ropeDist(-31) + 1.0) : P2(GATE_U - 12, -45); ME.x = p.x; ME.z = p.z; ME.y = floorAt(p.x, p.z); }
+    if (where === "seat") { const s = seatNear("grand stand", fromCrop(250, 930).setY(3)); if (s) sit(s); } else if (where === "rooters") { const s = seatNear("first-base bleachers", ROOTERS_AT); if (s) sit(s); } else if (where === "bleach3") { const s = seatNear("third-base bleachers", fromCrop(370, 660).setY(2)); if (s) sit(s); }
+    else { const p = where === "field" ? V3(0.5, 0, 12) : where === "lf" ? dir(-0.55).multiplyScalar(ropeDist(-31) + 1.0) : HG.c.clone().addScaledVector(HG.n, 10).addScaledVector(HG.t, -10); ME.x = p.x; ME.z = p.z; ME.y = floorAt(p.x, p.z); }
     say(GOTO.find(g => g[0] === where)[1]); }; fadeT = 0; FADE.visible = true; }
 const gameLine = () => { const S = GAME.st; if (!GAME.on || !S) return preStr(); const h = GAME.phase === "change" ? "Between innings" : GAME.phase === "over" ? "Final" : HALF_NAME(S.half); return `Pittsburg ${S.score.PIT}, Boston ${S.score.BOS} · ${h}${GAME.phase === "over" ? "" : " · " + S.outs + " out"}`; };
 const atBat = () => { const S = GAME.st; if (!GAME.on || !S || GAME.phase === "over" || !GAME.batter) return ""; const r = [1, 2, 3].filter(b => S.bases[b]).map(b => `${S.bases[b]} on ${["", "first", "second", "third"][b]}`); return `At bat: ${GAME.batter.short} · count ${GAME.balls}-${GAME.strikes}${r.length ? " · " + r.join(", ") : ""}`; };
@@ -738,7 +806,7 @@ let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag
 addEventListener("pointermove", e => { if (!drag) return; yaw -= (e.clientX - drag.x) * 0.004; pitch = clampN(pitch - (e.clientY - drag.y) * 0.004, -1.4, 1.4); drag.x = e.clientX; drag.y = e.clientY; }); addEventListener("pointerup", () => drag = null);
 const HANDS = [0, 1].map(i => { const grip = renderer.xr.getControllerGrip(i); rig.add(grip); const hand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.11), SKIN); grip.add(hand); const H = { grip, src: null };
   grip.addEventListener("connected", e => { H.src = e.data; if (e.data.handedness === "left") { PANEL.me.position.set(0, 0.05, 0.12); PANEL.me.rotation.set(-Math.PI / 2 + 0.8, 0, 0); grip.add(PANEL.me); } else { CARD.m.position.set(0, 0.02, -0.1); CARD.m.rotation.set(-1.0, 0, 0); grip.add(CARD.m); BAG.position.set(0.05, 0, -0.05); grip.add(BAG); } }); return H; });
-function begin() { audioInit(); if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); const s = P2(GATE_U - 14, -46); ME.x = s.x; ME.z = s.z; yaw = vrYaw = ROT_U + 0.25; HUD.style.display = renderer.xr.isPresenting ? "none" : "block"; drawPanel(); say("Rogers Street, Boston, a little before game time. Buy a ticket at the green booth ahead (walk up to its window and pull the trigger), then go in through the gate.", 9); }
+function begin() { audioInit(); if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); const s = HG.c.clone().addScaledVector(HG.n, 11).addScaledVector(HG.t, -14); ME.x = s.x; ME.z = s.z; yaw = vrYaw = Math.atan2(HG.n.x, HG.n.z) + 0.6; HUD.style.display = renderer.xr.isPresenting ? "none" : "block"; drawPanel(); say("Huntington Avenue, Boston, a little before game time. Buy a ticket at the booth by the gate (walk up to its window and pull the trigger), then go in under the arch.", 9); }
 document.getElementById("intro")?.addEventListener("click", begin);
 const VRB = document.getElementById("vr"); if (navigator.xr) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (!ok) return; VRB.style.display = "block"; VRB.onclick = async () => { const s = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); DIAG.stage("entering VR"); await renderer.xr.setSession(s); frame = 0; begin(); HUD.style.display = "none"; }; });
 
@@ -747,7 +815,7 @@ DIAG.stage("merging the scenery");
 const SMOKE = []; { const st = tex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 2, 32, 32, 30); gr.addColorStop(0, "rgba(200,200,200,0.55)"); gr.addColorStop(1, "rgba(200,200,200,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); }); const sm = new THREE.SpriteMaterial({ map: st, transparent: true, depthWrite: false, fog: true });
   for (const p of (window.SMOKE_AT || [])) for (let k = 0; k < 10; k++) { const sp = new THREE.Sprite(sm.clone()); sp.userData = { p, t: k / 10 }; scene.add(sp); SMOKE.push(sp); } }
 function updateSmoke(dt) { for (const sp of SMOKE) { const u = sp.userData; u.t = (u.t + dt * 0.06) % 1; const s = 2 + u.t * 14; sp.position.copy(u.p).add(V3(u.t * 30, u.t * 18, u.t * 12)); sp.scale.set(s, s, 1); sp.material.opacity = (1 - u.t) * 0.7; } }
-signMesh([["REFRESHMENTS", 46]], 3.6, 0.8, P2(-17.8, 43.5), ROT_U + Math.PI, 2.4);
+
 // ---------- drawing it cheaply: everything that never moves is merged into one mesh per material ----------
 { const groups = new Map(), keep = new Set([window.FLAG, BALL, ...SMOKE]); for (const o of [...scene.children]) { if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || keep.has(o)) continue; if (!groups.has(o.material)) groups.set(o.material, []); groups.get(o.material).push(o); }
   scene.updateMatrixWorld(true);
@@ -774,12 +842,12 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.05), v
   if (!started) { renderer.render(scene, camera); return; } if (act && HOVER) pressBtn(HOVER); else if (act && POINT_HIT) {} else if (act && NEAR) NEAR.act();
   camera.getWorldQuaternion(_fq); const moving = !!(mx || my);
   if (moving && ME.seat) standUp(); if (moving && !ME.seat) { const f = V3(0, 0, -1).applyQuaternion(_fq); f.y = 0; f.normalize(); const sd = V3(-f.z, 0, f.x), sp = run ? 3.2 : 1.4; tryMove(ME.x + (f.x * -my + sd.x * mx) * sp * dt, ME.z + (f.z * -my + sd.z * mx) * sp * dt); }
-  const inside = toUW(ME.x, ME.z)[1] > LOT.w0 + 0.3; CROWD.g.visible = inside; for (const P of Object.values(PEOPLE)) P.G.visible = inside; for (const V of VENDORS) V.P.G.visible = inside;
+  const inside = inLot(ME.x, ME.z); CROWD.g.visible = inside; for (const P of Object.values(PEOPLE)) P.G.visible = inside; for (const V of VENDORS) V.P.G.visible = inside;
   const fy = ME.seat ? ME.seat.p.y - 0.42 : floorAt(ME.x, ME.z); ME.y = lerpN(ME.y, fy, 0.35);
   rig.position.set(ME.x, ME.y, ME.z); rig.rotation.set(0, vr ? vrYaw : 0, 0); if (vr && ME.seat) rig.position.y = ME.seat.p.y + 0.78 - camera.position.y; if (!vr) { camera.position.set(0, ME.seat ? 0.42 + 0.78 : 1.6, 0); camera.rotation.set(pitch, yaw, 0, "YXZ"); }
   if (window.CAM_OVERRIDE) { rig.position.copy(CAM_OVERRIDE.p); rig.rotation.set(0, 0, 0); camera.position.set(0, 0, 0); camera.lookAt(CAM_OVERRIDE.t); }
   VIG.material.opacity = comfortVig && moving ? lerpN(VIG.material.opacity, run ? 0.7 : 0.45, 0.1) : lerpN(VIG.material.opacity, 0, 0.15); VIG.visible = VIG.material.opacity > 0.01;
-  for (const V of VENDORS) { const S = V.S; V.t += V.dir * dt * 0.6 / S.L; if (V.t > 0.95 || V.t < 0.05) V.dir *= -1; const p = S.o.clone().addScaledVector(S.A, V.t * S.L).addScaledVector(S.out, (V.row + 0.15) * S.rowD); V.P.G.position.set(p.x, (V.row + 1) * S.rowH, p.z); V.P.G.rotation.y = Math.atan2(-S.A.x * V.dir, -S.A.z * V.dir); }
+  for (const V of VENDORS) { const S = V.S, Ln = S.rowLine(V.row, 0.2), L = polyLen(Ln); V.t += V.dir * dt * 0.6 / L; if (V.t > 0.95 || V.t < 0.05) V.dir *= -1; const [p, t] = alongLine(Ln, V.t * L); V.P.G.position.set(p.x, (V.row + 1) * S.rowH, p.z); V.P.G.rotation.y = Math.atan2(-t.x * V.dir, -t.z * V.dir); }
   if (window.FLAG) { const pa = FLAG.geometry.attributes.position, tt = performance.now() / 1000; for (let i = 0; i < pa.count; i++) { const x = pa.getX(i) + 1.7; pa.setZ(i, Math.sin(x * 2.2 - tt * 4) * 0.12 * x / 3.4); } pa.needsUpdate = true; }
   if (fadeT >= 0) { fadeT += dt; const u = fadeT / 0.25; FADE.material.opacity = u < 1 ? u : Math.max(0, 2 - u); if (u >= 1 && fadeDo) { const f = fadeDo; fadeDo = null; f(); } if (u >= 2) { fadeT = -1; FADE.visible = false; } }
   if (preT > 0) { preT -= dt; if (preT <= 0) { say("\"Play ball!\" Umpire Connolly calls it, and Cy Young steps onto the pitcher's slab.", 6); startGame(); } }
