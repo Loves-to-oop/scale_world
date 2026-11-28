@@ -45,7 +45,10 @@ const STRATA = [
   ["Eminence and Potosi Dolomites", 2900, 3400, "about 490 million years (Cambrian)", "dolomite with sparkling quartz drusy cavities", "dolomite", "#b4a482", ["stromatolite"], "regional"],
   ["Davis and Eau Claire Formations", 3400, 3900, "about 500 million years", "sandy dolomite, siltstone and shale with worm burrows and trilobites", "shale", "#8a7e6a", ["trilobite", "burrow"], "regional"],
   ["Mt. Simon Sandstone", 3900, 4300, "about 510 million years", "coarse crossbedded sandstone laid on the bare ancient continent: the deepest sedimentary layer", "sandstone", "#c8a882", [], "regional"],
-  ["Precambrian granite", 4300, 4400, "about 1.4 billion years", "pink granite and rhyolite: the basement of the continent, older than all life you could see", "granite", "#b88a7a", [], "regional"]];
+  ["Precambrian granite and rhyolite", 4300, 32800, "about 1.47 billion years", "pink granite and rhyolite of the Eastern Granite-Rhyolite Province, the buried floor of the continent, cut by pegmatite veins and dikes", "granite", "#b88a7a", ["pegmatite", "dike"], "basement"],
+  ["Middle crust: gneiss", 32800, 72200, "older than 1.5 billion years (age not known)", "banded gneiss and amphibolite: rock squeezed and heated until it flowed like taffy", "gneiss", "#8a8478", ["gneiss", "dike"], "seismic"],
+  ["Lower crust: granulite", 72200, 190300, "1.5 billion years or more", "dense dark granulite with garnet and pyroxene, and deeper probably basalt added from below, where seismic waves speed up; the crust here is unusually thick", "granulite", "#55504a", ["garnet"], "seismic"],
+  ["Upper mantle: peridotite", 190300, 196900, "the mantle", "green peridotite, mostly olivine with pyroxene and garnet: hot and, over millions of years, slowly flowing", "peridotite", "#5e6a3a", ["peridotite"], "seismic"]];
 // fill the gaps (shale between named beds) so the column is continuous
 for (let i = STRATA.length - 1; i > 0; i--) { const a = STRATA[i - 1], b = STRATA[i]; if (a[2] < b[1]) STRATA.splice(i, 0, ["Carbondale Formation (shale)", a[2], b[1], "about 310 million years", "shale and claystone", "shale", "#7c7c74", [], "isgs"]); }
 const FOSSIL_INFO = { snail: ["Land snails", "Tiny shells of snails that lived on the cold, grassy plains of the ice age; loess is full of them."], pebble: ["Glacial pebbles", "Stones dragged hundreds of miles by the ice sheet from Canada and the upper Midwest: granite, basalt, quartzite."],
@@ -57,5 +60,23 @@ const FOSSIL_INFO = { snail: ["Land snails", "Tiny shells of snails that lived o
   bryozoan: ["Bryozoans (Archimedes)", "Colonies of tiny animals; Archimedes grew around a corkscrew-shaped axis."], acrocyathus: ["Acrocyathus", "A colonial coral, its many-sided cells packed like a honeycomb: a marker of the St. Louis Limestone."],
   chert: ["Chert nodules", "Lumps of flint-like silica, grown in the limestone; people made arrowheads from them."], geode: ["Geodes", "Hollow balls lined with quartz crystals, grown in the Warsaw shale; the Keokuk area is world-famous for them."],
   chaincoral: ["Chain coral (Halysites)", "A Silurian colonial coral whose tubes join in chains."], trilobite: ["Trilobites", "Armoured sea creatures; the Ordovician Isotelus grew more than a foot long."],
+  pegmatite: ["Pegmatite vein", "Giant crystals of white and pink feldspar, quartz and mica, grown from the last watery melt as the granite cooled."], dike: ["Dike", "A sheet of once-molten rock that forced its way up a crack and froze there."], gneiss: ["Banded gneiss", "Rock squeezed and heated so deep that its minerals separated into light and dark bands without melting."], garnet: ["Garnets", "Deep red crystals that grow only at the high pressures and temperatures of the deep crust."], peridotite: ["Olivine (peridot)", "Green olivine, the most common mineral of the upper mantle; the gem peridot is olivine. Pieces like this come up in volcanoes."],
   nautiloid: ["Straight nautiloids", "Relatives of the squid with long cone-shaped shells, divided into chambers."], stromatolite: ["Stromatolites and oncolites", "Layered mounds (stromatolites) and balls (oncolites) built by mats of microbes in shallow water: the oldest kind of fossil."], burrow: ["Worm burrows", "Tunnels left in the sea-floor mud by animals; their bodies were too soft to be preserved."] };
 
+
+// rock features rather than fossils in the deep layers
+const ROCKY = new Set(["pegmatite", "dike", "gneiss", "garnet", "peridotite", "geode", "chert", "pebble"]);
+// the temperature of the rock (deg C) at a depth below the ground outside, from heat flow (about 50 mW per square metre in southwestern Illinois) and
+// the heat made by radioactivity in the crust: about 13 C near the surface, 40 C at the granite, about 730 C at the base of the crust
+function tempC(dm) { const z = Math.max(0, dm) / 1000; if (z <= 10) return 13 + 20 * z - 0.24 * z * z; const z2 = z - 10; return 189 + 15.2 * z2 - 0.08 * z2 * z2; }
+const fmtTemp = c => `${Math.round(c * 9 / 5 + 32)} °F (${Math.round(c)} °C)`;
+const depthAtTemp = T => { let lo = 0, hi = 60000; for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (tempC(m) < T) lo = m; else hi = m; } return lo / 0.3048; };
+// things to pass on the way down: [depth in ft below the ground, title, what it is]
+const MARKS = [[13123, "As deep as the deepest mine", "Mponeng gold mine in South Africa goes about 4 km (2.5 miles) down, the deepest anyone works."],
+  [Math.round(depthAtTemp(122)), "The limit of life", "Microbes live in rock miles down, but none known can live above about 122 C (252 F). Here the rock reaches that, so below this the rock is probably lifeless."],
+  [29032, "Mount Everest, upside down", "Mount Everest is 8,849 m (29,032 ft) tall: stood on its head here, its summit would just reach this depth."],
+  [35876, "As deep as the deepest ocean", "Challenger Deep in the Pacific is 10,935 m (35,876 ft) deep."],
+  [40230, "The deepest hole ever drilled", "The Kola Superdeep Borehole in Russia reached 12,262 m (40,230 ft) in 1989. Below here, no person or drill has ever been."],
+  [49200, "Where Illinois earthquakes start", "Most earthquakes in Illinois begin roughly 5 to 20 km down, in rock still cold and stiff enough to snap."],
+  [Math.round(depthAtTemp(350)), "Where rock begins to flow", "At about 350 C (660 F) the rock is hot enough to bend and creep slowly instead of breaking, so earthquakes are rare below here."],
+  [190300, "The Moho: the base of the crust", "Seismic waves suddenly speed up here, to about 8 km a second, as they pass from crust into mantle. Under the St. Louis area it is about 57 to 62 km down (EarthScope OIINK seismic experiment), much deeper than the usual 35 to 40 km."]];
