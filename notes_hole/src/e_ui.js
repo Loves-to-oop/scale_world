@@ -1,18 +1,4 @@
 
-// ---------- the room above, drawn only on a screen or in VR (in mixed reality your own room is there instead) ----------
-const ROOM = new THREE.Group(); scene.add(ROOM);
-const RC = V3(0.6, 0, 0.3), RW = 5.0, RD = 4.2, RH = 2.5;
-{ const wood = texOf((g) => { for (let y = 0; y < 256; y += 32) { g.fillStyle = `rgb(${150 + Math.random() * 30},${105 + Math.random() * 20},${60 + Math.random() * 15})`; g.fillRect(0, y, 256, 32); g.fillStyle = "rgba(0,0,0,0.3)"; g.fillRect(0, y, 256, 1.5); g.fillRect(Math.random() * 256, y, 1.5, 32); for (let k = 0; k < 6; k++) { g.strokeStyle = "rgba(80,50,20,0.15)"; g.beginPath(); g.moveTo(0, y + Math.random() * 32); g.lineTo(256, y + Math.random() * 32); g.stroke(); } } }); wood.repeat.set(0.6, 0.6);
-  const sh = new THREE.Shape([[-RW / 2, -RD / 2], [RW / 2, -RD / 2], [RW / 2, RD / 2], [-RW / 2, RD / 2]].map(([x, z]) => new THREE.Vector2(x + RC.x, -(z + RC.z)))), hole = new THREE.Path(); hole.absarc(0, 0, R_HOLE, 0, Math.PI * 2, true); sh.holes.push(hole);
-  ROOM.add(new THREE.Mesh(new THREE.ShapeGeometry(sh, 48).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: wood, roughness: 0.6 })));
-  const wall = M(0xe8e2d4), walls = new THREE.Mesh(new THREE.BoxGeometry(RW, RH, RD), [0, 1, 2, 3, 4, 5].map(i => i === 3 ? new THREE.MeshStandardMaterial({ visible: false }) : i === 2 ? M(0xf4f2ec) : wall)); walls.material.forEach(m => m.side = THREE.BackSide); walls.position.copy(RC).setY(RH / 2); ROOM.add(walls);
-  const bx = (w, h, d, c, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), M(c)); m.position.set(x, y, z); ROOM.add(m); return m; };
-  bx(RW, 0.1, 0.02, 0xf8f6f0, RC.x, 0.05, RC.z - RD / 2 + 0.01); bx(RW, 0.1, 0.02, 0xf8f6f0, RC.x, 0.05, RC.z + RD / 2 - 0.01);
-  bx(2.0, 0.42, 0.85, 0x5a6a7a, RC.x + 0.3, 0.21, RC.z + RD / 2 - 0.5); bx(2.0, 0.45, 0.2, 0x56667a, RC.x + 0.3, 0.6, RC.z + RD / 2 - 0.1); for (const s of [-1, 1]) bx(0.2, 0.62, 0.85, 0x56667a, RC.x + 0.3 + s * 1.1, 0.31, RC.z + RD / 2 - 0.5);
-  bx(1.1, 0.04, 0.55, 0x7a5a3a, RC.x + 0.3, 0.42, RC.z + RD / 2 - 1.5); for (const [dx, dz] of [[-0.5, -0.22], [0.5, -0.22], [-0.5, 0.22], [0.5, 0.22]]) bx(0.04, 0.4, 0.04, 0x5a4028, RC.x + 0.3 + dx, 0.2, RC.z + RD / 2 - 1.5 + dz);
-  const win = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.2), new THREE.MeshBasicMaterial({ color: 0xbcd4e8 })); win.position.set(RC.x + 0.4, 1.4, RC.z - RD / 2 + 0.01); ROOM.add(win); bx(1.5, 0.06, 0.08, 0xf8f6f0, RC.x + 0.4, 0.78, RC.z - RD / 2 + 0.04);
-  const lt = new THREE.PointLight(0xfff4e0, 9, 12, 1.4); lt.position.set(RC.x, RH - 0.2, RC.z); ROOM.add(lt); }
-scene.add(new THREE.HemisphereLight(0xfff8f0, 0x3a3028, 0.35));
 
 // ---------- slate labels: the top of each layer, and the fossil you are looking at ----------
 function slate(lines, w = 760) { const c = document.createElement("canvas"); c.width = w; c.height = 40 + lines.length * 44; const g = c.getContext("2d"); g.fillStyle = "rgba(10,24,36,.85)"; g.beginPath(); g.roundRect(0, 0, w, c.height, 18); g.fill();
@@ -32,7 +18,7 @@ const STRAT_AT = ft => STRATA.find(s => ft >= s[1] && ft < s[2]) || STRATA[STRAT
 const SRC_TEXT = { isgs: "Depth and thickness from the Illinois State Geological Survey's map of the Bethalto Quadrangle, next to Glen Carbon.", typical: "Glacial deposits vary from yard to yard; this is a typical thickness for the uplands around Glen Carbon.", regional: "No deep well log for Glen Carbon was found, so this depth comes from regional Illinois Basin data and is approximate (the Bethalto map records Devonian limestone at 1,169 ft)." };
 const eyeW = V3(0, 0, 0);
 function whereAmI() { camera.getWorldPosition(eyeW); const y = eyeW.y - HOLE.position.y, belowFloor = -y / FT2M, dx = eyeW.x - HOLE.position.x, dz = eyeW.z - HOLE.position.z, inShaft = Math.hypot(dx, dz) < R_HOLE;
-  if (y > 0) return { y, place: arMode ? "In your room" : "In the room", belowFloor: 0 }; if (y > BASE_CEIL) return { y, place: "Inside the floor", belowFloor };
+  if (y > 0) return { y, place: arMode ? "In your room" : "In the living room", belowFloor: 0 }; if (y > BASE_CEIL) return { y, place: "Inside the floor", belowFloor };
   if (y > BASE_FLOOR) { const s = y < GRADE ? STRAT_AT(depthFt(y)) : null; return { y, place: "In the basement (made up)", belowFloor, s, behind: s ? `Behind the walls: ${s[0]}` : "" }; }
   const s = STRAT_AT(depthFt(y)); return { y, place: s[0], belowFloor, s, inShaft }; }
 
@@ -53,7 +39,7 @@ function layerStep(d) { const ft = depthFt(rig.position.y - HOLE.position.y + 1.
 function placeHole() { camera.getWorldPosition(eyeW); const f = V3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())); f.y = 0; f.normalize(); HOLE.position.set(eyeW.x + f.x * 1.2, rig.position.y > -0.01 ? 0 : HOLE.position.y, eyeW.z + f.z * 1.2); say("The hole is in front of you. Step into it and push the right stick down to climb down the ladder."); }
 let BTN = [], HOVER = null, wristFlash = null;
 function pressBtn(id) { wristFlash = id; setTimeout(() => { wristFlash = null; drawPanel(); }, 300);
-  if (id.startsWith("sp_")) { speedKey = id.slice(3); say(SPEEDS[speedKey][1]); } else if (id === "place") placeHole(); else if (id === "top") jumpTo(-6.3, "Back up in the room"); else if (id === "down") layerStep(1); else if (id === "upl") layerStep(-1);
+  if (id.startsWith("sp_")) { speedKey = id.slice(3); say(SPEEDS[speedKey][1]); } else if (id === "place") placeHole(); else if (id === "top") { fadeDo = () => { rig.position.y = HOLE.position.y; if (!renderer.xr.isPresenting) rig.position.set(-1.0, 0, 1.2); say(arMode ? "Back up in your room" : "Back up in the living room"); }; fadeT = 0; FADE.visible = true; } else if (id === "down") layerStep(1); else if (id === "upl") layerStep(-1);
   else if (id === "lbl") { showLabels = !showLabels; say(showLabels ? "Labels on" : "Labels off"); } else if (id === "vig") { comfortVig = !comfortVig; say(comfortVig ? "Comfort vignette on" : "Comfort vignette off"); } else if (id === "help") HELP.style.display = HELP.style.display === "block" ? "none" : "block";
   else if (id.startsWith("lm")) { const L = LANDMARKS[+id.slice(2)]; jumpTo(L[1], L[0]); } else if (id.startsWith("st")) { const s = STRATA[+id.slice(2)]; jumpTo(Math.max(s[1], TOP_FT + 1), s[0]); } drawPanel(); }
 
@@ -97,13 +83,13 @@ addEventListener("keydown", e => { keys[e.code] = true; if (!started) return; if
 addEventListener("keyup", e => keys[e.code] = false);
 let drag = null; renderer.domElement.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY }; begin(); });
 addEventListener("pointermove", e => { if (!drag) return; yaw -= (e.clientX - drag.x) * 0.004; pitch = clampN(pitch - (e.clientY - drag.y) * 0.004, -1.5, 1.5); drag.x = e.clientX; drag.y = e.clientY; }); addEventListener("pointerup", () => drag = null);
-function begin() { if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); if (!renderer.xr.isPresenting) { rig.position.set(-1.3, 0, 0.7); } drawPanel(); say(arMode ? "A hole 5 ft across has opened in your floor. Step into it and push the right stick down to climb down the ladder. The menu is on your left wrist." : "A hole 5 ft across has opened in the floor. Walk into it (W A S D) and press F to climb down the ladder.", 8); }
+function begin() { if (started) return; started = true; document.getElementById("intro")?.classList.add("gone"); if (!renderer.xr.isPresenting) { rig.position.set(-1.0, 0, 1.2); yaw = -0.93; pitch = -0.35; } drawPanel(); say(arMode ? "A hole 5 ft across has opened in your floor. Step into it and push the right stick down to climb down the ladder. The menu is on your left wrist." : "A hole 5 ft across has opened in the living-room floor. Walk into it (W A S D) and press F to climb down the ladder. The room stays where it is, so it rises above you as you go down.", 8); }
 document.getElementById("intro")?.addEventListener("click", begin);
 
 // ---------- headsets: mixed reality if the headset can show your room, otherwise VR ----------
 const VRB = document.getElementById("vr");
-async function enterXR(mode) { const s = await navigator.xr.requestSession(mode, { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); arMode = mode === "immersive-ar"; await renderer.xr.setSession(s); rig.position.set(0, 0, 0); camera.position.set(0, 0, 0); ROOM.visible = !arMode; scene.background = arMode ? null : new THREE.Color(0x1a1c1e); begin(); if (arMode) setTimeout(placeHole, 600); else HOLE.position.set(1.3, 0, -0.7); drawPanel();
-  s.addEventListener("end", () => { arMode = false; ROOM.visible = true; scene.background = new THREE.Color(0x1a1c1e); camera.position.set(0, 1.6, 0); HOLE.position.set(0, 0, 0); rig.position.set(-1.3, 0, 0.7); }); }
+async function enterXR(mode) { const s = await navigator.xr.requestSession(mode, { optionalFeatures: ["local-floor"] }); renderer.xr.setReferenceSpaceType("local-floor"); arMode = mode === "immersive-ar"; await renderer.xr.setSession(s); rig.position.set(0, 0, 0); camera.position.set(0, 0, 0); ROOM.visible = !arMode; scene.background = arMode ? null : new THREE.Color(0x1a1c1e); if (!arMode) rig.position.set(-1.0, 0, 1.2); begin(); if (arMode) setTimeout(placeHole, 600); drawPanel();
+  s.addEventListener("end", () => { arMode = false; ROOM.visible = true; scene.background = new THREE.Color(0x1a1c1e); camera.position.set(0, 1.6, 0); HOLE.position.set(0, 0, 0); rig.position.set(-1.0, 0, 1.2); }); }
 if (navigator.xr) { navigator.xr.isSessionSupported("immersive-ar").then(ar => { if (ar) { VRB.textContent = "Enter mixed reality"; VRB.style.display = "block"; VRB.onclick = () => enterXR("immersive-ar"); } else navigator.xr.isSessionSupported("immersive-vr").then(vr => { if (!vr) return; VRB.style.display = "block"; VRB.onclick = () => enterXR("immersive-vr"); }); }).catch(() => {}); }
 scene.background = new THREE.Color(0x1a1c1e);
 const HANDS = [0, 1].map(i => { const grip = renderer.xr.getControllerGrip(i); rig.add(grip); const hand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.11), M(0xd8b090)); grip.add(hand); grip.addEventListener("connected", e => { if (e.data.handedness === "left") { PANEL.me.position.set(0, 0.06, 0.06); PANEL.me.rotation.set(-1.0, 0, 0); grip.add(PANEL.me); drawPanel(); } }); return grip; });
@@ -114,7 +100,7 @@ function updatePointer() { if (!renderer.xr.isPresenting || !PANEL.me.parent) re
 
 // ---------- moving: walking where there is floor, and climbing only on the ladder in the hole ----------
 const inHoleXZ = (x, z, m = 0.15) => Math.hypot(x - HOLE.position.x, z - HOLE.position.z) < R_HOLE - m;
-const inRoomXZ = (x, z) => Math.abs(x - RC.x) < RW / 2 - 0.25 && Math.abs(z - RC.z) < RD / 2 - 0.25 && !(Math.abs(x - RC.x - 0.3) < 1.2 && z > RC.z + RD / 2 - 1.85);
+const inRoomXZ = (x, z) => HOUSE_OK(x - HOLE.position.x, z - HOLE.position.z);
 const inBaseXZ = (x, z) => Math.abs(x - HOLE.position.x - BOFF.x) < BW / 2 - 0.3 && Math.abs(z - HOLE.position.z - BOFF.z) < BD / 2 - 0.3;
 function canStand(x, z, y) { const ly = y - HOLE.position.y; if (inHoleXZ(x, z)) return true; if (arMode) return true; if (ly > -0.01) return inRoomXZ(x, z); if (Math.abs(ly - BASE_FLOOR) < 0.01) return inBaseXZ(x, z); return false; }
 let snapReady = true;
@@ -134,7 +120,7 @@ const clock = new THREE.Clock(); let frame = 0, lookT = 0;
 function lookAtFossil() { camera.getWorldPosition(eyeW); const fw = V3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())); let best = null, bs = 0.12; const p = V3(0, 0, 0);
   for (const F of FOSSILS) { p.copy(F.p).add(HOLE.position); if (Math.abs(p.y - eyeW.y) > 3) continue; const d = p.sub(eyeW), L = d.length(); if (L > 3) continue; const ang = d.normalize().angleTo(fw); if (ang < bs) { bs = ang; best = F; } } return best; }
 renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), 0.1); frame++;
-  if (started) move(dt); updatePointer();
+  if (started) move(dt); updatePointer(); FAN.rotation.y += dt * 1.6; if (frame % 6 === 0 && ROOM.visible) drawTV(clock.elapsedTime);
   if (fadeT >= 0) { fadeT += dt; const o = fadeT < 0.25 ? fadeT / 0.25 : fadeT < 0.4 ? 1 : 1 - (fadeT - 0.4) / 0.25; FADE.material.opacity = clampN(o, 0, 1); if (fadeT >= 0.25 && fadeDo) { fadeDo(); fadeDo = null; } if (fadeT > 0.65) { fadeT = -1; FADE.visible = false; } }
   VIG.material.opacity = lerpN(VIG.material.opacity, comfortVig && Math.abs(climbV) > 0.6 ? clampN((Math.abs(climbV) - 0.6) / 3, 0.35, 0.85) : 0, 0.1); VIG.visible = VIG.material.opacity > 0.01;
   camera.getWorldPosition(eyeW); const ly = eyeW.y - HOLE.position.y; setPortal(ly > 0.02);

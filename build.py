@@ -981,7 +981,7 @@ HL = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>A hol
 i0, i1 = HL.index('<div id="intro">'), HL.index('<button id="vr">')
 HL = HL[:i0] + """<div id="intro"><div class="card">
   <h1>A hole through the floor</h1>
-  <p>A round hole 5 ft across opens in your floor. A ladder goes down through a basement and on down a shaft lit by lamps every 10 ft,
+  <p>A round hole 5 ft across opens in the living-room floor of a 1980s ranch house in Glen Carbon. As you climb down, the room stays where it is and rises above you. A ladder goes down through a basement and on down a shaft lit by lamps every 10 ft,
   through the real layers of rock under Glen Carbon, Illinois: ice-age loess and till, the shales, limestones and coals of the Pennsylvanian
   (Glen Carbon's mines worked the Herrin Coal, about 150 ft down), the Mississippian limestones full of crinoids, and on down past the
   Devonian, Silurian, Ordovician and Cambrian to granite 4,400 ft below. Each layer is at its real depth, with the fossils found in it set in the wall.</p>
