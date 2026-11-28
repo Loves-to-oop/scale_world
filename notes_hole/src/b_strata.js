@@ -18,7 +18,7 @@ const STRATA = [
   ["Shelburn Formation (shale)", 130, 141, "about 307 million years", "red and green claystone and limestone above the Brereton", "shale", "#6e6a62", [], "isgs"],
   ["Brereton Limestone", 141, 147, "about 307 million years", "dark gray, micritic, iron-stained limestone: the base of the Shelburn", "limestone", "#6a6a66", ["brachiopod"], "isgs"],
   ["Anna Shale", 147, 150, "about 307 million years", "black, marine shale, the sea flooding the coal swamp", "blackshale", "#26262a", ["lingula"], "isgs"],
-  ["Herrin (No. 6) Coal", 150, 156, "about 308 million years", "the coal Glen Carbon's mines worked, and the town's name means coal valley: black, vitreous, bituminous, 6 ft thick, with a bluish clay 'blue band' near its base", "coal", "#141210", ["lepidodendron", "calamites"], "isgs"],
+  ["Herrin (No. 6) Coal", 150, 156, "about 308 million years", "the coal Glen Carbon's mines worked (Madison No. 2 found it 85-93 ft down, 6.5-7 ft thick), and the town's name means coal valley: black, vitreous, bituminous, 6 ft thick, with a bluish clay 'blue band' near its base", "coal", "#141210", ["lepidodendron", "calamites"], "isgs"],
   ["Carbondale Formation (shale)", 156, 225, "about 308 million years", "gray shale and claystone with carbonized roots below the coals; sporadic sandstone", "shale", "#7a7a72", ["fern", "calamites"], "isgs"],
   ["Hanover Limestone", 225, 228, "about 309 million years", "dark to medium gray nodular limestone, up to 3 ft thick, full of brachiopods", "limestone", "#76766e", ["brachiopod"], "isgs"],
   ["Carbondale Formation (shale)", 228, 268, "about 309 million years", "shale and claystone", "shale", "#82827a", ["fern"], "isgs"],
@@ -64,6 +64,12 @@ const FOSSIL_INFO = { snail: ["Land snails", "Tiny shells of snails that lived o
   nautiloid: ["Straight nautiloids", "Relatives of the squid with long cone-shaped shells, divided into chambers."], stromatolite: ["Stromatolites and oncolites", "Layered mounds (stromatolites) and balls (oncolites) built by mats of microbes in shallow water: the oldest kind of fossil."], burrow: ["Worm burrows", "Tunnels left in the sea-floor mud by animals; their bodies were too soft to be preserved."] };
 
 
+// Glen Carbon itself: Madison Coal Co.'s Mine No. 2 (1891-1931, its shaft a few hundred yards east of Glenwood Drive) found the Herrin Coal 85-93 ft
+// below its shaft, about 388 ft above sea level; Glenwood Drive is about 479 ft, so here the coal is about 90 ft down. The Bethalto column above puts it at
+// 150 ft, so everything from the top of the bedrock down to the granite is raised 60 ft, and the beds that would rise into the glacial deposits are gone.
+{ const SHIFT = 60, DRIFT = 48; for (const s of STRATA) { if (s[1] < DRIFT || s[8] === "seismic") continue; s[1] -= SHIFT; if (!s[0].startsWith("Precambrian")) s[2] -= SHIFT; }
+  for (let i = STRATA.length - 1; i >= 0; i--) { const s = STRATA[i]; if (s[8] === "seismic" || s[1] >= DRIFT || s[0].startsWith("Peoria") || s[0].startsWith("Roxana") || s[0].startsWith("Sangamon") || s[0].startsWith("Glasford")) continue; if (s[2] <= DRIFT) STRATA.splice(i, 1); else s[1] = DRIFT; }
+  const her = STRATA.find(s => s[0].startsWith("Herrin")); her[2] = her[1] + 6.5; const nx = STRATA[STRATA.indexOf(her) + 1]; nx[1] = her[2]; }
 // rock features rather than fossils in the deep layers
 const ROCKY = new Set(["pegmatite", "dike", "gneiss", "garnet", "peridotite", "geode", "chert", "pebble"]);
 // the temperature of the rock (deg C) at a depth below the ground outside, from heat flow (about 50 mW per square metre in southwestern Illinois) and
