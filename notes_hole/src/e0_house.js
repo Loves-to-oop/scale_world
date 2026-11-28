@@ -99,4 +99,4 @@ HB(0.02, 0.12, 0.08, M_WHITE, LR[1] - 0.01, 1.45, -4.25);
 const H_RECTS = [[-3.4, 2.1, -2.6, 1.7], [-3.4, 1.15, -6.0, -2.6], [1.15 + WT, 2.1, -6.0, -2.6]], H_DOORS = [[-2.4, -0.8, -2.95, -2.25], [1.25, 2.05, -2.95, -2.25]];
 const H_BLOCK = [[-3.4, -2.42, -1.85, 1.5], [-2.08, -1.48, -0.82, 0.42], [LR[1] - 0.47, 2.1, -1.22, 0.42], [-0.05, 0.95, -2.6, -1.5], [0.85, 1.15, -2.5, -2.2], [-3.4, 1.1, -6.0, -5.25], [-2.35, -0.85, -4.3, -2.9], [LR[0], LR[0] + 0.45, LR[3] - 0.45, LR[3]]];
 function HOUSE_OK(x, z) { const m = 0.22; const inR = H_RECTS.some(([a, b, c, d]) => x > a + m && x < b - m && z > c + m && z < d - m) || H_DOORS.some(([a, b, c, d]) => x > a + m && x < b - m && z > c && z < d); return inR && !H_BLOCK.some(([a, b, c, d]) => x > a - m && x < b + m && z > c - m && z < d + m); }
-scene.add(new THREE.HemisphereLight(0xfff8f0, 0x3a3028, 0.3));
+const HEMI = new THREE.HemisphereLight(0xfff8f0, 0x3a3028, 0.3); scene.add(HEMI);
