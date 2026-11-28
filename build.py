@@ -981,13 +981,13 @@ HL = CAT.replace("<title>A day in Çatalhöyük, 7000 BC</title>", "<title>A hol
 i0, i1 = HL.index('<div id="intro">'), HL.index('<button id="vr">')
 HL = HL[:i0] + """<div id="intro"><div class="card">
   <h1>A hole through the floor</h1>
-  <p>A round hole 5 ft across opens in the living-room floor of a 1980s ranch house in Glen Carbon. As you climb down, the room stays where it is and rises above you. A ladder goes down through a basement and on down a shaft lit by lamps every 10 ft,
+  <p>A round hole 5 ft across opens in the living-room floor of a 1980s ranch house in Glen Carbon. As you ride down, the room stays where it is and rises above you. A round lift with a railing takes you down through a basement and on down a shaft lit by lamps every 10 ft,
   through the real layers of rock under Glen Carbon, Illinois: ice-age loess and till, the shales, limestones and coals of the Pennsylvanian
   (Glen Carbon's mines worked the Herrin Coal, about 150 ft down), the Mississippian limestones full of crinoids, and on down past the
   Devonian, Silurian, Ordovician and Cambrian to granite 4,400 ft below. Each layer is at its real depth, with the fossils found in it set in the wall.</p>
-  <p>On a Quest there are two buttons. <b>Enter VR</b> puts you in the living room, and it rises above you as you climb down. <b>Enter mixed reality</b> puts the hole in your own floor: your room stays around it, and the ladder goes down through the opening.
-  Right stick up and down climbs; the left trigger goes five times faster; the menu and the layer you are in are on your left wrist.</p>
-  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk, drag to look, <kbd>R</kbd> climb up, <kbd>F</kbd> climb down, <kbd>[</kbd> <kbd>]</kbd> layer by layer, <kbd>V</kbd> comfort vignette.</p>
+  <p>On a Quest there are two buttons. <b>Enter VR</b> puts you in the living room, and it rises above you as you ride down. <b>Enter mixed reality</b> puts the hole in your own floor: your room stays around it, and the lift goes down through the opening.
+  Step onto the lift, point at its yellow control box and pull the trigger on UP, STOP or DOWN (or hold the right stick); the menu and the layer you are in are on your left wrist.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk, drag to look, <kbd>R</kbd> lift up, <kbd>F</kbd> lift down, <kbd>space</kbd> stop, <kbd>[</kbd> <kbd>]</kbd> layer by layer, <kbd>V</kbd> comfort vignette.</p>
   <p class="dim">Layers to 770 ft: Illinois State Geological Survey, Bethalto Quadrangle. Deeper layers: regional Illinois Basin column, approximate. The basement is made up. Click to begin.</p>
 </div></div>
 """ + HL[i1:]

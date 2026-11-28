@@ -1,4 +1,4 @@
-// hole.js -- A hole through your floor, in mixed reality: a 5-ft shaft opens in your real floor, a ladder goes down through a (made-up)
+// hole.js -- A hole through your floor, in mixed reality: a 5-ft shaft opens in your real floor, a lift goes down through a (made-up)
 // basement and on down a lit shaft through the real rock under Glen Carbon, Illinois: the glacial loess and till, the coal-bearing Pennsylvanian
 // shales and coals that Glen Carbon mined, the Mississippian limestones full of crinoids, and on down to granite 4,400 ft below. Fossils are set in
 // the walls where they occur. In a headset that can show your room (Quest), the shaft is drawn only through the hole, so your real floor stays

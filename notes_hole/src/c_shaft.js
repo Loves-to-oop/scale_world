@@ -56,17 +56,35 @@ STRATA.forEach(([name, top, bot, age, rock, kind, col], i) => { const t0 = Math.
   const m = addU(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tx.map, normalMap: tx.normal, normalScale: new THREE.Vector2(1.2, 1.2), side: THREE.BackSide, roughness: kind === "coal" ? 0.6 : 0.92, metalness: 0 }))); m.position.y = (y0 + y1) / 2; SHAFT.push({ i, y0, y1, mesh: m }); });
 { const g = addU(new THREE.Mesh(new THREE.CircleGeometry(R_HOLE, 40).rotateX(-Math.PI / 2), (() => { const t = rockPhotoTex("granite", "#b88a7a", 99); return new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normal, roughness: 0.8 }); })())); g.position.y = yOfFt(BOTTOM_FT); }
 
-// ---------- the ladder: steel rails and rungs every foot, from a metre above your floor to the bottom ----------
-const LAD_X = R_HOLE - 0.18, LAD_TOP = 1.05, LAD_BOT = yOfFt(BOTTOM_FT);
-{ const st = M(0x8a8c88, { metalness: 0.7, roughness: 0.35 }), stU = under(M(0x8a8c88, { metalness: 0.7, roughness: 0.35 }));
-  for (const z of [-0.23, 0.23]) { const a = new THREE.Mesh(new THREE.BoxGeometry(0.05, LAD_TOP, 0.025), st); a.position.set(LAD_X, LAD_TOP / 2, z); HOLE.add(a); const b = new THREE.Mesh(new THREE.BoxGeometry(0.05, -LAD_BOT, 0.025), stU); b.position.set(LAD_X, LAD_BOT / 2, z); b.renderOrder = 1; HOLE.add(b);
-    const top = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.014, 8, 16, Math.PI), st); top.position.set(LAD_X + 0.05, LAD_TOP, z); top.rotation.set(0, Math.PI / 2, Math.PI / 2); HOLE.add(top); }
-  const n = Math.floor((-LAD_BOT) / FT2M), rungs = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.014, 0.014, 0.46, 8).rotateX(Math.PI / 2), stU, n), m4 = new THREE.Matrix4(); for (let k = 0; k < n; k++) { m4.makeTranslation(LAD_X, -k * FT2M - 0.15, 0); rungs.setMatrixAt(k, m4); } rungs.renderOrder = 1; HOLE.add(rungs);
-  for (let k = 1; k <= 3; k++) { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.46, 8).rotateX(Math.PI / 2), st); r.position.set(LAD_X, k * 0.3 - 0.05, 0); HOLE.add(r); } }
+// ---------- the lift: a round steel platform with a railing, climbing two toothed guide rails on the shaft wall like a construction hoist ----------
+// At the top it sits flush with your floor. A yellow control box on the railing has up, stop and down buttons; it starts and stops gently.
+const LAD_BOT = yOfFt(BOTTOM_FT), PLAT = { y: 0, v: 0, dir: 0 }, GAP_A = 2.265, GAP_H = 0.5, LIFTMATS = [];
+function liftMat(mat) { mat.stencilWrite = true; mat.stencilRef = 1; mat.stencilFunc = THREE.AlwaysStencilFunc; mat.stencilFail = mat.stencilZFail = mat.stencilZPass = THREE.KeepStencilOp; LIFTMATS.push(mat); return mat; }
+const angDiff = (a, b) => Math.abs(((a - b + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+{ const rack = texOf((g, w, h) => { g.fillStyle = "#7a7c78"; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 16) { g.fillStyle = "#a8aaa6"; g.fillRect(0, y, w, 8); g.fillStyle = "#4a4c48"; g.fillRect(0, y + 8, w, 2); } }, 32, 64);
+  const H = -LAD_BOT, rk = rack.clone(); rk.needsUpdate = true; rk.repeat.set(1, H / 0.05);
+  for (const z of [-0.18, 0.18]) { const r = addU(new THREE.Mesh(new THREE.BoxGeometry(0.03, H, 0.05), M(0xffffff, { map: rk, metalness: 0.6, roughness: 0.4 }))); r.position.set(R_HOLE - 0.025, LAD_BOT / 2 - 0.06, z); } }
+const LIFT = new THREE.Group(); HOLE.add(LIFT);
+const LBTN = [];
+{ const plate = texOf((g, w, h) => { g.fillStyle = "#8e9094"; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 16) for (let x = (y / 16) % 2 * 8; x < w; x += 16) { g.save(); g.translate(x, y); g.rotate(((x + y) / 16) % 2 ? 0.8 : -0.8); g.fillStyle = "#b4b6ba"; g.fillRect(-5, -1.5, 10, 3); g.fillStyle = "#5e6064"; g.fillRect(-5, 1.5, 10, 1); g.restore(); } for (let k = 0; k < 600; k++) { g.fillStyle = `rgba(${Math.random() < 0.5 ? "40,40,40" : "220,220,220"},0.12)`; g.fillRect(Math.random() * w, Math.random() * h, 2, 2); } }, 256, 256); plate.repeat.set(3, 3);
+  const steel = liftMat(M(0x8a8c90, { metalness: 0.6, roughness: 0.45 })), yel = liftMat(M(0xe8b818, { roughness: 0.5 })), add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.renderOrder = 1; LIFT.add(m); return m; };
+  add(new THREE.CylinderGeometry(0.68, 0.68, 0.06, 56), [liftMat(M(0x6a6c70, { metalness: 0.6, roughness: 0.5 })), liftMat(M(0xffffff, { map: plate, bumpMap: plate, bumpScale: 2, metalness: 0.55, roughness: 0.5 })), liftMat(M(0x4a4c50, { metalness: 0.5 }))], 0, -0.03, 0);
+  add(new THREE.CylinderGeometry(0.66, 0.6, 0.22, 40, 1, true), steel, 0, -0.17, 0); add(new THREE.BoxGeometry(0.22, 0.3, 0.5), yel, 0.52, -0.24, 0);
+  for (const z of [-0.18, 0.18]) add(new THREE.BoxGeometry(0.12, 0.16, 0.1), steel, 0.66, -0.1, z);
+  const arc = Math.PI * 2 - GAP_H * 2, start = GAP_A + GAP_H, rail = (r, y, tube) => { const m = add(new THREE.TorusGeometry(r, tube, 8, 80, arc).rotateX(Math.PI / 2), yel, 0, y, 0); m.rotation.y = -start; };
+  rail(0.64, 1.05, 0.022); rail(0.64, 0.55, 0.016);
+  for (let k = 0; k <= 10; k++) { const a = start + arc * k / 10; add(new THREE.CylinderGeometry(0.018, 0.018, 1.05, 10), yel, Math.cos(a) * 0.64, 0.525, Math.sin(a) * 0.64); }
+  const kick = add(new THREE.CylinderGeometry(0.655, 0.655, 0.1, 64, 1, true, Math.PI / 2 - start - arc, arc), liftMat(M(0xe8b818, { roughness: 0.6, side: THREE.DoubleSide })), 0, 0.05, 0);
+  const bar = add(new THREE.CylinderGeometry(0.015, 0.015, 2 * 0.64 * Math.sin(GAP_H), 8), liftMat(M(0xe8d020, { emissive: 0x302800 })), Math.cos(GAP_A) * 0.64 * Math.cos(GAP_H), 0.95, Math.sin(GAP_A) * 0.64 * Math.cos(GAP_H)); bar.quaternion.setFromUnitVectors(UP, V3(-Math.sin(GAP_A), 0, Math.cos(GAP_A))); bar.visible = false; LIFT.userData.bar = bar;
+  // the control box, beside the gap, facing the middle of the platform
+  const ca = GAP_A - GAP_H - 0.3, box = new THREE.Group(); box.position.set(Math.cos(ca) * 0.6, 1.0, Math.sin(ca) * 0.6); box.lookAt(0, 1.0, 0); LIFT.add(box);
+  const face = texOf((g, w, h) => { g.fillStyle = "#e8b818"; g.fillRect(0, 0, w, h); g.fillStyle = "#1a1a1a"; g.font = "bold 22px Helvetica, sans-serif"; g.textAlign = "left"; g.fillText("UP", 78, 50); g.fillText("STOP", 78, 104); g.fillText("DOWN", 78, 158); g.font = "bold 13px Helvetica, sans-serif"; g.fillText("LIFT", 10, 186); g.strokeStyle = "#1a1a1a"; g.lineWidth = 3; g.strokeRect(2, 2, w - 4, h - 4); }, 160, 200);
+  const bm = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.07), yel); bm.renderOrder = 1; box.add(bm); const fp = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.2), liftMat(new THREE.MeshStandardMaterial({ map: face, roughness: 0.6 }))); fp.position.z = 0.0355; fp.renderOrder = 2; box.add(fp);
+  for (const [id, yy, col] of [["up", 0.062, 0x20a040], ["stop", 0.008, 0xd02020], ["down", -0.046, 0x20a040]]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.02, 20).rotateX(Math.PI / 2), liftMat(M(col, { emissive: col, emissiveIntensity: 0.25, roughness: 0.3 }))); b.position.set(-0.035, yy, 0.045); b.renderOrder = 2; box.add(b); b.userData.id = id; LBTN.push(b); }
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.0, 10), yel); pole.position.set(Math.cos(ca) * 0.6, 0.5, Math.sin(ca) * 0.6); pole.renderOrder = 1; LIFT.add(pole); }
 
-// ---------- lamps down the opposite wall, one every 10 ft; the three nearest you really light the rock ----------
 const LAMP_SP = 10 * FT2M, LAMPS = [];
 { const n = Math.floor((BASE_FLOOR - 1.2 - LAD_BOT) / LAMP_SP), bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.035, 10, 8), under(new THREE.MeshBasicMaterial({ color: 0xfff0c0 })), n), cages = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.05, 0.06, 0.12, 8, 1, true), under(M(0x3a3a38, { wireframe: true })), n), m4 = new THREE.Matrix4();
-  for (let k = 0; k < n; k++) { const y = BASE_FLOOR - 1.2 - k * LAMP_SP, a = Math.PI + (k % 2 ? 0.25 : -0.25), p = V3(Math.cos(a) * (R_HOLE - 0.08), y, Math.sin(a) * (R_HOLE - 0.08)); LAMPS.push(p); m4.makeTranslation(p.x, p.y, p.z); bulbs.setMatrixAt(k, m4); cages.setMatrixAt(k, m4); }
+  for (let k = 0; k < n; k++) { const y = BASE_FLOOR - 1.2 - k * LAMP_SP, a = Math.PI + (k % 2 ? 0.25 : -0.25), p = V3(Math.cos(a) * (R_HOLE - 0.01), y, Math.sin(a) * (R_HOLE - 0.01)); LAMPS.push(p); m4.makeTranslation(p.x, p.y, p.z); bulbs.setMatrixAt(k, m4); cages.setMatrixAt(k, m4); }
   bulbs.renderOrder = cages.renderOrder = 1; HOLE.add(bulbs, cages); }
 const LIGHTS = [0, 1, 2, 3].map(() => { const l = new THREE.PointLight(0xffe2b0, 3.5, 7, 1.5); HOLE.add(l); return l; });
