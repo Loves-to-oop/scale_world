@@ -12,6 +12,16 @@ function rockTex(kind, col, seed) { const c = document.createElement("canvas"); 
   else if (kind === "dolomite") { for (let i = 0; i < 3500; i++) { g.fillStyle = sh((r() - 0.5) * 0.16, 0.7); g.fillRect(r() * 256, r() * 256, 1.5, 1.5); } for (let i = 0; i < 25; i++) { g.fillStyle = "rgba(40,30,20,0.5)"; g.beginPath(); g.ellipse(r() * 256, r() * 256, 2 + r() * 5, 1.5 + r() * 3, 0, 0, 7); g.fill(); } for (let y = 0; y < 256; y += 60 + r() * 30) { g.fillStyle = sh(-0.1, 0.7); g.fillRect(0, y, 256, 2); } }
   else if (kind === "granite") { for (let i = 0; i < 5000; i++) { const v = r(); g.fillStyle = v < 0.5 ? "#c8907a" : v < 0.8 ? "#a8a8a4" : v < 0.93 ? "#e8d8c8" : "#1e1e20"; g.fillRect(r() * 256, r() * 256, 1 + r() * 3, 1 + r() * 3); } }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
+// photo-scanned rock and soil (ambientCG, CC0), tinted to each layer's colour and brightness, with the layer's own bedding laid over it; normal maps
+// give the walls real relief under the lamps. If the photos can't load, the drawn textures above are used alone.
+const ROCKSRC = { loess: "Ground054", soil: "Ground103", till: "Ground079L", shale: "Rock061", blackshale: "Rock061", coal: "Rock035", limestone: "Rock030", sandstone: "Ground104", dolomite: "Rock062", granite: "Granite005A" };
+const HOLE_TEX = __HOLE_TEX__;
+const loadImg = src => new Promise(res => { src = HOLE_TEX[src.split("/").pop()] || src; const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+const ROCKIMG = {}; await Promise.all([...new Set(Object.values(ROCKSRC))].map(async id => { const [c, n] = await Promise.all([loadImg(`tex/hole/${id}_c.jpg`), loadImg(`tex/hole/${id === "Granite005A" ? "Rock030" : id}_n.jpg`)]); if (!c) return; const s = document.createElement("canvas"); s.width = s.height = 16; const sg = s.getContext("2d"); sg.drawImage(c, 0, 0, 16, 16); let px; try { px = sg.getImageData(0, 0, 16, 16).data; } catch (e) { return; } let L = 0; for (let i = 0; i < px.length; i += 4) L += 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]; let nt = null; if (n) { nt = new THREE.Texture(n); nt.wrapS = nt.wrapT = THREE.RepeatWrapping; nt.needsUpdate = true; } ROCKIMG[id] = { c, lum: L / 256 / 255, n: nt }; }));
+function rockPhotoTex(kind, col, seed) { const P = ROCKIMG[ROCKSRC[kind]], proc = rockTex(kind, col, seed); if (!P) return { map: proc, normal: null };
+  const c = document.createElement("canvas"); c.width = c.height = 512; const g = c.getContext("2d"), cc = new THREE.Color(col), tl = 0.299 * cc.r + 0.587 * cc.g + 0.114 * cc.b; g.filter = `brightness(${clampN(tl / Math.max(P.lum, 0.02), 0.3, 3.5).toFixed(2)})`; g.drawImage(P.c, 0, 0, 512, 512); g.filter = "none";
+  g.globalCompositeOperation = "color"; g.globalAlpha = kind === "granite" ? 0.5 : 0.85; g.fillStyle = col; g.fillRect(0, 0, 512, 512); g.globalCompositeOperation = "soft-light"; g.globalAlpha = 0.45; g.drawImage(proc.image, 0, 0, 512, 512); g.globalCompositeOperation = "source-over"; g.globalAlpha = 1; proc.dispose();
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return { map: t, normal: P.n }; }
 function texOf(draw, w = 256, h = 256) { const c = document.createElement("canvas"); c.width = w; c.height = h; draw(c.getContext("2d"), w, h); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
 
 // ---------- the opening in your floor (writes the stencil), its rim, and the floor structure it cuts through ----------
@@ -42,9 +52,9 @@ const BW = 12.3, BD = 7.9, BOFF = V3(2.65, 0, -2.15);
 
 // ---------- the shaft below the basement: every layer at its real depth, the 5-ft bore through it ----------
 const SHAFT = [], TOP_FT = depthFt(BASE_FLOOR), BOTTOM_FT = STRATA[STRATA.length - 1][2];
-STRATA.forEach(([name, top, bot, age, rock, kind, col], i) => { const t0 = Math.max(top, TOP_FT); if (bot <= t0) return; const y0 = yOfFt(t0), y1 = yOfFt(bot), h = y0 - y1, tx = rockTex(kind, col, i * 37 + 5); tx.repeat.set(4, Math.max(1, h / 1.4));
-  const m = addU(new THREE.Mesh(new THREE.CylinderGeometry(R_HOLE, R_HOLE, h, 40, 1, true), new THREE.MeshStandardMaterial({ map: tx, side: THREE.BackSide, roughness: kind === "coal" ? 0.7 : 0.92, metalness: 0 }))); m.position.y = (y0 + y1) / 2; SHAFT.push({ i, y0, y1, mesh: m }); });
-{ const g = addU(new THREE.Mesh(new THREE.CircleGeometry(R_HOLE, 40).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: rockTex("granite", "#b88a7a", 99), roughness: 0.8 }))); g.position.y = yOfFt(BOTTOM_FT); }
+STRATA.forEach(([name, top, bot, age, rock, kind, col], i) => { const t0 = Math.max(top, TOP_FT); if (bot <= t0) return; const y0 = yOfFt(t0), y1 = yOfFt(bot), h = y0 - y1, tx = rockPhotoTex(kind, col, i * 37 + 5), geo = new THREE.CylinderGeometry(R_HOLE, R_HOLE, h, 40, 1, true), uv = geo.attributes.uv; for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * 4, uv.getY(k) * h / 1.2);
+  const m = addU(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tx.map, normalMap: tx.normal, normalScale: new THREE.Vector2(1.2, 1.2), side: THREE.BackSide, roughness: kind === "coal" ? 0.6 : 0.92, metalness: 0 }))); m.position.y = (y0 + y1) / 2; SHAFT.push({ i, y0, y1, mesh: m }); });
+{ const g = addU(new THREE.Mesh(new THREE.CircleGeometry(R_HOLE, 40).rotateX(-Math.PI / 2), (() => { const t = rockPhotoTex("granite", "#b88a7a", 99); return new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normal, roughness: 0.8 }); })())); g.position.y = yOfFt(BOTTOM_FT); }
 
 // ---------- the ladder: steel rails and rungs every foot, from a metre above your floor to the bottom ----------
 const LAD_X = R_HOLE - 0.18, LAD_TOP = 1.05, LAD_BOT = yOfFt(BOTTOM_FT);

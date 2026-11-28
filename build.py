@@ -991,5 +991,7 @@ HL = HL[:i0] + """<div id="intro"><div class="card">
   <p class="dim">Layers to 770 ft: Illinois State Geological Survey, Bethalto Quadrangle. Deeper layers: regional Illinois Basin column, approximate. The basement is made up. Click to begin.</p>
 </div></div>
 """ + HL[i1:]
-(HERE / "hole.html").write_text(HL.replace("__THREE__", three).replace("__SCENE__", (HERE / "hole.js").read_text(encoding="utf-8")), encoding="utf-8")
+import base64, json as _json
+_ht = {p.name: "data:image/jpeg;base64," + base64.b64encode(p.read_bytes()).decode() for p in sorted((HERE / "tex" / "hole").glob("*.jpg"))}
+(HERE / "hole.html").write_text(HL.replace("__THREE__", three).replace("__SCENE__", (HERE / "hole.js").read_text(encoding="utf-8").replace("__HOLE_TEX__", _json.dumps(_ht))), encoding="utf-8")
 print("  wrote hole.html")
